@@ -6,8 +6,10 @@ export function loadConfig(): EnvConfig {
   const PORT = parseInt(process.env.PORT || '4000', 10);
   const NODE_ENV = process.env.NODE_ENV || 'development';
 
-  const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
-    ? process.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim())
+  // Defaults differ for production vs development to avoid common misconfig
+  const isProd = (process.env.NODE_ENV || 'development') === 'production';
+  const defaultAllowedOrigins = isProd
+    ? ['https://app.arcwallet.network']
     : [
         'http://localhost:5173',
         'http://127.0.0.1:5173',
@@ -16,9 +18,13 @@ export function loadConfig(): EnvConfig {
         'http://localhost:3002'
       ];
 
-  const RP_ID = process.env.RP_ID || 'localhost';
+  const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
+    ? process.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim())
+    : defaultAllowedOrigins;
+
+  const RP_ID = process.env.RP_ID || (isProd ? 'app.arcwallet.network' : 'localhost');
   const RP_NAME = process.env.RP_NAME || 'Arc Wallet';
-  const ORIGIN = process.env.ORIGIN || 'http://localhost:5173';
+  const ORIGIN = process.env.ORIGIN || (isProd ? 'https://app.arcwallet.network' : 'http://localhost:5173');
 
   const DB_PATH = process.env.DB_PATH || path.join(process.cwd(), 'data', 'wallet.db');
 
