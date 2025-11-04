@@ -3,9 +3,9 @@ import React, { useState } from 'react';
 import WalletSelectionScreen from './components/WalletSelectionScreen';
 import WalletSetupScreen from './components/WalletSetupScreen';
 import WalletDashboard from './components/WalletDashboard';
+import ErrorBoundary from './components/ErrorBoundary';
 import { WalletProvider, useWallet } from './contexts/WalletContext';
 import { ArcAccountProvider } from './contexts/ArcAccountContext';
-import { SmartAccountProvider } from './contexts/SmartAccountContext';
 import { ActivityProvider } from './contexts/ActivityContext';
 
 const AppContent: React.FC = () => {
@@ -33,15 +33,15 @@ const AppContent: React.FC = () => {
 
 const App: React.FC = () => {
   return (
-    <WalletProvider>
-      <ArcAccountProvider>
-        <SmartAccountProvider>
+    <ErrorBoundary>
+      <WalletProvider>
+        <ArcAccountProvider>
           <ActivityProvider>
             <AppContent />
           </ActivityProvider>
-        </SmartAccountProvider>
-      </ArcAccountProvider>
-    </WalletProvider>
+        </ArcAccountProvider>
+      </WalletProvider>
+    </ErrorBoundary>
   );
 };
 

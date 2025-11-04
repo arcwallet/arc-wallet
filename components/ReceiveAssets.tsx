@@ -2,12 +2,13 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useWallet } from '../contexts/WalletContext';
 import { CopyIcon, ChevronDownIcon } from './Icons';
 import QRCode from 'qrcode';
+import { getAllSupportedTokens, TokenInfo } from '../config/tokens';
 
 const ReceiveAssets: React.FC = () => {
     const { address } = useWallet();
     const walletAddress = address || "0x0000000000000000000000000000000000000000";
     const [copyButtonText, setCopyButtonText] = useState('Copy Address');
-    const [selectedToken, setSelectedToken] = useState('ARC');
+    const [selectedToken, setSelectedToken] = useState<TokenInfo>(getAllSupportedTokens()[0]);
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
     const handleCopyAddress = () => {
@@ -68,15 +69,20 @@ const ReceiveAssets: React.FC = () => {
             <div className="w-full flex flex-col gap-2 mt-4">
                 <label className="text-text-secondary text-sm font-normal px-1" htmlFor="token-select">Receiving Token</label>
                 <div className="relative">
-                    <select 
+                    <select
                         id="token-select"
-                        value={selectedToken}
-                        onChange={(e) => setSelectedToken(e.target.value)}
+                        value={selectedToken.symbol}
+                        onChange={(e) => {
+                            const token = getAllSupportedTokens().find(t => t.symbol === e.target.value);
+                            if (token) setSelectedToken(token);
+                        }}
                         className="w-full appearance-none rounded-lg border border-border-color bg-surface px-4 py-3 text-text-primary focus:border-primary focus:ring-primary/50 focus:ring-2 transition-all"
                     >
-                        <option>ARC</option>
-                        <option>ETH</option>
-                        <option>USDC</option>
+                        {getAllSupportedTokens().map((token) => (
+                            <option key={token.symbol} value={token.symbol}>
+                                {token.name} ({token.symbol})
+                            </option>
+                        ))}
                     </select>
                     <ChevronDownIcon size={20} className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-text-secondary" />
                 </div>
@@ -104,12 +110,12 @@ const ReceiveAssets: React.FC = () => {
 
             {/* Network Info */}
             <div className="flex justify-center items-center py-2">
-                <p className="text-text-secondary text-sm font-normal leading-normal">Network: Arc L1</p>
+                <p className="text-text-secondary text-sm font-normal leading-normal">Network: Arc Testnet • Token: {selectedToken.symbol}</p>
             </div>
 
             {/* Footer Instruction */}
             <div className="pt-4 mt-auto">
-                <p className="text-text-secondary text-xs font-normal leading-normal text-center">Only send supported tokens. Unsupported transfers may be lost.</p>
+                <p className="text-text-secondary text-xs font-normal leading-normal text-center">Only send {selectedToken.symbol} to this address. Sending other tokens may result in permanent loss.</p>
             </div>
         </div>
     );

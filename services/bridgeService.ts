@@ -1,6 +1,6 @@
 import { BridgeKit, Blockchain } from '@circle-fin/bridge-kit';
 import { createAdapterFromPrivateKey } from '@circle-fin/adapter-viem-v2';
-import { parseUnits } from 'ethers';
+// Amount should be provided as a human-readable decimal string to BridgeKit
 
 const DEBUG = import.meta.env.VITE_BRIDGE_DEBUG === 'true';
 
@@ -17,7 +17,7 @@ export type BridgeProgressStep =
 
 export interface BridgeParams {
   privateKey: string;
-  amount: string;
+  amount: string; // human-readable decimal string
   direction: BridgeDirection;
   onProgress?: (step: BridgeProgressStep) => void;
 }
@@ -61,20 +61,21 @@ export async function bridgeUsdcWithSessionKey({
     const kit = new BridgeKit();
     const { fromChain, toChain, fromRpcUrl, toRpcUrl } = getChainConfig(direction);
 
-    // Use single adapter (Circle Bridge Kit handles automatic RPC management)
-    const adapter = await createAdapterFromPrivateKey({ privateKey });
+    // Create dedicated adapters per chain with explicit RPC URLs
+    const adapterFrom = await createAdapterFromPrivateKey({ privateKey, rpcUrl: fromRpcUrl });
+    const adapterTo = await createAdapterFromPrivateKey({ privateKey, rpcUrl: toRpcUrl });
 
     if (DEBUG) {
       console.log('🔗 Chain configuration:', { fromChain, toChain, fromRpcUrl, toRpcUrl });
-      console.log('📡 Adapter created');
+      console.log('📡 Adapters created');
     }
 
-    const normalizedAmount = Number(amount);
+    const normalizedAmount = Number((amount ?? '').toString());
     if (!Number.isFinite(normalizedAmount) || normalizedAmount <= 0) {
       throw new Error('Amount must be a positive number.');
     }
-    const atomicAmount = parseUnits(normalizedAmount.toString(), 6);
-    const amountString = atomicAmount.toString();
+    // BridgeKit expects a decimal string (human units), not atomic units
+    const amountString = normalizedAmount.toFixed(2);
 
     if (DEBUG) console.log('💰 Amount parsed:', { normalizedAmount, atomicAmount: amountString });
 
@@ -113,15 +114,13 @@ export async function bridgeUsdcWithSessionKey({
 
       const result = await kit.bridge({
         from: {
-          adapter,
+          adapter: adapterFrom,
           chain: fromChain,
-          token: 'USDC',
           amount: amountString,
         },
         to: {
-          adapter,
+          adapter: adapterTo,
           chain: toChain,
-          token: 'USDC',
         },
       });
 

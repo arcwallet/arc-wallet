@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useWallet } from '../contexts/WalletContext';
+import { passkeyClient, type SessionKeySummary } from '../services/passkeyClient';
 import { WalletIcon, CopyIcon, AddIcon, LaptopIcon, PhoneIcon, ChevronDownIcon } from './Icons';
 
 const WalletIdentitySection: React.FC = () => {
@@ -38,41 +39,145 @@ const WalletIdentitySection: React.FC = () => {
     );
 };
 
-const SecuritySection: React.FC = () => (
-    <div className="flex flex-col gap-4 rounded-xl bg-[#151A22] p-5 sm:p-6">
-        <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
-            <div className="flex flex-col gap-1">
-                <h3 className="text-lg font-semibold text-[#E6EEF3]">Security</h3>
-                <p className="text-sm text-[#A7B4C8]">Passkey Devices</p>
-            </div>
-            <button className="flex h-10 w-full shrink-0 cursor-pointer items-center justify-center gap-2 overflow-hidden rounded-lg border border-[#2B3440] bg-transparent px-4 text-sm font-medium text-[#E6EEF3] hover:bg-white/5 sm:w-auto">
-                <AddIcon size={18} />
-                <span className="truncate">Add New Device (Passkey)</span>
-            </button>
-        </div>
-        <div className="flex flex-col divide-y divide-[#2B3440]">
-            <div className="flex items-center justify-between gap-4 py-3">
-                <div className="flex items-center gap-4">
-                    <LaptopIcon size={24} className="text-[#A7B4C8]" />
-                    <div className="flex flex-col">
-                        <p className="font-medium text-[#E6EEF3]">MacBook TouchID</p>
-                        <p className="text-sm text-green-400">Current device</p>
-                    </div>
+const SecuritySection: React.FC = () => {
+    const { userId, sessionKey, registerPasskeyForCurrentUser } = useWallet();
+    const [loading, setLoading] = useState(false);
+    const [keys, setKeys] = useState<SessionKeySummary[]>([]);
+    const [devices, setDevices] = useState<any[]>([]);
+    const [error, setError] = useState<string | null>(null);
+
+    const currentAddress = sessionKey?.address?.toLowerCase();
+
+    const load = async () => {
+        if (!userId) return;
+        setLoading(true);
+        setError(null);
+        try {
+            const resp = await passkeyClient.getSessionKeys(userId);
+            const list = resp.data?.sessionKeys ?? [];
+            setKeys(list);
+            const devResp = await passkeyClient.getDevices(userId);
+            setDevices(devResp.data ?? []);
+        } catch (e: any) {
+            setError(e?.message || 'Failed to load session keys');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => { void load(); }, [userId]);
+
+    const handleRevoke = async (id: string) => {
+        try {
+            await passkeyClient.revokeSessionKey(id);
+            await load();
+        } catch (e: any) {
+            setError(e?.message || 'Failed to revoke session key');
+        }
+    };
+
+    const handleRemoveDevice = async (id: string) => {
+        try {
+            await passkeyClient.deleteDevice(id);
+            await load();
+        } catch (e: any) {
+            setError(e?.message || 'Failed to remove device');
+        }
+    };
+
+    const handleAddDevice = async () => {
+        try {
+            await registerPasskeyForCurrentUser();
+            await load();
+            alert('Passkey registered for this user. You can now authenticate on this device.');
+        } catch (e: any) {
+            setError(e?.message || 'Failed to register passkey');
+        }
+    };
+
+    return (
+        <div className="flex flex-col gap-4 rounded-xl bg-[#151A22] p-5 sm:p-6">
+            <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
+                <div className="flex flex-col gap-1">
+                    <h3 className="text-lg font-semibold text-[#E6EEF3]">Security</h3>
+                    <p className="text-sm text-[#A7B4C8]">Passkey Sessions & Devices</p>
                 </div>
-                <button className="text-sm font-medium text-[#A7B4C8] hover:text-[#E6EEF3]">Remove</button>
-            </div>
-            <div className="flex items-center justify-between gap-4 py-3">
-                <div className="flex items-center gap-4">
-                    <PhoneIcon size={24} className="text-[#A7B4C8]" />
-                    <div className="flex flex-col">
-                        <p className="font-medium text-[#E6EEF3]">iPhone 15 FaceID</p>
-                    </div>
+                <div className="flex gap-2">
+                    <button onClick={load} disabled={loading} className="flex h-10 items-center justify-center rounded-lg border border-[#2B3440] bg-transparent px-4 text-sm font-medium text-[#E6EEF3] hover:bg-white/5 disabled:opacity-60">
+                        Refresh
+                    </button>
+                    <button onClick={handleAddDevice} className="flex h-10 items-center justify-center gap-2 rounded-lg border border-[#2B3440] bg-transparent px-4 text-sm font-medium text-[#E6EEF3] hover:bg-white/5">
+                        <AddIcon size={18} />
+                        <span className="truncate">Add New Device (Passkey)</span>
+                    </button>
                 </div>
-                <button className="text-sm font-medium text-[#A7B4C8] hover:text-[#E6EEF3]">Remove</button>
             </div>
+            {error && <div className="rounded-md border border-accent-orange/40 bg-accent-orange/10 p-3 text-sm text-accent-orange">{error}</div>}
+            <div className="rounded-lg border border-[#2B3440] overflow-hidden">
+                <table className="w-full text-sm">
+                    <thead className="bg-[#0f1724] text-[#A7B4C8]">
+                        <tr>
+                            <th className="px-4 py-2 text-left">Address</th>
+                            <th className="px-4 py-2 text-left">Created</th>
+                            <th className="px-4 py-2 text-left">Expires</th>
+                            <th className="px-4 py-2 text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#2B3440]">
+                        {loading && (
+                            <tr><td className="px-4 py-3 text-[#A7B4C8]" colSpan={4}>Loading…</td></tr>
+                        )}
+                        {!loading && keys.length === 0 && (
+                            <tr><td className="px-4 py-6 text-[#A7B4C8]" colSpan={4}>No active session keys</td></tr>
+                        )}
+                        {keys.map(k => {
+                            const isCurrent = currentAddress && k.address.toLowerCase() === currentAddress;
+                            return (
+                                <tr key={k.id} className={isCurrent ? 'bg-white/5' : ''}>
+                                    <td className="px-4 py-3 font-mono text-[#E6EEF3]">{`${k.address.slice(0,6)}...${k.address.slice(-4)}`}{isCurrent && <span className="ml-2 text-green-400">(current)</span>}</td>
+                                    <td className="px-4 py-3 text-[#E6EEF3]">{new Date(k.createdAt).toLocaleString()}</td>
+                                    <td className="px-4 py-3 text-[#E6EEF3]">{new Date(k.expiresAt).toLocaleString()}</td>
+                                    <td className="px-4 py-3 text-right">
+                                        <button onClick={() => handleRevoke(k.id)} disabled={isCurrent} className="rounded-md border border-[#2B3440] px-3 py-1.5 text-[#E6EEF3] hover:bg-white/5 disabled:opacity-50">Revoke</button>
+                                    </td>
+                                </tr>
+                            );
+                        })}
+                    </tbody>
+                </table>
+            </div>
+            <div className="mt-6 rounded-lg border border-[#2B3440] overflow-hidden">
+                <div className="px-4 py-2 bg-[#0f1724] text-[#A7B4C8] text-sm">Passkey Devices</div>
+                <table className="w-full text-sm">
+                    <thead className="bg-[#0f1724] text-[#A7B4C8]">
+                        <tr>
+                            <th className="px-4 py-2 text-left">Credential ID</th>
+                            <th className="px-4 py-2 text-left">Transports</th>
+                            <th className="px-4 py-2 text-left">Created</th>
+                            <th className="px-4 py-2 text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#2B3440]">
+                        {devices.length === 0 && (
+                            <tr><td colSpan={4} className="px-4 py-6 text-[#A7B4C8]">No registered devices</td></tr>
+                        )}
+                        {devices.map((d) => (
+                            <tr key={d.id}>
+                                <td className="px-4 py-3 text-[#E6EEF3] break-all">{d.credentialID.slice(0,12)}…{d.credentialID.slice(-8)}</td>
+                                <td className="px-4 py-3 text-[#E6EEF3]">{(d.transports || []).join(', ') || '—'}</td>
+                                <td className="px-4 py-3 text-[#E6EEF3]">{new Date(d.createdAt).toLocaleString()}</td>
+                                <td className="px-4 py-3 text-right">
+                                    <button onClick={() => handleRemoveDevice(d.id)} className="rounded-md border border-[#2B3440] px-3 py-1.5 text-[#E6EEF3] hover:bg-white/5">Remove</button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+            <p className="text-xs text-[#A7B4C8]">Revoking the current session is disabled. Use Logout to end it.</p>
         </div>
-    </div>
-);
+    );
+};
 
 const NetworkSection: React.FC = () => (
     <div className="flex flex-col gap-4 rounded-xl bg-[#151A22] p-5 sm:p-6">

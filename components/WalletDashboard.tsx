@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import SideNavBar from './SideNavBar';
 import TransactionList from './TransactionList';
 import TransactionDetail from './TransactionDetail';
@@ -7,12 +7,12 @@ import ReceiveAssets from './ReceiveAssets';
 import Settings from './Settings';
 import MultiSigDashboard from './MultiSigDashboard';
 import Faucet from './Faucet';
-import Swap from './Swap';
+import SwapSimple from './SwapSimple';
 import Bridge from './Bridge';
+// import Bridge from './Bridge';
 import { Transaction } from '../types';
 import { useWallet } from '../contexts/WalletContext';
 import { useArcAccount } from '../contexts/ArcAccountContext';
-import { useSmartAccount } from '../contexts/SmartAccountContext';
 import type { AccountSnapshot } from '../services/arcRpcClient';
 import { formatBlockTime } from '../utils/format';
 import { useActivity } from '../contexts/ActivityContext';
@@ -26,6 +26,8 @@ import {
   SendIcon,
   ReceiveIcon
 } from './Icons';
+import { getAllSupportedTokens, TokenInfo } from '../config/tokens';
+import { tokenService, TokenBalance, TokenPrices } from '../services/tokenService';
 
 interface DashboardHeaderProps {
   account: AccountSnapshot | null;
@@ -37,34 +39,52 @@ interface DashboardHeaderProps {
 interface NotificationDropdownProps {
   isOpen: boolean;
   onClose: () => void;
+  onNavigateToTransactions: () => void;
 }
 
-const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ isOpen, onClose }) => {
+const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ isOpen, onClose, onNavigateToTransactions }) => {
+  const { activities } = useActivity();
+  const { sessionKey } = useWallet();
+
   if (!isOpen) return null;
 
-  const notifications = [
-    {
-      id: 1,
-      title: 'Transaction Completed',
-      message: 'Your USDC transfer has been confirmed',
-      time: '2 min ago',
-      type: 'success'
-    },
-    {
-      id: 2,
-      title: 'New Device Added',
-      message: 'iPhone 15 FaceID was added to your account',
-      time: '1 hour ago',
-      type: 'info'
-    },
-    {
-      id: 3,
-      title: 'Security Alert',
-      message: 'Session key will expire in 24 hours',
-      time: '3 hours ago',
-      type: 'warning'
+  // Create notifications from recent activities and system events
+  const notifications = useMemo(() => {
+    const activityNotifications = activities.slice(0, 3).map((activity, index) => {
+      const timeAgo = new Date().getTime() - activity.date.getTime();
+      const timeString = timeAgo < 60000 ? 'Just now' :
+                        timeAgo < 3600000 ? `${Math.floor(timeAgo / 60000)} min ago` :
+                        timeAgo < 86400000 ? `${Math.floor(timeAgo / 3600000)} hours ago` :
+                        `${Math.floor(timeAgo / 86400000)} days ago`;
+
+      const isPositive = activity.amount > 0;
+
+      return {
+        id: `activity-${activity.id}`,
+        title: isPositive ? `${activity.currency} Received` : `${activity.currency} Sent`,
+        message: `${Math.abs(activity.amount)} ${activity.currency} - ${activity.description}`,
+        time: timeString,
+        type: isPositive ? 'success' as const : 'info' as const
+      };
+    });
+
+    // Add system notifications
+    const systemNotifications = [];
+
+    // Session expiry warning
+    if (sessionKey?.address) {
+      systemNotifications.push({
+        id: 'session-warning',
+        title: 'Session Active',
+        message: 'Your wallet session is active and secure',
+        time: 'Now',
+        type: 'info' as const
+      });
     }
-  ];
+
+    // Combine activity and system notifications
+    return [...activityNotifications, ...systemNotifications].slice(0, 5);
+  }, [activities, sessionKey]);
 
   return (
     <>
@@ -95,13 +115,20 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ isOpen, onC
             ))
           ) : (
             <div className="p-8 text-center">
-              <p className="text-sm text-[#A7B4C8]">No new notifications</p>
+              <p className="text-sm text-[#A7B4C8]">No recent activity</p>
+              <p className="text-xs text-[#A7B4C8] mt-1">Your transactions and updates will appear here</p>
             </div>
           )}
         </div>
         <div className="p-3 border-t border-white/10">
-          <button className="w-full text-sm text-[#9EBBE4] hover:text-[#B9D1ED] transition-colors">
-            Mark all as read
+          <button
+            className="w-full text-sm text-[#9EBBE4] hover:text-[#B9D1ED] transition-colors"
+            onClick={() => {
+              onNavigateToTransactions();
+              onClose();
+            }}
+          >
+            View All Transactions
           </button>
         </div>
       </div>
@@ -109,9 +136,14 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ isOpen, onC
   );
 };
 
-const DashboardHeader: React.FC<DashboardHeaderProps> = ({ account, isRefreshing, onRefresh, error }) => {
+interface DashboardHeaderPropsWithNav extends DashboardHeaderProps {
+  onNavigate: (page: string) => void;
+}
+
+const DashboardHeader: React.FC<DashboardHeaderPropsWithNav> = ({ account, isRefreshing, onRefresh, error, onNavigate }) => {
   const { address, logout } = useWallet();
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const { activities } = useActivity();
   const blockLabel = account?.latestBlock.finalized ? 'Finalized Block' : 'Latest Block';
   const lastUpdated = account ? formatBlockTime(account.latestBlock.timestamp) : '—';
 
@@ -143,7 +175,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({ account, isRefreshing
         {address && (
           <div className="hidden sm:flex items-center gap-2 rounded-lg bg-surface px-3 py-1.5 border border-divider">
             <WalletIcon size={16} className="text-text-secondary" />
-            <p className="text-sm font-mono text-text-secondary">{`${address.slice(0, 6)}...${address.slice(-4)}`}</p>
+            <p className="text-sm font-mono text-text-secondary">{`${address.slice(0,6)}...${address.slice(-4)}`}</p>
           </div>
         )}
         {error && <p className="hidden md:block text-sm text-accent-orange">{error}</p>}
@@ -154,13 +186,16 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({ account, isRefreshing
           >
             <NotificationIcon size={20} />
             {/* Notification badge */}
-            <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full flex items-center justify-center">
-              <span className="text-xs text-white font-bold">3</span>
-            </span>
+            {activities.length > 0 && (
+              <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full flex items-center justify-center">
+                <span className="text-xs text-white font-bold">{Math.min(activities.length, 9)}</span>
+              </span>
+            )}
           </button>
           <NotificationDropdown
             isOpen={isNotificationOpen}
             onClose={() => setIsNotificationOpen(false)}
+            onNavigateToTransactions={() => onNavigate('Transactions')}
           />
         </div>
         <button
@@ -233,21 +268,110 @@ interface AssetsTableProps {
   isLoading: boolean;
 }
 
+interface TokenAssetData {
+  name: string;
+  ticker: string;
+  price: string;
+  change: string;
+  balance: string;
+  value: string;
+  icon: string;
+}
+
 const AssetsTable: React.FC<AssetsTableProps> = ({ balanceDisplay, isLoading }) => {
-  const rows = useMemo(
-    () => [
-      {
-        name: 'USDC (Native)',
-        ticker: 'USDC',
-        price: '$1.00',
+  const { sessionKey } = useWallet();
+  
+  
+  const [tokenBalances, setTokenBalances] = useState<TokenBalance[]>([]);
+  const [isLoadingTokens, setIsLoadingTokens] = useState(false);
+  const [prices, setPrices] = useState<TokenPrices>({});
+
+  // Fetch all token balances
+  useEffect(() => {
+    const fetchTokenBalances = async () => {
+      const addresses: string[] = [];
+      if (sessionKey?.address) addresses.push(sessionKey.address);
+      if (addresses.length === 0) {
+        setTokenBalances([]);
+        return;
+      }
+
+      setIsLoadingTokens(true);
+      try {
+        // Fetch per address then merge by token symbol (sum balances)
+        const resultsPerAddress = await Promise.all(
+          addresses.map((addr) => tokenService.getAllTokenBalances(addr, 'testnet', 'arcTestnet'))
+        );
+
+        const merged = new Map<string, { token: TokenInfo; qty: number }>();
+        for (const list of resultsPerAddress) {
+          for (const tb of list) {
+            const prev = merged.get(tb.token.symbol) ?? { token: tb.token, qty: 0 };
+            const qty = Number.parseFloat(tb.formattedBalance);
+            merged.set(tb.token.symbol, { token: tb.token, qty: prev.qty + (Number.isFinite(qty) ? qty : 0) });
+          }
+        }
+
+        const mergedBalances: TokenBalance[] = Array.from(merged.values()).map(({ token, qty }) => ({
+          token,
+          balance: 0n,
+          formattedBalance: qty.toString(),
+          usdValue: undefined,
+        }));
+
+        setTokenBalances(mergedBalances);
+        const symbols = getAllSupportedTokens().map(t => t.symbol);
+        const latestPrices = await tokenService.getTokenPrices(symbols);
+        setPrices(latestPrices);
+      } catch (error) {
+        console.error('Error fetching token balances:', error);
+        setTokenBalances([]);
+      } finally {
+        setIsLoadingTokens(false);
+      }
+    };
+
+    fetchTokenBalances();
+
+    // Refresh every 30 seconds
+    const interval = setInterval(fetchTokenBalances, 30000);
+    return () => clearInterval(interval);
+  }, [sessionKey?.address]);
+
+  const rows = useMemo(() => {
+    if (tokenBalances.length === 0) {
+      // Fallback to supported tokens with zero balances
+      return getAllSupportedTokens().map((token): TokenAssetData => {
+        const priceUsd = prices[token.symbol]?.usd ?? (token.symbol === 'USDC' ? 1.0 : 1.07);
+        return {
+          name: `${token.name} (${token.symbol})`,
+          ticker: token.symbol,
+          price: `$${priceUsd.toFixed(2)}`,
+          change: '+0.00%',
+          balance: '0.00',
+          value: '$0.00',
+          icon: token.icon || 'https://mintcdn.com/arc-docs/FYqE2_-PsObv0l4x/logo/Arc_Logo_FC.svg?fit=max&auto=format',
+        };
+      });
+    }
+
+    return tokenBalances.map((tokenBalance): TokenAssetData => {
+      const symbol = tokenBalance.token.symbol;
+      const priceUsd = prices[symbol]?.usd ?? (symbol === 'USDC' ? 1.0 : 1.07);
+      const qty = parseFloat(tokenBalance.formattedBalance);
+      const value = qty * priceUsd;
+
+      return {
+        name: `${tokenBalance.token.name} (${tokenBalance.token.symbol})`,
+        ticker: tokenBalance.token.symbol,
+        price: `$${priceUsd.toFixed(2)}`,
         change: '+0.00%',
-        balance: balanceDisplay ?? '$0.00',
-        value: balanceDisplay ?? '$0.00',
-        icon: 'https://mintcdn.com/arc-docs/FYqE2_-PsObv0l4x/logo/Arc_Logo_FC.svg?fit=max&auto=format',
-      },
-    ],
-    [balanceDisplay],
-  );
+        balance: `${qty.toFixed(2)} ${tokenBalance.token.symbol}`,
+        value: `$${value.toFixed(2)}`,
+        icon: tokenBalance.token.icon || 'https://mintcdn.com/arc-docs/FYqE2_-PsObv0l4x/logo/Arc_Logo_FC.svg?fit=max&auto=format',
+      };
+    });
+  }, [tokenBalances, prices]);
 
   return (
     <div className="mt-8">
@@ -285,14 +409,14 @@ const AssetsTable: React.FC<AssetsTableProps> = ({ balanceDisplay, isLoading }) 
                       <div className="text-green-400">{asset.change}</div>
                     </td>
                     <td className="whitespace-nowrap px-3 py-4 text-sm">
-                      {isLoading ? (
+                      {isLoading || isLoadingTokens ? (
                         <span className="animate-pulse text-[#A7B4C8]">Loading…</span>
                       ) : (
                         <div className="text-[#E6EEF3]">{asset.balance}</div>
                       )}
                     </td>
                     <td className="whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-0">
-                      {isLoading ? <span className="animate-pulse text-[#A7B4C8]">—</span> : asset.value}
+                      {isLoading || isLoadingTokens ? <span className="animate-pulse text-[#A7B4C8]">—</span> : asset.value}
                     </td>
                   </tr>
                 ))}
@@ -313,96 +437,11 @@ interface DashboardHomeProps {
   error: string | null;
 }
 
-const SmartAccountPanel: React.FC = () => {
-  const {
-    smartAccountAddress,
-    ownerAddress,
-    isDeploying,
-    isAuthorising,
-    isCheckingAuthorisation,
-    isSessionAuthorised,
-    authorisationExpiresAt,
-    error,
-    deploy,
-    authoriseCurrentSession,
-    clearError,
-  } = useSmartAccount();
-  const { sessionKey } = useWallet();
-
-  const addressDisplay = smartAccountAddress
-    ? `${smartAccountAddress.slice(0, 6)}...${smartAccountAddress.slice(-4)}`
-    : 'Not deployed';
-  const ownerDisplay = ownerAddress ? `${ownerAddress.slice(0, 6)}...${ownerAddress.slice(-4)}` : 'Pending';
-
-  const statusLabel = isCheckingAuthorisation
-    ? 'Checking…'
-    : isSessionAuthorised
-      ? authorisationExpiresAt
-        ? `Authorized until ${new Date(authorisationExpiresAt * 1000).toLocaleTimeString()}`
-        : 'Authorized'
-      : 'Not authorized';
-
-  return (
-    <div className="rounded-xl bg-[#151A22] p-6 mt-6">
-      <div className="flex flex-col gap-3">
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-[#E6EEF3]">Smart Account</h3>
-          {smartAccountAddress && <span className="text-xs text-[#A7B4C8] uppercase">Active</span>}
-        </div>
-        <p className="text-sm text-[#A7B4C8]">
-          Deploy and manage the smart account contract that will execute on-chain actions using session keys.
-        </p>
-        <div className="flex items-center justify-between rounded-lg border border-white/10 bg-[#0d182c] px-3 py-2 text-sm">
-          <span className="text-[#A7B4C8]">Address</span>
-          <span className="text-[#E6EEF3] font-mono">{addressDisplay}</span>
-        </div>
-        <div className="flex items-center justify-between rounded-lg border border-white/10 bg-[#0d182c] px-3 py-2 text-sm">
-          <span className="text-[#A7B4C8]">Owner</span>
-          <span className="text-[#E6EEF3] font-mono">{ownerDisplay}</span>
-        </div>
-        <div className="flex items-center justify-between rounded-lg border border-white/10 bg-[#0d182c] px-3 py-2 text-sm">
-          <span className="text-[#A7B4C8]">Session Status</span>
-          <span className={`font-medium ${isSessionAuthorised ? 'text-green-400' : 'text-accent-orange'}`}>
-            {statusLabel}
-          </span>
-        </div>
-        {error && (
-          <div className="flex items-start justify-between rounded-lg bg-accent-orange/10 border border-accent-orange px-3 py-2 text-sm text-accent-orange">
-            <span>{error}</span>
-            <button onClick={clearError} className="text-xs uppercase">Dismiss</button>
-          </div>
-        )}
-        <div className="flex flex-col sm:flex-row gap-3">
-          <button
-            onClick={deploy}
-            disabled={!sessionKey || isDeploying}
-            className="flex-1 rounded-lg bg-primary text-primary-text h-11 font-semibold hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed"
-          >
-            {isDeploying ? 'Deploying…' : 'Deploy Account'}
-          </button>
-          <button
-            onClick={() => authoriseCurrentSession()}
-            disabled={!sessionKey || !smartAccountAddress || isAuthorising}
-            className="flex-1 rounded-lg border border-[#2B3440] h-11 font-semibold text-[#E6EEF3] hover:bg-white/5 disabled:opacity-60 disabled:cursor-not-allowed"
-          >
-            {isAuthorising ? 'Authorising…' : 'Authorize Session Key'}
-          </button>
-        </div>
-        {!sessionKey && <p className="text-xs text-[#A7B4C8]">Authenticate with your passkey to manage session keys.</p>}
-        {sessionKey && smartAccountAddress && !isSessionAuthorised && !isAuthorising && (
-          <p className="text-xs text-accent-orange">
-            This session is not authorised yet. Authorise it to execute transactions through the smart account.
-          </p>
-        )}
-      </div>
-    </div>
-  );
-};
+// SmartAccount panel removed
 
 const DashboardHome: React.FC<DashboardHomeProps> = ({ onNavigate, balanceDisplay, isLoading, lastUpdated, error }) => (
   <>
     <BalanceOverview onNavigate={onNavigate} balanceDisplay={balanceDisplay} isLoading={isLoading} lastUpdated={lastUpdated} error={error} />
-    <SmartAccountPanel />
     <AssetsTable balanceDisplay={balanceDisplay} isLoading={isLoading} />
   </>
 );
@@ -411,7 +450,7 @@ const WalletDashboard: React.FC = () => {
   const [currentPage, setCurrentPage] = useState('Dashboard');
   const [selectedTransactionId, setSelectedTransactionId] = useState<string | null>(null);
 
-  const { address } = useWallet();
+  const { address, sessionKey } = useWallet();
   const { snapshot, formattedBalance, isLoading: isAccountLoading, error: accountError, refresh, lastUpdated } = useArcAccount();
 
   const { activities: transactions } = useActivity();
@@ -441,7 +480,7 @@ const WalletDashboard: React.FC = () => {
       case 'Receive':
         return <ReceiveAssets />;
       case 'Swap':
-        return <Swap />;
+        return <SwapSimple />;
       case 'Bridge':
         return <Bridge />;
       case 'Transactions':
@@ -469,7 +508,7 @@ const WalletDashboard: React.FC = () => {
     <div className="flex h-screen w-full bg-[#091325] text-white">
       <SideNavBar currentPage={currentPage} onNavigate={handleNavigate} />
       <main className="flex flex-1 flex-col overflow-hidden">
-        <DashboardHeader account={snapshot} isRefreshing={isAccountLoading} onRefresh={refresh} error={accountError} />
+        <DashboardHeader account={snapshot} isRefreshing={isAccountLoading} onRefresh={refresh} error={accountError} onNavigate={handleNavigate} />
         <div className="flex flex-1 overflow-auto">
           {currentPage === 'Transactions' ? (
             <>

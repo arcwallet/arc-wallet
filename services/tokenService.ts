@@ -119,18 +119,37 @@ class TokenService {
       }
 
       try {
-        // Mock price data - in production, integrate with CoinGecko or similar
-        const mockPrices: Record<string, number> = {
-          'USDC': 1.00,
-          'EURC': 1.07, // Approximate EUR to USD rate
-        };
+        // Try CoinGecko first when priceSource is configured
+        const ids = symbols
+          .map((s) => getTokenInfo(s)?.priceSource)
+          .filter((src): src is string => Boolean(src && src.startsWith('coingecko:')))
+          .map((src) => src!.split(':')[1]);
 
-        if (mockPrices[symbol]) {
-          const priceData = {
-            usd: mockPrices[symbol],
-            lastUpdated: now,
-          };
+        if (ids.length > 0) {
+          const uniqIds = Array.from(new Set(ids));
+          const query = encodeURIComponent(uniqIds.join(','));
+          const url = `https://api.coingecko.com/api/v3/simple/price?ids=${query}&vs_currencies=usd,eur`;
+          const res = await fetch(url);
+          if (res.ok) {
+            const data = await res.json() as Record<string, { usd?: number; eur?: number }>;
+            for (const sym of symbols) {
+              const src = getTokenInfo(sym)?.priceSource;
+              const id = src?.startsWith('coingecko:') ? src.split(':')[1] : undefined;
+              const record = id ? data[id] : undefined;
+              if (record?.usd) {
+                const priceData = { usd: record.usd, eur: record.eur, lastUpdated: now };
+                prices[sym] = priceData;
+                this.cachedPrices[sym] = priceData;
+              }
+            }
+            continue; // go next symbol set (filled via loop using cached)
+          }
+        }
 
+        // Fallback: stable assumptions
+        const fallback: Record<string, number> = { USDC: 1.0, EURC: 1.07 };
+        if (fallback[symbol]) {
+          const priceData = { usd: fallback[symbol], lastUpdated: now } as any;
           prices[symbol] = priceData;
           this.cachedPrices[symbol] = priceData;
         }
@@ -185,7 +204,7 @@ class TokenService {
 }
 
 // Export singleton instance
-const DEFAULT_RPC_URL = import.meta.env.VITE_ARC_RPC_URL ?? 'https://rpc.testnet.arc.network';
+const DEFAULT_RPC_URL = import.meta.env.VITE_ARC_RPC_URL ?? 'https://capable-tame-glitter.arc-testnet.quiknode.pro/96002201d9f8c9d93fcb9ec6bfdb069d3e8f3ef0';
 export const tokenService = new TokenService(DEFAULT_RPC_URL);
 
 // Export class for custom instances

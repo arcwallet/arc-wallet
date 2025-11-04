@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { KeyIcon } from './Icons';
+import { useWallet } from '../contexts/WalletContext';
 
 interface WalletSelectionScreenProps {
   onConnect: () => void;
@@ -7,6 +8,8 @@ interface WalletSelectionScreenProps {
 }
 
 const WalletSelectionScreen: React.FC<WalletSelectionScreenProps> = ({ onConnect, isConnecting = false }) => {
+  const { registerPasskeyForCurrentUser } = useWallet();
+  const [isRegistering, setIsRegistering] = useState(false);
   return (
     <div className="relative flex h-auto min-h-screen w-full flex-col">
       <div className="flex flex-1 justify-center items-center py-5 px-4">
@@ -27,6 +30,24 @@ const WalletSelectionScreen: React.FC<WalletSelectionScreenProps> = ({ onConnect
                 <KeyIcon size={20} className="text-primary-text" />
                 <span className="truncate">{isConnecting ? 'Connecting…' : 'Sign in with Passkey'}</span>
               </button>
+              <button
+                onClick={async () => {
+                  setIsRegistering(true);
+                  try {
+                    await registerPasskeyForCurrentUser();
+                    await onConnect();
+                  } catch (e: any) {
+                    alert(e?.message || 'Failed to register/sign in with passkey.');
+                  } finally {
+                    setIsRegistering(false);
+                  }
+                }}
+                disabled={isRegistering}
+                className="flex min-w-[84px] max-w-full cursor-pointer items-center justify-center overflow-hidden rounded-lg h-12 px-5 flex-1 bg-surface text-text-primary border border-divider hover:bg-white/5 text-base font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                <span className="truncate">{isRegistering ? 'Registering…' : 'Create New Passkey'}</span>
+              </button>
+              
               {/* BodyText */}
               <p className="text-text-secondary text-sm font-normal leading-normal text-center">
                 No seed phrase required. Your identity is verified using your device's secure hardware enclave.

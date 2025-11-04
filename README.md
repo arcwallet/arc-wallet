@@ -1,12 +1,15 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Arc Wallet
 
-# Run and deploy your AI Studio app
+A modern Web3 wallet built for Arc Network with support for multiple stablecoins (USDC, EURC), cross-chain bridging, and passkey authentication.
 
-This contains everything you need to run your app locally.
+## Features
 
-View your app in AI Studio: https://ai.studio/apps/drive/1qIbEi5-X1g1NHuMxSE73VUZDDbAPlLUQ
+- **Multi-Token Support**: USDC and EURC stablecoins
+- **Cross-Chain Bridging**: Bridge tokens between Arc Testnet and Ethereum Sepolia
+- **Passkey Authentication**: Secure WebAuthn-based authentication
+- **Smart Account Integration**: ERC-4337 account abstraction support
+- **Real-time Balances**: Live token balance updates
+- **Professional UI**: Modern, responsive interface
 
 ## Run Locally
 

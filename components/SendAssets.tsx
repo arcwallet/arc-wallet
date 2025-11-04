@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { isAddress } from 'ethers';
 import { useArcAccount } from '../contexts/ArcAccountContext';
 import { useWallet } from '../contexts/WalletContext';
-import { useSmartAccount } from '../contexts/SmartAccountContext';
 import { useActivity } from '../contexts/ActivityContext';
 import { formatUSDCAmount } from '../utils/format';
 import {
@@ -22,14 +21,14 @@ const TX_EXPLORER_BASE = 'https://testnet.arcscan.app/tx/';
 
 const SendAssets: React.FC = () => {
   const { snapshot, isLoading } = useArcAccount();
-  const { sessionKey } = useWallet();
-  const { smartAccountAddress, isSessionAuthorised, isCheckingAuthorisation } = useSmartAccount();
+  const { sessionKey, verifyWithPasskey } = useWallet();
   const { addActivity } = useActivity();
   const [amount, setAmount] = useState('');
   const [recipient, setRecipient] = useState('');
   const [selectedToken, setSelectedToken] = useState<TokenInfo>(getAllSupportedTokens()[0]);
   const [tokenBalance, setTokenBalance] = useState<string>('0');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [txHash, setTxHash] = useState<string | null>(null);
   const [submissionKind, setSubmissionKind] = useState<'transaction' | 'userOp'>('transaction');
@@ -48,27 +47,39 @@ const SendAssets: React.FC = () => {
     return formatted.display;
   }, [balance, selectedToken]);
 
+  const listAddresses = () => {
+    const addresses: string[] = [];
+    if (sessionKey?.address) addresses.push(sessionKey.address);
+    return addresses;
+  };
+
+  const fetchTotalBalance = async (symbol: string, addresses: string[]): Promise<number> => {
+    // Restrict to Arc Testnet only (as per selected network in UI)
+    const results: Array<number> = [];
+    for (const addr of addresses) {
+      try {
+        const r = await tokenService.getTokenBalance(symbol, addr, 'testnet', 'arcTestnet');
+        const val = r ? parseFloat(r.formattedBalance) : 0;
+        if (Number.isFinite(val)) results.push(val);
+      } catch (e) {
+        // ignore and continue
+      }
+    }
+    return results.reduce((a, b) => a + b, 0);
+  };
+
   // Fetch token balance when selected token or address changes
   useEffect(() => {
     const fetchTokenBalance = async () => {
-      if (!sessionKey?.address) {
+      const addresses = listAddresses();
+      if (addresses.length === 0) {
         setTokenBalance('0');
         return;
       }
 
       try {
-        const tokenBalanceData = await tokenService.getTokenBalance(
-          selectedToken.symbol,
-          sessionKey.address,
-          'testnet',
-          'arcTestnet'
-        );
-
-        if (tokenBalanceData) {
-          setTokenBalance(tokenBalanceData.formattedBalance);
-        } else {
-          setTokenBalance('0');
-        }
+        const total = await fetchTotalBalance(selectedToken.symbol, addresses);
+        setTokenBalance(total.toString());
       } catch (error) {
         console.error('Error fetching token balance:', error);
         setTokenBalance('0');
@@ -77,30 +88,47 @@ const SendAssets: React.FC = () => {
 
     fetchTokenBalance();
   }, [selectedToken, sessionKey?.address]);
+
+  // On mount or address change: auto-select the token that has non-zero balance on Arc Testnet
+  useEffect(() => {
+    const chooseTokenWithBalance = async () => {
+      const addresses = listAddresses();
+      if (addresses.length === 0) return;
+      try {
+        const tokens = getAllSupportedTokens();
+        let best: { token: TokenInfo; qty: number } | null = null;
+        for (const t of tokens) {
+          const qty = await fetchTotalBalance(t.symbol, addresses);
+          if (!best || qty > best.qty) {
+            best = { token: t, qty };
+          }
+        }
+        if (best && best.qty > 0 && best.token.symbol !== selectedToken.symbol) {
+          setSelectedToken(best.token);
+          setTokenBalance(best.qty.toString());
+        }
+      } catch (e) {
+        // ignore
+      }
+    };
+    void chooseTokenWithBalance();
+  }, [sessionKey?.address]);
   const amountNumber = parseFloat(amount) || 0;
   const feeDisplay = feeEstimate ? formatUSDCAmount(feeEstimate).display : isEstimating ? 'Estimating…' : '-';
   const feeNumber = feeEstimate ? Number(feeEstimate) / 1e18 : 0;
   const total = amountNumber > 0 ? amountNumber + feeNumber : 0;
 
-  const usingSmartAccount = Boolean(smartAccountAddress);
-  const isAuthorised = !usingSmartAccount || isSessionAuthorised;
+  const usingSmartAccount = false;
 
   useEffect(() => {
-    const shouldEstimate = sessionKey && isAuthorised && isAddress(recipient) && amountNumber > 0;
+    const shouldEstimate = sessionKey && isAddress(recipient) && amountNumber > 0;
     if (!shouldEstimate) {
       setFeeEstimate(null);
       return;
     }
     let cancelled = false;
     setIsEstimating(true);
-    const estimatePromise = usingSmartAccount && smartAccountAddress
-      ? estimateSmartAccountExecute({
-          sessionPrivateKey: sessionKey.privateKey,
-          smartAccountAddress,
-          to: recipient,
-          amount,
-        })
-      : estimateNativeTransfer({ from: sessionKey.address, to: recipient, amount });
+    const estimatePromise = estimateNativeTransfer({ from: sessionKey.address, to: recipient, amount });
 
     estimatePromise
       .then((estimate) => {
@@ -122,17 +150,11 @@ const SendAssets: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [sessionKey, recipient, amount, amountNumber, usingSmartAccount, isAuthorised, smartAccountAddress]);
+  }, [sessionKey, recipient, amount, amountNumber]);
 
   const isRecipientValid = recipient ? isAddress(recipient) : false;
   const hasSession = Boolean(sessionKey);
-  const canSubmit =
-    hasSession &&
-    isRecipientValid &&
-    amountNumber > 0 &&
-    amountNumber <= balance &&
-    !isSubmitting &&
-    isAuthorised;
+  const canSubmit = hasSession && isRecipientValid && amountNumber > 0 && amountNumber <= balance && !isSubmitting;
 
   const handleSubmit = async () => {
     if (!sessionKey) {
@@ -156,28 +178,18 @@ const SendAssets: React.FC = () => {
     setSubmitError(null);
     setTxHash(null);
     try {
+      // Require fresh passkey verification before sending
+      await verifyWithPasskey();
       let hash: string;
       let submissionKind: 'transaction' | 'userOp';
-      if (smartAccountAddress) {
-        const result = await executeSmartAccountTransferWithFallback({
-          sessionPrivateKey: sessionKey.privateKey,
-          smartAccountAddress,
-          to: recipient,
-          amount,
-        });
-        hash = result.hash;
-        submissionKind = result.kind;
-        setSubmissionKind(result.kind);
-      } else {
-        const result = await executeNativeTransfer({
-          sessionPrivateKey: sessionKey.privateKey,
-          to: recipient,
-          amount,
-        });
-        hash = result.hash;
-        submissionKind = result.kind;
-        setSubmissionKind(result.kind);
-      }
+      const result = await executeNativeTransfer({
+        sessionPrivateKey: sessionKey.privateKey,
+        to: recipient,
+        amount,
+      });
+      hash = result.hash;
+      submissionKind = result.kind;
+      setSubmissionKind(result.kind);
 
       setTxHash(hash);
       setAmount('');
@@ -194,7 +206,7 @@ const SendAssets: React.FC = () => {
           usdValue: -amountNumber,
           status: TransactionStatus.Completed,
           hash,
-          from: smartAccountAddress ?? sessionKey.address,
+          from: sessionKey.address,
           to: recipient,
           networkFee: 0,
           approvals: {
@@ -215,7 +227,7 @@ const SendAssets: React.FC = () => {
           usdValue: -amountNumber,
           status: TransactionStatus.Pending,
           hash,
-          from: smartAccountAddress ?? sessionKey.address,
+          from: sessionKey.address,
           to: recipient,
           networkFee: 0,
           approvals: {
@@ -234,6 +246,19 @@ const SendAssets: React.FC = () => {
       }
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleSubmitForApproval = async () => {
+    try {
+      setSubmitError(null);
+      setIsVerifying(true);
+      await verifyWithPasskey();
+    } catch (err: any) {
+      const msg = typeof err?.message === 'string' ? err.message : 'Passkey verification failed';
+      setSubmitError(msg);
+    } finally {
+      setIsVerifying(false);
     }
   };
 
@@ -360,8 +385,12 @@ const SendAssets: React.FC = () => {
           >
             {isSubmitting ? 'Sending…' : 'Send'}
           </button>
-          <button className="flex w-full cursor-pointer items-center justify-center overflow-hidden rounded-lg h-12 bg-surface text-text-primary text-base font-bold leading-normal tracking-wide transition-opacity hover:bg-white/5 border border-divider">
-            Submit for Approval
+          <button
+            onClick={handleSubmitForApproval}
+            disabled={isVerifying}
+            className="flex w-full cursor-pointer items-center justify-center overflow-hidden rounded-lg h-12 bg-surface text-text-primary text-base font-bold leading-normal tracking-wide transition-opacity hover:bg-white/5 border border-divider disabled:opacity-60"
+          >
+            {isVerifying ? 'Verifying…' : 'Submit for Approval'}
           </button>
         </div>
       </div>

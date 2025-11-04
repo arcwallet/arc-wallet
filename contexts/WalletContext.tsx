@@ -19,6 +19,8 @@ interface WalletContextValue {
   sessionKey: SessionKey | null;
   loginWithPasskey: () => Promise<void>;
   logout: () => void;
+  registerPasskeyForCurrentUser: () => Promise<void>;
+  verifyWithPasskey: () => Promise<void>;
 }
 
 const WalletContext = createContext<WalletContextValue | undefined>(undefined);
@@ -91,9 +93,10 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const registerPasskey = useCallback(async (userId: string) => {
     const username = `Arc User ${userId.slice(0, 6)}`;
     try {
-      const options = await passkeyClient.beginRegistration(userId, username);
+      const startResp = await passkeyClient.beginRegistration(username, username);
+      const options = startResp.data?.options ?? (startResp as any).data?.options; // safety for runtime typing
       const credential = await createRegistrationCredential(options);
-      await passkeyClient.finishRegistration(userId, credential);
+      await passkeyClient.finishRegistration(username, credential);
     } catch (error) {
       if (error instanceof PasskeyClientError && error.status === 400) {
         console.info('Passkey already registered, skipping re-registration');
@@ -107,11 +110,20 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }
   }, []);
 
-  const authenticateWithPasskey = useCallback(async (userId: string) => {
-    const options = await passkeyClient.beginAuthentication(userId);
+  const authenticateWithPasskey = useCallback(async (username?: string) => {
+    const startResp = await passkeyClient.beginAuthentication(username);
+    const options = startResp.data?.options ?? (startResp as any).data?.options;
     const credential = await createAuthenticationCredential(options);
-    const { sessionKey: newSession } = await passkeyClient.finishAuthentication(userId, credential);
-    return newSession;
+    const finishResp = await passkeyClient.finishAuthentication(credential);
+    const newSession = finishResp.data?.sessionKey ?? (finishResp as any).data?.sessionKey;
+    const user = finishResp.data?.user ?? (finishResp as any).data?.user;
+    if (user?.id && typeof window !== 'undefined') {
+      try {
+        window.localStorage.setItem(USER_ID_STORAGE_KEY, user.id);
+        setUserId(user.id);
+      } catch {}
+    }
+    return newSession as SessionKey;
   }, []);
 
   const loginWithPasskey = useCallback(async () => {
@@ -132,13 +144,15 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
     setIsConnecting(true);
     try {
-      let session = await authenticateWithPasskey(userId);
+      const username = `Arc User ${userId.slice(0, 6)}`;
+      let session = await authenticateWithPasskey(username);
       finalizeSession(session);
     } catch (firstError) {
       if (firstError instanceof PasskeyClientError && firstError.status === 404) {
         try {
           await registerPasskey(userId);
-          const session = await authenticateWithPasskey(userId);
+          const username = `Arc User ${userId.slice(0, 6)}`;
+          const session = await authenticateWithPasskey(username);
           finalizeSession(session);
           return;
         } catch (registerError) {
@@ -154,23 +168,6 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       }
 
       console.error('Passkey authentication failed', firstError);
-      const fallback = window.confirm(
-        'Passkey authentication failed. Would you like to generate a temporary session key as developer mode?',
-      );
-      if (fallback) {
-        const wallet = Wallet.createRandom();
-        window.alert(
-          `Developer session private key generated:\n${wallet.privateKey}\n\nPlease store this key securely. Session will expire in 10 minutes.`,
-        );
-        const session = {
-          address: wallet.address,
-          privateKey: wallet.privateKey,
-          expiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
-        } as SessionKey;
-        finalizeSession(session);
-        return;
-      }
-
       window.alert('Passkey authentication failed. Please try again.');
     } finally {
       setIsConnecting(false);
@@ -187,8 +184,17 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   }, []);
 
   const value = useMemo<WalletContextValue>(
-    () => ({ isAuthenticated, isConnecting, address, userId, sessionKey, loginWithPasskey, logout }),
-    [isAuthenticated, isConnecting, address, userId, sessionKey, loginWithPasskey, logout],
+    () => ({ isAuthenticated, isConnecting, address, userId, sessionKey, loginWithPasskey, logout, registerPasskeyForCurrentUser: async () => {
+      if (!userId) throw new Error('No userId available');
+      await registerPasskey(userId);
+    }, verifyWithPasskey: async () => {
+      const uid = userId || getOrCreateUserId();
+      if (!uid) throw new Error('No user identity');
+      const username = `Arc User ${uid.slice(0, 6)}`;
+      const session = await authenticateWithPasskey(username);
+      finalizeSession(session);
+    } }),
+    [isAuthenticated, isConnecting, address, userId, sessionKey, loginWithPasskey, logout, registerPasskey, authenticateWithPasskey, finalizeSession],
   );
 
   return <WalletContext.Provider value={value}>{children}</WalletContext.Provider>;

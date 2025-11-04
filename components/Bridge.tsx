@@ -6,6 +6,7 @@ import type { BridgeDirection } from '../services/bridgeService';
 import { bridgeUsdcWithSessionKey } from '../services/bridgeService';
 import { TransactionStatus, TransactionType } from '../types';
 import { SpinnerIcon } from './Icons';
+import { getAllSupportedTokens, TokenInfo } from '../config/tokens';
 
 const DIRECTIONS: { id: BridgeDirection; label: string; description: string }[] = [
   {
@@ -27,7 +28,9 @@ const Bridge: React.FC = () => {
   const { addActivity } = useActivity();
 
   const [direction, setDirection] = useState<BridgeDirection>('arc-to-sepolia');
+  const [selectedToken, setSelectedToken] = useState<TokenInfo>(getAllSupportedTokens().find(t => t.symbol === 'USDC') || getAllSupportedTokens()[0]);
   const [amount, setAmount] = useState('');
+  const [amountError, setAmountError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
   const [statusVariant, setStatusVariant] = useState<'info' | 'error' | 'success'>('info');
@@ -38,6 +41,22 @@ const Bridge: React.FC = () => {
     return Boolean(sessionKey?.privateKey) && normalized > 0 && !Number.isNaN(normalized) && !isSubmitting;
   }, [sessionKey, amount, isSubmitting]);
 
+  const normalizeAmount = (raw: string): string | null => {
+    if (raw == null) return null;
+    // remove thousand separators and spaces; unify comma to dot
+    let s = String(raw).trim().replace(/[,_\s]/g, '').replace(',', '.');
+    if (s === '') return null;
+    if (s.startsWith('.')) s = '0' + s;
+    if (s.endsWith('.')) s = s + '0';
+    const num = Number(s);
+    if (!Number.isFinite(num) || num <= 0) return null;
+    // Clamp to 6 decimals max for display; BridgeKit will accept decimal string
+    const [int, frac = ''] = s.split('.');
+    const clamped = frac.length > 6 ? `${int}.${frac.slice(0, 6)}` : s;
+    // return with 2 decimals to be safe for BridgeKit
+    return Number(clamped).toFixed(2);
+  };
+
   const handleBridge = async () => {
     if (!sessionKey?.privateKey) {
       setStatusVariant('error');
@@ -45,12 +64,14 @@ const Bridge: React.FC = () => {
       return;
     }
 
-    const normalizedAmount = Number(amount);
-    if (!Number.isFinite(normalizedAmount) || normalizedAmount <= 0) {
+    const normalized = normalizeAmount(amount);
+    if (!normalized) {
       setStatusVariant('error');
       setStatusMessage('Please enter a valid amount greater than zero.');
+      setAmountError('Use digits and , or . for decimals. Example: 1.5 or 1,5');
       return;
     }
+    setAmountError(null);
 
     setIsSubmitting(true);
     setStatusVariant('info');
@@ -60,7 +81,7 @@ const Bridge: React.FC = () => {
     try {
       const { sourceTxHash, receiveTxHash } = await bridgeUsdcWithSessionKey({
         privateKey: sessionKey.privateKey,
-        amount,
+        amount: normalized,
         direction,
         onProgress: (step) => {
           switch (step.type) {
@@ -68,16 +89,16 @@ const Bridge: React.FC = () => {
               setProgressItem('Switching networks…');
               break;
             case 'approve':
-              setProgressItem('Approving USDC spend…');
+              setProgressItem(`Approving ${selectedToken.symbol} spend…`);
               break;
             case 'burn':
-              setProgressItem('Burning USDC on source chain…');
+              setProgressItem(`Burning ${selectedToken.symbol} on source chain…`);
               break;
             case 'fetch-attestation':
               setProgressItem('Fetching attestation…');
               break;
             case 'mint':
-              setProgressItem('Minting USDC on destination chain…');
+              setProgressItem(`Minting ${selectedToken.symbol} on destination chain…`);
               break;
             default:
               break;
@@ -96,12 +117,12 @@ const Bridge: React.FC = () => {
         addActivity({
           id: sourceTxHash,
           type: TransactionType.Sent,
-          description: 'Bridge USDC from Arc to Sepolia',
+          description: `Bridge ${selectedToken.symbol} from Arc to Sepolia`,
           timestamp: 'Just now',
           date: now,
           amount: -amountNumber,
-          currency: 'USDC',
-          usdValue: -amountNumber,
+          currency: selectedToken.symbol,
+          usdValue: selectedToken.symbol === 'USDC' ? -amountNumber : -amountNumber * 1.07, // EUR to USD conversion
           status: TransactionStatus.Completed,
           hash: sourceTxHash,
           from: sessionKey.address,
@@ -115,12 +136,12 @@ const Bridge: React.FC = () => {
         addActivity({
           id: receiveTxHash,
           type: TransactionType.Received,
-          description: 'Bridge USDC from Sepolia',
+          description: `Bridge ${selectedToken.symbol} from Sepolia`,
           timestamp: 'Just now',
           date: now,
           amount: amountNumber,
-          currency: 'USDC',
-          usdValue: amountNumber,
+          currency: selectedToken.symbol,
+          usdValue: selectedToken.symbol === 'USDC' ? amountNumber : amountNumber * 1.07, // EUR to USD conversion
           status: TransactionStatus.Completed,
           hash: receiveTxHash,
           from: 'Sepolia Bridge',
@@ -157,9 +178,9 @@ const Bridge: React.FC = () => {
   return (
     <div className="w-full max-w-3xl mx-auto px-6 py-10 space-y-10">
       <div className="space-y-3 text-center">
-        <h2 className="text-text-primary text-4xl font-black leading-tight tracking-[-0.03em]">Bridge USDC</h2>
+        <h2 className="text-text-primary text-4xl font-black leading-tight tracking-[-0.03em]">Bridge {selectedToken.symbol}</h2>
         <p className="text-text-secondary text-base">
-          Bridge USDC between Arc Testnet and Ethereum Sepolia using your current Arc Wallet session.
+          Bridge {selectedToken.symbol} between Arc Testnet and Ethereum Sepolia using your current Arc Wallet session.
         </p>
       </div>
 
@@ -186,21 +207,40 @@ const Bridge: React.FC = () => {
         </div>
 
         <div className="rounded-xl border border-white/10 bg-[#151A22] p-6 space-y-4">
-          <label className="flex flex-col gap-2">
-            <span className="text-sm font-medium text-text-secondary">Amount (USDC)</span>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium text-text-secondary">Token</label>
+              <select
+                value={selectedToken.symbol}
+                onChange={(e) => {
+                  const token = getAllSupportedTokens().find(t => t.symbol === e.target.value);
+                  if (token) setSelectedToken(token);
+                }}
+                className="mt-1 w-full rounded-lg border border-white/10 bg-[#0f1729] px-4 py-3 text-text-primary focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
+              >
+                {getAllSupportedTokens().map((token) => (
+                  <option key={token.symbol} value={token.symbol}>
+                    {token.name} ({token.symbol})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <label className="flex flex-col gap-2">
+              <span className="text-sm font-medium text-text-secondary">Amount ({selectedToken.symbol})</span>
             <input
-              type="number"
-              min="0"
-              step={1 / 10 ** PRIMARY_TOKEN_DECIMALS}
+              type="text"
+              inputMode="decimal"
               value={amount}
               onChange={(event) => setAmount(event.target.value)}
               className="form-input h-12 rounded-lg border border-white/10 bg-[#0f1729] px-4 text-text-primary focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
-              placeholder="0.00"
+              placeholder="e.g. 1.5 or 1,5"
             />
+            {amountError && <span className="text-xs text-accent-orange">{amountError}</span>}
           </label>
           <p className="text-xs text-text-secondary">
-            Ensure your session key controls USDC on the selected source chain. Bridging uses the same private key across Sepolia and Arc.
+            Ensure your session key controls {selectedToken.symbol} on the selected source chain. Bridging uses the same private key across Sepolia and Arc.
           </p>
+          </div>
         </div>
 
         <motion.button
@@ -210,7 +250,7 @@ const Bridge: React.FC = () => {
           className="flex items-center justify-center gap-2 h-12 rounded-lg bg-primary text-primary-text text-base font-semibold transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {isSubmitting && <SpinnerIcon size={20} />}
-          <span>{isSubmitting ? 'Bridging…' : `Bridge ${directionDetails?.label ?? ''}`}</span>
+          <span>{isSubmitting ? `Bridging ${selectedToken.symbol}…` : `Bridge ${selectedToken.symbol} ${directionDetails?.label ?? ''}`}</span>
         </motion.button>
 
         {statusMessage && (
