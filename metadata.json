@@ -1,0 +1,5 @@
+{
+  "name": "Arc Wallet",
+  "description": "A multi-signature crypto wallet interface for viewing and managing transactions with a sleek, modern UI.",
+  "requestFramePermissions": []
+}

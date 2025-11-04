@@ -1,0 +1,62 @@
+Arc Docs home page
+⌘K
+- Status
+- Blog
+- Community
+- Arc.network
+Search...
+Navigation
+Tools
+- Explorer
+- Faucet
+
+##### Get Started
+- Welcome to Arc
+- Deploy on Arc
+- Connect to Arc
+- Contract Addresses
+
+##### Key Features
+- Stable Fee Design
+- Deterministic Finality
+- Opt-in Privacy
+
+##### Architecture
+- System Overview
+- Consensus Layer
+- Execution Layer
+- EVM Compatibility
+
+##### Tools
+- Account Abstraction
+- Block Explorers
+- Compliance
+- Data Indexers
+- Node Providers
+On this page
+- Providers
+
+# Account Abstraction
+Copy page
+Copy page
+Account Abstraction (AA) providers enable developers to build smart contract
+wallets that can initiate and validate transactions without relying on
+externally owned accounts (EOAs).
+Providers
+These platforms and SDKs enable Account Abstraction on Arc, offering tools for
+smart account creation, session management, paymaster integration, and
+transaction sponsorship.
+Arc’s Account Abstraction ecosystem is modular: developers can mix SDKs,
+paymasters, and bundlers from multiple providers to design their smart account
+architecture based on their needs.
+By using the Arc Network Testnet, you agree to the Terms of Service
+and Privacy Policy.
+Was this page helpful?
+EVM Compatibility
+Block Explorers
+⌘I
+Arc Docs home page
+x
+discord
+x
+discord

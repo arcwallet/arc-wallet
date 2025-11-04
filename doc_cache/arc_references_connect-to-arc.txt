@@ -1,0 +1,67 @@
+Arc Docs home page
+⌘K
+- Status
+- Blog
+- Community
+- Arc.network
+Search...
+Navigation
+Get Started
+- Explorer
+- Faucet
+
+##### Get Started
+- Welcome to Arc
+- Deploy on Arc
+- Connect to Arc
+- Contract Addresses
+
+##### Key Features
+- Stable Fee Design
+- Deterministic Finality
+- Opt-in Privacy
+
+##### Architecture
+- System Overview
+- Consensus Layer
+- Execution Layer
+- EVM Compatibility
+
+##### Tools
+- Account Abstraction
+- Block Explorers
+- Compliance
+- Data Indexers
+- Node Providers
+On this page
+- Network details
+- Arc Testnet
+- Wallet setup
+- Add Arc Testnet
+- Gas and fees
+
+# Connect to Arc
+Copy page
+Copy page
+This page shows how to connect your app and wallet to the Arc blockchain.
+Network details
+Arc Testnet
+Wallet setup
+Add Arc Testnet
+- Open MetaMask → Add network → Add a network manually.
+- Fill in:
+- Save, then switch to Arc.
+If your wallet supports custom gas tokens, ensure display/decimals for
+USDC (18 decimals) and clearly label fees as USDC.
+Gas and fees
+By using the Arc Network Testnet, you agree to the Terms of Service
+and Privacy Policy.
+Was this page helpful?
+Deploy on Arc
+Contract Addresses
+⌘I
+Arc Docs home page
+x
+discord
+x
+discord

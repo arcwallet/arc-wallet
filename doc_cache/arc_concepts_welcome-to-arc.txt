@@ -1,0 +1,120 @@
+Arc Docs home page
+⌘K
+- Status
+- Blog
+- Community
+- Arc.network
+Search...
+Navigation
+Get Started
+- Explorer
+- Faucet
+
+##### Get Started
+- Welcome to Arc
+- Deploy on Arc
+- Connect to Arc
+- Contract Addresses
+
+##### Key Features
+- Stable Fee Design
+- Deterministic Finality
+- Opt-in Privacy
+
+##### Architecture
+- System Overview
+- Consensus Layer
+- Execution Layer
+- EVM Compatibility
+
+##### Tools
+- Account Abstraction
+- Block Explorers
+- Compliance
+- Data Indexers
+- Node Providers
+On this page
+- Core principles
+- What you can build
+
+# Welcome to Arc
+Copy page
+Copy page
+Arc is an open Layer-1 blockchain purpose-built to unite programmable money and
+onchain innovation with real-world economic activity. Designed to serve as the
+Economic OS for the internet, Arc enables builders and issuers worldwide to
+power the next era of onchain lending, capital markets, FX, and payments,
+igniting liquidity across currencies and asset classes.
+Engineered for mass adoption, Arc is enterprise-grade infrastructure featuring
+predictable fiat-based fees using stablecoins as gas (starting with USDC),
+deterministic sub-second finality, opt-in configurable privacy, and direct
+integration with Circle’s full-stack platform for secure access to liquidity and
+powerful developer tooling.
+As a public EVM-compatible network, developers can deploy smart contracts, build
+applications, and transact freely using familiar tools. While validator
+participation is permissioned for security and compliance, access to Arc is
+fully open.
+Ready to start building? See the Deploy on Arc
+quickstart.
+Core principles
+Arc is more than a new blockchain. It’s a new approach to how global economic
+coordination and infrastructure should be built, forged with the same principles
+of transparency and trust that define Circle:
+Purpose-built, not general-purpose
+Arc focuses on real-world economic activity, including but not limited to
+global finance, internet commerce, and institutional-grade DeFi.
+Open and composable by default
+While enterprise-ready, Arc is a public network and open to all developers.
+Anyone can build, transact, integrate, and contribute to the Arc ecosystem.
+Market-neutral and multichain-aligned
+Arc is interoperable with the broader multichain ecosystem through Circle CCTP
+and Circle Gateway, unlocking new use cases, partners, and institutional
+liquidity onchain.
+Built to coordinate, not control
+Arc aligns builders and partners across exchanges, market makers, asset
+issuers, fintechs, banks, PSPs, and enterprises to achieve something bigger
+than the sum of their parts.
+Trusted infrastructure, end-to-end
+Arc is built on Malachite, a highly efficient BFT consensus engine designed
+for certainty, reliability, and long-term operational excellence.
+What you can build
+Onchain credit with offchain trust
+Design credit infrastructure that combines stablecoins with external trust
+signals:
+- Identity-based lending protocols using verifiable credentials
+- Reputation-driven credit systems tied to cash flow or payment history
+- SMB and consumer credit apps serving under-served markets
+Capital markets settlement and tokenized collateral
+Modernize capital markets with stablecoin-native settlement:
+- Tokenized securities platforms with instant DvP
+- Collateral management systems for stablecoin-backed margin
+- Tokenized funds and structured products issued onchain
+- Prediction markets trading real-time data, forecasts, and risk signals
+Stablecoin FX
+Create markets and services around stablecoin conversion and FX:
+- Perpetuals and derivatives exchanges on stablecoin pairs
+- Swap APIs for programmatic stablecoin-to-stablecoin conversion
+- Treasury tools for multi-currency rebalancing and cross-border payouts
+Agentic commerce
+Enable autonomous systems to transact natively onchain:
+- AI-mediated marketplaces where agents buy, sell, and execute transactions
+- Machine-to-machine payment networks for IoT and devices
+- Coordination systems for agents to post, match, and settle intents in real
+time
+Cross-border payments and payouts
+Power global money movement with fiat-backed stablecoins, instant settlement,
+and low fees:
+- Remittance platforms for consumer transfers
+- Payout systems for marketplaces, gig workers, and global payroll
+- Trade finance platforms with tokenized invoices and automated onchain
+settlement
+By using the Arc Network Testnet, you agree to the Terms of Service
+and Privacy Policy.
+Was this page helpful?
+Deploy on Arc
+⌘I
+Arc Docs home page
+x
+discord
+x
+discord

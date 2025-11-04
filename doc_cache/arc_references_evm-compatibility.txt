@@ -1,0 +1,121 @@
+Arc Docs home page
+⌘K
+- Status
+- Blog
+- Community
+- Arc.network
+Search...
+Navigation
+Architecture
+- Explorer
+- Faucet
+
+##### Get Started
+- Welcome to Arc
+- Deploy on Arc
+- Connect to Arc
+- Contract Addresses
+
+##### Key Features
+- Stable Fee Design
+- Deterministic Finality
+- Opt-in Privacy
+
+##### Architecture
+- System Overview
+- Consensus Layer
+- Execution Layer
+- EVM Compatibility
+
+##### Tools
+- Account Abstraction
+- Block Explorers
+- Compliance
+- Data Indexers
+- Node Providers
+On this page
+- ERC20 interface
+- EVM differences
+- USDC blocklist revert handling
+- Developer impact
+
+# EVM Compatibility
+Copy page
+Copy page
+Arc is compatible with the Ethereum Virtual Machine (EVM). Developers can deploy
+and interact with smart contracts using the same tools, languages, and
+frameworks they use on Ethereum such as Solidity, Foundry, and Hardhat.
+While the execution environment mirrors Ethereum’s, Arc introduces a few key
+differences:
+- USDC as native gas: All fees and balances are denominated in USDC, not
+ETH.
+- Deterministic finality: Transactions finalize instantly and cannot be
+reversed.
+- Simplified block times: Blocks are timestamped by real time, not epochs or
+slots.
+- Stable fee model: Gas prices are smoothed for predictability.
+- Permissioned validators: Arc uses a BFT consensus model (Malachite) for
+speed and reliability.
+These changes make Arc predictable and stable while preserving EVM
+compatibility.
+ERC20 interface
+transferFrom
+, and uses 6 decimals to match the standard
+USDC representation.
+This has two important effects:
+- Tiny USDC amounts (less than 1 x 10⁻⁶ USDC) cannot be transferred using the
+ERC20 interface.
+payable
+receive
+- functions) as ERC20 transfers are directly reflected in the
+native balance.
+EVM differences
+Arc targets the Prague EVM hard fork with minor differences in execution and
+consensus behavior.
+The table below summarizes key distinctions from Ethereum mainnet.
+SELFDESTRUCT
+PARENT_BEACON_BLOCK_ROOT
+keccak256(RLP(header))
+PREV_RANDAO
+0
+USDC blocklist revert handling
+Arc enforces USDC blocklists both pre- and post-execution:
+- Pre-mempool check: If the sender is blocklisted, the transaction is
+rejected before entering the mempool. No fees are collected.
+- Post-mempool check: If the address becomes blocklisted after acceptance
+but before execution, the transaction reverts at runtime and consumes gas.
+- Runtime transfer check: If a valid transaction attempts to move USDC to or
+from a blocklisted address, only that operation reverts. Fees are still
+collected.
+Developer impact
+For most use cases, Ethereum-based tooling and smart contracts will work on Arc
+without modification. However, developers should note a few practical
+differences:
+ethers.js
+viem
+- , display and accounting logic should format values in
+USD terms, not ETH.
+- Timestamps: Multiple blocks may share the same timestamp; avoid assuming
+strictly increasing values for onchain time comparisons.
+block.prevrandao
+- is always zero. Do not use it as a source
+of randomness; use an external oracle or verifiable randomness function (VRF)
+instead.
+- Finality: Transactions finalize immediately after inclusion. Offchain
+systems can safely act on events after a single confirmation: no additional
+block waiting is required.
+- SELFDESTRUCT restrictions: Contracts that self-destruct during deployment
+will revert if they attempt to send USDC value to themselves.
+These differences are designed to make Arc’s execution environment predictable
+and stable while remaining interoperable with the Ethereum developer ecosystem.
+By using the Arc Network Testnet, you agree to the Terms of Service
+and Privacy Policy.
+Was this page helpful?
+Execution Layer
+Account Abstraction
+⌘I
+Arc Docs home page
+x
+discord
+x
+discord

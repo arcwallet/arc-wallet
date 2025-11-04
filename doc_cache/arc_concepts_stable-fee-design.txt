@@ -1,0 +1,111 @@
+Arc Docs home page
+⌘K
+- Status
+- Blog
+- Community
+- Arc.network
+Search...
+Navigation
+Key Features
+- Explorer
+- Faucet
+
+##### Get Started
+- Welcome to Arc
+- Deploy on Arc
+- Connect to Arc
+- Contract Addresses
+
+##### Key Features
+- Stable Fee Design
+- Deterministic Finality
+- Opt-in Privacy
+
+##### Architecture
+- System Overview
+- Consensus Layer
+- Execution Layer
+- EVM Compatibility
+
+##### Tools
+- Account Abstraction
+- Block Explorers
+- Compliance
+- Data Indexers
+- Node Providers
+On this page
+- USDC as unit of account
+- Fee smoothing mechanism
+- Stablecoin fee payments
+- Developer benefits
+
+# Stable Fee Design
+Copy page
+Copy page
+Arc’s stable fee design eliminates the volatility of gas costs and ensures
+predictable, auditable transaction fees. As a developer, you benefit from fees
+denominated in USDC, a protocol-level smoothing mechanism, and flexible
+paymaster services.
+On Arc, the base fee is designed to remain around one cent (≈ $0.01) per
+transaction on average. This target embodies Arc’s guiding principle of “1
+cent, 1 second, 1 click”, making onchain finance as fast, simple, and
+affordable as the internet itself.
+USDC as unit of account
+Arc uses USDC as the native gas token instead of a volatile cryptocurrency. This
+eliminates the need to manage token price swings and simplifies accounting.
+On most blockchains, you pay gas in a volatile token (for example, ETH on
+Ethereum). That means the real cost in dollars can fluctuate based on token
+price and network demand. On Arc, the gas unit is pegged to USDC, which is
+designed to stay stable at 1 USD.
+As a result:
+- You can estimate fees in advance in dollar terms.
+- You don’t need to hold volatile tokens just to pay gas.
+- Accounting and treasury processes are simpler, because the unit of value you
+transfer and the unit you pay in are the same.
+g
+gas units, the fee is:
+fee
+= g × base_fee_in_USDC
+The base fee is set in USDC, so you avoid the market volatility of a token-based
+gas fee. The only variable is block space demand, which Arc mitigates using a
+smoothing mechanism.
+Fee smoothing mechanism
+Arc’s fee market builds on Ethereum’s EIP-1559 but changes how the base fee
+adjusts. Instead of recalculating fees every block, Arc uses an exponentially
+weighted moving average (EWMA) of block utilization.
+This means:
+- Fees adjust gradually, not abruptly.
+- Short-term demand spikes have less impact.
+- Base fees remain bounded, keeping costs low and predictable.
+For developers, this means you don’t need complex fee estimation logic. You can
+expect stable base fees over time, even under varying network load.
+Stablecoin fee payments
+Arc plans to expand how transaction fees can be paid by designing new mechanisms
+that:
+- Accept fees in stablecoins beyond USDC, including EURC, USDT, MXNB, and
+others.
+- Sponsor user transactions by paying fees on their behalf.
+- Programmatically define custom fee rules, such as discounts or subsidies.
+Stablecoin fee payment support is on the roadmap and not yet available on Arc.
+This flexibility improves usability for global users who may not hold USDC
+directly, and allows you to build gasless experiences or multi-currency apps
+without complex workarounds.
+Developer benefits
+By building on Arc’s stable fee design, you gain:
+- Predictable, dollar-based transaction costs: typically around 1 cent per
+transaction.
+- Stable fees despite network congestion.
+- Reduced integration friction for enterprise and fintech use cases.
+- Flexibility to sponsor fees or accept multiple stablecoins without custom
+workarounds.
+By using the Arc Network Testnet, you agree to the Terms of Service
+and Privacy Policy.
+Was this page helpful?
+Contract Addresses
+Deterministic Finality
+⌘I
+Arc Docs home page
+x
+discord
+x
+discord

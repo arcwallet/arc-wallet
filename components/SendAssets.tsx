@@ -1,0 +1,372 @@
+import React, { useEffect, useMemo, useState } from 'react';
+import { isAddress } from 'ethers';
+import { useArcAccount } from '../contexts/ArcAccountContext';
+import { useWallet } from '../contexts/WalletContext';
+import { useSmartAccount } from '../contexts/SmartAccountContext';
+import { useActivity } from '../contexts/ActivityContext';
+import { formatUSDCAmount } from '../utils/format';
+import {
+  estimateNativeTransfer,
+  estimateSmartAccountExecute,
+} from '../services/transactionService';
+import {
+  executeNativeTransfer,
+  executeSmartAccountTransferWithFallback,
+} from '../services/executionRouter';
+import { TransactionStatus, TransactionType } from '../types';
+import { ExpandIcon, ContactIcon } from './Icons';
+import { getAllSupportedTokens, TokenInfo, formatTokenAmount } from '../config/tokens';
+import { tokenService } from '../services/tokenService';
+
+const TX_EXPLORER_BASE = 'https://testnet.arcscan.app/tx/';
+
+const SendAssets: React.FC = () => {
+  const { snapshot, isLoading } = useArcAccount();
+  const { sessionKey } = useWallet();
+  const { smartAccountAddress, isSessionAuthorised, isCheckingAuthorisation } = useSmartAccount();
+  const { addActivity } = useActivity();
+  const [amount, setAmount] = useState('');
+  const [recipient, setRecipient] = useState('');
+  const [selectedToken, setSelectedToken] = useState<TokenInfo>(getAllSupportedTokens()[0]);
+  const [tokenBalance, setTokenBalance] = useState<string>('0');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [txHash, setTxHash] = useState<string | null>(null);
+  const [submissionKind, setSubmissionKind] = useState<'transaction' | 'userOp'>('transaction');
+  const [feeEstimate, setFeeEstimate] = useState<bigint | null>(null);
+  const [isEstimating, setIsEstimating] = useState(false);
+
+  const balance = useMemo(() => {
+    return parseFloat(tokenBalance) || 0;
+  }, [tokenBalance]);
+
+  const balanceLabel = useMemo(() => {
+    const formatted = formatTokenAmount(BigInt(Math.floor(balance * (10 ** selectedToken.decimals))), selectedToken, {
+      minimumFractionDigits: 2,
+      showSymbol: true
+    });
+    return formatted.display;
+  }, [balance, selectedToken]);
+
+  // Fetch token balance when selected token or address changes
+  useEffect(() => {
+    const fetchTokenBalance = async () => {
+      if (!sessionKey?.address) {
+        setTokenBalance('0');
+        return;
+      }
+
+      try {
+        const tokenBalanceData = await tokenService.getTokenBalance(
+          selectedToken.symbol,
+          sessionKey.address,
+          'testnet',
+          'arcTestnet'
+        );
+
+        if (tokenBalanceData) {
+          setTokenBalance(tokenBalanceData.formattedBalance);
+        } else {
+          setTokenBalance('0');
+        }
+      } catch (error) {
+        console.error('Error fetching token balance:', error);
+        setTokenBalance('0');
+      }
+    };
+
+    fetchTokenBalance();
+  }, [selectedToken, sessionKey?.address]);
+  const amountNumber = parseFloat(amount) || 0;
+  const feeDisplay = feeEstimate ? formatUSDCAmount(feeEstimate).display : isEstimating ? 'Estimating…' : '-';
+  const feeNumber = feeEstimate ? Number(feeEstimate) / 1e18 : 0;
+  const total = amountNumber > 0 ? amountNumber + feeNumber : 0;
+
+  const usingSmartAccount = Boolean(smartAccountAddress);
+  const isAuthorised = !usingSmartAccount || isSessionAuthorised;
+
+  useEffect(() => {
+    const shouldEstimate = sessionKey && isAuthorised && isAddress(recipient) && amountNumber > 0;
+    if (!shouldEstimate) {
+      setFeeEstimate(null);
+      return;
+    }
+    let cancelled = false;
+    setIsEstimating(true);
+    const estimatePromise = usingSmartAccount && smartAccountAddress
+      ? estimateSmartAccountExecute({
+          sessionPrivateKey: sessionKey.privateKey,
+          smartAccountAddress,
+          to: recipient,
+          amount,
+        })
+      : estimateNativeTransfer({ from: sessionKey.address, to: recipient, amount });
+
+    estimatePromise
+      .then((estimate) => {
+        if (!cancelled) {
+          setFeeEstimate(estimate.totalFeeWei);
+        }
+      })
+      .catch((error) => {
+        console.warn('Fee estimation failed', error);
+        if (!cancelled) {
+          setFeeEstimate(null);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsEstimating(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionKey, recipient, amount, amountNumber, usingSmartAccount, isAuthorised, smartAccountAddress]);
+
+  const isRecipientValid = recipient ? isAddress(recipient) : false;
+  const hasSession = Boolean(sessionKey);
+  const canSubmit =
+    hasSession &&
+    isRecipientValid &&
+    amountNumber > 0 &&
+    amountNumber <= balance &&
+    !isSubmitting &&
+    isAuthorised;
+
+  const handleSubmit = async () => {
+    if (!sessionKey) {
+      setSubmitError('Passkey session missing. Please sign in again.');
+      return;
+    }
+    if (!isRecipientValid) {
+      setSubmitError('Recipient address is not valid.');
+      return;
+    }
+    if (amountNumber <= 0) {
+      setSubmitError('Enter an amount greater than zero.');
+      return;
+    }
+    if (amountNumber > balance) {
+      setSubmitError('Amount exceeds available balance.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setSubmitError(null);
+    setTxHash(null);
+    try {
+      let hash: string;
+      let submissionKind: 'transaction' | 'userOp';
+      if (smartAccountAddress) {
+        const result = await executeSmartAccountTransferWithFallback({
+          sessionPrivateKey: sessionKey.privateKey,
+          smartAccountAddress,
+          to: recipient,
+          amount,
+        });
+        hash = result.hash;
+        submissionKind = result.kind;
+        setSubmissionKind(result.kind);
+      } else {
+        const result = await executeNativeTransfer({
+          sessionPrivateKey: sessionKey.privateKey,
+          to: recipient,
+          amount,
+        });
+        hash = result.hash;
+        submissionKind = result.kind;
+        setSubmissionKind(result.kind);
+      }
+
+      setTxHash(hash);
+      setAmount('');
+
+      if (submissionKind === 'transaction') {
+        const activity = {
+          id: hash,
+          type: TransactionType.Sent,
+          description: `Sent ${amountNumber.toFixed(4)} USDC`,
+          timestamp: 'Just now',
+          date: new Date(),
+          amount: -amountNumber,
+          currency: 'USDC',
+          usdValue: -amountNumber,
+          status: TransactionStatus.Completed,
+          hash,
+          from: smartAccountAddress ?? sessionKey.address,
+          to: recipient,
+          networkFee: 0,
+          approvals: {
+            required: 0,
+            list: [],
+          },
+        };
+        addActivity(activity);
+      } else {
+        const activity = {
+          id: hash,
+          type: TransactionType.Sent,
+          description: `User operation submitted (${hash.slice(0, 10)}…)`,
+          timestamp: 'Just now',
+          date: new Date(),
+          amount: -amountNumber,
+          currency: 'USDC',
+          usdValue: -amountNumber,
+          status: TransactionStatus.Pending,
+          hash,
+          from: smartAccountAddress ?? sessionKey.address,
+          to: recipient,
+          networkFee: 0,
+          approvals: {
+            required: 0,
+            list: [],
+          },
+        };
+        addActivity(activity);
+      }
+    } catch (error: any) {
+      const message = typeof error?.message === 'string' ? error.message : 'Transaction failed';
+      if (message.toLowerCase().includes('blocklist')) {
+        setSubmitError('Transfer blocked: the sender or recipient is blocklisted.');
+      } else {
+        setSubmitError(message);
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="w-full max-w-md mx-auto">
+      <div className="mb-12 text-center">
+        <p className="text-text-primary text-4xl font-black leading-tight tracking-[-0.033em]">Send Assets</p>
+        <p className="text-text-secondary text-base font-normal leading-normal mt-3">Initiate a secure transfer of your digital assets.</p>
+      </div>
+      <div className="flex flex-col gap-6">
+        <div className="flex flex-col w-full">
+          <p className="text-sm font-medium leading-normal pb-2 text-text-secondary">Asset</p>
+          <div className="relative w-full">
+            <select
+              value={selectedToken.symbol}
+              onChange={(e) => {
+                const token = getAllSupportedTokens().find(t => t.symbol === e.target.value);
+                if (token) setSelectedToken(token);
+              }}
+              className="form-select flex w-full appearance-none resize-none overflow-hidden rounded-lg text-text-primary focus:outline-none border border-border-color bg-input-bg h-14 p-3.5 pr-10 text-base font-normal leading-normal focus:border-primary focus:ring-2 focus:ring-primary/50"
+            >
+              {getAllSupportedTokens().map((token) => (
+                <option key={token.symbol} value={token.symbol}>
+                  {token.name} ({token.symbol})
+                </option>
+              ))}
+            </select>
+            <ExpandIcon size={20} className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-text-secondary" />
+          </div>
+          <p className="text-xs text-text-secondary mt-1.5 text-right">Balance: {isLoading ? 'Loading…' : balanceLabel}</p>
+        </div>
+        <label className="flex flex-col w-full">
+          <p className="text-sm font-medium leading-normal pb-2 text-text-secondary">Amount</p>
+          <div className="relative flex w-full flex-1 items-stretch">
+            <input
+              className="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/50 border border-border-color bg-input-bg h-14 placeholder:text-text-secondary/70 p-3.5 text-base font-normal leading-normal"
+              placeholder="0.00"
+              step="any"
+              type="number"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+            />
+            <button
+              onClick={() => setAmount(balance.toFixed(6))}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-bold text-primary hover:text-primary/80 transition-colors"
+            >
+              MAX
+            </button>
+          </div>
+        </label>
+        <label className="flex flex-col w-full">
+          <p className="text-sm font-medium leading-normal pb-2 text-text-secondary">Send To</p>
+          <div className="flex w-full flex-1 items-stretch rounded-lg">
+            <input
+              className="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded-l-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/50 border border-border-color bg-input-bg h-14 placeholder:text-text-secondary/70 p-3.5 pr-2 text-base font-normal leading-normal"
+              placeholder="Enter recipient wallet address"
+              value={recipient}
+              onChange={(e) => setRecipient(e.target.value)}
+            />
+            <div className="text-text-secondary flex items-center justify-center rounded-r-lg border border-l-0 border-border-color bg-input-bg px-3.5">
+              <ContactIcon size={20} />
+            </div>
+          </div>
+        </label>
+        <div className="mt-2 rounded-lg border border-border-color bg-input-bg/50 p-4">
+          <h3 className="text-sm font-medium text-text-secondary mb-3">Transaction Summary</h3>
+          <div className="flex flex-col gap-2.5 text-sm">
+            <div className="flex justify-between">
+              <span className="text-text-secondary">Sending</span>
+              <span className="text-text-primary font-medium">{amountNumber > 0 ? `${amountNumber} USDC` : '-'}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-text-secondary">Execution Route</span>
+              <span className="text-text-primary font-medium">
+                {usingSmartAccount ? 'Smart Account' : 'Signer Wallet'}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-text-secondary">Network Fee</span>
+              <span className="text-text-primary font-medium">{amountNumber > 0 ? feeDisplay : '-'}</span>
+            </div>
+            <div className="my-2 border-t border-dashed border-border-color" />
+            <div className="flex justify-between">
+              <span className="text-text-secondary font-medium">Total</span>
+              <span className="text-text-primary font-bold">{total > 0 ? `${total.toFixed(4)} USDC` : '-'}</span>
+            </div>
+          </div>
+        </div>
+        {!hasSession && (
+          <p className="text-sm text-accent-orange text-center">
+            Connect with your passkey to send transactions.
+          </p>
+        )}
+        {usingSmartAccount && hasSession && !isAuthorised && !isCheckingAuthorisation && (
+          <p className="text-sm text-accent-orange text-center">
+            Authorise this session from the smart account panel before executing transfers.
+          </p>
+        )}
+        {usingSmartAccount && isCheckingAuthorisation && (
+          <p className="text-sm text-text-secondary text-center">
+            Verifying smart account authorisation…
+          </p>
+        )}
+        {submitError && <p className="text-sm text-accent-orange text-center">{submitError}</p>}
+        {txHash && (
+          submissionKind === 'transaction' ? (
+            <p className="text-sm text-primary text-center">
+              Transaction submitted:{' '}
+              <a className="underline" href={`${TX_EXPLORER_BASE}${txHash}`} target="_blank" rel="noreferrer">
+                View on ArcScan
+              </a>
+            </p>
+          ) : (
+            <p className="text-sm text-primary text-center">
+              User operation submitted: <span className="font-mono">{txHash}</span>
+            </p>
+          )
+        )}
+        <div className="mt-4 flex flex-col gap-4">
+          <button
+            onClick={handleSubmit}
+            disabled={!canSubmit}
+            className="flex w-full cursor-pointer items-center justify-center overflow-hidden rounded-lg h-12 bg-primary text-primary-text text-base font-bold leading-normal tracking-wide transition-opacity hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {isSubmitting ? 'Sending…' : 'Send'}
+          </button>
+          <button className="flex w-full cursor-pointer items-center justify-center overflow-hidden rounded-lg h-12 bg-surface text-text-primary text-base font-bold leading-normal tracking-wide transition-opacity hover:bg-white/5 border border-divider">
+            Submit for Approval
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default SendAssets;
