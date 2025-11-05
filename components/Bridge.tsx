@@ -28,6 +28,7 @@ const Bridge: React.FC = () => {
   const { addActivity } = useActivity();
 
   const [direction, setDirection] = useState<BridgeDirection>('arc-to-sepolia');
+  // Only USDC is supported for bridge between Arc Testnet and Sepolia
   const [selectedToken, setSelectedToken] = useState<TokenInfo>(getAllSupportedTokens().find(t => t.symbol === 'USDC') || getAllSupportedTokens()[0]);
   const [amount, setAmount] = useState('');
   const [amountError, setAmountError] = useState<string | null>(null);
@@ -178,9 +179,9 @@ const Bridge: React.FC = () => {
   return (
     <div className="w-full max-w-3xl mx-auto px-6 py-10 space-y-10">
       <div className="space-y-3 text-center">
-        <h2 className="text-text-primary text-4xl font-black leading-tight tracking-[-0.03em]">Bridge {selectedToken.symbol}</h2>
+        <h2 className="text-text-primary text-4xl font-black leading-tight tracking-[-0.03em]">Bridge USDC</h2>
         <p className="text-text-secondary text-base">
-          Bridge {selectedToken.symbol} between Arc Testnet and Ethereum Sepolia using your current Arc Wallet session.
+          Transfer USDC between <span className="text-primary font-semibold">Arc Testnet</span> and <span className="text-primary font-semibold">Ethereum Sepolia</span> using Circle CCTP.
         </p>
       </div>
 
@@ -210,20 +211,23 @@ const Bridge: React.FC = () => {
           <div className="space-y-4">
             <div>
               <label className="text-sm font-medium text-text-secondary">Token</label>
-              <select
-                value={selectedToken.symbol}
-                onChange={(e) => {
-                  const token = getAllSupportedTokens().find(t => t.symbol === e.target.value);
-                  if (token) setSelectedToken(token);
-                }}
-                className="mt-1 w-full rounded-lg border border-white/10 bg-[#0f1729] px-4 py-3 text-text-primary focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
-              >
-                {getAllSupportedTokens().map((token) => (
-                  <option key={token.symbol} value={token.symbol}>
-                    {token.name} ({token.symbol})
-                  </option>
-                ))}
-              </select>
+              <div className="mt-1 w-full rounded-lg border border-white/10 bg-[#0f1729] px-4 py-3 text-text-primary flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold text-sm">
+                    $
+                  </div>
+                  <div>
+                    <p className="font-semibold">{selectedToken.name}</p>
+                    <p className="text-xs text-text-secondary">{selectedToken.symbol}</p>
+                  </div>
+                </div>
+                <div className="ml-auto text-xs text-text-secondary">
+                  Arc Testnet ↔ Sepolia
+                </div>
+              </div>
+              <p className="text-xs text-text-secondary mt-2">
+                Only USDC is supported for bridge between Arc Testnet and Ethereum Sepolia
+              </p>
             </div>
             <label className="flex flex-col gap-2">
               <span className="text-sm font-medium text-text-secondary">Amount ({selectedToken.symbol})</span>
