@@ -55,11 +55,17 @@ export async function bridgeUsdcWithSessionKey({
   direction,
   onProgress,
 }: BridgeParams): Promise<BridgeExecutionResult> {
+  // Keep chain config in outer scope so catch can reference it for error messages
+  let fromRpcUrl: string | undefined;
+  let toRpcUrl: string | undefined;
   try {
     if (DEBUG) console.log('🌉 Bridge operation starting:', { direction, amount });
 
     const kit = new BridgeKit();
-    const { fromChain, toChain, fromRpcUrl, toRpcUrl } = getChainConfig(direction);
+    const cfg = getChainConfig(direction);
+    const { fromChain, toChain } = cfg;
+    fromRpcUrl = cfg.fromRpcUrl;
+    toRpcUrl = cfg.toRpcUrl;
 
     // Create dedicated adapters per chain with explicit RPC URLs
     const adapterFrom = await createAdapterFromPrivateKey({ privateKey, rpcUrl: fromRpcUrl });
@@ -137,7 +143,7 @@ export async function bridgeUsdcWithSessionKey({
 
     // Enhanced error handling
     if (error?.message?.includes('network') || error?.message?.includes('RPC')) {
-      throw new Error(`Network connection error: ${fromRpcUrl} or ${toRpcUrl} may be unreachable. Please check RPC endpoints.`);
+      throw new Error(`Network connection error: ${fromRpcUrl || 'from-RPC'} or ${toRpcUrl || 'to-RPC'} may be unreachable. Please check RPC endpoints.`);
     } else if (error?.message?.includes('insufficient')) {
       throw new Error('Insufficient USDC balance. Please ensure you have enough USDC in your account.');
     } else if (error?.message?.includes('allowance')) {
