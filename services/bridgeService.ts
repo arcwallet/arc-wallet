@@ -116,12 +116,12 @@ export async function bridgeUsdcWithSessionKey({
         from: {
           adapter: adapterFrom,
           chain: fromChain,
-          amount: amountString,
         },
         to: {
           adapter: adapterTo,
           chain: toChain,
         },
+        amount: amountString,
       });
 
       if (DEBUG) console.log('✅ Bridge completed:', result);
