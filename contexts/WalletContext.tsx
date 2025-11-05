@@ -218,10 +218,9 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         }
       },
       verifyWithPasskey: async () => {
-        const uid = userId || getOrCreateUserId();
-        if (!uid) throw new Error('No user identity');
-        const username = `Arc User ${uid.slice(0, 6)}`;
-        const session = await authenticateWithPasskey(username);
+        // Use discoverable credentials (no username) for verification
+        // This allows the browser to show all passkeys registered for this RP_ID
+        const session = await authenticateWithPasskey();
         finalizeSession(session);
       }
     }),

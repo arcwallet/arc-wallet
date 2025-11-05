@@ -1,13 +1,8 @@
 import { Contract, JsonRpcProvider, Wallet, parseUnits } from 'ethers';
 import { ARC_SMART_ACCOUNT_ABI } from './smartAccountService.ts';
+import { getArcRpcUrl } from '../config/rpc';
 
-const runtimeEnv =
-  typeof import.meta !== 'undefined' && typeof import.meta.env !== 'undefined'
-    ? (import.meta.env as Record<string, string | undefined>)
-    : (process.env as Record<string, string | undefined>);
-
-export const RPC_URL =
-  runtimeEnv?.VITE_ARC_RPC_URL ?? runtimeEnv?.ARC_RPC_URL ?? 'https://rpc.testnet.arc.network';
+export const RPC_URL = getArcRpcUrl();
 
 export const getProvider = () => new JsonRpcProvider(RPC_URL);
 
