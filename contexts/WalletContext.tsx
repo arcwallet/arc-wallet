@@ -222,38 +222,17 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         }
       },
       verifyWithPasskey: async () => {
-        console.log('🔐 verifyWithPasskey called');
-
-        // Try with stored user first for faster passkey selection
-        const storedUserId = typeof window !== 'undefined' ? window.localStorage.getItem(USER_ID_STORAGE_KEY) : null;
+        console.log('🔐 verifyWithPasskey called - using discoverable credentials');
 
         try {
-          let session: SessionKey;
-
-          if (storedUserId) {
-            // Use stored userId to create username
-            const username = `Arc User ${storedUserId.slice(0, 6)}`;
-            console.log('🔐 Using stored username:', username);
-            session = await authenticateWithPasskey(username);
-          } else {
-            // Fallback to discoverable credentials
-            console.log('🔐 Using discoverable credentials (no username)');
-            session = await authenticateWithPasskey();
-          }
-
+          // Always use discoverable credentials for maximum compatibility
+          // This allows the browser to show all available passkeys
+          const session = await authenticateWithPasskey();
           console.log('✅ Passkey verification successful');
           finalizeSession(session);
         } catch (error) {
-          console.error('❌ Passkey verification error:', error);
-
-          // If username-based auth failed with "user not found", try discoverable
-          if (error instanceof PasskeyClientError && error.status === 404 && storedUserId) {
-            console.log('🔄 Retrying with discoverable credentials...');
-            const session = await authenticateWithPasskey();
-            finalizeSession(session);
-          } else {
-            throw error;
-          }
+          console.error('❌ Passkey verification failed:', error);
+          throw error;
         }
       }
     }),
