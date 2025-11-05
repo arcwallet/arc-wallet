@@ -34,10 +34,11 @@ const WalletSelectionScreen: React.FC<WalletSelectionScreenProps> = ({ onConnect
                 onClick={async () => {
                   setIsRegistering(true);
                   try {
+                    // registerPasskeyForCurrentUser now handles both registration and session creation
                     await registerPasskeyForCurrentUser();
-                    await onConnect();
+                    // No need to call onConnect() - registration now returns session key
                   } catch (e: any) {
-                    alert(e?.message || 'Failed to register/sign in with passkey.');
+                    alert(e?.message || 'Failed to register with passkey.');
                   } finally {
                     setIsRegistering(false);
                   }

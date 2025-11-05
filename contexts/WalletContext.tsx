@@ -90,30 +90,20 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }
   }, []);
 
-  const registerPasskey = useCallback(async (userId: string) => {
-    const username = `Arc User ${userId.slice(0, 6)}`;
-    try {
-      const startResp = await passkeyClient.beginRegistration(username, username);
-      const options = startResp.data?.options ?? (startResp as any).data?.options; // safety for runtime typing
-      const credential = await createRegistrationCredential(options);
-      await passkeyClient.finishRegistration(username, credential);
-    } catch (error) {
-      if (error instanceof PasskeyClientError && error.status === 400) {
-        console.info('Passkey already registered, skipping re-registration');
-        return;
-      }
-      if (error instanceof DOMException && error.name === 'InvalidStateError') {
-        console.info('Credential already exists on this authenticator');
-        return;
-      }
-      throw error;
-    }
-  }, []);
-
+  // Define authenticateWithPasskey FIRST before registerPasskey (which uses it)
   const authenticateWithPasskey = useCallback(async (username?: string) => {
     const startResp = await passkeyClient.beginAuthentication(username);
     const options = startResp.data?.options ?? (startResp as any).data?.options;
     const credential = await createAuthenticationCredential(options);
+
+    // Debug log
+    console.log('🔍 Frontend Auth Credential:', {
+      id: credential.id?.substring(0, 30) + '...',
+      rawId: (credential as any).rawId?.substring(0, 30) + '...',
+      idLength: credential.id?.length,
+      rawIdLength: (credential as any).rawId?.length
+    });
+
     const finishResp = await passkeyClient.finishAuthentication(credential);
     const newSession = finishResp.data?.sessionKey ?? (finishResp as any).data?.sessionKey;
     const user = finishResp.data?.user ?? (finishResp as any).data?.user;
@@ -126,6 +116,46 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     return newSession as SessionKey;
   }, []);
 
+  const registerPasskey = useCallback(async (userId: string): Promise<SessionKey | null> => {
+    const username = `Arc User ${userId.slice(0, 6)}`;
+    try {
+      const startResp = await passkeyClient.beginRegistration(username, username);
+      const options = startResp.data?.options ?? (startResp as any).data?.options;
+      const credential = await createRegistrationCredential(options);
+      const finishResp = await passkeyClient.finishRegistration(username, credential);
+
+      // Registration now returns a session key
+      const sessionKey = finishResp.data?.sessionKey ?? (finishResp as any).data?.sessionKey;
+      const user = finishResp.data?.user ?? (finishResp as any).data?.user;
+
+      // Update user ID from registration response
+      if (user?.id && typeof window !== 'undefined') {
+        try {
+          window.localStorage.setItem(USER_ID_STORAGE_KEY, user.id);
+          setUserId(user.id);
+        } catch {}
+      }
+
+      return sessionKey as SessionKey;
+    } catch (error) {
+      if (error instanceof PasskeyClientError && error.status === 400) {
+        console.info('Passkey already registered, trying to authenticate instead');
+        // If already registered, try to authenticate
+        const username = `Arc User ${userId.slice(0, 6)}`;
+        const session = await authenticateWithPasskey(username);
+        return session;
+      }
+      if (error instanceof DOMException && error.name === 'InvalidStateError') {
+        console.info('Credential already exists on this authenticator, trying to authenticate');
+        // If credential exists, try to authenticate
+        const username = `Arc User ${userId.slice(0, 6)}`;
+        const session = await authenticateWithPasskey(username);
+        return session;
+      }
+      throw error;
+    }
+  }, [authenticateWithPasskey]);
+
   const loginWithPasskey = useCallback(async () => {
     if (typeof window === 'undefined') {
       return;
@@ -135,31 +165,17 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       return;
     }
 
-    const userId = getOrCreateUserId();
-    if (!userId) {
-      window.alert('Unable to establish user identity for passkey login.');
-      return;
-    }
-    setUserId(userId);
-
     setIsConnecting(true);
     try {
-      const username = `Arc User ${userId.slice(0, 6)}`;
-      let session = await authenticateWithPasskey(username);
+      // Use discoverable credentials (no username needed)
+      // Browser will show all passkeys registered on this device for this RP_ID
+      let session = await authenticateWithPasskey();
       finalizeSession(session);
     } catch (firstError) {
       if (firstError instanceof PasskeyClientError && firstError.status === 404) {
-        try {
-          await registerPasskey(userId);
-          const username = `Arc User ${userId.slice(0, 6)}`;
-          const session = await authenticateWithPasskey(username);
-          finalizeSession(session);
-          return;
-        } catch (registerError) {
-          console.error('Passkey registration failed', registerError);
-          window.alert('Passkey registration failed. Please try again.');
-          return;
-        }
+        // No passkey found, prompt user to create one
+        window.alert('No passkey found. Please create a new passkey first.');
+        return;
       }
 
       if (firstError instanceof DOMException && firstError.name === 'NotAllowedError') {
@@ -172,7 +188,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     } finally {
       setIsConnecting(false);
     }
-  }, [authenticateWithPasskey, finalizeSession, registerPasskey]);
+  }, [authenticateWithPasskey, finalizeSession]);
 
   const logout = useCallback(() => {
     setAddress(null);
@@ -184,16 +200,31 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   }, []);
 
   const value = useMemo<WalletContextValue>(
-    () => ({ isAuthenticated, isConnecting, address, userId, sessionKey, loginWithPasskey, logout, registerPasskeyForCurrentUser: async () => {
-      if (!userId) throw new Error('No userId available');
-      await registerPasskey(userId);
-    }, verifyWithPasskey: async () => {
-      const uid = userId || getOrCreateUserId();
-      if (!uid) throw new Error('No user identity');
-      const username = `Arc User ${uid.slice(0, 6)}`;
-      const session = await authenticateWithPasskey(username);
-      finalizeSession(session);
-    } }),
+    () => ({
+      isAuthenticated,
+      isConnecting,
+      address,
+      userId,
+      sessionKey,
+      loginWithPasskey,
+      logout,
+      registerPasskeyForCurrentUser: async () => {
+        const uid = userId || getOrCreateUserId();
+        if (!uid) throw new Error('No user identity');
+        setUserId(uid);
+        const session = await registerPasskey(uid);
+        if (session) {
+          finalizeSession(session);
+        }
+      },
+      verifyWithPasskey: async () => {
+        const uid = userId || getOrCreateUserId();
+        if (!uid) throw new Error('No user identity');
+        const username = `Arc User ${uid.slice(0, 6)}`;
+        const session = await authenticateWithPasskey(username);
+        finalizeSession(session);
+      }
+    }),
     [isAuthenticated, isConnecting, address, userId, sessionKey, loginWithPasskey, logout, registerPasskey, authenticateWithPasskey, finalizeSession],
   );
 

@@ -132,6 +132,14 @@ export class PasskeyController {
         throw new ApiError('Invalid or expired challenge', 400, 'INVALID_CHALLENGE');
       }
 
+      // Debug: Log incoming credential
+      console.log('🔍 Registration Credential:', {
+        id: credential.id?.substring(0, 30),
+        rawId: (credential as any).rawId?.substring(0, 30),
+        idLength: credential.id?.length,
+        rawIdLength: (credential as any).rawId?.length
+      });
+
       // Verify registration response
       const verification = await verifyRegistrationResponse({
         response: credential,
@@ -156,11 +164,19 @@ export class PasskeyController {
         });
       }
 
-      // Store passkey credential (encode credentialID as base64url string)
+      // Store passkey credential
+      // IMPORTANT: Use credential.rawId directly (already base64url encoded)
+      // DO NOT encode again - verification.registrationInfo.credentialID is Uint8Array
       if (verification.registrationInfo) {
-        const credentialIdB64Url = Buffer
-          .from(verification.registrationInfo.credentialID)
-          .toString('base64url');
+        // Use frontend's rawId directly - it's already base64url encoded
+        const credentialIdB64Url = (credential as any).rawId || credential.id;
+
+        console.log('✅ Saving Credential ID:', {
+          frontendRawId: (credential as any).rawId,
+          usingId: credentialIdB64Url,
+          length: credentialIdB64Url?.length
+        });
+
         await this.db.createPasskeyCredential({
           id: randomUUID(),
           userId: user.id,
@@ -176,9 +192,17 @@ export class PasskeyController {
       // Clean up challenge
       await this.db.deleteChallenge(challengeRecord.id);
 
+      // Generate session key for the newly registered user
+      const sessionKey = await this.sessionKeyManager.generateSessionKey(user.id, 24); // 24 hours
+
       res.json({
         success: true,
         data: {
+          sessionKey: {
+            privateKey: sessionKey.privateKey,
+            address: sessionKey.address,
+            expiresAt: sessionKey.expiresAt.toISOString()
+          },
           user: {
             id: user.id,
             username: user.username,
@@ -262,11 +286,31 @@ export class PasskeyController {
         throw new ApiError('Credential is required', 400, 'MISSING_CREDENTIAL');
       }
 
+      console.log('🔍 Full Credential Object:', JSON.stringify(credential, null, 2));
+
       // Get passkey credential from database
-      const passkeyCredential = await this.db.getPasskeyByCredentialId(credential.id);
+      // Use rawId (base64url) instead of id (base64) to match database format
+      const credentialId = credential.rawId || credential.id;
+      console.log('🔍 Authentication Debug:', {
+        credentialId: credentialId?.substring(0, 50),
+        hasRawId: !!credential.rawId,
+        hasId: !!credential.id,
+        rawIdLength: credential.rawId?.length,
+        idLength: credential.id?.length
+      });
+      const passkeyCredential = await this.db.getPasskeyByCredentialId(credentialId);
       if (!passkeyCredential) {
+        console.error('❌ Passkey not found in database. Searched for:', credentialId?.substring(0, 30) + '...');
+        // List all credentials in database for debugging
+        const dbAny = this.db as any;
+        await dbAny.waitForReady();
+        const { promisify } = await import('util');
+        const all = promisify(dbAny.db.all.bind(dbAny.db));
+        const allCreds = await all('SELECT credential_id FROM passkey_credentials LIMIT 5');
+        console.error('📋 Available credentials in DB:', allCreds.map((c: any) => c.credential_id.substring(0, 30) + '...'));
         throw new ApiError('Passkey not found', 404, 'PASSKEY_NOT_FOUND');
       }
+      console.log('✅ Passkey found for user:', passkeyCredential.userId);
 
       // Get user
       const user = await this.db.getUserById(passkeyCredential.userId);
