@@ -179,7 +179,25 @@ const SendAssets: React.FC = () => {
     setTxHash(null);
     try {
       // Require fresh passkey verification before sending
-      await verifyWithPasskey();
+      try {
+        await verifyWithPasskey();
+      } catch (passkeyError: any) {
+        // Handle passkey-specific errors
+        const passkeyMsg = typeof passkeyError?.message === 'string' ? passkeyError.message : '';
+
+        if (passkeyError instanceof DOMException && passkeyError.name === 'NotAllowedError') {
+          throw new Error('Passkey verification was cancelled. Please try again and complete the verification.');
+        } else if (passkeyMsg.toLowerCase().includes('user not found')) {
+          throw new Error('Your passkey is not registered. Please sign out and create a new passkey.');
+        } else if (passkeyMsg.toLowerCase().includes('not found') || passkeyMsg.toLowerCase().includes('passkey not found')) {
+          throw new Error('Passkey not found. Please sign out and register a new passkey.');
+        } else if (passkeyMsg.toLowerCase().includes('challenge')) {
+          throw new Error('Authentication challenge expired. Please try again.');
+        } else {
+          throw new Error(`Passkey verification failed: ${passkeyMsg || 'Unknown error'}`);
+        }
+      }
+
       let hash: string;
       let submissionKind: 'transaction' | 'userOp';
       const result = await executeNativeTransfer({
@@ -253,7 +271,27 @@ const SendAssets: React.FC = () => {
     try {
       setSubmitError(null);
       setIsVerifying(true);
-      await verifyWithPasskey();
+
+      try {
+        await verifyWithPasskey();
+        // Success - show confirmation message
+        window.alert('✅ Passkey verified successfully! You can now proceed with the transaction using the Send button.');
+      } catch (passkeyError: any) {
+        // Handle passkey-specific errors
+        const passkeyMsg = typeof passkeyError?.message === 'string' ? passkeyError.message : '';
+
+        if (passkeyError instanceof DOMException && passkeyError.name === 'NotAllowedError') {
+          throw new Error('Passkey verification was cancelled. Please try again and complete the verification.');
+        } else if (passkeyMsg.toLowerCase().includes('user not found')) {
+          throw new Error('Your passkey is not registered. Please sign out and create a new passkey.');
+        } else if (passkeyMsg.toLowerCase().includes('not found') || passkeyMsg.toLowerCase().includes('passkey not found')) {
+          throw new Error('Passkey not found. Please sign out and register a new passkey.');
+        } else if (passkeyMsg.toLowerCase().includes('challenge')) {
+          throw new Error('Authentication challenge expired. Please try again.');
+        } else {
+          throw new Error(`Passkey verification failed: ${passkeyMsg || 'Unknown error'}`);
+        }
+      }
     } catch (err: any) {
       const msg = typeof err?.message === 'string' ? err.message : 'Passkey verification failed';
       setSubmitError(msg);
