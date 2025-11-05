@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: arcwallet-backend
+    rootDir: backend
+    env: node
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start
+    autoDeploy: true
+    plan: free
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: RP_ID
+        value: app.arcwallet.network
+      - key: ORIGIN
+        value: https://app.arcwallet.network
+      - key: ALLOWED_ORIGINS
+        value: https://app.arcwallet.network
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: JWT_SECRET
+        generateValue: true
+
