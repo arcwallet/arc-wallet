@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import 'dotenv/config';
-import express from 'express';
+import express, { Request, Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import { Database } from './models/Database.js';
@@ -78,7 +78,7 @@ app.use(rateLimitMiddleware('general'));
 app.use('/passkeys', createPasskeyRoutes(db, config));
 
 // Root endpoint
-app.get('/', (req, res) => {
+app.get('/', (req: Request, res: Response) => {
   res.json({
     success: true,
     message: 'Arc Wallet Passkey Backend',
@@ -104,7 +104,7 @@ app.get('/', (req, res) => {
 });
 
 // 404 handler
-app.use('*', (req, res) => {
+app.use('*', (req: Request, res: Response) => {
   res.status(404).json({
     success: false,
     error: 'Endpoint not found',
