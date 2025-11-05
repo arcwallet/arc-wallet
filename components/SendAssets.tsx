@@ -28,7 +28,6 @@ const SendAssets: React.FC = () => {
   const [selectedToken, setSelectedToken] = useState<TokenInfo>(getAllSupportedTokens()[0]);
   const [tokenBalance, setTokenBalance] = useState<string>('0');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isVerifying, setIsVerifying] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [txHash, setTxHash] = useState<string | null>(null);
   const [submissionKind, setSubmissionKind] = useState<'transaction' | 'userOp'>('transaction');
@@ -267,38 +266,6 @@ const SendAssets: React.FC = () => {
     }
   };
 
-  const handleSubmitForApproval = async () => {
-    try {
-      setSubmitError(null);
-      setIsVerifying(true);
-
-      try {
-        await verifyWithPasskey();
-        // Success - show confirmation message
-        window.alert('✅ Passkey verified successfully! You can now proceed with the transaction using the Send button.');
-      } catch (passkeyError: any) {
-        // Handle passkey-specific errors
-        const passkeyMsg = typeof passkeyError?.message === 'string' ? passkeyError.message : '';
-
-        if (passkeyError instanceof DOMException && passkeyError.name === 'NotAllowedError') {
-          throw new Error('Passkey verification was cancelled. Please try again and complete the verification.');
-        } else if (passkeyMsg.toLowerCase().includes('user not found')) {
-          throw new Error('Your passkey is not registered. Please sign out and create a new passkey.');
-        } else if (passkeyMsg.toLowerCase().includes('not found') || passkeyMsg.toLowerCase().includes('passkey not found')) {
-          throw new Error('Passkey not found. Please sign out and register a new passkey.');
-        } else if (passkeyMsg.toLowerCase().includes('challenge')) {
-          throw new Error('Authentication challenge expired. Please try again.');
-        } else {
-          throw new Error(`Passkey verification failed: ${passkeyMsg || 'Unknown error'}`);
-        }
-      }
-    } catch (err: any) {
-      const msg = typeof err?.message === 'string' ? err.message : 'Passkey verification failed';
-      setSubmitError(msg);
-    } finally {
-      setIsVerifying(false);
-    }
-  };
 
   return (
     <div className="w-full max-w-md mx-auto">
@@ -415,21 +382,27 @@ const SendAssets: React.FC = () => {
             </p>
           )
         )}
-        <div className="mt-4 flex flex-col gap-4">
+        <div className="mt-6">
           <button
             onClick={handleSubmit}
             disabled={!canSubmit}
-            className="flex w-full cursor-pointer items-center justify-center overflow-hidden rounded-lg h-12 bg-primary text-primary-text text-base font-bold leading-normal tracking-wide transition-opacity hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed"
+            className="flex w-full cursor-pointer items-center justify-center overflow-hidden rounded-lg h-14 bg-primary text-primary-text text-lg font-bold leading-normal tracking-wide transition-all hover:opacity-90 hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 shadow-lg"
           >
-            {isSubmitting ? 'Sending…' : 'Send'}
+            {isSubmitting ? (
+              <span className="flex items-center gap-2">
+                <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Verifying & Sending…
+              </span>
+            ) : (
+              'Send with Passkey'
+            )}
           </button>
-          <button
-            onClick={handleSubmitForApproval}
-            disabled={isVerifying}
-            className="flex w-full cursor-pointer items-center justify-center overflow-hidden rounded-lg h-12 bg-surface text-text-primary text-base font-bold leading-normal tracking-wide transition-opacity hover:bg-white/5 border border-divider disabled:opacity-60"
-          >
-            {isVerifying ? 'Verifying…' : 'Submit for Approval'}
-          </button>
+          <p className="text-xs text-text-secondary text-center mt-3">
+            You'll be prompted to verify with your passkey before sending
+          </p>
         </div>
       </div>
     </div>
