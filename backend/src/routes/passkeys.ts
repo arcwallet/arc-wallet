@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { PasskeyController } from '../controllers/PasskeyController.js';
 import { Database } from '../models/Database.js';
 import {
@@ -23,7 +23,7 @@ export function createPasskeyRoutes(db: Database, config: EnvConfig): Router {
     '/register/start',
     rateLimitMiddleware('registration'),
     validateRequestBody(['username', 'displayName']),
-    async (req, res, next) => {
+    async (req: Request, res: Response, next: NextFunction) => {
       try {
         await passkeyController.registrationStart(req, res);
       } catch (error) {
@@ -40,7 +40,7 @@ export function createPasskeyRoutes(db: Database, config: EnvConfig): Router {
     '/register/finish',
     rateLimitMiddleware('registration'),
     validateRequestBody(['username', 'credential']),
-    async (req, res, next) => {
+    async (req: Request, res: Response, next: NextFunction) => {
       try {
         await passkeyController.registrationFinish(req, res);
       } catch (error) {
@@ -56,7 +56,7 @@ export function createPasskeyRoutes(db: Database, config: EnvConfig): Router {
   router.post(
     '/auth/start',
     rateLimitMiddleware('auth'),
-    async (req, res, next) => {
+    async (req: Request, res: Response, next: NextFunction) => {
       try {
         await passkeyController.authenticationStart(req, res);
       } catch (error) {
@@ -73,7 +73,7 @@ export function createPasskeyRoutes(db: Database, config: EnvConfig): Router {
     '/auth/finish',
     rateLimitMiddleware('auth'),
     validateRequestBody(['credential']),
-    async (req, res, next) => {
+    async (req: Request, res: Response, next: NextFunction) => {
       try {
         await passkeyController.authenticationFinish(req, res);
       } catch (error) {
@@ -89,7 +89,7 @@ export function createPasskeyRoutes(db: Database, config: EnvConfig): Router {
   router.get(
     '/session-keys/:userId',
     rateLimitMiddleware('general'),
-    async (req, res, next) => {
+    async (req: Request, res: Response, next: NextFunction) => {
       try {
         await passkeyController.getSessionKeys(req, res);
       } catch (error) {
@@ -105,7 +105,7 @@ export function createPasskeyRoutes(db: Database, config: EnvConfig): Router {
   router.delete(
     '/session-keys/:sessionKeyId',
     rateLimitMiddleware('general'),
-    async (req, res, next) => {
+    async (req: Request, res: Response, next: NextFunction) => {
       try {
         await passkeyController.revokeSessionKey(req, res);
       } catch (error) {
@@ -143,7 +143,7 @@ export function createPasskeyRoutes(db: Database, config: EnvConfig): Router {
    * GET /passkeys/health
    * Health check for passkey service
    */
-  router.get('/health', async (req, res, next) => {
+  router.get('/health', async (req: Request, res: Response, next: NextFunction) => {
     try {
       await passkeyController.healthCheck(req, res);
     } catch (error) {
