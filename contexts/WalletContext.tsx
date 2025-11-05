@@ -218,10 +218,39 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         }
       },
       verifyWithPasskey: async () => {
-        // Use discoverable credentials (no username) for verification
-        // This allows the browser to show all passkeys registered for this RP_ID
-        const session = await authenticateWithPasskey();
-        finalizeSession(session);
+        console.log('🔐 verifyWithPasskey called');
+
+        // Try with stored user first for faster passkey selection
+        const storedUserId = typeof window !== 'undefined' ? window.localStorage.getItem(USER_ID_STORAGE_KEY) : null;
+
+        try {
+          let session: SessionKey;
+
+          if (storedUserId) {
+            // Use stored userId to create username
+            const username = `Arc User ${storedUserId.slice(0, 6)}`;
+            console.log('🔐 Using stored username:', username);
+            session = await authenticateWithPasskey(username);
+          } else {
+            // Fallback to discoverable credentials
+            console.log('🔐 Using discoverable credentials (no username)');
+            session = await authenticateWithPasskey();
+          }
+
+          console.log('✅ Passkey verification successful');
+          finalizeSession(session);
+        } catch (error) {
+          console.error('❌ Passkey verification error:', error);
+
+          // If username-based auth failed with "user not found", try discoverable
+          if (error instanceof PasskeyClientError && error.status === 404 && storedUserId) {
+            console.log('🔄 Retrying with discoverable credentials...');
+            const session = await authenticateWithPasskey();
+            finalizeSession(session);
+          } else {
+            throw error;
+          }
+        }
       }
     }),
     [isAuthenticated, isConnecting, address, userId, sessionKey, loginWithPasskey, logout, registerPasskey, authenticateWithPasskey, finalizeSession],

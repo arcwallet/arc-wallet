@@ -247,7 +247,8 @@ export class PasskeyController {
       const options = await generateAuthenticationOptions({
         rpID: this.config.RP_ID,
         allowCredentials,
-        userVerification: 'required'
+        userVerification: 'required',
+        timeout: 60000 // 60 seconds timeout
       });
 
       // Store challenge in database
