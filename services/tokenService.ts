@@ -204,7 +204,7 @@ class TokenService {
 }
 
 // Export singleton instance
-const DEFAULT_RPC_URL = import.meta.env.VITE_ARC_RPC_URL ?? 'https://capable-tame-glitter.arc-testnet.quiknode.pro/96002201d9f8c9d93fcb9ec6bfdb069d3e8f3ef0';
+const DEFAULT_RPC_URL = import.meta.env.VITE_ARC_RPC_URL ?? 'https://rpc.testnet.arc.network';
 export const tokenService = new TokenService(DEFAULT_RPC_URL);
 
 // Export class for custom instances
