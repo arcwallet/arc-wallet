@@ -66,7 +66,7 @@ const SideNavBar: React.FC<SideNavBarProps> = ({ currentPage, onNavigate }) => {
   return (
     <aside className="hidden md:flex w-64 flex-col border-r border-white/10 bg-[#091325]/50 p-4">
         <div className="flex items-center gap-3 p-3">
-            <img src="/arcwalletlogo.svg" alt="Arc Wallet" className="h-10 w-10" />
+            <img src="/arcwalletlogo.png" alt="Arc Wallet" className="h-10 w-10 object-contain" />
             <h1 className="text-[#E6EEF3] text-lg font-bold">Arc Wallet</h1>
         </div>
         <nav className="mt-8 flex flex-1 flex-col gap-2">
