@@ -96,13 +96,17 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     const options = startResp.data?.options ?? (startResp as any).data?.options;
     const credential = await createAuthenticationCredential(options);
 
-    // Debug log
-    console.log('🔍 Frontend Auth Credential:', {
-      id: credential.id?.substring(0, 30) + '...',
-      rawId: (credential as any).rawId?.substring(0, 30) + '...',
+    // Debug log - DETAILED
+    console.log('🔍 Frontend Auth Credential FULL:', {
+      id: credential.id,
+      rawId: (credential as any).rawId,
       idLength: credential.id?.length,
-      rawIdLength: (credential as any).rawId?.length
+      rawIdLength: (credential as any).rawId?.length,
+      type: credential.type
     });
+
+    // Also log what we're sending to backend
+    console.log('📤 Sending to backend:', JSON.stringify(credential, null, 2).substring(0, 500));
 
     const finishResp = await passkeyClient.finishAuthentication(credential);
     const newSession = finishResp.data?.sessionKey ?? (finishResp as any).data?.sessionKey;
