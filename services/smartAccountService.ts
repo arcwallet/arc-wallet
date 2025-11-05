@@ -1,8 +1,7 @@
 import { JsonRpcProvider, Wallet, ContractFactory, Contract, type Provider, type Signer } from 'ethers';
 import artifact from '../artifacts/ArcSmartAccount.json' assert { type: 'json' };
-import { getArcRpcUrl } from '../config/rpc';
 
-const RPC_URL = getArcRpcUrl();
+const RPC_URL = import.meta.env.VITE_ARC_RPC_URL ?? 'https://rpc.testnet.arc.network';
 const ENTRY_POINT = import.meta.env.VITE_ARC_ENTRY_POINT ?? '0x0000000000000000000000000000000000000000';
 
 const getProvider = () => new JsonRpcProvider(RPC_URL);

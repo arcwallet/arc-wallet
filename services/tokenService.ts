@@ -1,6 +1,5 @@
 import { Contract, JsonRpcProvider, formatUnits } from 'ethers';
 import { SUPPORTED_TOKENS, TokenInfo, getTokenInfo, getTokenContractAddress } from '../config/tokens';
-import { getArcRpcUrl } from '../config/rpc';
 
 // ERC-20 Token Contract ABI (minimal)
 const ERC20_ABI = [
@@ -205,7 +204,8 @@ class TokenService {
 }
 
 // Export singleton instance
-export const tokenService = new TokenService(getArcRpcUrl());
+const DEFAULT_RPC_URL = import.meta.env.VITE_ARC_RPC_URL ?? 'https://capable-tame-glitter.arc-testnet.quiknode.pro/96002201d9f8c9d93fcb9ec6bfdb069d3e8f3ef0';
+export const tokenService = new TokenService(DEFAULT_RPC_URL);
 
 // Export class for custom instances
 export { TokenService };

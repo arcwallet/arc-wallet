@@ -18,16 +18,9 @@ A modern Web3 wallet built for Arc Network with support for multiple stablecoins
 
 1. Install dependencies:
    `npm install`
-2. Configure environment variables in `.env`:
-   - **ThirdWeb RPC (Recommended):** Get your API key from [ThirdWeb Dashboard](https://thirdweb.com/dashboard) and set:
-     ```bash
-     VITE_THIRDWEB_API_KEY=your_api_key_here
-     ```
-   - **Alternative:** Use public RPC endpoint (not recommended for production):
-     ```bash
-     VITE_ARC_RPC_URL=https://rpc.testnet.arc.network
-     ```
-3. (Optional) Point `VITE_PASSKEY_API_URL` to your running passkey backend. Default is `http://localhost:4000`.
+2. Configure environment variables in [.env.local](.env.local) as needed
+3. (Optional) Override `VITE_ARC_RPC_URL` in `.env` if you want to point at a custom Arc RPC endpoint. Default is `https://rpc.testnet.arc.network`.
+4. (Optional) Point `VITE_PASSKEY_API_URL` to your running passkey backend. Default is `http://localhost:4000`.
 5. (Optional) Provide the ERC-4337 entry point contract via `VITE_ARC_ENTRY_POINT` if you are testing on a network that uses a different address.
 6. (Optional) Configure a bundler endpoint with `VITE_ARC_BUNDLER_URL` to submit smart-account UserOperations via `eth_sendUserOperation`. The app automatically falls back to direct transactions when the bundler is unavailable.
 6. Run the app:

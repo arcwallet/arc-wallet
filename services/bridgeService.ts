@@ -1,6 +1,5 @@
 import { BridgeKit, Blockchain } from '@circle-fin/bridge-kit';
 import { createAdapterFromPrivateKey } from '@circle-fin/adapter-viem-v2';
-import { getArcRpcUrl, getSepoliaRpcUrl } from '../config/rpc';
 // Amount should be provided as a human-readable decimal string to BridgeKit
 
 const DEBUG = import.meta.env.VITE_BRIDGE_DEBUG === 'true';
@@ -30,8 +29,8 @@ export interface BridgeExecutionResult {
 }
 
 const getChainConfig = (direction: BridgeDirection) => {
-  const arcRpcUrl = getArcRpcUrl();
-  const sepoliaRpcUrl = getSepoliaRpcUrl();
+  const arcRpcUrl = import.meta.env.VITE_ARC_RPC_URL || 'https://rpc.testnet.arc.network';
+  const sepoliaRpcUrl = import.meta.env.VITE_SEPOLIA_RPC_URL || 'https://ethereum-sepolia-rpc.publicnode.com';
 
   if (direction === 'arc-to-sepolia') {
     return {
