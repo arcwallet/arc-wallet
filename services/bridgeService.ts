@@ -58,8 +58,20 @@ export async function bridgeUsdcWithSessionKey({
   // Keep chain config in outer scope so catch can reference it for error messages
   let fromRpcUrl: string | undefined;
   let toRpcUrl: string | undefined;
+
   try {
-    if (DEBUG) console.log('🌉 Bridge operation starting:', { direction, amount });
+    console.log('🌉 [BRIDGE] Operation starting:', { direction, amount });
+
+    // CRITICAL: Log environment variables
+    console.log('🔧 [BRIDGE] Environment check:', {
+      VITE_ARC_RPC_URL: import.meta.env.VITE_ARC_RPC_URL || 'NOT SET',
+      VITE_SEPOLIA_RPC_URL: import.meta.env.VITE_SEPOLIA_RPC_URL || 'NOT SET',
+      VITE_BRIDGE_DEBUG: import.meta.env.VITE_BRIDGE_DEBUG || 'NOT SET',
+      hasPrivateKey: !!privateKey
+    });
+
+    // Check available Blockchain enums
+    console.log('📋 [BRIDGE] Available Blockchain enums:', Object.keys(Blockchain));
 
     const kit = new BridgeKit();
     const cfg = getChainConfig(direction);
@@ -67,14 +79,28 @@ export async function bridgeUsdcWithSessionKey({
     fromRpcUrl = cfg.fromRpcUrl;
     toRpcUrl = cfg.toRpcUrl;
 
-    // Create dedicated adapters per chain with explicit RPC URLs
-    const adapterFrom = await createAdapterFromPrivateKey({ privateKey, rpcUrl: fromRpcUrl });
-    const adapterTo = await createAdapterFromPrivateKey({ privateKey, rpcUrl: toRpcUrl });
+    console.log('🔗 [BRIDGE] Chain configuration:', {
+      direction,
+      fromChain,
+      toChain,
+      fromRpcUrl,
+      toRpcUrl,
+      fromChainType: typeof fromChain,
+      toChainType: typeof toChain
+    });
 
-    if (DEBUG) {
-      console.log('🔗 Chain configuration:', { fromChain, toChain, fromRpcUrl, toRpcUrl });
-      console.log('📡 Adapters created');
-    }
+    // Create dedicated adapters per chain with explicit RPC URLs
+    console.log('📡 [BRIDGE] Creating adapters...');
+    const adapterFrom = await createAdapterFromPrivateKey({ privateKey, rpcUrl: fromRpcUrl });
+    console.log('✅ [BRIDGE] From adapter created');
+
+    const adapterTo = await createAdapterFromPrivateKey({ privateKey, rpcUrl: toRpcUrl });
+    console.log('✅ [BRIDGE] To adapter created');
+
+    console.log('👛 [BRIDGE] Adapter addresses:', {
+      fromAddress: (adapterFrom as any).address || 'unknown',
+      toAddress: (adapterTo as any).address || 'unknown'
+    });
 
     const normalizedAmount = Number((amount ?? '').toString());
     if (!Number.isFinite(normalizedAmount) || normalizedAmount <= 0) {
@@ -83,13 +109,21 @@ export async function bridgeUsdcWithSessionKey({
     // BridgeKit expects a decimal string (human units), not atomic units
     const amountString = normalizedAmount.toFixed(2);
 
-    if (DEBUG) console.log('💰 Amount parsed:', { normalizedAmount, atomicAmount: amountString });
+    console.log('💰 [BRIDGE] Amount parsed:', {
+      input: amount,
+      normalized: normalizedAmount,
+      amountString
+    });
 
     const handler = (payload: { method: string; values?: Record<string, unknown> }) => {
       const method = payload.method;
       const txHash = typeof payload.values?.txHash === 'string' ? (payload.values!.txHash as string) : undefined;
 
-      if (DEBUG) console.log('🔄 Bridge event:', { method, txHash });
+      console.log('🔄 [BRIDGE] Event received:', {
+        method,
+        txHash,
+        values: payload.values
+      });
 
       switch (method) {
         case 'approve':
@@ -108,7 +142,7 @@ export async function bridgeUsdcWithSessionKey({
           onProgress?.({ type: 'switch-network' });
           break;
         default:
-          if (DEBUG) console.log('❓ Unknown bridge event:', method);
+          console.log('❓ [BRIDGE] Unknown event method:', method);
           break;
       }
     };
@@ -116,7 +150,11 @@ export async function bridgeUsdcWithSessionKey({
     kit.on('*', handler);
 
     try {
-      if (DEBUG) console.log('🚀 Making bridge call...');
+      console.log('🚀 [BRIDGE] Calling BridgeKit.bridge() with:', {
+        from: { chain: fromChain },
+        to: { chain: toChain },
+        amount: amountString
+      });
 
       const result = await kit.bridge({
         from: {
@@ -130,7 +168,8 @@ export async function bridgeUsdcWithSessionKey({
         amount: amountString,
       });
 
-      if (DEBUG) console.log('✅ Bridge completed:', result);
+      console.log('✅ [BRIDGE] Bridge completed successfully!');
+      console.log('📊 [BRIDGE] Result:', JSON.stringify(result, null, 2));
 
       const { sourceTxHash, receiveTxHash } = extractTransactionHashes(result);
       onProgress?.({ type: 'completed', sourceTxHash, receiveTxHash });
@@ -139,7 +178,17 @@ export async function bridgeUsdcWithSessionKey({
       kit.off('*', handler);
     }
   } catch (error: any) {
-    if (DEBUG) console.error('❌ Bridge error:', error);
+    console.error('❌ [BRIDGE] Critical error occurred!');
+    console.error('🔴 [BRIDGE] Error details:', {
+      message: error?.message,
+      code: error?.code,
+      name: error?.name,
+      cause: error?.cause,
+      stack: error?.stack?.split('\n').slice(0, 10)
+    });
+
+    // Log the full error object
+    console.error('🔴 [BRIDGE] Full error object:', error);
 
     // Enhanced error handling
     if (error?.message?.includes('network') || error?.message?.includes('RPC')) {
@@ -152,6 +201,8 @@ export async function bridgeUsdcWithSessionKey({
       throw new Error('Unsupported chain combination. Please check Arc - Sepolia bridge.');
     } else if (error?.code === 'CALL_EXCEPTION') {
       throw new Error('Smart contract call failed. Please check gas fee or contract address.');
+    } else if (error?.message?.includes('Invalid chain')) {
+      throw new Error(`Invalid blockchain configuration. Available chains: ${Object.keys(Blockchain).join(', ')}`);
     }
 
     throw new Error(`Bridge operation failed: ${error?.message || 'Unknown error'}`);
