@@ -1,11 +1,18 @@
-import { JsonRpcProvider, formatEther, formatUnits } from 'ethers';
+import { JsonRpcProvider, formatEther, formatUnits, Interface } from 'ethers';
 import { RPC_URL } from './transactionService';
 import type { Transaction } from '../types';
 import { TransactionStatus, TransactionType } from '../types';
+import { SUPPORTED_TOKENS } from '../config/tokens';
 
 const provider = new JsonRpcProvider(RPC_URL);
 const RATE_LIMIT_ERROR_CODE = -32007;
-const MAX_BLOCKS_DEFAULT = 80;
+const MAX_BLOCKS_DEFAULT = 500; // Increased from 80 to 500 for better history
+
+// ERC-20 Transfer event signature
+const ERC20_TRANSFER_TOPIC = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
+const ERC20_INTERFACE = new Interface([
+  'event Transfer(address indexed from, address indexed to, uint256 value)',
+]);
 
 export class RateLimitError extends Error {
   constructor(message: string, public readonly original?: unknown) {
@@ -56,11 +63,24 @@ export async function fetchRecentTransactions(
     return [];
   }
 
-  const maxTransactions = options.maxTransactions ?? 30;
+  console.log('🔍 [Activity] Fetching transactions for', normalizedAddress);
+
+  const maxTransactions = options.maxTransactions ?? 50; // Increased from 30
   const maxBlocks = options.maxBlocks ?? MAX_BLOCKS_DEFAULT;
 
   const latestBlock = await callWithRateLimit(provider.getBlockNumber());
+  console.log('📊 [Activity] Latest block:', latestBlock, '- Scanning', maxBlocks, 'blocks');
+
   const transactions: Transaction[] = [];
+  const seenTxHashes = new Set<string>();
+
+  // Get all token contract addresses for filtering
+  const tokenAddresses = Object.values(SUPPORTED_TOKENS)
+    .flatMap(token => [
+      token.networks.testnet?.arcTestnet?.toLowerCase(),
+      token.networks.testnet?.sepolia?.toLowerCase(),
+    ])
+    .filter((addr): addr is string => Boolean(addr));
 
   let scannedBlocks = 0;
   let currentBlock = latestBlock;
@@ -90,38 +110,117 @@ export async function fetchRecentTransactions(
       if (transactions.length >= maxTransactions) {
         break;
       }
-      const from = tx.from?.toLowerCase();
-      const to = tx.to?.toLowerCase();
-      if (from !== normalizedAddress && to !== normalizedAddress) {
+
+      if (seenTxHashes.has(tx.hash)) {
         continue;
       }
 
-      const direction = from === normalizedAddress ? TransactionType.Sent : TransactionType.Received;
-      const valueWei = tx.value ?? 0n;
-      const amount = parseFloat(formatEther(valueWei));
-      const feeWei = (tx.gasPrice ?? 0n) * (tx.gasLimit ?? 0n);
-      const fee = parseFloat(formatUnits(feeWei, 18));
+      const from = tx.from?.toLowerCase();
+      const to = tx.to?.toLowerCase();
       const timestampMs = Number(block.timestamp) * 1000;
 
-      transactions.push({
-        id: tx.hash,
-        type: direction,
-        description:
-          direction === TransactionType.Sent ? 'Native transfer' : 'Native transfer received',
-        timestamp: formatRelativeTime(timestampMs),
-        date: new Date(timestampMs),
-        amount: direction === TransactionType.Sent ? -amount : amount,
-        currency: 'ARC',
-        usdValue: amount,
-        status: TransactionStatus.Completed,
-        hash: tx.hash,
-        from: tx.from ?? '',
-        to: tx.to ?? '',
-        networkFee: fee,
-        approvals: { required: 0, list: [] },
-      });
+      // Check for native transfers
+      if (from === normalizedAddress || to === normalizedAddress) {
+        const valueWei = tx.value ?? 0n;
+        if (valueWei > 0n) {
+          const direction = from === normalizedAddress ? TransactionType.Sent : TransactionType.Received;
+          const amount = parseFloat(formatEther(valueWei));
+          const feeWei = (tx.gasPrice ?? 0n) * (tx.gasLimit ?? 0n);
+          const fee = parseFloat(formatUnits(feeWei, 18));
+
+          seenTxHashes.add(tx.hash);
+          transactions.push({
+            id: tx.hash,
+            type: direction,
+            description: direction === TransactionType.Sent ? 'ARC sent' : 'ARC received',
+            timestamp: formatRelativeTime(timestampMs),
+            date: new Date(timestampMs),
+            amount: direction === TransactionType.Sent ? -amount : amount,
+            currency: 'ARC',
+            usdValue: amount * 0.1, // Placeholder price
+            status: TransactionStatus.Completed,
+            hash: tx.hash,
+            from: tx.from ?? '',
+            to: tx.to ?? '',
+            networkFee: fee,
+            approvals: { required: 0, list: [] },
+          });
+          continue;
+        }
+      }
+
+      // Check for ERC-20 token transfers
+      if (to && tokenAddresses.includes(to) && tx.data && tx.data.length > 10) {
+        try {
+          // Get transaction receipt to check logs
+          const receipt = await callWithRateLimit(provider.getTransactionReceipt(tx.hash));
+          if (!receipt) continue;
+
+          for (const log of receipt.logs) {
+            // Check if this is a Transfer event
+            if (log.topics[0] !== ERC20_TRANSFER_TOPIC) continue;
+
+            const parsedLog = ERC20_INTERFACE.parseLog({
+              topics: log.topics as string[],
+              data: log.data,
+            });
+
+            if (!parsedLog) continue;
+
+            const logFrom = parsedLog.args.from?.toLowerCase();
+            const logTo = parsedLog.args.to?.toLowerCase();
+            const value = parsedLog.args.value;
+
+            // Check if this transfer involves our address
+            if (logFrom !== normalizedAddress && logTo !== normalizedAddress) {
+              continue;
+            }
+
+            // Find which token this is
+            const token = Object.values(SUPPORTED_TOKENS).find(
+              t => t.networks.testnet?.arcTestnet?.toLowerCase() === log.address.toLowerCase()
+            );
+
+            if (!token) continue;
+
+            const direction = logFrom === normalizedAddress ? TransactionType.Sent : TransactionType.Received;
+            const amount = parseFloat(formatUnits(value, token.decimals));
+            const feeWei = receipt.gasUsed * (receipt.effectiveGasPrice ?? 0n);
+            const fee = parseFloat(formatUnits(feeWei, 18));
+
+            // Estimate USD value
+            const usdPrice = token.symbol === 'USDC' ? 1.0 : token.symbol === 'EURC' ? 1.07 : 1.0;
+            const usdValue = amount * usdPrice;
+
+            seenTxHashes.add(tx.hash);
+            transactions.push({
+              id: `${tx.hash}-${log.index}`,
+              type: direction,
+              description: direction === TransactionType.Sent
+                ? `${token.symbol} sent`
+                : `${token.symbol} received`,
+              timestamp: formatRelativeTime(timestampMs),
+              date: new Date(timestampMs),
+              amount: direction === TransactionType.Sent ? -amount : amount,
+              currency: token.symbol,
+              usdValue,
+              status: TransactionStatus.Completed,
+              hash: tx.hash,
+              from: logFrom,
+              to: logTo,
+              networkFee: fee,
+              approvals: { required: 0, list: [] },
+            });
+          }
+        } catch (error) {
+          // Silently skip if we can't parse this transaction
+          console.warn('Failed to parse token transfer', tx.hash, error);
+        }
+      }
     }
   }
+
+  console.log('✅ [Activity] Found', transactions.length, 'transactions after scanning', scannedBlocks, 'blocks');
 
   transactions.sort((a, b) => b.date.getTime() - a.date.getTime());
   return transactions.slice(0, maxTransactions);
