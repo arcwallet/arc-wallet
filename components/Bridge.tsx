@@ -212,21 +212,23 @@ const Bridge: React.FC = () => {
             <div>
               <label className="text-sm font-medium text-text-secondary">Token</label>
               <div className="mt-1 w-full rounded-lg border border-white/10 bg-[#0f1729] px-4 py-3 text-text-primary flex items-center gap-3">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold text-sm">
-                    $
-                  </div>
+                <div className="flex items-center gap-3">
+                  <img
+                    src="/icons/usdc.svg"
+                    alt="USDC"
+                    className="w-10 h-10"
+                  />
                   <div>
-                    <p className="font-semibold">{selectedToken.name}</p>
-                    <p className="text-xs text-text-secondary">{selectedToken.symbol}</p>
+                    <p className="font-semibold text-base">USDC</p>
+                    <p className="text-xs text-text-secondary">USD Coin</p>
                   </div>
                 </div>
-                <div className="ml-auto text-xs text-text-secondary">
+                <div className="ml-auto text-xs text-text-secondary bg-white/5 px-3 py-1.5 rounded-full">
                   Arc Testnet ↔ Sepolia
                 </div>
               </div>
               <p className="text-xs text-text-secondary mt-2">
-                Only USDC is supported for bridge between Arc Testnet and Ethereum Sepolia
+                ✓ Only USDC is supported for bridge between Arc Testnet and Ethereum Sepolia
               </p>
             </div>
             <label className="flex flex-col gap-2">
