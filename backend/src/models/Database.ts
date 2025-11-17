@@ -6,7 +6,8 @@ import {
   User,
   PasskeyCredential,
   SessionKey,
-  WebAuthnChallenge
+  WebAuthnChallenge,
+  BridgeTransaction
 } from '../types/index.js';
 
 export class Database {
@@ -91,6 +92,26 @@ export class Database {
       )
     `);
 
+    // Bridge transactions table
+    await run(`
+      CREATE TABLE IF NOT EXISTS bridge_transactions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT NOT NULL,
+        session_key_address TEXT NOT NULL,
+        amount TEXT NOT NULL,
+        direction TEXT NOT NULL,
+        token TEXT NOT NULL,
+        status TEXT NOT NULL,
+        source_tx_hash TEXT,
+        destination_tx_hash TEXT,
+        attestation TEXT,
+        error_message TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+      )
+    `);
+
     // Create indexes
     await run('CREATE INDEX IF NOT EXISTS idx_users_username ON users (username)');
     await run('CREATE INDEX IF NOT EXISTS idx_passkeys_user_id ON passkey_credentials (user_id)');
@@ -99,6 +120,8 @@ export class Database {
     await run('CREATE INDEX IF NOT EXISTS idx_session_keys_expires ON session_keys (expires_at)');
     await run('CREATE INDEX IF NOT EXISTS idx_session_keys_address ON session_keys (address)');
     await run('CREATE INDEX IF NOT EXISTS idx_challenges_expires ON webauthn_challenges (expires_at)');
+    await run('CREATE INDEX IF NOT EXISTS idx_bridge_transactions_user_id ON bridge_transactions (user_id)');
+    await run('CREATE INDEX IF NOT EXISTS idx_bridge_transactions_status ON bridge_transactions (status)');
   }
 
   async waitForReady(): Promise<void> {
@@ -391,6 +414,120 @@ export class Database {
       type: row.type,
       expiresAt: new Date(row.expires_at),
       createdAt: new Date(row.created_at)
+    };
+  }
+
+  // Bridge transaction operations
+  async createBridgeTransaction(transaction: Omit<BridgeTransaction, 'id' | 'createdAt' | 'updatedAt'>): Promise<BridgeTransaction> {
+    await this.waitForReady();
+    const run: any = promisify(this.db.run.bind(this.db));
+    const get: any = promisify(this.db.get.bind(this.db));
+
+    const now = new Date().toISOString();
+    const result = await run(
+      `INSERT INTO bridge_transactions
+       (user_id, session_key_address, amount, direction, token, status,
+        source_tx_hash, destination_tx_hash, attestation, error_message, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        transaction.userId,
+        transaction.sessionKeyAddress,
+        transaction.amount,
+        transaction.direction,
+        transaction.token,
+        transaction.status,
+        transaction.sourceTxHash || null,
+        transaction.destinationTxHash || null,
+        transaction.attestation || null,
+        transaction.errorMessage || null,
+        now,
+        now
+      ]
+    );
+
+    const created = await get('SELECT * FROM bridge_transactions WHERE id = ?', [result.lastID]);
+    return this.mapBridgeTransaction(created);
+  }
+
+  async getBridgeTransaction(id: number): Promise<BridgeTransaction | null> {
+    await this.waitForReady();
+    const get: any = promisify(this.db.get.bind(this.db));
+
+    const transaction = await get('SELECT * FROM bridge_transactions WHERE id = ?', [id]);
+    return transaction ? this.mapBridgeTransaction(transaction) : null;
+  }
+
+  async updateBridgeTransaction(
+    id: number,
+    updates: Partial<Pick<BridgeTransaction, 'status' | 'sourceTxHash' | 'destinationTxHash' | 'attestation' | 'errorMessage'>>
+  ): Promise<BridgeTransaction | null> {
+    await this.waitForReady();
+    const run: any = promisify(this.db.run.bind(this.db));
+
+    const fields = [];
+    const values = [];
+
+    if (updates.status !== undefined) {
+      fields.push('status = ?');
+      values.push(updates.status);
+    }
+    if (updates.sourceTxHash !== undefined) {
+      fields.push('source_tx_hash = ?');
+      values.push(updates.sourceTxHash);
+    }
+    if (updates.destinationTxHash !== undefined) {
+      fields.push('destination_tx_hash = ?');
+      values.push(updates.destinationTxHash);
+    }
+    if (updates.attestation !== undefined) {
+      fields.push('attestation = ?');
+      values.push(updates.attestation);
+    }
+    if (updates.errorMessage !== undefined) {
+      fields.push('error_message = ?');
+      values.push(updates.errorMessage);
+    }
+
+    if (fields.length === 0) return this.getBridgeTransaction(id);
+
+    fields.push('updated_at = ?');
+    values.push(new Date().toISOString());
+    values.push(id);
+
+    await run(
+      `UPDATE bridge_transactions SET ${fields.join(', ')} WHERE id = ?`,
+      values
+    );
+
+    return this.getBridgeTransaction(id);
+  }
+
+  async getBridgeHistory(userId: string, limit: number = 50, offset: number = 0): Promise<BridgeTransaction[]> {
+    await this.waitForReady();
+    const all: any = promisify(this.db.all.bind(this.db));
+
+    const transactions = await all(
+      'SELECT * FROM bridge_transactions WHERE user_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?',
+      [userId, limit, offset]
+    );
+    return transactions.map(this.mapBridgeTransaction);
+  }
+
+  private mapBridgeTransaction(row: any): BridgeTransaction {
+    return {
+      id: row.id,
+      userId: row.user_id,
+      sessionKeyAddress: row.session_key_address,
+      amount: row.amount,
+      direction: row.direction,
+      token: row.token,
+      status: row.status,
+      sourceTxHash: row.source_tx_hash,
+      destinationTxHash: row.destination_tx_hash,
+      attestation: row.attestation,
+      errorMessage: row.error_message,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
     };
   }
 

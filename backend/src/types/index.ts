@@ -44,6 +44,22 @@ export interface WebAuthnChallenge {
   createdAt: Date;
 }
 
+export interface BridgeTransaction {
+  id: number;
+  userId: string;
+  sessionKeyAddress: string;
+  amount: string;
+  direction: 'arc-to-sepolia' | 'sepolia-to-arc';
+  token: string;
+  status: 'pending' | 'burn_complete' | 'attestation_fetched' | 'mint_complete' | 'completed' | 'failed';
+  sourceTxHash?: string;
+  destinationTxHash?: string;
+  attestation?: string;
+  errorMessage?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 // API Request/Response Types
 export interface RegistrationStartRequest {
   username: string;

@@ -21,12 +21,18 @@ const rateLimiters = {
     points: 5, // Number of requests
     duration: 3600, // Per hour
   }),
+
+  // Moderate rate limiter for bridge operations
+  bridge: new RateLimiterMemory({
+    points: 20, // Number of requests
+    duration: 3600, // Per hour
+  }),
 };
 
 /**
  * General rate limiting middleware
  */
-export const rateLimitMiddleware = (type: 'general' | 'auth' | 'registration' = 'general') => {
+export const rateLimitMiddleware = (type: 'general' | 'auth' | 'registration' | 'bridge' = 'general') => {
   const disabled = process.env.DISABLE_RATE_LIMIT === 'true' || process.env.NODE_ENV !== 'production';
   return async (req: Request, res: Response, next: NextFunction) => {
     if (disabled) {
