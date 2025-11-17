@@ -11,6 +11,7 @@
     "test": "vitest"
   },
   "dependencies": {
+    "@sendgrid/mail": "^8.1.6",
     "@simplewebauthn/server": "^10.0.0",
     "@simplewebauthn/types": "^10.0.0",
     "cors": "^2.8.5",

@@ -6,6 +6,7 @@ import { MagicUserStore } from '../magicLink/UserStore.js';
 import { MagicSessionStore } from '../magicLink/SessionStore.js';
 import { MagicLinkService } from '../magicLink/MagicLinkService.js';
 import { rateLimitMiddleware } from '../middleware/security.js';
+import type { MagicLinkMailer } from '../services/magicLinkMailer.js';
 
 const SESSION_COOKIE_NAME = 'arcwallet_session';
 const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
@@ -56,7 +57,7 @@ const renderTemplate = (title: string, body: string) => `<!doctype html>
   </body>
 </html>`;
 
-export const createMagicLinkRouter = (config: EnvConfig) => {
+export const createMagicLinkRouter = (config: EnvConfig, mailer: MagicLinkMailer) => {
   const router = Router();
   const userStore = new MagicUserStore(path.join(process.cwd(), 'data'));
   const sessionStore = new MagicSessionStore();
@@ -92,7 +93,7 @@ export const createMagicLinkRouter = (config: EnvConfig) => {
     res.send(renderTemplate('Sign In', body));
   });
 
-  router.post('/api/send-link', rateLimitMiddleware('registration'), (req, res) => {
+  router.post('/api/send-link', rateLimitMiddleware('registration'), async (req, res) => {
     const email = sanitizeEmail(req.body?.email);
     if (!email) {
       return res.status(400).json({ success: false, error: 'Please provide a valid email address.' });
@@ -102,11 +103,21 @@ export const createMagicLinkRouter = (config: EnvConfig) => {
     const token = tokenService.generateToken(user);
     const magicUrl = `${baseUrl}/auth/callback?token=${token}`;
 
-    console.log('📬 [Magic Link]', user.email, magicUrl);
+    try {
+      await mailer.sendMagicLink({ to: user.email, url: magicUrl });
+    } catch (error) {
+      console.error('Magic link email failed:', error);
+      if (!mailer.isConfigured()) {
+        console.log('📬 [Magic Link Preview]', user.email, magicUrl);
+      }
+      return res.status(500).json({ success: false, error: 'Failed to send magic link email.' });
+    }
 
     res.json({
       success: true,
-      message: 'Magic link sent. Please check your inbox.'
+      message: mailer.isConfigured()
+        ? 'Magic link sent. Please check your inbox.'
+        : 'Magic link generated. Check server logs while email is disabled.'
     });
   });
 

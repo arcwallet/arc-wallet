@@ -8,6 +8,7 @@ import { Database } from './models/Database.js';
 import { SessionKeyManager } from './utils/SessionKeyManager.js';
 import { createPasskeyRoutes } from './routes/passkeys.js';
 import { createMagicLinkRouter } from './routes/magicLink.js';
+import { createMagicLinkMailer } from './services/magicLinkMailer.js';
 import { loadConfig, validateConfig } from './utils/config.js';
 import { cookieMiddleware } from './middleware/cookies.js';
 import {
@@ -25,6 +26,11 @@ validateConfig(config);
 // Initialize database
 const db = new Database(config.DB_PATH);
 const sessionKeyManager = new SessionKeyManager(db);
+const magicLinkMailer = createMagicLinkMailer({
+  apiKey: process.env.SENDGRID_API_KEY,
+  fromAddress: process.env.EMAIL_FROM_ADDRESS,
+  fromName: process.env.EMAIL_FROM_NAME ?? 'Arc Wallet',
+});
 
 // Create Express app
 const app = express();
@@ -78,7 +84,7 @@ app.use(healthCheck);
 app.use(rateLimitMiddleware('general'));
 
 // Routes
-app.use(createMagicLinkRouter(config));
+app.use(createMagicLinkRouter(config, magicLinkMailer));
 app.use('/passkeys', createPasskeyRoutes(db, config));
 
 // Root endpoint
