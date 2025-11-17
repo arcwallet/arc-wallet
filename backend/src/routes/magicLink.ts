@@ -105,7 +105,7 @@ export const createMagicLinkRouter = (config: EnvConfig, mailer: MagicLinkMailer
 
     const user = userStore.findOrCreate(email);
     const token = tokenService.generateToken(user);
-    const magicUrl = `${baseUrl}/auth/callback?token=${token}`;
+    const magicUrl = `${baseUrl}?token=${token}`;
 
     try {
       await mailer.sendMagicLink({ to: user.email, url: magicUrl });
@@ -123,24 +123,6 @@ export const createMagicLinkRouter = (config: EnvConfig, mailer: MagicLinkMailer
         ? 'Magic link sent. Please check your inbox.'
         : 'Magic link generated. Check server logs while email is disabled.'
     });
-  });
-
-  router.get('/auth/callback', (req, res) => {
-    const { token } = req.query;
-    if (!token || typeof token !== 'string') {
-      return res.redirect('/login');
-    }
-
-    const redirectTarget = config.MAGIC_LINK_BASE_URL || '/';
-    const body = `
-      <h1>Verifying Link</h1>
-      <p id="callback-message" class="muted">Starting a secure session…</p>
-      <script>
-        window.__ARC_REDIRECT__ = '${redirectTarget}';
-      </script>
-      <script defer src="/static/callback.js"></script>
-    `;
-    res.send(renderTemplate('Verification', body));
   });
 
   router.post('/api/verify', (req, res) => {

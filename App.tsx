@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import './styles/magic.css';
 import arcWalletLoginLogo from './assets/arcwalletloginlogo.png';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -38,16 +38,34 @@ const WalletExperience: React.FC<{ email: string }> = ({ email }) => {
 };
 
 const RootView: React.FC = () => {
-  const { email, loading } = useSession();
+  const { email, loading, verifyMagicToken, verifyingToken, message } = useSession();
+  const [tokenHandled, setTokenHandled] = useState(false);
 
-  if (loading) {
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('token');
+    if (!token || tokenHandled) return;
+
+    verifyMagicToken(token)
+      .finally(() => {
+        params.delete('token');
+        const next = params.toString();
+        const url = `${window.location.pathname}${next ? `?${next}` : ''}`;
+        window.history.replaceState({}, '', url);
+        setTokenHandled(true);
+      })
+      .catch(() => {});
+  }, [tokenHandled, verifyMagicToken]);
+
+  if (loading || verifyingToken) {
     return (
       <div className="auth-card">
         <div className="login-header">
           <img src={arcWalletLoginLogo} alt="Arc Wallet" className="login-logo" />
           <span className="login-title">Arc Wallet</span>
         </div>
-        <p className="muted">Checking your session…</p>
+        <p className="muted">{verifyingToken ? 'Verifying your magic link…' : 'Checking your session…'}</p>
+        {message && <p className="muted error">{message}</p>}
       </div>
     );
   }

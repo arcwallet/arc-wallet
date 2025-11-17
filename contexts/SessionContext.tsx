@@ -6,12 +6,14 @@ interface SessionState {
   loading: boolean;
   requestStatus: 'idle' | 'success' | 'error';
   message: string | null;
+  verifyingToken: boolean;
 }
 
 interface SessionContextValue extends SessionState {
   sendMagicLink: (email: string) => Promise<void>;
   refresh: () => Promise<void>;
   logout: () => Promise<void>;
+  verifyMagicToken: (token: string) => Promise<void>;
 }
 
 const SessionContext = createContext<SessionContextValue | undefined>(undefined);
@@ -22,6 +24,7 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
     loading: true,
     requestStatus: 'idle',
     message: null,
+    verifyingToken: false,
   });
 
   const refresh = useCallback(async () => {
@@ -72,11 +75,31 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
     await refresh();
   }, [refresh]);
 
+  const verifyMagicToken = useCallback(
+    async (token: string) => {
+      setState((prev) => ({ ...prev, verifyingToken: true, message: null }));
+      try {
+        await sessionApi.verify(token);
+        await refresh();
+        setState((prev) => ({ ...prev, verifyingToken: false }));
+      } catch (error) {
+        setState((prev) => ({
+          ...prev,
+          verifyingToken: false,
+          message: error instanceof Error ? error.message : 'Failed to verify magic link.',
+        }));
+        throw error;
+      }
+    },
+    [refresh],
+  );
+
   const value: SessionContextValue = {
     ...state,
     sendMagicLink,
     refresh,
     logout,
+    verifyMagicToken,
   };
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
