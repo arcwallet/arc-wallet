@@ -131,9 +131,13 @@ export const createMagicLinkRouter = (config: EnvConfig, mailer: MagicLinkMailer
       return res.redirect('/login');
     }
 
+    const redirectTarget = config.MAGIC_LINK_BASE_URL || '/';
     const body = `
       <h1>Verifying Link</h1>
       <p id="callback-message" class="muted">Starting a secure session…</p>
+      <script>
+        window.__ARC_REDIRECT__ = '${redirectTarget}';
+      </script>
       <script defer src="/static/callback.js"></script>
     `;
     res.send(renderTemplate('Verification', body));

@@ -30,9 +30,10 @@
       return;
     }
 
+    const target = window.__ARC_REDIRECT__ || '/';
     setMessage('Sign-in successful. Redirecting...');
     setTimeout(() => {
-      window.location.href = '/dashboard';
+      window.location.href = target;
     }, 800);
   } catch (error) {
     console.error('Magic link verification error:', error);
