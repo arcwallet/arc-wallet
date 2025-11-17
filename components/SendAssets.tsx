@@ -33,14 +33,6 @@ const SendAssets: React.FC = () => {
   const [submissionKind, setSubmissionKind] = useState<'transaction' | 'userOp'>('transaction');
   const [feeEstimate, setFeeEstimate] = useState<bigint | null>(null);
   const [isEstimating, setIsEstimating] = useState(false);
-  const PASSKEY_REFRESH_BUFFER_MS = 2 * 60 * 1000;
-
-  const sessionExpiresSoon = useMemo(() => {
-    if (!sessionKey?.expiresAt) return true;
-    const expiresMs = Date.parse(sessionKey.expiresAt);
-    if (Number.isNaN(expiresMs)) return true;
-    return expiresMs - Date.now() <= PASSKEY_REFRESH_BUFFER_MS;
-  }, [sessionKey?.expiresAt]);
 
   const balance = useMemo(() => {
     return parseFloat(tokenBalance) || 0;
@@ -185,23 +177,21 @@ const SendAssets: React.FC = () => {
     setSubmitError(null);
     setTxHash(null);
     try {
-      if (sessionExpiresSoon) {
-        try {
-          await verifyWithPasskey();
-        } catch (passkeyError: any) {
-          const passkeyMsg = typeof passkeyError?.message === 'string' ? passkeyError.message : '';
+      try {
+        await verifyWithPasskey();
+      } catch (passkeyError: any) {
+        const passkeyMsg = typeof passkeyError?.message === 'string' ? passkeyError.message : '';
 
-          if (passkeyError instanceof DOMException && passkeyError.name === 'NotAllowedError') {
-            throw new Error('Passkey verification was cancelled. Please try again and complete the verification.');
-          } else if (passkeyMsg.toLowerCase().includes('user not found')) {
-            throw new Error('Your passkey is not registered. Please sign out and create a new passkey.');
-          } else if (passkeyMsg.toLowerCase().includes('not found') || passkeyMsg.toLowerCase().includes('passkey not found')) {
-            throw new Error('Passkey not found. Please sign out and register a new passkey.');
-          } else if (passkeyMsg.toLowerCase().includes('challenge')) {
-            throw new Error('Authentication challenge expired. Please try again.');
-          } else {
-            throw new Error(`Passkey verification failed: ${passkeyMsg || 'Unknown error'}`);
-          }
+        if (passkeyError instanceof DOMException && passkeyError.name === 'NotAllowedError') {
+          throw new Error('Passkey verification was cancelled. Please try again and complete the verification.');
+        } else if (passkeyMsg.toLowerCase().includes('user not found')) {
+          throw new Error('Your passkey is not registered. Please sign out and create a new passkey.');
+        } else if (passkeyMsg.toLowerCase().includes('not found') || passkeyMsg.toLowerCase().includes('passkey not found')) {
+          throw new Error('Passkey not found. Please sign out and register a new passkey.');
+        } else if (passkeyMsg.toLowerCase().includes('challenge')) {
+          throw new Error('Authentication challenge expired. Please try again.');
+        } else {
+          throw new Error(`Passkey verification failed: ${passkeyMsg || 'Unknown error'}`);
         }
       }
 
