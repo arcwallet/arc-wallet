@@ -43,6 +43,9 @@ export function loadConfig(): EnvConfig {
     if (JWT_SECRET === 'default-jwt-secret-change-in-production') {
       throw new Error('JWT_SECRET must be set in production');
     }
+    if (!MAGIC_LINK_BASE_URL) {
+      throw new Error('MAGIC_LINK_BASE_URL must be set in production');
+    }
   }
 
   // Validate port
