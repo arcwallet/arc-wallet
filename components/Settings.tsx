@@ -233,13 +233,114 @@ const OrganizationRolesSection: React.FC = () => (
     </div>
 );
 
-const RecoverySection: React.FC = () => (
-    <div className="flex flex-col items-start gap-3 rounded-xl bg-[#151A22]/70 p-5 sm:p-6">
-        <h3 className="text-base font-semibold text-[#E6EEF3]">Recovery Options</h3>
-        <p className="text-sm text-[#A7B4C8]">Your organization recovery policy defines how this wallet can be restored if devices are lost.</p>
-        <button className="mt-1 text-sm font-medium text-[#9EBBE4] hover:text-[#B9D1ED]">View Recovery Policy</button>
-    </div>
-);
+const RecoverySection: React.FC = () => {
+    const { sessionKey } = useWallet();
+    const [showPrivateKey, setShowPrivateKey] = useState(false);
+    const [copied, setCopied] = useState(false);
+
+    const handleCopyPrivateKey = () => {
+        if (sessionKey?.privateKey) {
+            navigator.clipboard.writeText(sessionKey.privateKey);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        }
+    };
+
+    const handleRevealPrivateKey = () => {
+        if (!showPrivateKey) {
+            const confirmed = window.confirm(
+                '⚠️ SECURITY WARNING\n\n' +
+                'Your private key grants full access to your wallet and funds.\n\n' +
+                'Never share it with anyone. Anyone with this key can steal your assets.\n\n' +
+                'Make sure you are in a private location and no one can see your screen.\n\n' +
+                'Do you want to reveal your private key?'
+            );
+            if (!confirmed) return;
+        }
+        setShowPrivateKey(!showPrivateKey);
+    };
+
+    if (!sessionKey?.privateKey) {
+        return (
+            <div className="flex flex-col items-start gap-3 rounded-xl bg-[#151A22]/70 p-5 sm:p-6">
+                <h3 className="text-base font-semibold text-[#E6EEF3]">Wallet Backup</h3>
+                <p className="text-sm text-[#A7B4C8]">No wallet connected. Sign in to view backup options.</p>
+            </div>
+        );
+    }
+
+    return (
+        <div className="flex flex-col items-start gap-4 rounded-xl bg-[#151A22]/70 p-5 sm:p-6">
+            <div className="flex w-full items-start justify-between">
+                <div className="flex flex-col gap-1">
+                    <h3 className="text-base font-semibold text-[#E6EEF3]">Wallet Backup</h3>
+                    <p className="text-sm text-[#A7B4C8]">Export your private key to backup your wallet</p>
+                </div>
+            </div>
+
+            {/* Security Warning */}
+            <div className="w-full rounded-lg border border-[#ff6b81]/30 bg-[#ff6b81]/10 p-4">
+                <div className="flex gap-2">
+                    <span className="text-[#ff6b81]">⚠️</span>
+                    <div className="flex flex-col gap-1">
+                        <p className="text-sm font-semibold text-[#ff6b81]">Security Warning</p>
+                        <p className="text-xs text-[#ffb3be]">
+                            Never share your private key with anyone. Store it securely offline. Anyone with access to your private key can control your wallet and steal your funds.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            {/* Private Key Display */}
+            <div className="w-full flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                    <label className="text-sm font-medium text-[#A7B4C8]">Private Key</label>
+                    <button
+                        onClick={handleRevealPrivateKey}
+                        className="text-sm font-medium text-[#9EBBE4] hover:text-[#B9D1ED]"
+                    >
+                        {showPrivateKey ? 'Hide' : 'Reveal'}
+                    </button>
+                </div>
+
+                <div className="relative flex items-center gap-2 rounded-lg border border-[#2B3440] bg-[#091325]/50 px-3 py-3">
+                    <p className="flex-1 font-mono text-sm text-[#E6EEF3] break-all">
+                        {showPrivateKey
+                            ? sessionKey.privateKey
+                            : '••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••'
+                        }
+                    </p>
+                    {showPrivateKey && (
+                        <button
+                            onClick={handleCopyPrivateKey}
+                            className="flex shrink-0 items-center justify-center rounded-md p-1.5 text-[#A7B4C8] hover:bg-white/10 hover:text-[#E6EEF3]"
+                            title="Copy to clipboard"
+                        >
+                            <CopyIcon size={18} />
+                        </button>
+                    )}
+                </div>
+
+                {copied && (
+                    <p className="text-xs text-[#6de4b4]">✓ Copied to clipboard</p>
+                )}
+            </div>
+
+            {/* Additional Instructions */}
+            {showPrivateKey && (
+                <div className="w-full rounded-lg border border-[#2B3440] bg-[#091325]/30 p-4">
+                    <h4 className="text-sm font-semibold text-[#E6EEF3] mb-2">How to use your private key:</h4>
+                    <ul className="text-xs text-[#A7B4C8] space-y-1 list-disc list-inside">
+                        <li>Import this key into MetaMask, Trust Wallet, or any compatible wallet</li>
+                        <li>Store it in a password manager or write it down on paper</li>
+                        <li>Keep multiple backups in different secure locations</li>
+                        <li>Never store it in plain text on your computer or cloud storage</li>
+                    </ul>
+                </div>
+            )}
+        </div>
+    );
+};
 
 const SessionInfoSection: React.FC = () => {
     const { email, logout: sessionLogout } = useSession();
