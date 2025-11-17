@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "hardhat test test/*.spec.ts"
+    "test": "hardhat test test/*.spec.ts",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@circle-fin/adapter-viem-v2": "^1.0.1",
@@ -25,6 +26,7 @@
   "devDependencies": {
     "@nomicfoundation/hardhat-chai-matchers": "^2.0.4",
     "@nomicfoundation/hardhat-ethers": "^3.0.5",
+    "@playwright/test": "^1.56.1",
     "@types/chai": "^4.3.11",
     "@types/mocha": "^10.0.6",
     "@types/node": "^22.14.0",

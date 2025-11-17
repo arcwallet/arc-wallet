@@ -52,10 +52,10 @@ A modern Web3 wallet built for Arc Network with support for multiple stablecoins
 
 ## Testing & QA
 
-### Automated (planned)
-1. **Playwright happy-path**: login page → request magic link (mock SendGrid) → simulate `/auth/callback?token=...` → verify dashboard loads previous wallet for that email. This ensures regressions in token verification or wallet restore are caught.
-2. **Playwright multi-user**: create wallets for email A and B, ensure switching `currentEmail` loads the right encrypted wallet and never leaks data to the other.
-3. **API smoke tests**: run a small Vitest suite hitting `/api/send-link` and `/api/verify` with fake SendGrid client to guarantee 15‑minute expiry logic.
+### Automated
+1. **Frontend E2E (`npm run test:e2e`)** – spins up Vite dev server and runs Playwright against it. Email/API requests are mocked so no SendGrid traffic leaves your machine. First-time setup requires `npx playwright install`.
+2. **Backend API tests (`cd backend && npm test`)** – Vitest + Supertest suite covering `/api/send-link → /api/verify → /api/session → /api/logout`.
+3. **Smart contract tests (`npm test`)** – existing Hardhat specs in `test/*.spec.ts`.
 
 ### Manual QA checklist
 1. Request a magic link, open email, ensure the button contains the correct link and the plain URL is hidden.
