@@ -23,18 +23,7 @@ const WalletExperience: React.FC<{ email: string }> = ({ email }) => {
     return <WalletSetupScreen email={email} onComplete={activateWithPrivateKey} onLogout={handleLogout} />;
   }
 
-  return (
-    <>
-      <div className="session-banner">
-        <div>
-          <p className="session-label">Signed in as</p>
-          <p className="session-email">{email}</p>
-        </div>
-        <button onClick={handleLogout}>Sign out</button>
-      </div>
-      <WalletDashboard />
-    </>
-  );
+  return <WalletDashboard />;
 };
 
 const RootView: React.FC = () => {
@@ -59,13 +48,16 @@ const RootView: React.FC = () => {
 
   if (loading || verifyingToken) {
     return (
-      <div className="auth-card">
-        <div className="login-header">
+      <div className="fullpage-login">
+        <div className="login-logo-container">
           <img src={arcWalletLoginLogo} alt="Arc Wallet" className="login-logo" />
-          <span className="login-title">Arc Wallet</span>
         </div>
-        <p className="muted">{verifyingToken ? 'Verifying your magic link…' : 'Checking your session…'}</p>
-        {message && <p className="muted error">{message}</p>}
+        <div className="login-content">
+          <p className="login-message muted">
+            {verifyingToken ? 'Verifying your magic link…' : 'Checking your session…'}
+          </p>
+          {message && <p className="login-message error">{message}</p>}
+        </div>
       </div>
     );
   }
@@ -84,7 +76,13 @@ const App: React.FC = () => (
         <ArcAccountProvider>
           <ActivityProvider>
             <div className="auth-wrapper">
-              <React.Suspense fallback={<div className="auth-card"><p className="muted">Loading…</p></div>}>
+              <React.Suspense fallback={
+                <div className="fullpage-login">
+                  <div className="login-content">
+                    <p className="login-message muted">Loading…</p>
+                  </div>
+                </div>
+              }>
                 <RootView />
               </React.Suspense>
             </div>

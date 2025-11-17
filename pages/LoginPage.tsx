@@ -29,34 +29,37 @@ const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="auth-card">
-      <div className="login-header">
+    <div className="fullpage-login">
+      <div className="login-logo-container">
         <img src={arcWalletLoginLogo} alt="Arc Wallet" className="login-logo" />
-        <span className="login-title">Arc Wallet</span>
       </div>
-      <form onSubmit={handleSubmit} className="auth-form">
-        <input
-          type="email"
-          name="email"
-          placeholder="Enter your work email"
-          required
-          value={email}
-          onChange={(event) => setEmail(event.target.value)}
-        />
-        <button type="submit" disabled={submitting || cooldown > 0}>
-          {submitting ? 'Sending…' : cooldown > 0 ? `Retry in ${cooldown}s` : 'Sign in'}
-        </button>
-      </form>
-      {message && (
-        <p className={`muted ${requestStatus === 'error' ? 'error' : 'success'}`}>
-          {message}
-        </p>
-      )}
-      {cooldown > 0 && (
-        <p className="muted">
-          Please check your inbox. You can request another link after the countdown.
-        </p>
-      )}
+      <div className="login-content">
+        <h1 className="login-heading">Sign in</h1>
+        <form onSubmit={handleSubmit} className="login-form">
+          <input
+            type="email"
+            name="email"
+            placeholder="Enter your email"
+            required
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            className="login-input"
+          />
+          <button type="submit" disabled={submitting || cooldown > 0} className="login-button">
+            {submitting ? 'Sending…' : cooldown > 0 ? `Retry in ${cooldown}s` : 'Sign in'}
+          </button>
+        </form>
+        {message && (
+          <p className={`login-message ${requestStatus === 'error' ? 'error' : 'success'}`}>
+            {message}
+          </p>
+        )}
+        {cooldown > 0 && (
+          <p className="login-message muted">
+            Please check your inbox. You can request another link after the countdown.
+          </p>
+        )}
+      </div>
     </div>
   );
 };

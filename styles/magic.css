@@ -21,6 +21,141 @@ body {
   padding: 24px;
 }
 
+/* Full-page login layout */
+.fullpage-login {
+  min-height: 100vh;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 32px;
+  position: relative;
+}
+
+.login-logo-container {
+  position: absolute;
+  top: 32px;
+  left: 32px;
+}
+
+.login-logo {
+  height: 30px;
+  width: auto;
+}
+
+.login-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  max-width: 480px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.login-heading {
+  font-size: 3rem;
+  font-weight: 700;
+  margin-bottom: 48px;
+  color: #eef3f8;
+  text-align: center;
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  width: 100%;
+}
+
+.login-input {
+  padding: 16px 20px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(5, 8, 22, 0.6);
+  color: #eef3f8;
+  font-size: 1rem;
+  width: 100%;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.login-input:focus {
+  outline: none;
+  border-color: rgba(108, 124, 255, 0.5);
+  background: rgba(5, 8, 22, 0.8);
+}
+
+.login-input::placeholder {
+  color: #6b7a95;
+}
+
+.login-button {
+  padding: 14px 48px;
+  border-radius: 12px;
+  border: none;
+  background: linear-gradient(135deg, #6c7cff, #4aa9ff);
+  color: white;
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: opacity 0.2s ease, transform 0.1s ease;
+  box-shadow: 0 4px 20px rgba(108, 124, 255, 0.3);
+}
+
+.login-button:hover:not(:disabled) {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.login-button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.login-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.login-message {
+  font-size: 0.95rem;
+  margin-top: 16px;
+  text-align: center;
+  color: #b5c1d8;
+  line-height: 1.55;
+}
+
+.logout-button {
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: none;
+  background: linear-gradient(135deg, #6c7cff, #4aa9ff);
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+  width: 100%;
+  margin-top: 16px;
+}
+
+.logout-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.muted {
+  color: #8a9bb5;
+}
+
+.success {
+  color: #6de4b4;
+}
+
+.error {
+  color: #ff6b81;
+}
+
+/* Legacy card styles (keeping for other components if needed) */
 .auth-card {
   background: rgba(9, 13, 30, 0.9);
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -56,8 +191,7 @@ body {
   font-size: 1rem;
 }
 
-.auth-form button,
-.logout-button {
+.auth-form button {
   padding: 12px 16px;
   border-radius: 12px;
   border: none;
@@ -71,24 +205,6 @@ body {
 .auth-form button:disabled {
   opacity: 0.6;
   cursor: not-allowed;
-}
-
-.logout-button {
-  width: 100%;
-  margin-top: 16px;
-}
-
-.muted {
-  font-size: 0.95rem;
-  margin-top: 12px;
-}
-
-.success {
-  color: #6de4b4;
-}
-
-.error {
-  color: #ff6b81;
 }
 
 .session-banner {
@@ -120,22 +236,4 @@ body {
 .session-email {
   font-size: 0.95rem;
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
-}
-
-.login-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 16px;
-}
-
-.login-logo {
-  height: 32px;
-  width: auto;
-}
-
-.login-title {
-  font-size: 1rem;
-  font-weight: 600;
-  color: #eef3f8;
 }

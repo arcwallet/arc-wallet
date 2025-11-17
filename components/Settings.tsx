@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useWallet } from '../contexts/WalletContext';
+import { useSession } from '../contexts/SessionContext';
 import { passkeyClient, type SessionKeySummary } from '../services/passkeyClient';
 import { WalletIcon, CopyIcon, AddIcon, LaptopIcon, PhoneIcon, ChevronDownIcon } from './Icons';
 
@@ -240,6 +241,38 @@ const RecoverySection: React.FC = () => (
     </div>
 );
 
+const SessionInfoSection: React.FC = () => {
+    const { email, logout: sessionLogout } = useSession();
+    const { logout: walletLogout } = useWallet();
+
+    if (!email) {
+        return null;
+    }
+
+    const handleLogout = async () => {
+        await sessionLogout();
+        walletLogout();
+    };
+
+    return (
+        <div className="flex flex-col gap-3 rounded-xl border border-[#2B3440] bg-[#0b1325] p-5 sm:p-6">
+            <p className="text-xs font-medium uppercase tracking-wide text-[#9EBBE4]">Signed in as</p>
+            <p className="text-lg font-semibold text-[#E6EEF3]">{email}</p>
+            <p className="text-sm text-[#A7B4C8]">
+                Magic link sessions remain active for 24 hours. Sign out to revoke the current session.
+            </p>
+            <div className="flex justify-end">
+                <button
+                    onClick={handleLogout}
+                    className="rounded-lg border border-[#2B3440] px-4 py-2 text-sm font-medium text-[#E6EEF3] hover:bg-white/5"
+                >
+                    Sign out
+                </button>
+            </div>
+        </div>
+    );
+};
+
 
 const Settings: React.FC = () => {
   return (
@@ -260,6 +293,7 @@ const Settings: React.FC = () => {
         <NetworkSection />
         <OrganizationRolesSection />
         <RecoverySection />
+        <SessionInfoSection />
       </div>
     </div>
   );
