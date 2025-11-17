@@ -5,13 +5,23 @@ const LoginPage: React.FC = () => {
   const { sendMagicLink, requestStatus, message } = useSession();
   const [email, setEmail] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
+
+  React.useEffect(() => {
+    if (cooldown <= 0) return;
+    const timer = window.setInterval(() => {
+      setCooldown((current) => Math.max(current - 1, 0));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [cooldown]);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!email) return;
+    if (!email || submitting || cooldown > 0) return;
     setSubmitting(true);
     try {
       await sendMagicLink(email);
+      setCooldown(30);
     } finally {
       setSubmitting(false);
     }
@@ -30,8 +40,8 @@ const LoginPage: React.FC = () => {
           value={email}
           onChange={(event) => setEmail(event.target.value)}
         />
-        <button type="submit" disabled={submitting}>
-          {submitting ? 'Sending…' : 'Send Link'}
+        <button type="submit" disabled={submitting || cooldown > 0}>
+          {submitting ? 'Sending…' : cooldown > 0 ? `Retry in ${cooldown}s` : 'Send Link'}
         </button>
       </form>
       {message && (
@@ -39,7 +49,11 @@ const LoginPage: React.FC = () => {
           {message}
         </p>
       )}
-      <p className="muted">We email a link that stays valid for 15 minutes.</p>
+      <p className="muted">
+        {cooldown > 0
+          ? 'Please check your inbox. You can request another link after the countdown.'
+          : 'We email a link that stays valid for 15 minutes.'}
+      </p>
     </div>
   );
 };
