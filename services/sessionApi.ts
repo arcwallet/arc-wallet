@@ -1,3 +1,6 @@
+const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
+const resolveUrl = (path: string) => `${API_BASE}${path}`;
+
 interface ApiResponse<T = unknown> {
   success: boolean;
   message?: string;
@@ -21,7 +24,7 @@ const handleResponse = async <T>(response: Response): Promise<T> => {
 
 export const sessionApi = {
   async sendLink(email: string) {
-    const response = await fetch('/api/send-link', {
+    const response = await fetch(resolveUrl('/api/send-link'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email }),
@@ -30,8 +33,9 @@ export const sessionApi = {
   },
 
   async verify(token: string) {
-    const response = await fetch('/api/verify', {
+    const response = await fetch(resolveUrl('/api/verify'), {
       method: 'POST',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ token }),
     });
@@ -39,7 +43,7 @@ export const sessionApi = {
   },
 
   async getSession(): Promise<{ email: string } | null> {
-    const response = await fetch('/api/session', { credentials: 'include' });
+    const response = await fetch(resolveUrl('/api/session'), { credentials: 'include' });
     if (response.status === 401) {
       return null;
     }
@@ -48,8 +52,9 @@ export const sessionApi = {
   },
 
   async logout() {
-    const response = await fetch('/api/logout', {
+    const response = await fetch(resolveUrl('/api/logout'), {
       method: 'POST',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
     });
     return handleResponse<ApiResponse>(response);
