@@ -16,7 +16,7 @@ type CookieRequest = Request & { cookies?: Record<string, string> };
 const COOKIE_BASE_OPTIONS = (isProd: boolean) => ({
   httpOnly: true,
   sameSite: 'none' as const,
-  secure: isProd || true,
+  secure: isProd,
   maxAge: SESSION_TTL_MS,
   path: '/',
 });
