@@ -1,0 +1,45 @@
+name: Frontend E2E Tests
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+      - feature/**
+  pull_request:
+    paths:
+      - 'App.tsx'
+      - 'components/**'
+      - 'contexts/**'
+      - 'pages/**'
+      - 'tests/e2e/**'
+      - 'playwright.config.ts'
+      - '.github/workflows/frontend-e2e.yml'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps
+
+      - name: Run Playwright tests
+        env:
+          VITE_API_BASE_URL: http://localhost:4000
+          VITE_PASSKEY_API_URL: http://localhost:4000
+          VITE_WALLET_ENCRYPTION_SECRET: test-test-test-test
+        run: npm run test:e2e -- --reporter=github
