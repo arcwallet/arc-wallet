@@ -42,13 +42,28 @@ export const sessionApi = {
     return handleResponse<ApiResponse>(response);
   },
 
-  async getSession(): Promise<{ email: string } | null> {
-    const response = await fetch(resolveUrl('/api/session'), { credentials: 'include' });
-    if (response.status === 401) {
-      return null;
+  async getSession(timeoutMs = 8000): Promise<{ email: string } | null> {
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const response = await fetch(resolveUrl('/api/session'), {
+        credentials: 'include',
+        signal: controller.signal,
+      });
+      if (response.status === 401) {
+        return null;
+      }
+      const body = await handleResponse<ApiResponse<{ email: string }>>(response);
+      return body?.data ?? null;
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        console.warn('Session request timed out');
+        return null;
+      }
+      throw error;
+    } finally {
+      window.clearTimeout(timer);
     }
-    const body = await handleResponse<ApiResponse<{ email: string }>>(response);
-    return body?.data ?? null;
   },
 
   async logout() {
