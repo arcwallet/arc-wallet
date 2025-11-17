@@ -80,6 +80,10 @@ export const createMagicLinkRouter = (config: EnvConfig, mailer: MagicLinkMailer
       return res.redirect('/dashboard');
     }
 
+    const hintText = mailer.isConfigured()
+      ? 'We will email you a secure, one-time sign-in link.'
+      : 'During the demo the magic link is printed in the server console.';
+
     const body = `
       <h1>Arc Wallet Magic Link</h1>
       <p>Enter your email address to receive a one-time link.</p>
@@ -87,7 +91,7 @@ export const createMagicLinkRouter = (config: EnvConfig, mailer: MagicLinkMailer
         <input type="email" name="email" placeholder="ornek@arcwallet.io" required />
         <button type="submit">Send Link</button>
       </form>
-      <p id="login-status" class="muted">During the demo the link appears in the server console.</p>
+      <p id="login-status" class="muted">${hintText}</p>
       <script defer src="/static/login.js"></script>
     `;
     res.send(renderTemplate('Sign In', body));

@@ -20,7 +20,7 @@ const LoginPage: React.FC = () => {
   return (
     <div className="auth-card">
       <h1>Arc Wallet Magic Link</h1>
-      <p>Enter your email address to receive a one-time sign-in link.</p>
+      <p>Enter your email address to receive a secure one-time sign-in link in your inbox.</p>
       <form onSubmit={handleSubmit} className="auth-form">
         <input
           type="email"
@@ -39,7 +39,7 @@ const LoginPage: React.FC = () => {
           {message}
         </p>
       )}
-      <p className="muted">In this demo the magic link is logged to the server console.</p>
+      <p className="muted">We email a link that stays valid for 15 minutes.</p>
     </div>
   );
 };

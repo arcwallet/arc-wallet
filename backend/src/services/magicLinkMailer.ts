@@ -48,6 +48,7 @@ export const createMagicLinkMailer = (config: MagicLinkMailerConfig): MagicLinkM
       };
 
       await sgMail.send(msg);
+      console.log('✉️  Magic link email sent to', to);
     },
   };
 };
