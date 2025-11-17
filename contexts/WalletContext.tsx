@@ -21,6 +21,7 @@ interface WalletContextValue {
   logout: () => void;
   registerPasskeyForCurrentUser: () => Promise<void>;
   verifyWithPasskey: () => Promise<void>;
+  activateWithPrivateKey: (privateKey: string) => Promise<void>;
 }
 
 const WalletContext = createContext<WalletContextValue | undefined>(undefined);
@@ -203,6 +204,24 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }
   }, []);
 
+  const activateWithPrivateKey = useCallback(
+    async (privateKey: string) => {
+      try {
+        const wallet = new Wallet(privateKey);
+        const session: SessionKey = {
+          privateKey: wallet.privateKey,
+          address: wallet.address,
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        };
+        finalizeSession(session);
+      } catch (error) {
+        console.error('Invalid private key provided', error);
+        throw new Error('Invalid private key. Please double-check and try again.');
+      }
+    },
+    [finalizeSession],
+  );
+
   const value = useMemo<WalletContextValue>(
     () => ({
       isAuthenticated,
@@ -234,9 +253,22 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           console.error('❌ Passkey verification failed:', error);
           throw error;
         }
-      }
+      },
+      activateWithPrivateKey,
     }),
-    [isAuthenticated, isConnecting, address, userId, sessionKey, loginWithPasskey, logout, registerPasskey, authenticateWithPasskey, finalizeSession],
+    [
+      isAuthenticated,
+      isConnecting,
+      address,
+      userId,
+      sessionKey,
+      loginWithPasskey,
+      logout,
+      registerPasskey,
+      authenticateWithPasskey,
+      finalizeSession,
+      activateWithPrivateKey,
+    ],
   );
 
   return <WalletContext.Provider value={value}>{children}</WalletContext.Provider>;

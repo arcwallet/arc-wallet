@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Wallet } from 'ethers';
 import { AddIcon, DocumentIcon } from './Icons';
 
 interface SelectionCardProps {
@@ -41,16 +42,70 @@ const SelectionCard: React.FC<SelectionCardProps> = ({ icon, title, description,
 }
 
 interface WalletSetupScreenProps {
-  onComplete: () => void;
+  email: string;
+  onComplete: (privateKey: string) => void;
+  onLogout?: () => void;
 }
 
-const WalletSetupScreen: React.FC<WalletSetupScreenProps> = ({ onComplete }) => {
-    const [selection, setSelection] = useState<'create' | 'import'>('import');
+const WalletSetupScreen: React.FC<WalletSetupScreenProps> = ({ email, onComplete, onLogout }) => {
+    const [selection, setSelection] = useState<'create' | 'import'>('create');
+    const [generatedKey, setGeneratedKey] = useState<string | null>(null);
+    const [importKey, setImportKey] = useState('');
+    const [error, setError] = useState<string | null>(null);
+    const [copied, setCopied] = useState(false);
+
+    const handleContinue = () => {
+        setError(null);
+        setCopied(false);
+
+        if (selection === 'create') {
+            if (!generatedKey) {
+                const wallet = Wallet.createRandom();
+                setGeneratedKey(wallet.privateKey);
+                return;
+            }
+            onComplete(generatedKey);
+            return;
+        }
+
+        const normalized = importKey.trim();
+        if (!/^0x[a-fA-F0-9]{64}$/.test(normalized)) {
+            setError('Please enter a valid 64-character hexadecimal private key.');
+            return;
+        }
+        onComplete(normalized);
+    };
+
+    const handleCopy = async () => {
+        if (!generatedKey || typeof navigator === 'undefined' || !navigator.clipboard) return;
+        try {
+            await navigator.clipboard.writeText(generatedKey);
+            setCopied(true);
+        } catch {
+            setCopied(false);
+        }
+    };
+
+    const showGeneratedPreview = selection === 'create' && Boolean(generatedKey);
 
     return (
         <div className="relative flex h-auto min-h-screen w-full flex-col items-center justify-center p-4 sm:p-6 lg:p-8">
             <div className="w-full max-w-2xl rounded-xl border border-[#D1DCE8]/20 bg-[#151A22] p-6 sm:p-8 lg:p-12">
-                <div className="flex flex-col gap-8">
+                    <div className="flex flex-col gap-8">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                            <div>
+                                <p className="text-[#E6EEF3] text-lg font-semibold">You're signed in as</p>
+                                <p className="text-[#9EBBE4] text-base font-mono">{email}</p>
+                            </div>
+                            {onLogout && (
+                                <button
+                                    onClick={onLogout}
+                                    className="rounded-lg border border-[#2B3440] px-4 py-2 text-sm font-medium text-[#A7B4C8] hover:text-[#E6EEF3]"
+                                >
+                                    Sign out
+                                </button>
+                            )}
+                        </div>
                     {/* ProgressBar */}
                     <div className="flex flex-col gap-3">
                         <div className="flex gap-6 justify-between">
@@ -84,6 +139,47 @@ const WalletSetupScreen: React.FC<WalletSetupScreenProps> = ({ onComplete }) => 
                             onClick={() => setSelection('import')}
                        />
                     </div>
+                    {/* Import or Generated Key UI */}
+                    {selection === 'import' && (
+                        <div className="flex flex-col gap-3">
+                            <label className="text-sm font-medium text-[#E6EEF3]">Enter your private key</label>
+                            <textarea
+                                value={importKey}
+                                onChange={(event) => setImportKey(event.target.value)}
+                                placeholder="0x..."
+                                className="h-28 rounded-lg border border-[#D1DCE8]/20 bg-[#091325]/60 p-3 font-mono text-sm text-[#E6EEF3] focus:border-[#9EBBE4]/60 focus:outline-none"
+                            />
+                        </div>
+                    )}
+
+                    {showGeneratedPreview && (
+                        <div className="rounded-lg border border-[#9EBBE4]/40 bg-[#091325]/60 p-4 flex flex-col gap-3">
+                            <p className="text-[#E6EEF3] font-medium">Your generated private key</p>
+                            <p className="text-[#A7B4C8] text-sm">
+                                Store this key securely. Anyone with this key can control your wallet.
+                            </p>
+                            <div className="rounded-md bg-[#050914] border border-[#9EBBE4]/30 p-3 font-mono text-sm text-[#E6EEF3] break-all">
+                                {generatedKey}
+                            </div>
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={handleCopy}
+                                    className="rounded-lg border border-[#2B3440] px-4 py-2 text-sm text-[#E6EEF3]"
+                                >
+                                    {copied ? 'Copied!' : 'Copy key'}
+                                </button>
+                                <button
+                                    onClick={() => setGeneratedKey(null)}
+                                    className="rounded-lg border border-[#2B3440] px-4 py-2 text-sm text-[#E6EEF3]"
+                                >
+                                    Generate another
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {error && <p className="text-[#ff6b6b] text-sm">{error}</p>}
+
                     {/* Separator */}
                     <div className="w-full h-px bg-[#D1DCE8]/20"></div>
                     {/* ButtonGroup */}
@@ -93,9 +189,11 @@ const WalletSetupScreen: React.FC<WalletSetupScreenProps> = ({ onComplete }) => 
                                 <span className="truncate">Back</span>
                             </button>
                             <button 
-                                onClick={onComplete}
+                                onClick={handleContinue}
                                 className="flex min-w-[84px] w-full sm:w-auto cursor-pointer items-center justify-center overflow-hidden rounded-lg h-11 px-5 bg-[#9EBBE4] text-[#091325] text-base font-bold leading-normal tracking-wide transition-opacity hover:opacity-90">
-                                <span className="truncate">Continue</span>
+                                <span className="truncate">
+                                    {selection === 'create' && !generatedKey ? 'Generate Key' : 'Continue'}
+                                </span>
                             </button>
                         </div>
                     </div>

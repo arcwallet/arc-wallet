@@ -90,3 +90,34 @@ body {
 .error {
   color: #ff6b81;
 }
+
+.session-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  background: rgba(9, 19, 37, 0.85);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.session-banner button {
+  padding: 8px 16px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: transparent;
+  color: #eef3f8;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.session-label {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  color: #9ebbe4;
+  letter-spacing: 0.08em;
+}
+
+.session-email {
+  font-size: 0.95rem;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+}
