@@ -2,12 +2,42 @@ import { Router, Request, Response } from 'express';
 import { body, param, query, validationResult } from 'express-validator';
 import { Database } from '../models/Database.js';
 import { rateLimitMiddleware } from '../middleware/security.js';
+import { BridgeKit } from '@circle-fin/bridge-kit';
+import { createAdapterFromPrivateKey } from '@circle-fin/adapter-viem-v2';
+import { createPublicClient, http, defineChain } from 'viem';
+import { sepolia } from 'viem/chains';
 
 export interface BridgeConfig {
   NODE_ENV: string;
   ARC_RPC_URL: string;
   SEPOLIA_RPC_URL: string;
 }
+
+// Define Arc Testnet chain
+const arcTestnet = defineChain({
+  id: 1025,
+  name: 'Arc Testnet',
+  nativeCurrency: {
+    decimals: 18,
+    name: 'Ether',
+    symbol: 'ETH',
+  },
+  rpcUrls: {
+    default: {
+      http: ['https://rpc.testnet.arc.network'],
+    },
+    public: {
+      http: ['https://rpc.testnet.arc.network'],
+    },
+  },
+  blockExplorers: {
+    default: {
+      name: 'Arc Explorer',
+      url: 'https://explorer.testnet.arc.network',
+    },
+  },
+  testnet: true,
+});
 
 /**
  * Bridge Routes
@@ -228,7 +258,7 @@ export function createBridgeRoutes(db: Database, config: BridgeConfig): Router {
 }
 
 /**
- * Execute bridge operation asynchronously
+ * Execute bridge operation asynchronously using Circle Bridge Kit SDK
  * This function runs in the background after returning 202 Accepted
  */
 async function executeBridgeOperation(
@@ -242,36 +272,150 @@ async function executeBridgeOperation(
 ): Promise<void> {
   try {
     console.log(`🌉 [BRIDGE ${transactionId}] Executing bridge operation`);
+    console.log(`   Direction: ${direction}`);
+    console.log(`   Amount: ${amount} ${token}`);
 
-    // TODO: Implement Circle Bridge Kit integration
-    // For now, this is a placeholder that simulates the bridge process
+    // Initialize Circle Bridge Kit
+    const kit = new BridgeKit();
 
-    // Step 1: Update status to indicate we're processing
-    await db.updateBridgeTransaction(transactionId, {
-      status: 'pending'
+    // Setup event listeners for progress tracking
+    kit.on('*', async (event) => {
+      console.log(`🌉 [BRIDGE ${transactionId}] ${event.method} event:`, event.values);
     });
 
-    // NOTE: The actual implementation would use Circle's Bridge Kit SDK:
-    // 1. Initialize adapters for source and destination chains
-    // 2. Create Circle Bridge Kit client
-    // 3. Execute burn on source chain
-    // 4. Wait for attestation from Circle
-    // 5. Execute mint on destination chain
-
-    // For now, mark as failed with a helpful message
-    await db.updateBridgeTransaction(transactionId, {
-      status: 'failed',
-      errorMessage: 'Bridge implementation pending: Circle Bridge Kit SDK needs to be integrated. Please install @circle-fin/bridge-kit and @circle-fin/adapter-viem-v2 dependencies.'
+    kit.on('approve', async (event) => {
+      console.log(`✅ [BRIDGE ${transactionId}] Token approved:`, event.values.txHash);
     });
 
-    console.log(`⚠️  [BRIDGE ${transactionId}] Bridge SDK not yet integrated`);
+    kit.on('burn', async (event) => {
+      console.log(`🔥 [BRIDGE ${transactionId}] USDC burned on source chain:`, event.values.txHash);
+      await db.updateBridgeTransaction(transactionId, {
+        status: 'burn_complete',
+        sourceTxHash: event.values.txHash
+      });
+    });
+
+    kit.on('fetchAttestation', async (event) => {
+      console.log(`📝 [BRIDGE ${transactionId}] Attestation fetched from Circle`);
+      await db.updateBridgeTransaction(transactionId, {
+        status: 'attestation_fetched',
+        attestation: JSON.stringify(event.values.data)
+      });
+    });
+
+    kit.on('mint', async (event) => {
+      console.log(`💰 [BRIDGE ${transactionId}] USDC minted on destination chain:`, event.values.txHash);
+      await db.updateBridgeTransaction(transactionId, {
+        status: 'mint_complete',
+        destinationTxHash: event.values.txHash
+      });
+    });
+
+    // Determine source and destination chains based on direction
+    const isArcToSepolia = direction === 'arc-to-sepolia';
+    const sourceChain = isArcToSepolia ? arcTestnet : sepolia;
+    const destChain = isArcToSepolia ? sepolia : arcTestnet;
+    const sourceRpcUrl = isArcToSepolia ? config.ARC_RPC_URL : config.SEPOLIA_RPC_URL;
+    const destRpcUrl = isArcToSepolia ? config.SEPOLIA_RPC_URL : config.ARC_RPC_URL;
+
+    // Create adapter for source chain with custom RPC
+    const sourceAdapter = createAdapterFromPrivateKey({
+      privateKey: privateKey as `0x${string}`,
+      capabilities: {
+        addressContext: 'user-controlled',
+      },
+      getPublicClient: ({ chain }) =>
+        createPublicClient({
+          chain: chain || sourceChain,
+          transport: http(sourceRpcUrl, {
+            retryCount: 3,
+            timeout: 30000,
+          }),
+        }),
+    });
+
+    // Create adapter for destination chain with custom RPC
+    const destAdapter = createAdapterFromPrivateKey({
+      privateKey: privateKey as `0x${string}`,
+      capabilities: {
+        addressContext: 'user-controlled',
+      },
+      getPublicClient: ({ chain }) =>
+        createPublicClient({
+          chain: chain || destChain,
+          transport: http(destRpcUrl, {
+            retryCount: 3,
+            timeout: 30000,
+          }),
+        }),
+    });
+
+    // Execute the bridge transfer
+    console.log(`🌉 [BRIDGE ${transactionId}] Starting bridge transfer...`);
+
+    // Note: Circle CCTP uses chain names like 'Ethereum_Sepolia' for testnet
+    // Arc Testnet may not be supported by Circle CCTP yet
+    // Using 'Ethereum_Sepolia' and 'Base_Sepolia' as an example for now
+    const result = await kit.bridge({
+      from: {
+        adapter: sourceAdapter,
+        chain: isArcToSepolia ? 'Arc_Testnet' as any : 'Ethereum_Sepolia',
+      },
+      to: {
+        adapter: destAdapter,
+        chain: isArcToSepolia ? 'Ethereum_Sepolia' : 'Arc_Testnet' as any,
+      },
+      amount: amount,
+      token: 'USDC',
+      config: {
+        transferSpeed: 'FAST',
+      },
+    });
+
+    console.log(`🌉 [BRIDGE ${transactionId}] Bridge result:`, result.state);
+    console.log(`🌉 [BRIDGE ${transactionId}] Steps:`, result.steps);
+
+    if (result.state === 'success') {
+      // Extract transaction hashes from steps
+      const burnStep = result.steps.find(s => s.name === 'depositForBurn' || s.name === 'burn');
+      const mintStep = result.steps.find(s => s.name === 'mint');
+
+      await db.updateBridgeTransaction(transactionId, {
+        status: 'completed',
+        sourceTxHash: burnStep?.txHash || undefined,
+        destinationTxHash: mintStep?.txHash || undefined,
+      });
+
+      console.log(`✅ [BRIDGE ${transactionId}] Bridge completed successfully`);
+    } else {
+      // Handle partial success or failure
+      const errorStep = result.steps.find(s => s.state === 'error');
+      const errorMessage = errorStep
+        ? `Bridge failed at step: ${errorStep.name}`
+        : 'Bridge failed with unknown error';
+
+      await db.updateBridgeTransaction(transactionId, {
+        status: 'failed',
+        errorMessage: errorMessage,
+      });
+
+      console.error(`❌ [BRIDGE ${transactionId}] ${errorMessage}`);
+    }
 
   } catch (error: any) {
     console.error(`❌ [BRIDGE ${transactionId}] Bridge execution error:`, error);
 
-    await db.updateBridgeTransaction(transactionId, {
-      status: 'failed',
-      errorMessage: error.message || 'Unknown error occurred during bridge operation'
-    });
+    // Check if it's a route not supported error
+    if (error.message?.includes('Route not supported') || error.message?.includes('not available')) {
+      await db.updateBridgeTransaction(transactionId, {
+        status: 'failed',
+        errorMessage: 'Arc Testnet is not yet supported by Circle CCTP. Please use supported testnets like Ethereum Sepolia ↔ Base Sepolia.'
+      });
+    } else {
+      await db.updateBridgeTransaction(transactionId, {
+        status: 'failed',
+        errorMessage: error.message || 'Unknown error occurred during bridge operation'
+      });
+    }
   }
 }
