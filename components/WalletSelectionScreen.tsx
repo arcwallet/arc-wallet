@@ -5,9 +5,16 @@ import { useWallet } from '../contexts/WalletContext';
 interface WalletSelectionScreenProps {
   onConnect: () => void;
   isConnecting?: boolean;
+  onUseRecovery?: () => void;
+  email?: string | null;
 }
 
-const WalletSelectionScreen: React.FC<WalletSelectionScreenProps> = ({ onConnect, isConnecting = false }) => {
+const WalletSelectionScreen: React.FC<WalletSelectionScreenProps> = ({
+  onConnect,
+  isConnecting = false,
+  onUseRecovery,
+  email,
+}) => {
   const { registerPasskeyForCurrentUser } = useWallet();
   const [isRegistering, setIsRegistering] = useState(false);
   return (
@@ -19,6 +26,11 @@ const WalletSelectionScreen: React.FC<WalletSelectionScreenProps> = ({ onConnect
             <div className="flex flex-col items-center gap-3">
               <p className="text-text-primary text-4xl font-black leading-tight tracking-[-0.033em]">Access Wallet</p>
               <p className="text-text-secondary text-base font-normal leading-normal">Your wallet is protected with Passkey security.</p>
+              {email && (
+                <p className="text-sm font-mono text-text-secondary">
+                  Signed in as <span className="text-text-primary">{email}</span>
+                </p>
+              )}
             </div>
             {/* SingleButton */}
             <div className="flex flex-col gap-4">
@@ -59,7 +71,13 @@ const WalletSelectionScreen: React.FC<WalletSelectionScreenProps> = ({ onConnect
             </div>
             {/* MetaText */}
             <div className="pt-2">
-              <p className="text-text-secondary hover:text-primary text-sm font-normal leading-normal text-center hover:underline cursor-pointer">Use Recovery Access</p>
+              <button
+                type="button"
+                className="text-text-secondary hover:text-primary text-sm font-medium leading-normal text-center hover:underline cursor-pointer"
+                onClick={onUseRecovery}
+              >
+                Use Recovery Access
+              </button>
             </div>
           </div>
         </div>

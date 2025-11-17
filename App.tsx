@@ -4,6 +4,7 @@ import arcWalletLoginLogo from './assets/arcwalletloginlogo.png';
 import ErrorBoundary from './components/ErrorBoundary';
 import WalletDashboard from './components/WalletDashboard';
 import WalletSetupScreen from './components/WalletSetupScreen';
+import WalletSelectionScreen from './components/WalletSelectionScreen';
 const LoginPage = React.lazy(() => import('./pages/LoginPage'));
 import { SessionProvider, useSession } from './contexts/SessionContext';
 import { WalletProvider, useWallet } from './contexts/WalletContext';
@@ -11,15 +12,28 @@ import { ArcAccountProvider } from './contexts/ArcAccountContext';
 import { ActivityProvider } from './contexts/ActivityContext';
 
 const WalletExperience: React.FC<{ email: string }> = ({ email }) => {
-  const { isAuthenticated, activateWithPrivateKey, logout: walletLogout } = useWallet();
+  const { isAuthenticated, activateWithPrivateKey, loginWithPasskey, isConnecting, logout: walletLogout } = useWallet();
   const { logout: sessionLogout } = useSession();
+  const [usingRecovery, setUsingRecovery] = useState(false);
 
   const handleLogout = async () => {
     await sessionLogout();
     walletLogout();
+    setUsingRecovery(false);
   };
 
-  if (!isAuthenticated) {
+  if (!isAuthenticated && !usingRecovery) {
+    return (
+      <WalletSelectionScreen
+        email={email}
+        onConnect={loginWithPasskey}
+        isConnecting={isConnecting}
+        onUseRecovery={() => setUsingRecovery(true)}
+      />
+    );
+  }
+
+  if (!isAuthenticated && usingRecovery) {
     return <WalletSetupScreen email={email} onComplete={activateWithPrivateKey} onLogout={handleLogout} />;
   }
 

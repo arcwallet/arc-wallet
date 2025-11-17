@@ -51,7 +51,7 @@ test.describe('Magic link onboarding', () => {
     // Simulate clicking the email link (token appended to URL)
     await page.goto('/?token=fake-test-token');
 
-    await expect(page.getByText("You're signed in as")).toBeVisible();
+    await expect(page.getByText('Access Wallet')).toBeVisible();
     await expect(page.getByText(email)).toBeVisible();
   });
 });
