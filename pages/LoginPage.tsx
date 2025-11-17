@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useSession } from '../contexts/SessionContext';
+import arcWalletLoginLogo from '../assets/arcwalletloginlogo.png';
 
 const LoginPage: React.FC = () => {
   const { sendMagicLink, requestStatus, message } = useSession();
@@ -29,6 +30,10 @@ const LoginPage: React.FC = () => {
 
   return (
     <div className="auth-card">
+      <div className="login-header">
+        <img src={arcWalletLoginLogo} alt="Arc Wallet" className="login-logo" />
+        <span className="login-title">Arc Wallet</span>
+      </div>
       <h1>Arc Wallet Magic Link</h1>
       <p>Enter your email address to receive a secure one-time sign-in link in your inbox.</p>
       <form onSubmit={handleSubmit} className="auth-form">
