@@ -9,6 +9,7 @@ import React, {
 } from 'react';
 import { Wallet } from 'ethers';
 import { passkeyClient, PasskeyClientError, type SessionKey } from '../services/passkeyClient';
+import { useSession } from './SessionContext';
 import { createRegistrationCredential, createAuthenticationCredential } from '../utils/webauthn';
 
 interface WalletContextValue {
@@ -41,12 +42,38 @@ const getOrCreateUserId = () => {
   return userId;
 };
 
+const WALLET_STORAGE_KEY = 'arcwallet:wallets';
+
+const loadStoredWallets = (): Record<string, SessionKey> => {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = window.localStorage.getItem(WALLET_STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as Record<string, SessionKey>) : {};
+  } catch {
+    return {};
+  }
+};
+
+const persistWalletForEmail = (email: string, session: SessionKey) => {
+  if (typeof window === 'undefined') return;
+  const existing = loadStoredWallets();
+  existing[email.toLowerCase()] = session;
+  window.localStorage.setItem(WALLET_STORAGE_KEY, JSON.stringify(existing));
+};
+
+const getWalletForEmail = (email: string | null): SessionKey | null => {
+  if (!email) return null;
+  const stored = loadStoredWallets();
+  return stored[email.toLowerCase()] ?? null;
+};
+
 export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [address, setAddress] = useState<string | null>(null);
   const [sessionKey, setSessionKey] = useState<SessionKey | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
+  const { currentEmail } = useSession();
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -58,21 +85,30 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       setUserId(storedUserId);
     }
 
-    const sessionRaw = window.sessionStorage.getItem(SESSION_KEY_STORAGE_KEY);
-    if (sessionRaw) {
-      try {
-        const parsed = JSON.parse(sessionRaw) as SessionKey;
-        const expiresMs = Date.parse(parsed.expiresAt);
-        if (!Number.isNaN(expiresMs) && expiresMs > Date.now()) {
-          setSessionKey(parsed);
-          setAddress(parsed.address);
-          setIsAuthenticated(true);
-          return;
+    const stored = getWalletForEmail(currentEmail ?? null);
+    if (stored) {
+      setSessionKey(stored);
+      setAddress(stored.address);
+      setIsAuthenticated(true);
+      window.sessionStorage.setItem(SESSION_KEY_STORAGE_KEY, JSON.stringify(stored));
+      return;
+    } else {
+      const sessionRaw = window.sessionStorage.getItem(SESSION_KEY_STORAGE_KEY);
+      if (sessionRaw) {
+        try {
+          const parsed = JSON.parse(sessionRaw) as SessionKey;
+          const expiresMs = Date.parse(parsed.expiresAt);
+          if (!Number.isNaN(expiresMs) && expiresMs > Date.now()) {
+            setSessionKey(parsed);
+            setAddress(parsed.address);
+            setIsAuthenticated(true);
+            return;
+          }
+        } catch (error) {
+          console.warn('Failed to parse stored session key', error);
         }
-      } catch (error) {
-        console.warn('Failed to parse stored session key', error);
+        window.sessionStorage.removeItem(SESSION_KEY_STORAGE_KEY);
       }
-      window.sessionStorage.removeItem(SESSION_KEY_STORAGE_KEY);
     }
 
     const legacyAddress = window.sessionStorage.getItem('arcwallet:last-address');
@@ -80,7 +116,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       setAddress(legacyAddress);
       setIsAuthenticated(true);
     }
-  }, []);
+  }, [currentEmail]);
 
   const finalizeSession = useCallback((session: SessionKey) => {
     setSessionKey(session);
@@ -88,8 +124,11 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     setIsAuthenticated(true);
     if (typeof window !== 'undefined') {
       window.sessionStorage.setItem(SESSION_KEY_STORAGE_KEY, JSON.stringify(session));
+      if (currentEmail) {
+        persistWalletForEmail(currentEmail, session);
+      }
     }
-  }, []);
+  }, [currentEmail]);
 
   // Define authenticateWithPasskey FIRST before registerPasskey (which uses it)
   const authenticateWithPasskey = useCallback(async (username?: string) => {

@@ -14,6 +14,7 @@ interface SessionContextValue extends SessionState {
   refresh: () => Promise<void>;
   logout: () => Promise<void>;
   verifyMagicToken: (token: string) => Promise<void>;
+  currentEmail: string | null;
 }
 
 const SessionContext = createContext<SessionContextValue | undefined>(undefined);
@@ -96,6 +97,7 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const value: SessionContextValue = {
     ...state,
+    currentEmail: state.email,
     sendMagicLink,
     refresh,
     logout,
