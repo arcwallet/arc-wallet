@@ -37,10 +37,6 @@ export const createMagicLinkMailer = (config: MagicLinkMailerConfig): MagicLinkM
           email: config.fromAddress!,
           name: config.fromName ?? 'Arc Wallet',
         },
-        replyTo: {
-          email: config.fromAddress!,
-          name: config.fromName ?? 'Arc Wallet',
-        },
         subject: 'Sign in to Arc Wallet - Your secure access link',
         text: `Hello,\n\nClick the link below to sign in to your Arc Wallet account:\n\n${url}\n\nThis link is valid for 15 minutes and can only be used once.\n\nIf you did not request this email, you can safely ignore it.\n\nBest regards,\nArc Wallet Team`,
         html: `
