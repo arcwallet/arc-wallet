@@ -1,9 +1,10 @@
 import React from 'react';
 import './styles/magic.css';
+import arcWalletLoginLogo from './assets/arcwalletloginlogo.png';
 import ErrorBoundary from './components/ErrorBoundary';
 import WalletDashboard from './components/WalletDashboard';
 import WalletSetupScreen from './components/WalletSetupScreen';
-import LoginPage from './pages/LoginPage';
+const LoginPage = React.lazy(() => import('./pages/LoginPage'));
 import { SessionProvider, useSession } from './contexts/SessionContext';
 import { WalletProvider, useWallet } from './contexts/WalletContext';
 import { ArcAccountProvider } from './contexts/ArcAccountContext';
@@ -42,6 +43,10 @@ const RootView: React.FC = () => {
   if (loading) {
     return (
       <div className="auth-card">
+        <div className="login-header">
+          <img src={arcWalletLoginLogo} alt="Arc Wallet" className="login-logo" />
+          <span className="login-title">Arc Wallet</span>
+        </div>
         <p className="muted">Checking your session…</p>
       </div>
     );
@@ -61,7 +66,9 @@ const App: React.FC = () => (
         <ArcAccountProvider>
           <ActivityProvider>
             <div className="auth-wrapper">
-              <RootView />
+              <React.Suspense fallback={<div className="auth-card"><p className="muted">Loading…</p></div>}>
+                <RootView />
+              </React.Suspense>
             </div>
           </ActivityProvider>
         </ArcAccountProvider>

@@ -34,19 +34,17 @@ const LoginPage: React.FC = () => {
         <img src={arcWalletLoginLogo} alt="Arc Wallet" className="login-logo" />
         <span className="login-title">Arc Wallet</span>
       </div>
-      <h1>Arc Wallet Magic Link</h1>
-      <p>Enter your email address to receive a secure one-time sign-in link in your inbox.</p>
       <form onSubmit={handleSubmit} className="auth-form">
         <input
           type="email"
           name="email"
-          placeholder="ornek@arcwallet.io"
+          placeholder="Enter your work email"
           required
           value={email}
           onChange={(event) => setEmail(event.target.value)}
         />
         <button type="submit" disabled={submitting || cooldown > 0}>
-          {submitting ? 'Sending…' : cooldown > 0 ? `Retry in ${cooldown}s` : 'Send Link'}
+          {submitting ? 'Sending…' : cooldown > 0 ? `Retry in ${cooldown}s` : 'Sign in'}
         </button>
       </form>
       {message && (
@@ -54,11 +52,11 @@ const LoginPage: React.FC = () => {
           {message}
         </p>
       )}
-      <p className="muted">
-        {cooldown > 0
-          ? 'Please check your inbox. You can request another link after the countdown.'
-          : 'We email a link that stays valid for 15 minutes.'}
-      </p>
+      {cooldown > 0 && (
+        <p className="muted">
+          Please check your inbox. You can request another link after the countdown.
+        </p>
+      )}
     </div>
   );
 };
