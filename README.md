@@ -27,6 +27,43 @@ A modern Web3 wallet built for Arc Network with support for multiple stablecoins
 8. Run the app:
    `npm run dev`
 
+## Magic Link Email Delivery (SendGrid)
+
+1. **Verify the sending domain** inside SendGrid → *Settings → Sender Authentication* and create the three CNAMEs + DMARC TXT that Render already lists (`em4148…`, `s1._domainkey…`, `s2._domainkey…`, `_dmarc…`). Wait for SendGrid to mark them as verified.
+2. **Create a Mail Send API key** (Full Access or restricted to “Mail Send”) and copy it once.
+3. **Configure backend env vars** (Render → Environment):
+   - `SENDGRID_API_KEY=<copied-key>`
+   - `EMAIL_FROM_ADDRESS=support@arcwallet.network` (must be within the verified domain)
+   - `EMAIL_FROM_NAME=Arc Wallet`
+   - `MAGIC_LINK_BASE_URL=https://app.arcwallet.network/auth/callback`
+4. **Frontend env vars** (Vercel → Settings → Environment Variables):
+   - `VITE_API_BASE_URL=https://arcwallet-backend.onrender.com`
+   - `VITE_PASSKEY_API_URL=https://arcwallet-backend.onrender.com`
+   - `VITE_WALLET_ENCRYPTION_SECRET=<same secret as local>`
+5. Redeploy backend first (Render) and then frontend (Vercel). The backend logs will print the generated magic link URL so you can confirm it matches the production domain. If the SendGrid API call fails you will see the error stack trace in Render logs.
+
+## Deployment Environment Checklist
+
+| Layer | Required variables | Notes |
+| --- | --- | --- |
+| **Frontend (Vercel)** | `VITE_API_BASE_URL`, `VITE_PASSKEY_API_URL`, `VITE_WALLET_ENCRYPTION_SECRET`, `VITE_ARC_RPC_URL` (optional), bundle debug flags | Use exactly the same `VITE_WALLET_ENCRYPTION_SECRET` everywhere so encrypted wallets can be restored. |
+| **Backend (Render)** | `NODE_ENV=production`, `PORT=10000`, `ALLOWED_ORIGINS=https://app.arcwallet.network`, `RP_ID=app.arcwallet.network`, `ORIGIN=https://app.arcwallet.network`, `MAGIC_LINK_BASE_URL=https://app.arcwallet.network/auth/callback`, `SENDGRID_API_KEY`, `EMAIL_FROM_ADDRESS`, `EMAIL_FROM_NAME`, `SESSION_SECRET`, `JWT_SECRET` | Use long random strings for `SESSION_SECRET` / `JWT_SECRET`; Render automatically injects `PORT` but we pin it to 10000 to match logs. |
+| **Shared** | DNS per SendGrid instructions, verified domain | Without DNS verification SendGrid will drop the email. |
+
+## Testing & QA
+
+### Automated (planned)
+1. **Playwright happy-path**: login page → request magic link (mock SendGrid) → simulate `/auth/callback?token=...` → verify dashboard loads previous wallet for that email. This ensures regressions in token verification or wallet restore are caught.
+2. **Playwright multi-user**: create wallets for email A and B, ensure switching `currentEmail` loads the right encrypted wallet and never leaks data to the other.
+3. **API smoke tests**: run a small Vitest suite hitting `/api/send-link` and `/api/verify` with fake SendGrid client to guarantee 15‑minute expiry logic.
+
+### Manual QA checklist
+1. Request a magic link, open email, ensure the button contains the correct link and the plain URL is hidden.
+2. Click the link in the same browser → you should land directly inside the dashboard with the previously created wallet (no redirect loop to `/login`).
+3. Repeat in a fresh browser profile: login should prompt setup again (encrypted cache is per browser/email).
+4. Sign out via dashboard footer; session cookie should clear and `/api/session` returns 401 until you re-login.
+5. On failure scenarios (expired token, invalid token) the frontend should display the backend error message and stay on the login screen.
+
 ## Passkey Backend (Proof of Concept)
 
 A lightweight Express service under `backend/` handles WebAuthn registration and authentication flows and mints short-lived session keys for the smart account workflow.
