@@ -276,26 +276,30 @@ const SessionInfoSection: React.FC = () => {
 
 const Settings: React.FC = () => {
   return (
-    <div className="w-full">
-      {/* PageHeading */}
-      <div className="mb-8 sm:mb-12">
-        <div className="flex flex-wrap justify-between gap-3">
-          <div className="flex min-w-72 flex-col gap-2 sm:gap-3">
-            <h1 className="text-3xl sm:text-4xl font-bold leading-tight tracking-tight text-text-primary">Settings</h1>
-            <p className="text-base font-normal leading-normal text-text-secondary">Manage your security, network, and organization settings.</p>
+    <>
+      <div className="w-full">
+        {/* PageHeading */}
+        <div className="mb-8 sm:mb-12">
+          <div className="flex flex-wrap justify-between gap-3">
+            <div className="flex min-w-72 flex-col gap-2 sm:gap-3">
+              <h1 className="text-3xl sm:text-4xl font-bold leading-tight tracking-tight text-text-primary">Settings</h1>
+              <p className="text-base font-normal leading-normal text-text-secondary">Manage your security, network, and organization settings.</p>
+            </div>
           </div>
         </div>
+        {/* Settings Sections */}
+        <div className="flex flex-col gap-8">
+          <WalletIdentitySection />
+          <SecuritySection />
+          <NetworkSection />
+          <OrganizationRolesSection />
+          <RecoverySection />
+        </div>
       </div>
-      {/* Settings Sections */}
-      <div className="flex flex-col gap-8">
-        <WalletIdentitySection />
-        <SecuritySection />
-        <NetworkSection />
-        <OrganizationRolesSection />
-        <RecoverySection />
+      <div className="mt-8">
         <SessionInfoSection />
       </div>
-    </div>
+    </>
   );
 };
 
