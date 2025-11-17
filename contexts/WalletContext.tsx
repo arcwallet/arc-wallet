@@ -41,6 +41,20 @@ const supportsEncryption = () =>
   Boolean(textEncoder && textDecoder) &&
   ENCRYPTION_SECRET.length >= 16;
 
+let encryptionWarningIssued = false;
+
+const ensureEncryptionConfigured = () => {
+  const ready = supportsEncryption();
+  if (!ready && typeof window !== 'undefined' && !encryptionWarningIssued) {
+    encryptionWarningIssued = true;
+    const message =
+      'Secure wallet backup is disabled because VITE_WALLET_ENCRYPTION_SECRET is missing or too short. Configure a strong secret to enable automatic wallet recovery.';
+    console.warn(message);
+    window.alert(message);
+  }
+  return ready;
+};
+
 const getOrCreateUserId = () => {
   if (typeof window === 'undefined') {
     return null;
@@ -134,6 +148,10 @@ const decryptSession = async (email: string, record: { cipher: string; iv?: stri
 
 const persistWalletForEmail = async (email: string, session: SessionKey) => {
   if (typeof window === 'undefined') return;
+  if (!ensureEncryptionConfigured()) {
+    console.warn('Skipping wallet persistence because encryption is not configured');
+    return;
+  }
   const existing = loadStoredWallets();
   existing[email.toLowerCase()] = await encryptSession(email, session);
   window.localStorage.setItem(WALLET_STORAGE_KEY, JSON.stringify(existing));
@@ -141,6 +159,9 @@ const persistWalletForEmail = async (email: string, session: SessionKey) => {
 
 const getWalletForEmail = async (email: string | null): Promise<SessionKey | null> => {
   if (!email || typeof window === 'undefined') return null;
+  if (!ensureEncryptionConfigured()) {
+    return null;
+  }
   const stored = loadStoredWallets();
   const record = stored[email.toLowerCase()];
   if (!record) return null;
@@ -161,11 +182,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    if (!supportsEncryption()) {
-      console.warn(
-        'Wallet encryption disabled. Configure VITE_WALLET_ENCRYPTION_SECRET with at least 16 characters to protect stored sessions.',
-      );
-    }
+    ensureEncryptionConfigured();
   }, []);
 
   useEffect(() => {
