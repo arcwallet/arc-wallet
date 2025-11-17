@@ -9,8 +9,8 @@ import React, {
 } from 'react';
 import { Wallet } from 'ethers';
 import { passkeyClient, PasskeyClientError, type SessionKey } from '../services/passkeyClient';
-import { useSession } from './SessionContext';
 import { createRegistrationCredential, createAuthenticationCredential } from '../utils/webauthn';
+import { useSession } from './SessionContext';
 
 interface WalletContextValue {
   isAuthenticated: boolean;
@@ -29,6 +29,17 @@ const WalletContext = createContext<WalletContextValue | undefined>(undefined);
 
 const USER_ID_STORAGE_KEY = 'arcwallet:user-id';
 const SESSION_KEY_STORAGE_KEY = 'arcwallet:session-key';
+const WALLET_STORAGE_KEY = 'arcwallet:wallets';
+const ENCRYPTION_SECRET = import.meta.env.VITE_WALLET_ENCRYPTION_SECRET ?? '';
+
+const textEncoder = typeof TextEncoder !== 'undefined' ? new TextEncoder() : null;
+const textDecoder = typeof TextDecoder !== 'undefined' ? new TextDecoder() : null;
+
+const supportsEncryption = () =>
+  typeof window !== 'undefined' &&
+  Boolean(window.crypto?.subtle) &&
+  Boolean(textEncoder && textDecoder) &&
+  ENCRYPTION_SECRET.length >= 16;
 
 const getOrCreateUserId = () => {
   if (typeof window === 'undefined') {
@@ -42,29 +53,102 @@ const getOrCreateUserId = () => {
   return userId;
 };
 
-const WALLET_STORAGE_KEY = 'arcwallet:wallets';
+const toBase64 = (buffer: ArrayBuffer) => {
+  if (typeof window === 'undefined') return '';
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  bytes.forEach((b) => (binary += String.fromCharCode(b)));
+  return window.btoa(binary);
+};
 
-const loadStoredWallets = (): Record<string, SessionKey> => {
+const fromBase64 = (value: string) => {
+  if (typeof window === 'undefined') return new Uint8Array();
+  const binary = window.atob(value);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+};
+
+const loadStoredWallets = (): Record<string, { cipher: string; iv?: string }> => {
   if (typeof window === 'undefined') return {};
   try {
     const raw = window.localStorage.getItem(WALLET_STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as Record<string, SessionKey>) : {};
+    return raw ? (JSON.parse(raw) as Record<string, { cipher: string; iv?: string }>) : {};
   } catch {
     return {};
   }
 };
 
-const persistWalletForEmail = (email: string, session: SessionKey) => {
+const removeStoredWallet = (email: string) => {
+  if (typeof window === 'undefined') return;
+  const lower = email.toLowerCase();
+  const existing = loadStoredWallets();
+  if (!existing[lower]) return;
+  delete existing[lower];
+  if (Object.keys(existing).length === 0) {
+    window.localStorage.removeItem(WALLET_STORAGE_KEY);
+  } else {
+    window.localStorage.setItem(WALLET_STORAGE_KEY, JSON.stringify(existing));
+  }
+};
+
+const getAesKey = async (email: string) => {
+  const encoder = textEncoder!;
+  const hash = await window.crypto.subtle.digest('SHA-256', encoder.encode(`${email.toLowerCase()}::${ENCRYPTION_SECRET}`));
+  return window.crypto.subtle.importKey('raw', hash, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+};
+
+const encryptSession = async (email: string, session: SessionKey) => {
+  if (!supportsEncryption() || !textEncoder) {
+    return { cipher: JSON.stringify(session) };
+  }
+  const key = await getAesKey(email);
+  const iv = window.crypto.getRandomValues(new Uint8Array(12));
+  const cipherBuffer = await window.crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, textEncoder.encode(JSON.stringify(session)));
+  return { cipher: toBase64(cipherBuffer), iv: toBase64(iv.buffer) };
+};
+
+const decryptSession = async (email: string, record: { cipher: string; iv?: string }) => {
+  if (!record) return null;
+  if (!supportsEncryption() || !record.iv || !textDecoder) {
+    try {
+      return JSON.parse(record.cipher) as SessionKey;
+    } catch {
+      return null;
+    }
+  }
+  try {
+    const key = await getAesKey(email);
+    const ivBytes = fromBase64(record.iv);
+    const cipherBytes = fromBase64(record.cipher);
+    const plainBuffer = await window.crypto.subtle.decrypt({ name: 'AES-GCM', iv: ivBytes }, key, cipherBytes);
+    const decoder = textDecoder;
+    return JSON.parse(decoder.decode(plainBuffer)) as SessionKey;
+  } catch (error) {
+    console.warn('Failed to decrypt wallet for email', email, error);
+    return null;
+  }
+};
+
+const persistWalletForEmail = async (email: string, session: SessionKey) => {
   if (typeof window === 'undefined') return;
   const existing = loadStoredWallets();
-  existing[email.toLowerCase()] = session;
+  existing[email.toLowerCase()] = await encryptSession(email, session);
   window.localStorage.setItem(WALLET_STORAGE_KEY, JSON.stringify(existing));
 };
 
-const getWalletForEmail = (email: string | null): SessionKey | null => {
-  if (!email) return null;
+const getWalletForEmail = async (email: string | null): Promise<SessionKey | null> => {
+  if (!email || typeof window === 'undefined') return null;
   const stored = loadStoredWallets();
-  return stored[email.toLowerCase()] ?? null;
+  const record = stored[email.toLowerCase()];
+  if (!record) return null;
+  const decrypted = await decryptSession(email, record);
+  if (!decrypted) {
+    removeStoredWallet(email);
+  }
+  return decrypted;
 };
 
 export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
@@ -76,29 +160,45 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const { currentEmail } = useSession();
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!supportsEncryption()) {
+      console.warn(
+        'Wallet encryption disabled. Configure VITE_WALLET_ENCRYPTION_SECRET with at least 16 characters to protect stored sessions.',
+      );
+    }
+  }, []);
+
+  useEffect(() => {
     if (typeof window === 'undefined') {
       return;
     }
 
-    const storedUserId = window.localStorage.getItem(USER_ID_STORAGE_KEY);
-    if (storedUserId) {
-      setUserId(storedUserId);
-    }
+    let cancelled = false;
 
-    const stored = getWalletForEmail(currentEmail ?? null);
-    if (stored) {
-      setSessionKey(stored);
-      setAddress(stored.address);
-      setIsAuthenticated(true);
-      window.sessionStorage.setItem(SESSION_KEY_STORAGE_KEY, JSON.stringify(stored));
-      return;
-    } else {
+    const initialize = async () => {
+      const storedUserId = window.localStorage.getItem(USER_ID_STORAGE_KEY);
+      if (storedUserId && !cancelled) {
+        setUserId(storedUserId);
+      }
+
+      const stored = await getWalletForEmail(currentEmail ?? null);
+      if (cancelled) {
+        return;
+      }
+      if (stored) {
+        setSessionKey(stored);
+        setAddress(stored.address);
+        setIsAuthenticated(true);
+        window.sessionStorage.setItem(SESSION_KEY_STORAGE_KEY, JSON.stringify(stored));
+        return;
+      }
+
       const sessionRaw = window.sessionStorage.getItem(SESSION_KEY_STORAGE_KEY);
       if (sessionRaw) {
         try {
           const parsed = JSON.parse(sessionRaw) as SessionKey;
           const expiresMs = Date.parse(parsed.expiresAt);
-          if (!Number.isNaN(expiresMs) && expiresMs > Date.now()) {
+          if (!Number.isNaN(expiresMs) && expiresMs > Date.now() && !cancelled) {
             setSessionKey(parsed);
             setAddress(parsed.address);
             setIsAuthenticated(true);
@@ -109,13 +209,19 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         }
         window.sessionStorage.removeItem(SESSION_KEY_STORAGE_KEY);
       }
-    }
 
-    const legacyAddress = window.sessionStorage.getItem('arcwallet:last-address');
-    if (legacyAddress) {
-      setAddress(legacyAddress);
-      setIsAuthenticated(true);
-    }
+      const legacyAddress = window.sessionStorage.getItem('arcwallet:last-address');
+      if (legacyAddress && !cancelled) {
+        setAddress(legacyAddress);
+        setIsAuthenticated(true);
+      }
+    };
+
+    void initialize();
+
+    return () => {
+      cancelled = true;
+    };
   }, [currentEmail]);
 
   const finalizeSession = useCallback((session: SessionKey) => {
@@ -125,7 +231,9 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     if (typeof window !== 'undefined') {
       window.sessionStorage.setItem(SESSION_KEY_STORAGE_KEY, JSON.stringify(session));
       if (currentEmail) {
-        persistWalletForEmail(currentEmail, session);
+        void persistWalletForEmail(currentEmail, session).catch((error) => {
+          console.warn('Failed to persist wallet for email', currentEmail, error);
+        });
       }
     }
   }, [currentEmail]);
