@@ -9,7 +9,15 @@ const runtimeEnv =
 export const RPC_URL =
   runtimeEnv?.VITE_ARC_RPC_URL ?? runtimeEnv?.ARC_RPC_URL ?? 'https://rpc.testnet.arc.network';
 
-export const getProvider = () => new JsonRpcProvider(RPC_URL);
+let sharedProvider: JsonRpcProvider | null = null;
+
+export const getProvider = () => {
+  if (!sharedProvider) {
+    sharedProvider = new JsonRpcProvider(RPC_URL);
+    sharedProvider.pollingInterval = 6000;
+  }
+  return sharedProvider;
+};
 
 export interface FeeEstimate {
   gasLimit: bigint;

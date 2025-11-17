@@ -33,6 +33,14 @@ const SendAssets: React.FC = () => {
   const [submissionKind, setSubmissionKind] = useState<'transaction' | 'userOp'>('transaction');
   const [feeEstimate, setFeeEstimate] = useState<bigint | null>(null);
   const [isEstimating, setIsEstimating] = useState(false);
+  const PASSKEY_REFRESH_BUFFER_MS = 2 * 60 * 1000;
+
+  const sessionExpiresSoon = useMemo(() => {
+    if (!sessionKey?.expiresAt) return true;
+    const expiresMs = Date.parse(sessionKey.expiresAt);
+    if (Number.isNaN(expiresMs)) return true;
+    return expiresMs - Date.now() <= PASSKEY_REFRESH_BUFFER_MS;
+  }, [sessionKey?.expiresAt]);
 
   const balance = useMemo(() => {
     return parseFloat(tokenBalance) || 0;
@@ -177,23 +185,23 @@ const SendAssets: React.FC = () => {
     setSubmitError(null);
     setTxHash(null);
     try {
-      // Require fresh passkey verification before sending
-      try {
-        await verifyWithPasskey();
-      } catch (passkeyError: any) {
-        // Handle passkey-specific errors
-        const passkeyMsg = typeof passkeyError?.message === 'string' ? passkeyError.message : '';
+      if (sessionExpiresSoon) {
+        try {
+          await verifyWithPasskey();
+        } catch (passkeyError: any) {
+          const passkeyMsg = typeof passkeyError?.message === 'string' ? passkeyError.message : '';
 
-        if (passkeyError instanceof DOMException && passkeyError.name === 'NotAllowedError') {
-          throw new Error('Passkey verification was cancelled. Please try again and complete the verification.');
-        } else if (passkeyMsg.toLowerCase().includes('user not found')) {
-          throw new Error('Your passkey is not registered. Please sign out and create a new passkey.');
-        } else if (passkeyMsg.toLowerCase().includes('not found') || passkeyMsg.toLowerCase().includes('passkey not found')) {
-          throw new Error('Passkey not found. Please sign out and register a new passkey.');
-        } else if (passkeyMsg.toLowerCase().includes('challenge')) {
-          throw new Error('Authentication challenge expired. Please try again.');
-        } else {
-          throw new Error(`Passkey verification failed: ${passkeyMsg || 'Unknown error'}`);
+          if (passkeyError instanceof DOMException && passkeyError.name === 'NotAllowedError') {
+            throw new Error('Passkey verification was cancelled. Please try again and complete the verification.');
+          } else if (passkeyMsg.toLowerCase().includes('user not found')) {
+            throw new Error('Your passkey is not registered. Please sign out and create a new passkey.');
+          } else if (passkeyMsg.toLowerCase().includes('not found') || passkeyMsg.toLowerCase().includes('passkey not found')) {
+            throw new Error('Passkey not found. Please sign out and register a new passkey.');
+          } else if (passkeyMsg.toLowerCase().includes('challenge')) {
+            throw new Error('Authentication challenge expired. Please try again.');
+          } else {
+            throw new Error(`Passkey verification failed: ${passkeyMsg || 'Unknown error'}`);
+          }
         }
       }
 
@@ -258,6 +266,8 @@ const SendAssets: React.FC = () => {
       const message = typeof error?.message === 'string' ? error.message : 'Transaction failed';
       if (message.toLowerCase().includes('blocklist')) {
         setSubmitError('Transfer blocked: the sender or recipient is blocklisted.');
+      } else if (message.includes('request limit') || error?.code === -32007) {
+        setSubmitError('RPC rate limit reached. Please wait a few seconds or upgrade your RPC plan.');
       } else {
         setSubmitError(message);
       }
@@ -394,7 +404,7 @@ const SendAssets: React.FC = () => {
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
-                Verifying & Sending…
+                {sessionExpiresSoon ? 'Verifying & Sending…' : 'Sending…'}
               </span>
             ) : (
               'Send with Passkey'

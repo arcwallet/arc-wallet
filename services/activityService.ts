@@ -1,10 +1,10 @@
-import { JsonRpcProvider, formatEther, formatUnits, Interface } from 'ethers';
-import { RPC_URL } from './transactionService';
+import { formatEther, formatUnits, Interface } from 'ethers';
+import { getProvider } from './transactionService';
 import type { Transaction } from '../types';
 import { TransactionStatus, TransactionType } from '../types';
 import { SUPPORTED_TOKENS } from '../config/tokens';
 
-const provider = new JsonRpcProvider(RPC_URL);
+const provider = getProvider();
 const RATE_LIMIT_ERROR_CODE = -32007;
 const MAX_BLOCKS_DEFAULT = 500; // Increased from 80 to 500 for better history
 
