@@ -128,7 +128,7 @@ export const createMagicLinkRouter = (config: EnvConfig, mailer: MagicLinkMailer
   router.post('/api/verify', (req, res) => {
     const token = typeof req.body?.token === 'string' ? req.body.token : null;
     if (!token) {
-      return res.status(400).json({ success: false, error: 'Token gerekli.' });
+      return res.status(400).json({ success: false, error: 'Magic link token is required.' });
     }
 
     const payload = tokenService.verifyToken(token);
