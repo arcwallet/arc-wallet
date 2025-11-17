@@ -285,10 +285,11 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     return newSession as SessionKey;
   }, []);
 
-  const registerPasskey = useCallback(async (userId: string): Promise<SessionKey | null> => {
-    const username = `Arc User ${userId.slice(0, 6)}`;
-    try {
-      const startResp = await passkeyClient.beginRegistration(username, username);
+const registerPasskey = useCallback(async (userId: string, email?: string | null): Promise<SessionKey | null> => {
+  const username = email ?? `Arc User ${userId.slice(0, 6)}`;
+  const displayName = email ?? username;
+  try {
+    const startResp = await passkeyClient.beginRegistration(username, displayName);
       const options = startResp.data?.options ?? (startResp as any).data?.options;
       const credential = await createRegistrationCredential(options);
       const finishResp = await passkeyClient.finishRegistration(username, credential);
@@ -310,14 +311,14 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       if (error instanceof PasskeyClientError && error.status === 400) {
         console.info('Passkey already registered, trying to authenticate instead');
         // If already registered, try to authenticate
-        const username = `Arc User ${userId.slice(0, 6)}`;
+        const username = email ?? `Arc User ${userId.slice(0, 6)}`;
         const session = await authenticateWithPasskey(username);
         return session;
       }
       if (error instanceof DOMException && error.name === 'InvalidStateError') {
         console.info('Credential already exists on this authenticator, trying to authenticate');
         // If credential exists, try to authenticate
-        const username = `Arc User ${userId.slice(0, 6)}`;
+        const username = email ?? `Arc User ${userId.slice(0, 6)}`;
         const session = await authenticateWithPasskey(username);
         return session;
       }
@@ -350,7 +351,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         }
         setUserId(uid);
         try {
-          const newSession = await registerPasskey(uid);
+          const newSession = await registerPasskey(uid, currentEmail);
           if (newSession) {
             finalizeSession(newSession);
           }
@@ -372,7 +373,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     } finally {
       setIsConnecting(false);
     }
-  }, [authenticateWithPasskey, finalizeSession]);
+  }, [authenticateWithPasskey, finalizeSession, currentEmail]);
 
   const logout = useCallback(() => {
     setAddress(null);
@@ -414,7 +415,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         const uid = userId || getOrCreateUserId();
         if (!uid) throw new Error('No user identity');
         setUserId(uid);
-        const session = await registerPasskey(uid);
+        const session = await registerPasskey(uid, currentEmail);
         if (session) {
           finalizeSession(session);
         }
@@ -425,7 +426,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         try {
           // Always use discoverable credentials for maximum compatibility
           // This allows the browser to show all available passkeys
-          const session = await authenticateWithPasskey();
+          const session = await authenticateWithPasskey(currentEmail ?? undefined);
           console.log('✅ Passkey verification successful');
           finalizeSession(session);
         } catch (error) {
@@ -447,6 +448,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       authenticateWithPasskey,
       finalizeSession,
       activateWithPrivateKey,
+      currentEmail,
     ],
   );
 
