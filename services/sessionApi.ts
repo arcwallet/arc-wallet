@@ -38,7 +38,7 @@ export const sessionApi = {
       if (error instanceof DOMException && error.name === 'AbortError') {
         throw new Error('Send link request timed out. Please try again.');
       }
-      throw new Error(error instanceof Error ? error.message : 'Failed to send magic link. Please try again.');
+      throw error;
     } finally {
       window.clearTimeout(timer);
     }
@@ -60,7 +60,7 @@ export const sessionApi = {
       if (error instanceof DOMException && error.name === 'AbortError') {
         throw new Error('Verification timed out. Please try again.');
       }
-      throw new Error(error instanceof Error ? error.message : 'Verification failed. Please try again.');
+      throw error;
     } finally {
       window.clearTimeout(timer);
     }

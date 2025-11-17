@@ -8,7 +8,6 @@ import { Database } from './models/Database.js';
 import { SessionKeyManager } from './utils/SessionKeyManager.js';
 import { createPasskeyRoutes } from './routes/passkeys.js';
 import { createMagicLinkRouter } from './routes/magicLink.js';
-import { createBridgeRoutes } from './routes/bridge.js';
 import { createMagicLinkMailer } from './services/magicLinkMailer.js';
 import { loadConfig, validateConfig } from './utils/config.js';
 import { cookieMiddleware } from './middleware/cookies.js';
@@ -87,11 +86,6 @@ app.use(rateLimitMiddleware('general'));
 // Routes
 app.use(createMagicLinkRouter(config, magicLinkMailer));
 app.use('/passkeys', createPasskeyRoutes(db, config));
-app.use(createBridgeRoutes(db, {
-  NODE_ENV: config.NODE_ENV,
-  ARC_RPC_URL: process.env.VITE_ARC_RPC_URL || 'https://rpc.testnet.arc.network',
-  SEPOLIA_RPC_URL: process.env.VITE_SEPOLIA_RPC_URL || 'https://ethereum-sepolia-rpc.publicnode.com',
-}));
 
 // Root endpoint
 app.get('/', (req: Request, res: Response) => {
@@ -103,7 +97,6 @@ app.get('/', (req: Request, res: Response) => {
     endpoints: {
       health: '/health',
       passkeys: '/passkeys',
-      bridge: '/bridge',
       registration: {
         start: 'POST /passkeys/register/start',
         finish: 'POST /passkeys/register/finish'
@@ -115,11 +108,6 @@ app.get('/', (req: Request, res: Response) => {
       sessionKeys: {
         get: 'GET /passkeys/session-keys/:userId',
         revoke: 'DELETE /passkeys/session-keys/:sessionKeyId'
-      },
-      bridgeOperations: {
-        start: 'POST /bridge/start',
-        status: 'GET /bridge/status/:transactionId',
-        history: 'GET /bridge/history/:userId'
       }
     }
   });
