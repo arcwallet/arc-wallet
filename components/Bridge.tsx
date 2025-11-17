@@ -2,11 +2,12 @@ import React, { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useWallet } from '../contexts/WalletContext';
 import { useActivity } from '../contexts/ActivityContext';
-import type { BridgeDirection } from '../services/bridgeService';
-import { bridgeUsdcWithSessionKey } from '../services/bridgeService';
 import { TransactionStatus, TransactionType } from '../types';
 import { SpinnerIcon } from './Icons';
 import { getAllSupportedTokens, TokenInfo } from '../config/tokens';
+import { startBridge, pollBridgeStatus } from '../services/bridgeApiClient';
+
+type BridgeDirection = 'arc-to-sepolia' | 'sepolia-to-arc';
 
 const DIRECTIONS: { id: BridgeDirection; label: string; description: string }[] = [
   {
@@ -24,7 +25,7 @@ const DIRECTIONS: { id: BridgeDirection; label: string; description: string }[] 
 const PRIMARY_TOKEN_DECIMALS = 6;
 
 const Bridge: React.FC = () => {
-  const { sessionKey } = useWallet();
+  const { sessionKey, userId } = useWallet();
   const { addActivity } = useActivity();
 
   const [direction, setDirection] = useState<BridgeDirection>('arc-to-sepolia');
@@ -36,11 +37,12 @@ const Bridge: React.FC = () => {
   const [statusMessage, setStatusMessage] = useState('');
   const [statusVariant, setStatusVariant] = useState<'info' | 'error' | 'success'>('info');
   const [progressItem, setProgressItem] = useState<string>('');
+  const [currentTransactionId, setCurrentTransactionId] = useState<number | null>(null);
 
   const canSubmit = useMemo(() => {
     const normalized = Number(amount);
-    return Boolean(sessionKey?.privateKey) && normalized > 0 && !Number.isNaN(normalized) && !isSubmitting;
-  }, [sessionKey, amount, isSubmitting]);
+    return Boolean(sessionKey?.address) && Boolean(userId) && normalized > 0 && !Number.isNaN(normalized) && !isSubmitting;
+  }, [sessionKey, userId, amount, isSubmitting]);
 
   const normalizeAmount = (raw: string): string | null => {
     if (raw == null) return null;
@@ -59,9 +61,9 @@ const Bridge: React.FC = () => {
   };
 
   const handleBridge = async () => {
-    if (!sessionKey?.privateKey) {
+    if (!sessionKey?.address || !userId) {
       setStatusVariant('error');
-      setStatusMessage('Active session key not found. Please sign in with your passkey.');
+      setStatusMessage('Session not found. Please sign in with your passkey.');
       return;
     }
 
@@ -76,36 +78,72 @@ const Bridge: React.FC = () => {
 
     setIsSubmitting(true);
     setStatusVariant('info');
-    setStatusMessage('Bridge transaction in progress. You may be prompted to approve multiple steps.');
-    setProgressItem('');
+    setStatusMessage('Initiating bridge transaction with backend...');
+    setProgressItem('Sending request to backend');
+    setCurrentTransactionId(null);
 
     try {
-      const { sourceTxHash, receiveTxHash } = await bridgeUsdcWithSessionKey({
-        privateKey: sessionKey.privateKey,
+      // Step 1: Start bridge via backend
+      const startResponse = await startBridge({
+        userId,
+        sessionKeyAddress: sessionKey.address,
         amount: normalized,
         direction,
-        onProgress: (step) => {
-          switch (step.type) {
-            case 'switch-network':
-              setProgressItem('Switching networks…');
+        token: 'USDC',
+      });
+
+      if (!startResponse.success || !startResponse.data) {
+        throw new Error(startResponse.error || 'Failed to start bridge transaction');
+      }
+
+      const transactionId = startResponse.data.transactionId;
+      setCurrentTransactionId(transactionId);
+      setProgressItem('Bridge transaction started. Monitoring progress...');
+
+      // Step 2: Poll for status updates
+      const finalStatus = await pollBridgeStatus(
+        transactionId,
+        (status, data) => {
+          console.log('Bridge status update:', status, data);
+
+          switch (status) {
+            case 'pending':
+              setProgressItem('Bridge transaction pending...');
               break;
-            case 'approve':
-              setProgressItem(`Approving ${selectedToken.symbol} spend…`);
+            case 'burn_complete':
+              setProgressItem(`${selectedToken.symbol} burned on source chain`);
               break;
-            case 'burn':
-              setProgressItem(`Burning ${selectedToken.symbol} on source chain…`);
+            case 'attestation_fetched':
+              setProgressItem('Attestation received from Circle');
               break;
-            case 'fetch-attestation':
-              setProgressItem('Fetching attestation…');
+            case 'mint_complete':
+              setProgressItem(`${selectedToken.symbol} minted on destination chain`);
               break;
-            case 'mint':
-              setProgressItem(`Minting ${selectedToken.symbol} on destination chain…`);
+            case 'completed':
+              setProgressItem('Bridge completed!');
+              break;
+            case 'failed':
+              setProgressItem('Bridge failed');
               break;
             default:
-              break;
+              setProgressItem(`Status: ${status}`);
           }
         },
-      });
+        60, // 60 attempts
+        5000 // 5 seconds interval
+      );
+
+      if (!finalStatus.success || !finalStatus.data) {
+        throw new Error(finalStatus.error || 'Bridge status check failed');
+      }
+
+      if (finalStatus.data.status === 'failed') {
+        throw new Error(finalStatus.data.errorMessage || 'Bridge transaction failed on backend');
+      }
+
+      // Success!
+      const sourceTxHash = finalStatus.data.sourceTxHash;
+      const destinationTxHash = finalStatus.data.destinationTxHash;
 
       setStatusVariant('success');
       setStatusMessage('Bridge completed successfully. Activity list has been updated.');
@@ -114,6 +152,7 @@ const Bridge: React.FC = () => {
       const amountNumber = Number(amount);
       const now = new Date();
 
+      // Add to activity feed
       if (direction === 'arc-to-sepolia' && sourceTxHash) {
         addActivity({
           id: sourceTxHash,
@@ -123,7 +162,7 @@ const Bridge: React.FC = () => {
           date: now,
           amount: -amountNumber,
           currency: selectedToken.symbol,
-          usdValue: selectedToken.symbol === 'USDC' ? -amountNumber : -amountNumber * 1.07, // EUR to USD conversion
+          usdValue: selectedToken.symbol === 'USDC' ? -amountNumber : -amountNumber * 1.07,
           status: TransactionStatus.Completed,
           hash: sourceTxHash,
           from: sessionKey.address,
@@ -133,18 +172,18 @@ const Bridge: React.FC = () => {
         });
       }
 
-      if (direction === 'sepolia-to-arc' && receiveTxHash) {
+      if (direction === 'sepolia-to-arc' && destinationTxHash) {
         addActivity({
-          id: receiveTxHash,
+          id: destinationTxHash,
           type: TransactionType.Received,
           description: `Bridge ${selectedToken.symbol} from Sepolia`,
           timestamp: 'Just now',
           date: now,
           amount: amountNumber,
           currency: selectedToken.symbol,
-          usdValue: selectedToken.symbol === 'USDC' ? amountNumber : amountNumber * 1.07, // EUR to USD conversion
+          usdValue: selectedToken.symbol === 'USDC' ? amountNumber : amountNumber * 1.07,
           status: TransactionStatus.Completed,
-          hash: receiveTxHash,
+          hash: destinationTxHash,
           from: 'Sepolia Bridge',
           to: sessionKey.address,
           networkFee: 0,
@@ -157,20 +196,10 @@ const Bridge: React.FC = () => {
       setStatusMessage(message);
       setProgressItem('');
 
-      // Detailed log in debug mode
-      if (import.meta.env.VITE_BRIDGE_DEBUG === 'true') {
-        console.error('🚨 Bridge component error:', error);
-        console.error('🔍 Error details:', {
-          message: error.message,
-          code: error.code,
-          cause: error.cause,
-          stack: error.stack?.split('\n').slice(0, 5) // log first few stack frames for context
-        });
-      } else {
-        console.error('Bridge failed', error);
-      }
+      console.error('Bridge failed:', error);
     } finally {
       setIsSubmitting(false);
+      setCurrentTransactionId(null);
     }
   };
 
