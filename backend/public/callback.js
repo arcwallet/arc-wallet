@@ -33,7 +33,11 @@
     const target = window.__ARC_REDIRECT__ || '/';
     setMessage('Sign-in successful. Redirecting...');
     setTimeout(() => {
-      window.location.href = target;
+      const url = new URL(target, window.location.origin);
+      if (!url.pathname.endsWith('/dashboard')) {
+        url.pathname = '/dashboard';
+      }
+      window.location.href = url.toString();
     }, 800);
   } catch (error) {
     console.error('Magic link verification error:', error);
