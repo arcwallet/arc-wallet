@@ -23,23 +23,47 @@ const handleResponse = async <T>(response: Response): Promise<T> => {
 };
 
 export const sessionApi = {
-  async sendLink(email: string) {
-    const response = await fetch(resolveUrl('/api/send-link'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email }),
-    });
-    return handleResponse<ApiResponse>(response);
+  async sendLink(email: string, timeoutMs = 10000) {
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const response = await fetch(resolveUrl('/api/send-link'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+        signal: controller.signal,
+      });
+      return handleResponse<ApiResponse>(response);
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        throw new Error('Send link request timed out. Please try again.');
+      }
+      throw error;
+    } finally {
+      window.clearTimeout(timer);
+    }
   },
 
-  async verify(token: string) {
-    const response = await fetch(resolveUrl('/api/verify'), {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token }),
-    });
-    return handleResponse<ApiResponse>(response);
+  async verify(token: string, timeoutMs = 10000) {
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const response = await fetch(resolveUrl('/api/verify'), {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token }),
+        signal: controller.signal,
+      });
+      return handleResponse<ApiResponse>(response);
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        throw new Error('Verification timed out. Please try again.');
+      }
+      throw error;
+    } finally {
+      window.clearTimeout(timer);
+    }
   },
 
   async getSession(timeoutMs = 8000): Promise<{ email: string } | null> {
