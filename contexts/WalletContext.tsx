@@ -342,9 +342,24 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       finalizeSession(session);
     } catch (firstError) {
       if (firstError instanceof PasskeyClientError && firstError.status === 404) {
-        // No passkey found, prompt user to create one
-        window.alert('No passkey found. Please create a new passkey first.');
-        return;
+        console.info('No existing passkey. Attempting registration.');
+        const uid = userId || getOrCreateUserId();
+        if (!uid) {
+          window.alert('Unable to generate identity for passkey registration.');
+          return;
+        }
+        setUserId(uid);
+        try {
+          const newSession = await registerPasskey(uid);
+          if (newSession) {
+            finalizeSession(newSession);
+          }
+          return;
+        } catch (registerErr) {
+          console.error('Automatic passkey registration failed', registerErr);
+          window.alert('No passkey found and registration failed. Please try again.');
+          return;
+        }
       }
 
       if (firstError instanceof DOMException && firstError.name === 'NotAllowedError') {
