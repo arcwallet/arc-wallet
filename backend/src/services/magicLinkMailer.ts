@@ -42,7 +42,13 @@ export const createMagicLinkMailer = (config: MagicLinkMailerConfig): MagicLinkM
         html: `
           <p>Hello,</p>
           <p>Click the button below to sign in to Arc Wallet. This link expires in 15 minutes.</p>
-          <p><a href="${url}" style="display:inline-block;padding:12px 20px;border-radius:8px;background:#5c7cfa;color:#fff;text-decoration:none;">Sign in</a></p>
+          <p style="margin: 20px 0;">
+            <a href="${url}" style="display:inline-block;padding:12px 20px;border-radius:8px;background:#5c7cfa;color:#fff;text-decoration:none;">Sign in</a>
+          </p>
+          <p style="margin-top:12px;">
+            If the button above does not work, copy and paste this URL into your browser:<br />
+            <a href="${url}" style="color:#5c7cfa;">${url}</a>
+          </p>
           <p>If you did not request this email, you can safely ignore it.</p>
         `,
       };
