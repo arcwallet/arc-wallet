@@ -164,7 +164,7 @@ const Bridge: React.FC = () => {
           message: error.message,
           code: error.code,
           cause: error.cause,
-          stack: error.stack?.split('\n').slice(0, 5) // İlk 5 satır stack trace
+          stack: error.stack?.split('\n').slice(0, 5) // log first few stack frames for context
         });
       } else {
         console.error('Bridge failed', error);

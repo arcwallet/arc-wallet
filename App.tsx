@@ -1,48 +1,28 @@
-// Fix: Import `useState` from React to fix "Cannot find name 'useState'" error.
-import React, { useState } from 'react';
-import WalletSelectionScreen from './components/WalletSelectionScreen';
-import WalletSetupScreen from './components/WalletSetupScreen';
-import WalletDashboard from './components/WalletDashboard';
-import ErrorBoundary from './components/ErrorBoundary';
-import { WalletProvider, useWallet } from './contexts/WalletContext';
-import { ArcAccountProvider } from './contexts/ArcAccountContext';
-import { ActivityProvider } from './contexts/ActivityContext';
+import React from 'react';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { SessionProvider } from './contexts/SessionContext';
+import LoginPage from './pages/LoginPage';
+import CallbackPage from './pages/CallbackPage';
+import DashboardPage from './pages/DashboardPage';
+import ProtectedRoute from './components/ProtectedRoute';
+import './styles/magic.css';
 
-const AppContent: React.FC = () => {
-  const { isAuthenticated, isConnecting, loginWithPasskey } = useWallet();
-  const [setupComplete, setSetupComplete] = useState(false); // This can be removed later when setup flow is real
-
-  const handleSetupComplete = () => {
-    setSetupComplete(true);
-  };
-  
-  if (!isAuthenticated) {
-    return <WalletSelectionScreen onConnect={loginWithPasskey} isConnecting={isConnecting} />;
-  }
-
-  // This setup screen is part of the initial flow but for now we bypass it after connect.
-  // In the future, connection might lead to setup if the wallet is new.
-  if (!setupComplete) {
-     // A sensible default is to consider setup complete once connected.
-     // This can be made more complex later.
-     handleSetupComplete();
-  }
-
-  return <WalletDashboard />;
-};
-
-const App: React.FC = () => {
-  return (
-    <ErrorBoundary>
-      <WalletProvider>
-        <ArcAccountProvider>
-          <ActivityProvider>
-            <AppContent />
-          </ActivityProvider>
-        </ArcAccountProvider>
-      </WalletProvider>
-    </ErrorBoundary>
-  );
-};
+const App: React.FC = () => (
+  <SessionProvider>
+    <BrowserRouter>
+      <div className="auth-wrapper">
+        <Routes>
+          <Route path="/" element={<Navigate to="/login" replace />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/auth/callback" element={<CallbackPage />} />
+          <Route element={<ProtectedRoute />}>
+            <Route path="/dashboard" element={<DashboardPage />} />
+          </Route>
+          <Route path="*" element={<Navigate to="/login" replace />} />
+        </Routes>
+      </div>
+    </BrowserRouter>
+  </SessionProvider>
+);
 
 export default App;

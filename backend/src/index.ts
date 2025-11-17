@@ -7,7 +7,9 @@ import helmet from 'helmet';
 import { Database } from './models/Database.js';
 import { SessionKeyManager } from './utils/SessionKeyManager.js';
 import { createPasskeyRoutes } from './routes/passkeys.js';
+import { createMagicLinkRouter } from './routes/magicLink.js';
 import { loadConfig, validateConfig } from './utils/config.js';
+import { cookieMiddleware } from './middleware/cookies.js';
 import {
   errorHandler,
   securityHeaders,
@@ -59,6 +61,7 @@ app.use(cors({
 // Request parsing middleware
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(cookieMiddleware);
 
 // Security headers
 app.use(securityHeaders);
@@ -75,6 +78,7 @@ app.use(healthCheck);
 app.use(rateLimitMiddleware('general'));
 
 // Routes
+app.use(createMagicLinkRouter(config));
 app.use('/passkeys', createPasskeyRoutes(db, config));
 
 // Root endpoint

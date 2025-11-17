@@ -25,6 +25,7 @@ export function loadConfig(): EnvConfig {
   const RP_ID = process.env.RP_ID || (isProd ? 'app.arcwallet.network' : 'localhost');
   const RP_NAME = process.env.RP_NAME || 'Arc Wallet';
   const ORIGIN = process.env.ORIGIN || (isProd ? 'https://app.arcwallet.network' : 'http://localhost:5173');
+  const MAGIC_LINK_BASE_URL = process.env.MAGIC_LINK_BASE_URL || '';
 
   const DB_PATH = process.env.DB_PATH || path.join(process.cwd(), 'data', 'wallet.db');
 
@@ -65,7 +66,8 @@ export function loadConfig(): EnvConfig {
     SESSION_SECRET,
     JWT_SECRET,
     RATE_LIMIT_WINDOW_MS,
-    RATE_LIMIT_MAX_REQUESTS
+    RATE_LIMIT_MAX_REQUESTS,
+    MAGIC_LINK_BASE_URL,
   };
 
   // Log configuration (excluding secrets)

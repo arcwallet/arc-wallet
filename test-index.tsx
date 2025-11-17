@@ -5,10 +5,8 @@ function TestApp() {
   return (
     <div style={{ padding: '20px', fontSize: '20px' }}>
       <h1>🔥 Test App Working!</h1>
-      <p>Frontend çalışıyor - beyaz ekran sorunu yok!</p>
-      <button onClick={() => console.log('Button clicked!')}>
-        Test Button
-      </button>
+      <p>Frontend is running — no blank screen issues!</p>
+      <button onClick={() => console.log('Button clicked!')}>Test Button</button>
     </div>
   );
 }
