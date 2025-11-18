@@ -60,6 +60,52 @@ export interface BridgeTransaction {
   updatedAt: string;
 }
 
+// Multi-sig types
+export interface MultiSigAccount {
+  id: string;
+  name: string;
+  address: string | null;
+  requiredSignatures: number;
+  createdBy: string;
+  createdAt: Date;
+}
+
+export interface MultiSigMember {
+  id: string;
+  accountId: string;
+  userId: string;
+  email: string;
+  role: 'owner' | 'signer' | 'viewer';
+  status: 'pending' | 'active' | 'removed';
+  addedAt: Date;
+}
+
+export interface MultiSigTransaction {
+  id: string;
+  accountId: string;
+  submitterId: string;
+  targetAddress: string;
+  value: string;
+  tokenAddress: string | null;
+  tokenSymbol: string;
+  data: string | null;
+  description: string | null;
+  status: 'pending' | 'executed' | 'rejected' | 'expired';
+  txHash: string | null;
+  onChainTxId: number | null;
+  createdAt: Date;
+  expiresAt: Date;
+}
+
+export interface MultiSigSignature {
+  id: string;
+  transactionId: string;
+  signerId: string;
+  signerAddress: string;
+  status: 'approved' | 'rejected';
+  signedAt: Date;
+}
+
 // API Request/Response Types
 export interface RegistrationStartRequest {
   username: string;
@@ -151,4 +197,6 @@ export interface EnvConfig {
   RATE_LIMIT_WINDOW_MS: number;
   RATE_LIMIT_MAX_REQUESTS: number;
   MAGIC_LINK_BASE_URL?: string;
+  ARC_RPC_URL: string;
+  SEPOLIA_RPC_URL: string;
 }

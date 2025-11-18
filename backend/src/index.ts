@@ -9,6 +9,7 @@ import { SessionKeyManager } from './utils/SessionKeyManager.js';
 import { createPasskeyRoutes } from './routes/passkeys.js';
 import { createMagicLinkRouter } from './routes/magicLink.js';
 import { createBridgeRoutes } from './routes/bridge.js';
+import multiSigRoutes from './routes/multiSig.js';
 import { createMagicLinkMailer } from './services/magicLinkMailer.js';
 import { loadConfig, validateConfig } from './utils/config.js';
 import { cookieMiddleware } from './middleware/cookies.js';
@@ -89,9 +90,10 @@ app.use(createMagicLinkRouter(config, magicLinkMailer));
 app.use('/passkeys', createPasskeyRoutes(db, config));
 app.use(createBridgeRoutes(db, {
   NODE_ENV: config.NODE_ENV,
-  ARC_RPC_URL: process.env.VITE_ARC_RPC_URL || 'https://rpc.testnet.arc.network',
-  SEPOLIA_RPC_URL: process.env.VITE_SEPOLIA_RPC_URL || 'https://ethereum-sepolia-rpc.publicnode.com',
+  ARC_RPC_URL: config.ARC_RPC_URL,
+  SEPOLIA_RPC_URL: config.SEPOLIA_RPC_URL,
 }));
+app.use('/multisig', multiSigRoutes);
 
 // Root endpoint
 app.get('/', (req: Request, res: Response) => {
@@ -120,6 +122,20 @@ app.get('/', (req: Request, res: Response) => {
         start: 'POST /bridge/start',
         status: 'GET /bridge/status/:transactionId',
         history: 'GET /bridge/history/:userId'
+      },
+      multiSig: {
+        createAccount: 'POST /multisig/accounts',
+        getAccounts: 'GET /multisig/accounts/user/:userId',
+        getAccount: 'GET /multisig/accounts/:accountId',
+        updateAccount: 'PUT /multisig/accounts/:accountId',
+        addMember: 'POST /multisig/accounts/:accountId/members',
+        removeMember: 'DELETE /multisig/accounts/:accountId/members/:memberId',
+        createTransaction: 'POST /multisig/transactions',
+        getTransaction: 'GET /multisig/transactions/:transactionId',
+        getTransactions: 'GET /multisig/accounts/:accountId/transactions',
+        approveTransaction: 'POST /multisig/transactions/:transactionId/approve',
+        rejectTransaction: 'POST /multisig/transactions/:transactionId/reject',
+        deployContract: 'POST /multisig/accounts/:accountId/deploy'
       }
     }
   });

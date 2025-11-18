@@ -26,6 +26,8 @@ export function loadConfig(): EnvConfig {
   const RP_NAME = process.env.RP_NAME || 'Arc Wallet';
   const ORIGIN = process.env.ORIGIN || (isProd ? 'https://app.arcwallet.network' : 'http://localhost:5173');
   const MAGIC_LINK_BASE_URL = process.env.MAGIC_LINK_BASE_URL || '';
+  const ARC_RPC_URL = process.env.ARC_RPC_URL || process.env.VITE_ARC_RPC_URL || 'https://rpc.testnet.arc.network';
+  const SEPOLIA_RPC_URL = process.env.SEPOLIA_RPC_URL || process.env.VITE_SEPOLIA_RPC_URL || 'https://ethereum-sepolia-rpc.publicnode.com';
 
   const DB_PATH = process.env.DB_PATH || path.join(process.cwd(), 'data', 'wallet.db');
 
@@ -71,6 +73,8 @@ export function loadConfig(): EnvConfig {
     RATE_LIMIT_WINDOW_MS,
     RATE_LIMIT_MAX_REQUESTS,
     MAGIC_LINK_BASE_URL,
+    ARC_RPC_URL,
+    SEPOLIA_RPC_URL,
   };
 
   // Log configuration (excluding secrets)
@@ -113,5 +117,11 @@ export function validateConfig(config: EnvConfig): void {
 
   if (config.RATE_LIMIT_MAX_REQUESTS <= 0) {
     throw new Error('RATE_LIMIT_MAX_REQUESTS must be positive');
+  }
+  if (!config.ARC_RPC_URL) {
+    throw new Error('ARC_RPC_URL must be provided');
+  }
+  if (!config.SEPOLIA_RPC_URL) {
+    throw new Error('SEPOLIA_RPC_URL must be provided');
   }
 }

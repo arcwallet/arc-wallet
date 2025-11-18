@@ -24,7 +24,10 @@ A modern Web3 wallet built for Arc Network with support for multiple stablecoins
 5. (Optional) Point `VITE_PASSKEY_API_URL` to your running passkey backend. Default is `http://localhost:4000`.
 6. (Optional) Provide the ERC-4337 entry point contract via `VITE_ARC_ENTRY_POINT` if you are testing on a network that uses a different address.
 7. (Optional) Configure a bundler endpoint with `VITE_ARC_BUNDLER_URL` to submit smart-account UserOperations via `eth_sendUserOperation`. The app automatically falls back to direct transactions when the bundler is unavailable.
-8. Run the app:
+8. Configure bridge RPCs if you plan to use the Circle Bridge Kit integration:
+   - Frontend: `VITE_ARC_RPC_URL`, `VITE_SEPOLIA_RPC_URL`
+   - Backend: `ARC_RPC_URL`, `SEPOLIA_RPC_URL`
+9. Run the app:
    `npm run dev`
 
 ## Magic Link Email Delivery (SendGrid)
@@ -47,7 +50,7 @@ A modern Web3 wallet built for Arc Network with support for multiple stablecoins
 | Layer | Required variables | Notes |
 | --- | --- | --- |
 | **Frontend (Vercel)** | `VITE_API_BASE_URL`, `VITE_PASSKEY_API_URL`, `VITE_WALLET_ENCRYPTION_SECRET`, `VITE_ARC_RPC_URL` (optional), bundle debug flags | Use exactly the same `VITE_WALLET_ENCRYPTION_SECRET` everywhere so encrypted wallets can be restored. |
-| **Backend (Render)** | `NODE_ENV=production`, `PORT=10000`, `ALLOWED_ORIGINS=https://app.arcwallet.network`, `RP_ID=app.arcwallet.network`, `ORIGIN=https://app.arcwallet.network`, `MAGIC_LINK_BASE_URL=https://app.arcwallet.network/auth/callback`, `SENDGRID_API_KEY`, `EMAIL_FROM_ADDRESS`, `EMAIL_FROM_NAME`, `SESSION_SECRET`, `JWT_SECRET` | Use long random strings for `SESSION_SECRET` / `JWT_SECRET`; Render automatically injects `PORT` but we pin it to 10000 to match logs. |
+| **Backend (Render)** | `NODE_ENV=production`, `PORT=10000`, `ALLOWED_ORIGINS=https://app.arcwallet.network`, `RP_ID=app.arcwallet.network`, `ORIGIN=https://app.arcwallet.network`, `MAGIC_LINK_BASE_URL=https://app.arcwallet.network/auth/callback`, `ARC_RPC_URL`, `SEPOLIA_RPC_URL`, `SENDGRID_API_KEY`, `EMAIL_FROM_ADDRESS`, `EMAIL_FROM_NAME`, `SESSION_SECRET`, `JWT_SECRET` | Use long random strings for `SESSION_SECRET` / `JWT_SECRET`; Render automatically injects `PORT` but we pin it to 10000 to match logs. |
 | **Shared** | DNS per SendGrid instructions, verified domain | Without DNS verification SendGrid will drop the email. |
 
 ## Testing & QA
