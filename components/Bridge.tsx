@@ -6,6 +6,7 @@ import { TransactionStatus, TransactionType } from '../types';
 import { SpinnerIcon } from './Icons';
 import { getAllSupportedTokens, TokenInfo } from '../config/tokens';
 import { startBridge, pollBridgeStatus } from '../services/bridgeApiClient';
+import type { BridgeApiResponse } from '../services/bridgeApiClient';
 
 type BridgeDirection = 'arc-to-sepolia' | 'sepolia-to-arc';
 
@@ -25,8 +26,9 @@ const DIRECTIONS: { id: BridgeDirection; label: string; description: string }[] 
 const PRIMARY_TOKEN_DECIMALS = 6;
 
 const Bridge: React.FC = () => {
-  const { sessionKey, userId } = useWallet();
+  const { sessionKey, userId, verifyWithPasskey, logout } = useWallet();
   const { addActivity } = useActivity();
+  const [needsReauth, setNeedsReauth] = useState(false);
 
   const [direction, setDirection] = useState<BridgeDirection>('arc-to-sepolia');
   // Only USDC is supported for bridge between Arc Testnet and Sepolia
@@ -93,7 +95,9 @@ const Bridge: React.FC = () => {
       });
 
       if (!startResponse.success || !startResponse.data) {
-        throw new Error(startResponse.error || 'Failed to start bridge transaction');
+        const error = new Error(startResponse.error || 'Failed to start bridge transaction') as any;
+        error.code = startResponse.code;
+        throw error;
       }
 
       const transactionId = startResponse.data.transactionId;
@@ -123,7 +127,7 @@ const Bridge: React.FC = () => {
               setProgressItem('Bridge completed!');
               break;
             case 'failed':
-              setProgressItem('Bridge failed');
+              setProgressItem(data?.errorMessage || 'Bridge failed');
               break;
             default:
               setProgressItem(`Status: ${status}`);
@@ -192,6 +196,17 @@ const Bridge: React.FC = () => {
       }
     } catch (error: any) {
       const message = typeof error?.message === 'string' ? error.message : 'Bridge transaction failed';
+      const errorCode = error?.code;
+
+      // Check if we need to re-authenticate
+      if (errorCode === 'SESSION_KEY_NOT_FOUND' ||
+          errorCode === 'SESSION_KEY_EXPIRED' ||
+          errorCode === 'SESSION_KEY_USER_MISMATCH' ||
+          message.includes('Session key') ||
+          message.includes('re-authenticate')) {
+        setNeedsReauth(true);
+      }
+
       setStatusVariant('error');
       setStatusMessage(message);
       setProgressItem('');
@@ -204,6 +219,21 @@ const Bridge: React.FC = () => {
   };
 
   const directionDetails = useMemo(() => DIRECTIONS.find((item) => item.id === direction), [direction]);
+
+  const handleReauthenticate = async () => {
+    try {
+      setStatusVariant('info');
+      setStatusMessage('Re-authenticating with passkey...');
+      await verifyWithPasskey();
+      setNeedsReauth(false);
+      setStatusVariant('success');
+      setStatusMessage('Re-authentication successful! You can now try the bridge operation again.');
+    } catch (error) {
+      console.error('Re-authentication failed:', error);
+      setStatusVariant('error');
+      setStatusMessage('Re-authentication failed. Please try logging in again.');
+    }
+  };
 
   return (
     <div className="w-full max-w-3xl mx-auto px-6 py-10 space-y-10">
@@ -300,6 +330,14 @@ const Bridge: React.FC = () => {
           >
             {statusMessage}
             {progressItem && <div className="mt-1 text-xs text-text-secondary">{progressItem}</div>}
+            {needsReauth && (
+              <button
+                onClick={handleReauthenticate}
+                className="mt-3 w-full rounded-lg bg-primary text-primary-text py-2 px-4 text-sm font-semibold hover:opacity-90 transition-opacity"
+              >
+                Re-authenticate with Passkey
+              </button>
+            )}
           </div>
         )}
       </div>
