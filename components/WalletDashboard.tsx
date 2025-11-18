@@ -162,11 +162,11 @@ const DashboardHeader: React.FC<DashboardHeaderPropsWithNav> = ({ account, isRef
           <RefreshIcon size={16} className={isRefreshing ? 'animate-spin' : ''} />
         </button>
       </div>
-      <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4">
         <div className="hidden lg:flex flex-col text-right">
           <p className="text-xs text-[#A7B4C8] uppercase tracking-wide">{blockLabel}</p>
-          <p className="text-sm font-semibold text-[#E6EEF3]">{account ? `#${account.latestBlock.number.toLocaleString()}` : '—'}</p>
-          <p className="text-xs text-[#A7B4C8]">{lastUpdated}</p>
+          <p className="text-sm font-semibold text-[#E6EEF3]">{isRefreshing ? <ShimmerBar width="70px" /> : account ? `#${account.latestBlock.number.toLocaleString()}` : '—'}</p>
+          <p className="text-xs text-[#A7B4C8]">{isRefreshing ? <ShimmerBar width="60px" /> : lastUpdated}</p>
         </div>
         <div className="flex items-center gap-2 rounded-lg bg-[#151A22] px-3 py-1.5">
           <div className="size-2 rounded-full bg-green-500" />
@@ -218,6 +218,12 @@ interface BalanceOverviewProps {
   error: string | null;
 }
 
+const ShimmerBar: React.FC<{ width?: string }> = ({ width = '100%' }) => (
+  <div className="relative overflow-hidden rounded-md bg-white/5" style={{ width, height: '14px' }}>
+    <div className="absolute inset-0 animate-[shimmer_1.8s_infinite]" style={{ background: 'linear-gradient(90deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0.04) 100%)' }} />
+  </div>
+);
+
 const BalanceOverview: React.FC<BalanceOverviewProps> = ({ onNavigate, balanceDisplay, isLoading, lastUpdated, error }) => {
   const displayBalance = balanceDisplay ?? '$0.00';
   const updatedAt = lastUpdated ? new Date(lastUpdated).toLocaleTimeString() : '—';
@@ -228,15 +234,15 @@ const BalanceOverview: React.FC<BalanceOverviewProps> = ({ onNavigate, balanceDi
         <div className="flex flex-col gap-2">
           <p className="text-base font-medium text-[#A7B4C8]">Total Balance</p>
           <div className="flex items-center gap-4">
-            <p className="text-4xl font-bold text-[#E6EEF3]">
-              {isLoading ? <span className="animate-pulse text-[#A7B4C8]">Loading…</span> : displayBalance}
+            <p className="text-4xl font-bold text-[#E6EEF3] min-h-[44px]">
+              {isLoading ? <ShimmerBar width="180px" /> : displayBalance}
             </p>
             <div className="flex items-center gap-1.5">
               <p className="text-green-400 text-sm font-medium">Finalized</p>
               <VerifiedIcon size={16} className="text-green-400" />
             </div>
           </div>
-          <p className="text-xs text-[#A7B4C8]">Synced at {updatedAt}</p>
+          <p className="text-xs text-[#A7B4C8]">{isLoading ? <ShimmerBar width="110px" /> : `Synced at ${updatedAt}`}</p>
           {error && <p className="text-sm text-accent-orange">{error}</p>}
         </div>
         <button className="p-2 text-[#A7B4C8] hover:bg-white/10 rounded-lg" title="Hide balance">
@@ -405,18 +411,29 @@ const AssetsTable: React.FC<AssetsTableProps> = ({ balanceDisplay, isLoading }) 
                       </div>
                     </td>
                     <td className="whitespace-nowrap px-3 py-4 text-sm">
-                      <div className="text-[#E6EEF3]">{asset.price}</div>
-                      <div className="text-green-400">{asset.change}</div>
+                      {isLoading || isLoadingTokens ? (
+                        <div className="flex flex-col gap-1">
+                          <ShimmerBar width="60px" />
+                          <ShimmerBar width="40px" />
+                        </div>
+                      ) : (
+                        <>
+                          <div className="text-[#E6EEF3]">{asset.price}</div>
+                          <div className={asset.change.startsWith('+') ? 'text-green-400' : 'text-red-400'}>
+                            {asset.change}
+                          </div>
+                        </>
+                      )}
                     </td>
                     <td className="whitespace-nowrap px-3 py-4 text-sm">
                       {isLoading || isLoadingTokens ? (
-                        <span className="animate-pulse text-[#A7B4C8]">Loading…</span>
+                        <ShimmerBar width="80px" />
                       ) : (
                         <div className="text-[#E6EEF3]">{asset.balance}</div>
                       )}
                     </td>
                     <td className="whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-0">
-                      {isLoading || isLoadingTokens ? <span className="animate-pulse text-[#A7B4C8]">—</span> : asset.value}
+                      {isLoading || isLoadingTokens ? <ShimmerBar width="90px" /> : asset.value}
                     </td>
                   </tr>
                 ))}
