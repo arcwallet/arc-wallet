@@ -180,6 +180,11 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const [userId, setUserId] = useState<string | null>(null);
   const { currentEmail } = useSession();
 
+  const loadStoredWalletForCurrentEmail = useCallback(async (): Promise<SessionKey | null> => {
+    if (!currentEmail) return null;
+    return getWalletForEmail(currentEmail);
+  }, [currentEmail]);
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
     ensureEncryptionConfigured();
@@ -196,18 +201,6 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       const storedUserId = window.localStorage.getItem(USER_ID_STORAGE_KEY);
       if (storedUserId && !cancelled) {
         setUserId(storedUserId);
-      }
-
-      const stored = await getWalletForEmail(currentEmail ?? null);
-      if (cancelled) {
-        return;
-      }
-      if (stored) {
-        setSessionKey(stored);
-        setAddress(stored.address);
-        setIsAuthenticated(true);
-        window.sessionStorage.setItem(SESSION_KEY_STORAGE_KEY, JSON.stringify(stored));
-        return;
       }
 
       const sessionRaw = window.sessionStorage.getItem(SESSION_KEY_STORAGE_KEY);
@@ -240,111 +233,6 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       cancelled = true;
     };
   }, [currentEmail]);
-
-  // Auto-register passkey after email login if not already authenticated
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    if (!currentEmail) return;
-    if (isAuthenticated) return; // Already has passkey session
-    if (isConnecting) return; // Already in progress
-
-    let cancelled = false;
-
-    const autoRegisterPasskey = async () => {
-      // Small delay to ensure email session is fully established
-      await new Promise(resolve => setTimeout(resolve, 500));
-      if (cancelled) return;
-
-      console.log('🔐 Auto-registering passkey for email:', currentEmail);
-      setIsConnecting(true);
-
-      try {
-        const uid = userId || getOrCreateUserId();
-        if (!uid) {
-          console.warn('Unable to generate identity for auto passkey registration');
-          return;
-        }
-        setUserId(uid);
-
-        // Try to register or authenticate with existing passkey
-        const startResp = await passkeyClient.beginRegistration(currentEmail, currentEmail);
-        const options = startResp.data?.options ?? (startResp as any).data?.options;
-        const credential = await createRegistrationCredential(options);
-        const finishResp = await passkeyClient.finishRegistration(currentEmail, credential);
-
-        const newSessionKey = finishResp.data?.sessionKey ?? (finishResp as any).data?.sessionKey;
-        const user = finishResp.data?.user ?? (finishResp as any).data?.user;
-
-        if (user?.id) {
-          window.localStorage.setItem(USER_ID_STORAGE_KEY, user.id);
-          setUserId(user.id);
-        }
-
-        if (newSessionKey && !cancelled) {
-          const sessionWithUsername: SessionKey = {
-            ...newSessionKey,
-            username: user?.username || currentEmail
-          };
-          setSessionKey(sessionWithUsername);
-          setAddress(sessionWithUsername.address);
-          setIsAuthenticated(true);
-          window.sessionStorage.setItem(SESSION_KEY_STORAGE_KEY, JSON.stringify(sessionWithUsername));
-          if (currentEmail) {
-            void persistWalletForEmail(currentEmail, sessionWithUsername).catch(console.warn);
-          }
-        }
-      } catch (error: any) {
-        // If already registered, try to authenticate
-        if (error instanceof PasskeyClientError && error.status === 400) {
-          console.info('Passkey already exists, authenticating...');
-          try {
-            const authStartResp = await passkeyClient.beginAuthentication(currentEmail);
-            const authOptions = authStartResp.data?.options ?? (authStartResp as any).data?.options;
-            const authCredential = await createAuthenticationCredential(authOptions);
-            const authFinishResp = await passkeyClient.finishAuthentication(authCredential);
-
-            const session = authFinishResp.data?.sessionKey ?? (authFinishResp as any).data?.sessionKey;
-            const user = authFinishResp.data?.user ?? (authFinishResp as any).data?.user;
-
-            if (user?.id) {
-              window.localStorage.setItem(USER_ID_STORAGE_KEY, user.id);
-              setUserId(user.id);
-            }
-
-            if (session && !cancelled) {
-              const sessionWithUsername: SessionKey = {
-                ...session,
-                username: user?.username || currentEmail
-              };
-              setSessionKey(sessionWithUsername);
-              setAddress(sessionWithUsername.address);
-              setIsAuthenticated(true);
-              window.sessionStorage.setItem(SESSION_KEY_STORAGE_KEY, JSON.stringify(sessionWithUsername));
-              if (currentEmail) {
-                void persistWalletForEmail(currentEmail, sessionWithUsername).catch(console.warn);
-              }
-            }
-          } catch (authError) {
-            console.error('Auto passkey authentication failed:', authError);
-          }
-        } else if (error instanceof DOMException && error.name === 'NotAllowedError') {
-          console.warn('User cancelled passkey registration');
-        } else {
-          console.error('Auto passkey registration failed:', error);
-        }
-      } finally {
-        if (!cancelled) {
-          setIsConnecting(false);
-        }
-      }
-    };
-
-    void autoRegisterPasskey();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [currentEmail, isAuthenticated, isConnecting, userId]);
 
   const finalizeSession = useCallback((session: SessionKey) => {
     setSessionKey(session);
@@ -443,7 +331,8 @@ const registerPasskey = useCallback(async (userId: string, email?: string | null
       // Use discoverable credentials (no username needed)
       // Browser will show all passkeys registered on this device for this RP_ID
       let session = await authenticateWithPasskey();
-      finalizeSession(session);
+      const storedWallet = await loadStoredWalletForCurrentEmail();
+      finalizeSession(storedWallet ?? session);
     } catch (firstError) {
       if (firstError instanceof PasskeyClientError && firstError.status === 404) {
         console.info('No existing passkey. Attempting registration.');
@@ -476,7 +365,7 @@ const registerPasskey = useCallback(async (userId: string, email?: string | null
     } finally {
       setIsConnecting(false);
     }
-  }, [authenticateWithPasskey, finalizeSession, currentEmail]);
+  }, [authenticateWithPasskey, finalizeSession, currentEmail, loadStoredWalletForCurrentEmail]);
 
   const logout = useCallback(() => {
     setAddress(null);
@@ -497,6 +386,11 @@ const registerPasskey = useCallback(async (userId: string, email?: string | null
           expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
         };
         finalizeSession(session);
+        if (typeof window !== 'undefined') {
+          window.alert(
+            'Your wallet is ready. Write down your private key and store it safely. You can reveal it later under Settings → Wallet Backup.',
+          );
+        }
       } catch (error) {
         console.error('Invalid private key provided', error);
         throw new Error('Invalid private key. Please double-check and try again.');
@@ -519,23 +413,19 @@ const registerPasskey = useCallback(async (userId: string, email?: string | null
         if (!uid) throw new Error('No user identity');
         setUserId(uid);
         const session = await registerPasskey(uid, currentEmail);
-        if (session) {
-          finalizeSession(session);
+        const stored = await loadStoredWalletForCurrentEmail();
+        const sessionToUse = stored ?? session;
+        if (sessionToUse) {
+          finalizeSession(sessionToUse);
         }
       },
       verifyWithPasskey: async () => {
-        // Use stored username from session key for auto-selection (no selection dialog)
-        const storedUsername = sessionKey?.username || currentEmail;
-        console.log('🔐 verifyWithPasskey called', { storedUsername, hasSessionKey: !!sessionKey });
-
         try {
-          // Pass username to backend to get specific allowCredentials
-          // This prevents the browser from showing a passkey selection dialog
+          const storedUsername = sessionKey?.username || currentEmail;
           const session = await authenticateWithPasskey(storedUsername ?? undefined);
-          console.log('✅ Passkey verification successful');
-          finalizeSession(session);
+          const stored = await loadStoredWalletForCurrentEmail();
+          finalizeSession(stored ?? session);
         } catch (error) {
-          console.error('❌ Passkey verification failed:', error);
           throw error;
         }
       },
@@ -554,6 +444,7 @@ const registerPasskey = useCallback(async (userId: string, email?: string | null
       finalizeSession,
       activateWithPrivateKey,
       currentEmail,
+      loadStoredWalletForCurrentEmail,
     ],
   );
 
