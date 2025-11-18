@@ -23,6 +23,7 @@ import {
   LockIcon,
   VerifiedIcon,
   EyeOffIcon,
+  EyeIcon,
   SendIcon,
   ReceiveIcon
 } from './Icons';
@@ -149,20 +150,8 @@ const DashboardHeader: React.FC<DashboardHeaderPropsWithNav> = ({ account, isRef
 
   return (
     <header className="flex h-20 items-center justify-between gap-4 border-b border-white/10 px-8 py-3">
-      <div className="flex items-center gap-2">
-        <h2 className="text-lg font-semibold text-[#E6EEF3]">Arc Wallet Dashboard</h2>
-        <button
-          onClick={() => {
-            void onRefresh();
-          }}
-          className="flex items-center justify-center rounded-md p-1.5 text-[#A7B4C8] hover:bg-[#151A22]"
-          title="Refresh account snapshot"
-          aria-live="polite"
-        >
-          <RefreshIcon size={16} className={isRefreshing ? 'animate-spin' : ''} />
-        </button>
-      </div>
-        <div className="flex items-center gap-4">
+      <div />
+      <div className="flex items-center gap-4">
         <div className="hidden lg:flex flex-col text-right">
           <p className="text-xs text-[#A7B4C8] uppercase tracking-wide">{blockLabel}</p>
           <p className="text-sm font-semibold text-[#E6EEF3]">{isRefreshing ? <ShimmerBar width="70px" /> : account ? `#${account.latestBlock.number.toLocaleString()}` : '—'}</p>
@@ -173,10 +162,18 @@ const DashboardHeader: React.FC<DashboardHeaderPropsWithNav> = ({ account, isRef
           <p className="text-sm font-medium text-[#A7B4C8]">Arc Testnet</p>
         </div>
         {address && (
-          <div className="hidden sm:flex items-center gap-2 rounded-lg bg-surface px-3 py-1.5 border border-divider">
+          <button
+            onClick={() => {
+              navigator.clipboard.writeText(address);
+              setHasCopiedAddress(true);
+              setTimeout(() => setHasCopiedAddress(false), 2000);
+            }}
+            className="hidden sm:flex items-center gap-2 rounded-lg bg-surface px-3 py-1.5 border border-divider text-left hover:bg-white/10 transition-colors"
+            title="Copy wallet address"
+          >
             <WalletIcon size={16} className="text-text-secondary" />
-            <p className="text-sm font-mono text-text-secondary">{`${address.slice(0,6)}...${address.slice(-4)}`}</p>
-          </div>
+            <p className="text-sm font-mono text-text-secondary">{hasCopiedAddress ? 'Copied!' : `${address.slice(0, 6)}...${address.slice(-4)}`}</p>
+          </button>
         )}
         {error && <p className="hidden md:block text-sm text-accent-orange">{error}</p>}
         <div className="relative">
@@ -216,6 +213,10 @@ interface BalanceOverviewProps {
   isLoading: boolean;
   lastUpdated: number | null;
   error: string | null;
+  onRefresh: () => Promise<void>;
+  isRefreshing: boolean;
+  isHidden: boolean;
+  toggleHidden: () => void;
 }
 
 const ShimmerBar: React.FC<{ width?: string }> = ({ width = '100%' }) => (
@@ -224,7 +225,7 @@ const ShimmerBar: React.FC<{ width?: string }> = ({ width = '100%' }) => (
   </div>
 );
 
-const BalanceOverview: React.FC<BalanceOverviewProps> = ({ onNavigate, balanceDisplay, isLoading, lastUpdated, error }) => {
+const BalanceOverview: React.FC<BalanceOverviewProps> = ({ onNavigate, balanceDisplay, isLoading, lastUpdated, error, onRefresh, isRefreshing, isHidden, toggleHidden }) => {
   const displayBalance = balanceDisplay ?? '$0.00';
   const updatedAt = lastUpdated ? new Date(lastUpdated).toLocaleTimeString() : '—';
 
@@ -235,18 +236,33 @@ const BalanceOverview: React.FC<BalanceOverviewProps> = ({ onNavigate, balanceDi
           <p className="text-base font-medium text-[#A7B4C8]">Total Balance</p>
           <div className="flex items-center gap-4">
             <p className="text-4xl font-bold text-[#E6EEF3] min-h-[44px]">
-              {isLoading ? <ShimmerBar width="180px" /> : displayBalance}
+              {isLoading ? <ShimmerBar width="180px" /> : isHidden ? '••••••' : displayBalance}
             </p>
             <div className="flex items-center gap-1.5">
               <p className="text-green-400 text-sm font-medium">Finalized</p>
               <VerifiedIcon size={16} className="text-green-400" />
             </div>
           </div>
-          <p className="text-xs text-[#A7B4C8]">{isLoading ? <ShimmerBar width="110px" /> : `Synced at ${updatedAt}`}</p>
+          <div className="flex items-center gap-2 text-xs text-[#A7B4C8]">
+            {isLoading ? <ShimmerBar width="110px" /> : `Synced at ${updatedAt}`}
+            {!isLoading && (
+              <button
+                onClick={() => void onRefresh()}
+                className="p-1 text-[#A7B4C8] hover:text-white transition-colors"
+                aria-label="Refresh balances"
+              >
+                <RefreshIcon size={14} className={isRefreshing ? 'animate-spin' : ''} />
+              </button>
+            )}
+          </div>
           {error && <p className="text-sm text-accent-orange">{error}</p>}
         </div>
-        <button className="p-2 text-[#A7B4C8] hover:bg-white/10 rounded-lg" title="Hide balance">
-          <EyeOffIcon size={20} />
+        <button
+          onClick={toggleHidden}
+          className="p-2 text-[#A7B4C8] hover:bg-white/10 rounded-lg"
+          title={isHidden ? 'Show balance' : 'Hide balance'}
+        >
+          {isHidden ? <EyeIcon size={20} /> : <EyeOffIcon size={20} />}
         </button>
       </div>
       <div className="flex gap-4">
@@ -452,13 +468,27 @@ interface DashboardHomeProps {
   isLoading: boolean;
   lastUpdated: number | null;
   error: string | null;
+  onRefresh: () => Promise<void>;
+  isRefreshing: boolean;
+  isHidden: boolean;
+  toggleHidden: () => void;
 }
 
 // SmartAccount panel removed
 
-const DashboardHome: React.FC<DashboardHomeProps> = ({ onNavigate, balanceDisplay, isLoading, lastUpdated, error }) => (
+const DashboardHome: React.FC<DashboardHomeProps> = ({ onNavigate, balanceDisplay, isLoading, lastUpdated, error, onRefresh, isRefreshing, isHidden, toggleHidden }) => (
   <>
-    <BalanceOverview onNavigate={onNavigate} balanceDisplay={balanceDisplay} isLoading={isLoading} lastUpdated={lastUpdated} error={error} />
+    <BalanceOverview
+      onNavigate={onNavigate}
+      balanceDisplay={balanceDisplay}
+      isLoading={isLoading}
+      lastUpdated={lastUpdated}
+      error={error}
+      onRefresh={onRefresh}
+      isRefreshing={isRefreshing}
+      isHidden={isHidden}
+      toggleHidden={toggleHidden}
+    />
     <AssetsTable balanceDisplay={balanceDisplay} isLoading={isLoading} />
   </>
 );
@@ -466,6 +496,8 @@ const DashboardHome: React.FC<DashboardHomeProps> = ({ onNavigate, balanceDispla
 const WalletDashboard: React.FC = () => {
   const [currentPage, setCurrentPage] = useState('Dashboard');
   const [selectedTransactionId, setSelectedTransactionId] = useState<string | null>(null);
+  const [isBalanceHidden, setIsBalanceHidden] = useState(false);
+  const [hasCopiedAddress, setHasCopiedAddress] = useState(false);
 
   const { address, sessionKey } = useWallet();
   const { snapshot, formattedBalance, isLoading: isAccountLoading, error: accountError, refresh, lastUpdated } = useArcAccount();
@@ -490,6 +522,10 @@ const WalletDashboard: React.FC = () => {
             isLoading={isAccountLoading}
             lastUpdated={lastUpdated}
             error={accountError}
+            onRefresh={refresh}
+            isRefreshing={isAccountLoading}
+            isHidden={isBalanceHidden}
+            toggleHidden={() => setIsBalanceHidden((prev) => !prev)}
           />
         );
       case 'Send':
@@ -516,6 +552,10 @@ const WalletDashboard: React.FC = () => {
             isLoading={isAccountLoading}
             lastUpdated={lastUpdated}
             error={accountError}
+            onRefresh={refresh}
+            isRefreshing={isAccountLoading}
+            isHidden={isBalanceHidden}
+            toggleHidden={() => setIsBalanceHidden((prev) => !prev)}
           />
         );
     }

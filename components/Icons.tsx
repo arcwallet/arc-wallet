@@ -161,6 +161,13 @@ export const EyeOffIcon: React.FC<IconProps> = ({ className = "", size = 20 }) =
   </svg>
 );
 
+export const EyeIcon: React.FC<IconProps> = ({ className = "", size = 20 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+    <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+
 export const CloseIcon: React.FC<IconProps> = ({ className = "", size = 20 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
     <line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
