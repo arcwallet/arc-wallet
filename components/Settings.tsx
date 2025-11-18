@@ -107,9 +107,12 @@ const SecuritySection: React.FC = () => {
                     <button onClick={load} disabled={loading} className="flex h-10 items-center justify-center rounded-lg border border-[#2B3440] bg-transparent px-4 text-sm font-medium text-[#E6EEF3] hover:bg-white/5 disabled:opacity-60">
                         Refresh
                     </button>
-                    <button onClick={handleAddDevice} className="flex h-10 items-center justify-center gap-2 rounded-lg border border-[#2B3440] bg-transparent px-4 text-sm font-medium text-[#E6EEF3] hover:bg-white/5">
+                    <button
+                        onClick={handleAddDevice}
+                        className="flex h-10 items-center justify-center gap-2 rounded-lg border border-[#2B3440] bg-transparent px-4 text-sm font-medium text-[#E6EEF3] hover:bg-white/5"
+                    >
                         <AddIcon size={18} />
-                        <span className="truncate">Add New Device (Passkey)</span>
+                        <span className="truncate">Register Passkey for {userId?.slice(0, 6) ?? 'user'}</span>
                     </button>
                 </div>
             </div>
