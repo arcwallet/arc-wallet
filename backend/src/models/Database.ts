@@ -286,6 +286,17 @@ export class Database {
     return sessionKeys.map(this.mapSessionKey);
   }
 
+  async getActiveSessionKeyByAddress(address: string): Promise<SessionKey | null> {
+    await this.waitForReady();
+    const get: any = promisify(this.db.get.bind(this.db));
+
+    const sessionKey = await get(
+      'SELECT * FROM session_keys WHERE LOWER(address) = LOWER(?) AND expires_at > ? ORDER BY created_at DESC LIMIT 1',
+      [address, new Date().toISOString()]
+    );
+    return sessionKey ? this.mapSessionKey(sessionKey) : null;
+  }
+
   async revokeSessionKey(id: string): Promise<void> {
     await this.waitForReady();
     const run: any = promisify(this.db.run.bind(this.db));

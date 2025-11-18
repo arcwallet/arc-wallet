@@ -77,10 +77,17 @@ export function createBridgeRoutes(db: Database, config: BridgeConfig): Router {
 
       try {
         // Verify session key exists and is active
-        const sessionKeys = await db.getActiveSessionKeysByUserId(userId);
-        const sessionKey = sessionKeys.find(sk => sk.address.toLowerCase() === sessionKeyAddress.toLowerCase());
+        // First try by address (more reliable), then fallback to userId
+        let sessionKey = await db.getActiveSessionKeyByAddress(sessionKeyAddress);
 
         if (!sessionKey) {
+          // Fallback: try by userId if address lookup fails
+          const sessionKeys = await db.getActiveSessionKeysByUserId(userId);
+          sessionKey = sessionKeys.find(sk => sk.address.toLowerCase() === sessionKeyAddress.toLowerCase()) || null;
+        }
+
+        if (!sessionKey) {
+          console.log(`❌ [BRIDGE] Session key not found for address: ${sessionKeyAddress}, userId: ${userId}`);
           return res.status(404).json({
             success: false,
             error: 'Session key not found or expired',
