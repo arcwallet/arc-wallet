@@ -140,6 +140,57 @@ export function createPasskeyRoutes(db: Database, config: EnvConfig): Router {
   );
 
   /**
+   * POST /passkeys/recovery/start
+   * Start passkey recovery process
+   */
+  router.post(
+    '/recovery/start',
+    rateLimitMiddleware('registration'),
+    validateRequestBody(['email']),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        await passkeyController.recoveryStart(req, res);
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
+
+  /**
+   * POST /passkeys/recovery/verify
+   * Verify recovery token
+   */
+  router.post(
+    '/recovery/verify',
+    rateLimitMiddleware('auth'),
+    validateRequestBody(['token']),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        await passkeyController.recoveryVerify(req, res);
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
+
+  /**
+   * POST /passkeys/recovery/complete
+   * Complete recovery and delete old passkeys
+   */
+  router.post(
+    '/recovery/complete',
+    rateLimitMiddleware('auth'),
+    validateRequestBody(['token']),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        await passkeyController.recoveryComplete(req, res);
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
+
+  /**
    * GET /passkeys/health
    * Health check for passkey service
    */

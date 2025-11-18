@@ -59,6 +59,27 @@ const LoginPage: React.FC = () => {
             Please check your inbox. You can request another link after the countdown.
           </p>
         )}
+        <button
+          onClick={() => {
+            window.history.pushState({}, '', '/recovery');
+            window.dispatchEvent(new PopStateEvent('popstate'));
+          }}
+          className="login-message muted"
+          style={{
+            display: 'block',
+            marginTop: '1.5rem',
+            textDecoration: 'underline',
+            cursor: 'pointer',
+            fontSize: '0.9rem',
+            background: 'none',
+            border: 'none',
+            padding: 0,
+            width: '100%',
+            textAlign: 'center'
+          }}
+        >
+          Lost your passkey? Recover access
+        </button>
       </div>
     </div>
   );

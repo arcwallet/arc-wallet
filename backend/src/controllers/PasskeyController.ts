@@ -48,8 +48,13 @@ export class PasskeyController {
 
       let options;
       if (existingUser) {
-        // Existing user: allow adding another passkey, exclude current credentials
+        // Check if user already has a passkey - only allow one per email
         const userPasskeys = await this.db.getPasskeysByUserId(existingUser.id);
+        if (userPasskeys.length > 0) {
+          throw new ApiError('A passkey already exists for this email. Please use authentication instead.', 400, 'PASSKEY_EXISTS');
+        }
+
+        // Existing user without passkey: allow registration
         options = await generateRegistrationOptions({
           rpName: this.config.RP_NAME,
           rpID: this.config.RP_ID,
@@ -62,7 +67,7 @@ export class PasskeyController {
           userVerification: 'required',
           authenticatorAttachment: 'platform'
         },
-          excludeCredentials: userPasskeys.map(pk => ({ id: pk.credentialID, transports: pk.transports })),
+          excludeCredentials: [],
           supportedAlgorithmIDs: [-7, -257]
         });
 
@@ -558,4 +563,139 @@ export class PasskeyController {
       createdAt: new Date(row.created_at)
     }));
   }
+
+  /**
+   * Start passkey recovery - send recovery email
+   */
+  recoveryStart = async (req: Request, res: Response) => {
+    try {
+      const { email } = req.body;
+
+      if (!email) {
+        throw new ApiError('Email is required', 400, 'MISSING_EMAIL');
+      }
+
+      // Normalize email
+      const normalizedEmail = email.trim().toLowerCase();
+
+      // Check if user exists
+      const user = await this.db.getUserByUsername(normalizedEmail);
+      if (!user) {
+        // Don't reveal if user exists or not for security
+        console.log(`❌ [RECOVERY] User not found for email: ${normalizedEmail}`);
+        return res.json({
+          success: true,
+          message: 'If an account exists with this email, a recovery link will be sent.'
+        });
+      }
+
+      // Generate recovery token
+      const token = randomUUID() + '-' + randomUUID();
+      const expiresAt = new Date();
+      expiresAt.setHours(expiresAt.getHours() + 1); // 1 hour expiry
+
+      await this.db.createRecoveryToken({
+        id: randomUUID(),
+        email: normalizedEmail,
+        token,
+        expiresAt
+      });
+
+      console.log(`📧 [RECOVERY] Token generated for: ${normalizedEmail}`);
+      console.log(`🔗 [RECOVERY] Token: ${token}`);
+
+      // Return token in response for now (in production, send via email)
+      res.json({
+        success: true,
+        message: 'If an account exists with this email, a recovery link will be sent.',
+        // Include token in dev mode for testing
+        ...(this.config.NODE_ENV === 'development' && { recoveryToken: token })
+      });
+
+    } catch (error) {
+      console.error('Recovery start error:', error);
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      throw new ApiError('Failed to start recovery', 500, 'RECOVERY_START_FAILED');
+    }
+  };
+
+  /**
+   * Verify recovery token
+   */
+  recoveryVerify = async (req: Request, res: Response) => {
+    try {
+      const { token } = req.body;
+
+      if (!token) {
+        throw new ApiError('Recovery token is required', 400, 'MISSING_TOKEN');
+      }
+
+      const recoveryToken = await this.db.getRecoveryToken(token);
+      if (!recoveryToken) {
+        throw new ApiError('Invalid or expired recovery token', 400, 'INVALID_TOKEN');
+      }
+
+      res.json({
+        success: true,
+        data: {
+          email: recoveryToken.email,
+          valid: true
+        }
+      });
+
+    } catch (error) {
+      console.error('Recovery verify error:', error);
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      throw new ApiError('Failed to verify recovery token', 500, 'RECOVERY_VERIFY_FAILED');
+    }
+  };
+
+  /**
+   * Complete recovery - delete old passkeys and allow new registration
+   */
+  recoveryComplete = async (req: Request, res: Response) => {
+    try {
+      const { token, privateKey } = req.body;
+
+      if (!token) {
+        throw new ApiError('Recovery token is required', 400, 'MISSING_TOKEN');
+      }
+
+      const recoveryToken = await this.db.getRecoveryToken(token);
+      if (!recoveryToken) {
+        throw new ApiError('Invalid or expired recovery token', 400, 'INVALID_TOKEN');
+      }
+
+      // Delete all passkeys and session keys for this email
+      const deletedPasskeys = await this.db.deletePasskeysByEmail(recoveryToken.email);
+      const deletedSessionKeys = await this.db.deleteSessionKeysByEmail(recoveryToken.email);
+
+      // Mark token as used
+      await this.db.markRecoveryTokenUsed(token);
+
+      console.log(`✅ [RECOVERY] Completed for: ${recoveryToken.email}`);
+      console.log(`   Deleted ${deletedPasskeys} passkeys, ${deletedSessionKeys} session keys`);
+
+      res.json({
+        success: true,
+        data: {
+          email: recoveryToken.email,
+          deletedPasskeys,
+          deletedSessionKeys,
+          message: 'Recovery complete. You can now register a new passkey.'
+        }
+      });
+
+    } catch (error) {
+      console.error('Recovery complete error:', error);
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      throw new ApiError('Failed to complete recovery', 500, 'RECOVERY_COMPLETE_FAILED');
+    }
+  };
 }

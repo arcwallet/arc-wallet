@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { multiSigController } from '../controllers/MultiSigController';
+import { multiSigController } from '../controllers/MultiSigController.js';
 
 const router = Router();
 

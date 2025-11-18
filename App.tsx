@@ -6,10 +6,12 @@ import WalletDashboard from './components/WalletDashboard';
 import WalletSetupScreen from './components/WalletSetupScreen';
 import WalletSelectionScreen from './components/WalletSelectionScreen';
 const LoginPage = React.lazy(() => import('./pages/LoginPage'));
+const RecoveryPage = React.lazy(() => import('./pages/RecoveryPage'));
 import { SessionProvider, useSession } from './contexts/SessionContext';
 import { WalletProvider, useWallet } from './contexts/WalletContext';
 import { ArcAccountProvider } from './contexts/ArcAccountContext';
 import { ActivityProvider } from './contexts/ActivityContext';
+import { MultiSigProvider } from './contexts/MultiSigContext';
 
 const WalletExperience: React.FC<{ email: string }> = ({ email }) => {
   const { isAuthenticated, activateWithPrivateKey, loginWithPasskey, isConnecting, logout: walletLogout } = useWallet();
@@ -43,11 +45,22 @@ const WalletExperience: React.FC<{ email: string }> = ({ email }) => {
 const RootView: React.FC = () => {
   const { email, loading, verifyMagicToken, verifyingToken, message } = useSession();
   const [tokenHandled, setTokenHandled] = useState(false);
+  const [currentPath, setCurrentPath] = useState(window.location.pathname);
+
+  // Listen for path changes
+  useEffect(() => {
+    const handlePopState = () => setCurrentPath(window.location.pathname);
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const token = params.get('token');
     if (!token || tokenHandled) return;
+
+    // Skip magic link verification if we're on recovery page (recovery has its own token handling)
+    if (currentPath === '/recovery') return;
 
     verifyMagicToken(token)
       .finally(() => {
@@ -58,7 +71,12 @@ const RootView: React.FC = () => {
         setTokenHandled(true);
       })
       .catch(() => {});
-  }, [tokenHandled, verifyMagicToken]);
+  }, [tokenHandled, verifyMagicToken, currentPath]);
+
+  // Show recovery page if on /recovery path
+  if (currentPath === '/recovery') {
+    return <RecoveryPage />;
+  }
 
   if (loading || verifyingToken) {
     return (
@@ -89,17 +107,19 @@ const App: React.FC = () => (
       <WalletProvider>
         <ArcAccountProvider>
           <ActivityProvider>
-            <div className="auth-wrapper">
-              <React.Suspense fallback={
-                <div className="fullpage-login">
-                  <div className="login-content">
-                    <p className="login-message muted">Loading…</p>
+            <MultiSigProvider>
+              <div className="auth-wrapper">
+                <React.Suspense fallback={
+                  <div className="fullpage-login">
+                    <div className="login-content">
+                      <p className="login-message muted">Loading…</p>
+                    </div>
                   </div>
-                </div>
-              }>
-                <RootView />
-              </React.Suspense>
-            </div>
+                }>
+                  <RootView />
+                </React.Suspense>
+              </div>
+            </MultiSigProvider>
           </ActivityProvider>
         </ArcAccountProvider>
       </WalletProvider>

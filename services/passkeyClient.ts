@@ -59,6 +59,7 @@ export interface SessionKey {
   address: string;
   privateKey: string;
   expiresAt: string;
+  username?: string; // Email or username used for passkey registration
 }
 
 interface RegistrationStartData {
@@ -128,6 +129,16 @@ export const passkeyClient = {
   }>>(`/passkeys/devices/${userId}`),
 
   deleteDevice: (credentialId: string) => deleteJSON(`/passkeys/devices/${credentialId}`),
+
+  // Recovery
+  startRecovery: (email: string) =>
+    postJSON<{ message: string; recoveryToken?: string }>('/passkeys/recovery/start', { email }),
+
+  verifyRecoveryToken: (token: string) =>
+    postJSON<{ email: string; valid: boolean }>('/passkeys/recovery/verify', { token }),
+
+  completeRecovery: (token: string, privateKey?: string) =>
+    postJSON<{ email: string; deletedPasskeys: number; deletedSessionKeys: number; message: string }>('/passkeys/recovery/complete', { token, privateKey }),
 
   PasskeyClientError,
 };

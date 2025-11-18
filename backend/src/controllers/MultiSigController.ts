@@ -1,8 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { ethers } from 'ethers';
-import { Database } from '../models/Database';
-import { ApiError, MultiSigAccount, MultiSigMember, MultiSigTransaction, MultiSigSignature } from '../types';
+import { Database } from '../models/Database.js';
+import { ApiError, MultiSigAccount, MultiSigMember, MultiSigTransaction, MultiSigSignature } from '../types/index.js';
 
 export class MultiSigController {
   private db: Database;
