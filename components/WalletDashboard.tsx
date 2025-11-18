@@ -150,7 +150,7 @@ const DashboardHeader: React.FC<DashboardHeaderPropsWithNav> = ({ account, isRef
   return (
     <header className="flex h-20 items-center justify-between gap-4 border-b border-white/10 px-8 py-3">
       <div className="flex items-center gap-2">
-        <h2 className="text-lg font-semibold text-[#E6EEF3]">Enterprise Treasury</h2>
+        <h2 className="text-lg font-semibold text-[#E6EEF3]">Arc Wallet Dashboard</h2>
         <button
           onClick={() => {
             void onRefresh();
