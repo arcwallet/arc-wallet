@@ -144,6 +144,7 @@ interface DashboardHeaderPropsWithNav extends DashboardHeaderProps {
 const DashboardHeader: React.FC<DashboardHeaderPropsWithNav> = ({ account, isRefreshing, onRefresh, error, onNavigate }) => {
   const { address, logout } = useWallet();
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const [hasCopiedAddress, setHasCopiedAddress] = useState(false);
   const { activities } = useActivity();
   const blockLabel = account?.latestBlock.finalized ? 'Finalized Block' : 'Latest Block';
   const lastUpdated = account ? formatBlockTime(account.latestBlock.timestamp) : '—';
@@ -497,7 +498,6 @@ const WalletDashboard: React.FC = () => {
   const [currentPage, setCurrentPage] = useState('Dashboard');
   const [selectedTransactionId, setSelectedTransactionId] = useState<string | null>(null);
   const [isBalanceHidden, setIsBalanceHidden] = useState(false);
-  const [hasCopiedAddress, setHasCopiedAddress] = useState(false);
 
   const { address, sessionKey } = useWallet();
   const { snapshot, formattedBalance, isLoading: isAccountLoading, error: accountError, refresh, lastUpdated } = useArcAccount();
