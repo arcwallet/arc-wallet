@@ -3,7 +3,8 @@
  * Frontend service for multi-sig wallet operations
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+const API_BASE_URL = ((import.meta.env.VITE_API_BASE_URL ?? import.meta.env.VITE_API_URL) || '').replace(/\/$/, '');
+const resolveUrl = (path: string) => (API_BASE_URL ? `${API_BASE_URL}${path}` : path);
 
 // Types
 export interface MultiSigAccount {
@@ -71,7 +72,7 @@ interface ApiResponse<T> {
 
 // Helper functions
 async function postJSON<T>(endpoint: string, data: any): Promise<ApiResponse<T>> {
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+  const response = await fetch(resolveUrl(endpoint), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -90,7 +91,7 @@ async function postJSON<T>(endpoint: string, data: any): Promise<ApiResponse<T>>
 }
 
 async function getJSON<T>(endpoint: string): Promise<ApiResponse<T>> {
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+  const response = await fetch(resolveUrl(endpoint), {
     method: 'GET',
     headers: {
       'Content-Type': 'application/json',
@@ -108,7 +109,7 @@ async function getJSON<T>(endpoint: string): Promise<ApiResponse<T>> {
 }
 
 async function putJSON<T>(endpoint: string, data: any): Promise<ApiResponse<T>> {
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+  const response = await fetch(resolveUrl(endpoint), {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
@@ -127,7 +128,7 @@ async function putJSON<T>(endpoint: string, data: any): Promise<ApiResponse<T>> 
 }
 
 async function deleteJSON<T>(endpoint: string, data?: any): Promise<ApiResponse<T>> {
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+  const response = await fetch(resolveUrl(endpoint), {
     method: 'DELETE',
     headers: {
       'Content-Type': 'application/json',
