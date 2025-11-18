@@ -622,3 +622,4 @@ export class MultiSigController {
 }
 
 export const multiSigController = new MultiSigController();
+export default multiSigController;
