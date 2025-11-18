@@ -292,7 +292,6 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           if (currentEmail) {
             void persistWalletForEmail(currentEmail, sessionWithUsername).catch(console.warn);
           }
-          console.log('✅ Auto passkey registration successful');
         }
       } catch (error: any) {
         // If already registered, try to authenticate
@@ -324,7 +323,6 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
               if (currentEmail) {
                 void persistWalletForEmail(currentEmail, sessionWithUsername).catch(console.warn);
               }
-              console.log('✅ Auto passkey authentication successful');
             }
           } catch (authError) {
             console.error('Auto passkey authentication failed:', authError);
@@ -367,18 +365,6 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     const startResp = await passkeyClient.beginAuthentication(username);
     const options = startResp.data?.options ?? (startResp as any).data?.options;
     const credential = await createAuthenticationCredential(options);
-
-    // Debug log - DETAILED
-    console.log('🔍 Frontend Auth Credential FULL:', {
-      id: credential.id,
-      rawId: (credential as any).rawId,
-      idLength: credential.id?.length,
-      rawIdLength: (credential as any).rawId?.length,
-      type: credential.type
-    });
-
-    // Also log what we're sending to backend
-    console.log('📤 Sending to backend:', JSON.stringify(credential, null, 2).substring(0, 500));
 
     const finishResp = await passkeyClient.finishAuthentication(credential);
     const newSession = finishResp.data?.sessionKey ?? (finishResp as any).data?.sessionKey;
