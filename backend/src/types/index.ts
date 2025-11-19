@@ -197,6 +197,7 @@ export interface EnvConfig {
   RATE_LIMIT_WINDOW_MS: number;
   RATE_LIMIT_MAX_REQUESTS: number;
   MAGIC_LINK_BASE_URL?: string;
+  COOKIE_DOMAIN?: string;
   ARC_RPC_URL: string;
   SEPOLIA_RPC_URL: string;
 }

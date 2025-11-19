@@ -26,6 +26,8 @@ export function loadConfig(): EnvConfig {
   const RP_NAME = process.env.RP_NAME || 'Arc Wallet';
   const ORIGIN = process.env.ORIGIN || (isProd ? 'https://app.arcwallet.network' : 'http://localhost:5173');
   const MAGIC_LINK_BASE_URL = process.env.MAGIC_LINK_BASE_URL || '';
+  // Cookie domain for cross-subdomain sharing (e.g., .arcwallet.network)
+  const COOKIE_DOMAIN = process.env.COOKIE_DOMAIN || undefined;
   const ARC_RPC_URL = process.env.ARC_RPC_URL || process.env.VITE_ARC_RPC_URL || 'https://rpc.testnet.arc.network';
   const SEPOLIA_RPC_URL = process.env.SEPOLIA_RPC_URL || process.env.VITE_SEPOLIA_RPC_URL || 'https://ethereum-sepolia-rpc.publicnode.com';
 
@@ -73,6 +75,7 @@ export function loadConfig(): EnvConfig {
     RATE_LIMIT_WINDOW_MS,
     RATE_LIMIT_MAX_REQUESTS,
     MAGIC_LINK_BASE_URL,
+    COOKIE_DOMAIN,
     ARC_RPC_URL,
     SEPOLIA_RPC_URL,
   };
