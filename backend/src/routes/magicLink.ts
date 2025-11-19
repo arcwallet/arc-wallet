@@ -17,11 +17,11 @@ type CookieRequest = Request & { cookies?: Record<string, string> };
 
 const COOKIE_BASE_OPTIONS = (isProd: boolean) => ({
   httpOnly: true,
-  sameSite: 'lax' as const,    // Fixed: lax instead of none
-  secure: true,                // Fixed: ALWAYS secure (enforce HTTPS)
-  maxAge: 4 * 60 * 60 * 1000,  // Fixed: 4 hours instead of 24
+  sameSite: 'lax' as const,
+  secure: isProd,              // Only secure in production (HTTPS required)
+  maxAge: 4 * 60 * 60 * 1000,  // 4 hours
   path: '/',
-  domain: undefined,           // Let browser handle domain
+  domain: undefined,
 });
 
 const sanitizeEmail = (email: unknown): string | null => {
@@ -133,23 +133,33 @@ export const createMagicLinkRouter = (config: EnvConfig, mailer: MagicLinkMailer
     if (!token) {
       return res.status(400).json({ success: false, error: 'Magic link token is required.' });
     }
-  
+
+    // Check if user already has a valid session
+    const existingSession = requireSession(req);
+    if (existingSession) {
+      // Already logged in, just return success
+      return res.json({ success: true });
+    }
+
     // Check if token already used
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
     const alreadyUsed = await db.isTokenUsed(tokenHash);
     if (alreadyUsed) {
-      return res.status(400).json({ success: false, error: 'Token already used.' });
+      return res.status(400).json({
+        success: false,
+        error: 'This link has already been used. Please request a new magic link.'
+      });
     }
-  
+
     const payload = tokenService.verifyToken(token);
     if (!payload || !payload.expiresAt) {
       return res.status(400).json({ success: false, error: 'Invalid or expired magic link.' });
     }
-  
+
     // Mark token as used
     const expiresAt = new Date(payload.expiresAt);
     await db.markTokenUsed(tokenHash, expiresAt);
-  
+
     const user = userStore.findOrCreate(payload.email);
     const session = sessionStore.create(user, SESSION_TTL_MS);
     res.cookie(SESSION_COOKIE_NAME, session.id, COOKIE_BASE_OPTIONS(config.NODE_ENV === 'production'));

@@ -23,7 +23,7 @@ const handleResponse = async <T>(response: Response): Promise<T> => {
 };
 
 export const sessionApi = {
-  async sendLink(email: string, timeoutMs = 10000) {
+  async sendLink(email: string, timeoutMs = 30000) {
     const controller = new AbortController();
     const timer = window.setTimeout(() => controller.abort(), timeoutMs);
     try {
@@ -44,7 +44,7 @@ export const sessionApi = {
     }
   },
 
-  async verify(token: string, timeoutMs = 10000) {
+  async verify(token: string, timeoutMs = 15000) {
     const controller = new AbortController();
     const timer = window.setTimeout(() => controller.abort(), timeoutMs);
     try {
