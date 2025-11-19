@@ -103,19 +103,15 @@ export const ActivityProvider: React.FC<{ children: ReactNode }> = ({ children }
 
     const load = async () => {
       if (cooldownRef.current && Date.now() < cooldownRef.current) {
-        console.log('⏳ [Activity] In cooldown, skipping fetch');
         return;
       }
       try {
-        console.log('🔄 [Activity] Loading transactions for', address);
         const history = await fetchRecentTransactions(address, {
           maxTransactions: 50,
           maxBlocks: 500,
         });
 
         if (cancelled) return;
-
-        console.log('📝 [Activity] Loaded', history.length, 'transactions from blockchain');
 
         setActivities((current) => {
           const historyMap = new Map(history.map((tx) => [tx.id, tx]));
@@ -125,7 +121,6 @@ export const ActivityProvider: React.FC<{ children: ReactNode }> = ({ children }
           const merged = [...history, ...pending];
           merged.sort((a, b) => b.date.getTime() - a.date.getTime());
           pendingRef.current = new Set(merged.filter((tx) => tx.status === TransactionStatus.Pending).map((tx) => tx.hash));
-          console.log('✅ [Activity] Total activities:', merged.length, '(pending:', pending.length, ')');
           return merged;
         });
       } catch (error) {

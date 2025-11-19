@@ -60,47 +60,15 @@ export async function bridgeUsdcWithSessionKey({
   let toRpcUrl: string | undefined;
 
   try {
-    console.log('🌉 [BRIDGE] Operation starting:', { direction, amount });
-
-    // CRITICAL: Log environment variables
-    console.log('🔧 [BRIDGE] Environment check:', {
-      VITE_ARC_RPC_URL: import.meta.env.VITE_ARC_RPC_URL || 'NOT SET',
-      VITE_SEPOLIA_RPC_URL: import.meta.env.VITE_SEPOLIA_RPC_URL || 'NOT SET',
-      VITE_BRIDGE_DEBUG: import.meta.env.VITE_BRIDGE_DEBUG || 'NOT SET',
-      hasPrivateKey: !!privateKey
-    });
-
-    // Check available Blockchain enums
-    console.log('📋 [BRIDGE] Available Blockchain enums:', Object.keys(Blockchain));
-
     const kit = new BridgeKit();
     const cfg = getChainConfig(direction);
     const { fromChain, toChain } = cfg;
     fromRpcUrl = cfg.fromRpcUrl;
     toRpcUrl = cfg.toRpcUrl;
 
-    console.log('🔗 [BRIDGE] Chain configuration:', {
-      direction,
-      fromChain,
-      toChain,
-      fromRpcUrl,
-      toRpcUrl,
-      fromChainType: typeof fromChain,
-      toChainType: typeof toChain
-    });
-
     // Create dedicated adapters per chain with explicit RPC URLs
-    console.log('📡 [BRIDGE] Creating adapters...');
     const adapterFrom = await createAdapterFromPrivateKey({ privateKey, rpcUrl: fromRpcUrl });
-    console.log('✅ [BRIDGE] From adapter created');
-
     const adapterTo = await createAdapterFromPrivateKey({ privateKey, rpcUrl: toRpcUrl });
-    console.log('✅ [BRIDGE] To adapter created');
-
-    console.log('👛 [BRIDGE] Adapter addresses:', {
-      fromAddress: (adapterFrom as any).address || 'unknown',
-      toAddress: (adapterTo as any).address || 'unknown'
-    });
 
     const normalizedAmount = Number((amount ?? '').toString());
     if (!Number.isFinite(normalizedAmount) || normalizedAmount <= 0) {
@@ -109,21 +77,9 @@ export async function bridgeUsdcWithSessionKey({
     // BridgeKit expects a decimal string (human units), not atomic units
     const amountString = normalizedAmount.toFixed(2);
 
-    console.log('💰 [BRIDGE] Amount parsed:', {
-      input: amount,
-      normalized: normalizedAmount,
-      amountString
-    });
-
     const handler = (payload: { method: string; values?: Record<string, unknown> }) => {
       const method = payload.method;
       const txHash = typeof payload.values?.txHash === 'string' ? (payload.values!.txHash as string) : undefined;
-
-      console.log('🔄 [BRIDGE] Event received:', {
-        method,
-        txHash,
-        values: payload.values
-      });
 
       switch (method) {
         case 'approve':
@@ -142,7 +98,7 @@ export async function bridgeUsdcWithSessionKey({
           onProgress?.({ type: 'switch-network' });
           break;
         default:
-          console.log('❓ [BRIDGE] Unknown event method:', method);
+          // Unknown events are ignored
           break;
       }
     };
@@ -150,12 +106,6 @@ export async function bridgeUsdcWithSessionKey({
     kit.on('*', handler);
 
     try {
-      console.log('🚀 [BRIDGE] Calling BridgeKit.bridge() with:', {
-        from: { chain: fromChain },
-        to: { chain: toChain },
-        amount: amountString
-      });
-
       const result = await kit.bridge({
         from: {
           adapter: adapterFrom,
@@ -167,9 +117,6 @@ export async function bridgeUsdcWithSessionKey({
         },
         amount: amountString,
       });
-
-      console.log('✅ [BRIDGE] Bridge completed successfully!');
-      console.log('📊 [BRIDGE] Result:', JSON.stringify(result, null, 2));
 
       const { sourceTxHash, receiveTxHash } = extractTransactionHashes(result);
       onProgress?.({ type: 'completed', sourceTxHash, receiveTxHash });

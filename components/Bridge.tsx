@@ -108,7 +108,6 @@ const Bridge: React.FC = () => {
       const finalStatus = await pollBridgeStatus(
         transactionId,
         (status, data) => {
-          console.log('Bridge status update:', status, data);
 
           switch (status) {
             case 'pending':

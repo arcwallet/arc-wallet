@@ -110,12 +110,6 @@ export async function createAuthenticationCredential(options: PublicKeyCredentia
     throw new Error('WebAuthn is not supported in this environment.');
   }
 
-  console.log('🔐 [webauthn] createAuthenticationCredential starting', {
-    challenge: options.challenge?.substring(0, 20) + '...',
-    allowCredentials: options.allowCredentials?.length || 'discoverable',
-    timeout: options.timeout
-  });
-
   const publicKey: PublicKeyCredentialRequestOptions = {
     ...options,
     challenge: base64UrlToBuffer(options.challenge),
@@ -125,13 +119,7 @@ export async function createAuthenticationCredential(options: PublicKeyCredentia
     })),
   };
 
-  console.log('🔐 [webauthn] Calling navigator.credentials.get() - Browser prompt should appear now...');
-  const startTime = Date.now();
-
   const assertion = (await navigator.credentials.get({ publicKey })) as PublicKeyCredential | null;
-
-  const elapsed = Date.now() - startTime;
-  console.log(`✅ [webauthn] Browser prompt completed in ${elapsed}ms`);
 
   if (!assertion) {
     throw new DOMException('Passkey authentication was cancelled', 'AbortError');

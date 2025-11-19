@@ -3,7 +3,7 @@
 ## Adım 1: SendGrid'den DNS Kayıtlarını Alın
 
 ### SendGrid'e Giriş
-1. https://app.sendgrid.com → Giriş yapın
+1. https://app.sendgrid.com → Log in
 2. Settings → Sender Authentication
 3. "Authenticate Your Domain" butonuna tıklayın
 4. Domain: `arcwallet.network` girin
@@ -67,7 +67,7 @@ TTL: 1 Hour
 
 ### B) Cloudflare
 
-1. https://dash.cloudflare.com → Giriş yapın
+1. https://dash.cloudflare.com → Log in
 2. `arcwallet.network` domain'e tıklayın
 3. Sol menüden **DNS** → **Records**
 4. **Add record** butonuna tıklayın
@@ -88,7 +88,7 @@ TTL: Auto
 
 ### C) Namecheap
 
-1. https://ap.www.namecheap.com → Giriş yapın
+1. https://ap.www.namecheap.com → Log in
 2. Domain List → `arcwallet.network` → **Manage**
 3. **Advanced DNS** sekmesine gidin
 4. **Add New Record** butonuna tıklayın

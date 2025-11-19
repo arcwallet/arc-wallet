@@ -100,16 +100,12 @@ export const passkeyClient = {
     postJSON<unknown>('/passkeys/register/finish', { username, credential }),
 
   beginAuthentication: async (username?: string) => {
-    console.log('🔐 [passkeyClient] beginAuthentication', { username: username || 'discoverable' });
     const result = await postJSON<AuthenticationStartData>('/passkeys/auth/start', username ? { username } : {});
-    console.log('✅ [passkeyClient] beginAuthentication success');
     return result;
   },
 
   finishAuthentication: async (credential: unknown) => {
-    console.log('🔐 [passkeyClient] finishAuthentication');
     const result = await postJSON<AuthenticationFinishData>('/passkeys/auth/finish', { credential });
-    console.log('✅ [passkeyClient] finishAuthentication success');
     return result;
   },
 

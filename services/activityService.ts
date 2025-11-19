@@ -63,13 +63,13 @@ export async function fetchRecentTransactions(
     return [];
   }
 
-  console.log('🔍 [Activity] Fetching transactions for', normalizedAddress);
+
 
   const maxTransactions = options.maxTransactions ?? 50; // Increased from 30
   const maxBlocks = options.maxBlocks ?? MAX_BLOCKS_DEFAULT;
 
   const latestBlock = await callWithRateLimit(provider.getBlockNumber());
-  console.log('📊 [Activity] Latest block:', latestBlock, '- Scanning', maxBlocks, 'blocks');
+
 
   const transactions: Transaction[] = [];
   const seenTxHashes = new Set<string>();
@@ -220,7 +220,7 @@ export async function fetchRecentTransactions(
     }
   }
 
-  console.log('✅ [Activity] Found', transactions.length, 'transactions after scanning', scannedBlocks, 'blocks');
+
 
   transactions.sort((a, b) => b.date.getTime() - a.date.getTime());
   return transactions.slice(0, maxTransactions);

@@ -63,7 +63,7 @@ const RecoveryPage: React.FC = () => {
 
       // In development, show the token for testing
       if (response.data?.recoveryToken) {
-        console.log('Recovery token:', response.data.recoveryToken);
+        
         setRecoveryToken(response.data.recoveryToken);
         // Auto-verify in dev mode
         setTimeout(() => verifyToken(response.data!.recoveryToken!), 1000);
