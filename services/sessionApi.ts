@@ -66,7 +66,7 @@ export const sessionApi = {
     }
   },
 
-  async getSession(timeoutMs = 8000): Promise<{ email: string } | null> {
+  async getSession(timeoutMs = 3000): Promise<{ email: string } | null> {
     const controller = new AbortController();
     const timer = window.setTimeout(() => controller.abort(), timeoutMs);
     try {
