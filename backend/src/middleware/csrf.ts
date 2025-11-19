@@ -14,12 +14,21 @@ export const setCsrfCookie = (req: Request, res: Response, next: NextFunction) =
   if (!csrfToken) {
     const newCsrfToken = randomBytes(16).toString('hex');
     res.cookie(CSRF_COOKIE_NAME, newCsrfToken, {
-      // httpOnly: false - Client-side script needs to read this
-      // sameSite: 'lax' is a good default
+      httpOnly: false,  // Client-side script needs to read this
+      sameSite: 'lax',
+      secure: false,    // Allow HTTP in development
+      path: '/',
     });
   }
   next();
 };
+
+// Routes that don't require CSRF validation (public endpoints)
+const CSRF_EXEMPT_ROUTES = [
+  '/api/send-link',
+  '/api/verify',
+  '/health',
+];
 
 /**
  * Validates the CSRF token for state-changing methods (POST, PUT, DELETE, PATCH).
@@ -28,7 +37,10 @@ export const setCsrfCookie = (req: Request, res: Response, next: NextFunction) =
 export const validateCsrfToken = (req: Request, res: Response, next: NextFunction) => {
   const isStateChangingMethod = ['POST', 'PUT', 'DELETE', 'PATCH'].includes(req.method);
 
-  if (isStateChangingMethod) {
+  // Skip CSRF validation for exempt routes
+  const isExempt = CSRF_EXEMPT_ROUTES.some(route => req.path === route || req.path.startsWith(route));
+
+  if (isStateChangingMethod && !isExempt) {
     const csrfTokenFromHeader = req.header(CSRF_HEADER);
     const csrfTokenFromCookie = req.cookies[CSRF_COOKIE_NAME];
 
