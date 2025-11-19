@@ -1,6 +1,12 @@
 const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
 const resolveUrl = (path: string) => `${API_BASE}${path}`;
 
+// Get CSRF token from cookie
+const getCsrfToken = (): string | null => {
+  const match = document.cookie.match(/(?:^|; )_csrf=([^;]*)/);
+  return match ? decodeURIComponent(match[1]) : null;
+};
+
 interface ApiResponse<T = unknown> {
   success: boolean;
   message?: string;
@@ -27,9 +33,15 @@ export const sessionApi = {
     const controller = new AbortController();
     const timer = window.setTimeout(() => controller.abort(), timeoutMs);
     try {
+      const csrfToken = getCsrfToken();
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (csrfToken) {
+        headers['X-CSRF-Token'] = csrfToken;
+      }
       const response = await fetch(resolveUrl('/api/send-link'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        headers,
         body: JSON.stringify({ email }),
         signal: controller.signal,
       });
@@ -48,10 +60,15 @@ export const sessionApi = {
     const controller = new AbortController();
     const timer = window.setTimeout(() => controller.abort(), timeoutMs);
     try {
+      const csrfToken = getCsrfToken();
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (csrfToken) {
+        headers['X-CSRF-Token'] = csrfToken;
+      }
       const response = await fetch(resolveUrl('/api/verify'), {
         method: 'POST',
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ token }),
         signal: controller.signal,
       });
@@ -91,10 +108,15 @@ export const sessionApi = {
   },
 
   async logout() {
+    const csrfToken = getCsrfToken();
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (csrfToken) {
+      headers['X-CSRF-Token'] = csrfToken;
+    }
     const response = await fetch(resolveUrl('/api/logout'), {
       method: 'POST',
       credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
     });
     return handleResponse<ApiResponse>(response);
   },
