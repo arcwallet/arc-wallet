@@ -95,6 +95,7 @@ app.use(createBridgeRoutes(db, {
   NODE_ENV: config.NODE_ENV,
   ARC_RPC_URL: config.ARC_RPC_URL,
   SEPOLIA_RPC_URL: config.SEPOLIA_RPC_URL,
+  JWT_SECRET: config.JWT_SECRET,
 }));
 app.use('/multisig', createMultiSigRoutes(db, config));
 

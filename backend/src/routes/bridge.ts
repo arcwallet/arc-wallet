@@ -10,6 +10,7 @@ export interface BridgeConfig {
   NODE_ENV: string;
   ARC_RPC_URL: string;
   SEPOLIA_RPC_URL: string;
+  JWT_SECRET: string;
 }
 
 /**
