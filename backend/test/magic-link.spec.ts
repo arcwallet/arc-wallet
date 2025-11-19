@@ -6,6 +6,7 @@ import os from 'os';
 import path from 'path';
 import type { Express } from 'express';
 import { createMagicLinkRouter } from '../src/routes/magicLink.js';
+import { Database } from '../src/models/Database.js';
 import { cookieMiddleware } from '../src/middleware/cookies.js';
 import type { EnvConfig } from '../src/types/index.js';
 import type { MagicLinkMailer, MagicLinkMessage } from '../src/services/magicLinkMailer.js';
@@ -38,10 +39,11 @@ const createMailer = () => {
 
 const createApp = (mailer: MagicLinkMailer) => {
   const app = express();
+  const db = new Database(baseConfig.DB_PATH);
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
   app.use(cookieMiddleware);
-  app.use(createMagicLinkRouter(baseConfig, mailer));
+  app.use(createMagicLinkRouter(baseConfig, mailer, db));
   return app;
 };
 

@@ -1,12 +1,14 @@
 import fs from 'fs';
 import express, { Router, Request, Response } from 'express';
 import path from 'path';
+import crypto from 'crypto';
 import { EnvConfig } from '../types/index.js';
 import { MagicUserStore } from '../magicLink/UserStore.js';
 import { MagicSessionStore } from '../magicLink/SessionStore.js';
 import { MagicLinkService } from '../magicLink/MagicLinkService.js';
 import { rateLimitMiddleware } from '../middleware/security.js';
-import type { MagicLinkMailer } from '../services/magicLinkMailer.js';
+import { MagicLinkMailer } from '../services/magicLinkMailer.js';
+import { Database } from '../models/Database.js';
 
 const SESSION_COOKIE_NAME = 'arcwallet_session';
 const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
@@ -15,10 +17,11 @@ type CookieRequest = Request & { cookies?: Record<string, string> };
 
 const COOKIE_BASE_OPTIONS = (isProd: boolean) => ({
   httpOnly: true,
-  sameSite: 'none' as const,
-  secure: isProd,
-  maxAge: SESSION_TTL_MS,
+  sameSite: 'lax' as const,    // Fixed: lax instead of none
+  secure: true,                // Fixed: ALWAYS secure (enforce HTTPS)
+  maxAge: 4 * 60 * 60 * 1000,  // Fixed: 4 hours instead of 24
   path: '/',
+  domain: undefined,           // Let browser handle domain
 });
 
 const sanitizeEmail = (email: unknown): string | null => {
@@ -57,7 +60,7 @@ const renderTemplate = (title: string, body: string) => `<!doctype html>
   </body>
 </html>`;
 
-export const createMagicLinkRouter = (config: EnvConfig, mailer: MagicLinkMailer) => {
+export const createMagicLinkRouter = (config: EnvConfig, mailer: MagicLinkMailer, db: Database) => {
   const router = Router();
   const userStore = new MagicUserStore(path.join(process.cwd(), 'data'));
   const sessionStore = new MagicSessionStore();
@@ -125,17 +128,28 @@ export const createMagicLinkRouter = (config: EnvConfig, mailer: MagicLinkMailer
     });
   });
 
-  router.post('/api/verify', (req, res) => {
+  router.post('/api/verify', async (req, res) => {
     const token = typeof req.body?.token === 'string' ? req.body.token : null;
     if (!token) {
       return res.status(400).json({ success: false, error: 'Magic link token is required.' });
     }
-
+  
+    // Check if token already used
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const alreadyUsed = await db.isTokenUsed(tokenHash);
+    if (alreadyUsed) {
+      return res.status(400).json({ success: false, error: 'Token already used.' });
+    }
+  
     const payload = tokenService.verifyToken(token);
-    if (!payload) {
+    if (!payload || !payload.expiresAt) {
       return res.status(400).json({ success: false, error: 'Invalid or expired magic link.' });
     }
-
+  
+    // Mark token as used
+    const expiresAt = new Date(payload.expiresAt);
+    await db.markTokenUsed(tokenHash, expiresAt);
+  
     const user = userStore.findOrCreate(payload.email);
     const session = sessionStore.create(user, SESSION_TTL_MS);
     res.cookie(SESSION_COOKIE_NAME, session.id, COOKIE_BASE_OPTIONS(config.NODE_ENV === 'production'));

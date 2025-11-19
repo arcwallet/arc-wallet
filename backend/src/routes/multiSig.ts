@@ -1,24 +1,39 @@
-import { Router } from 'express';
-import { multiSigController } from '../controllers/MultiSigController.js';
+import { Router, Request, Response, NextFunction } from 'express';
+import { MultiSigController } from '../controllers/MultiSigController.js';
+import { Database } from '../models/Database.js';
+import { EnvConfig } from '../types/index.js';
+import { authMiddleware } from '../middleware/auth.js';
 
-const router = Router();
+export function createMultiSigRoutes(db: Database, config: EnvConfig): Router {
+  const router = Router();
+  const controller = new MultiSigController(db);
 
-// Account routes
-router.post('/accounts', (req, res, next) => multiSigController.createAccount(req, res, next));
-router.get('/accounts/user/:userId', (req, res, next) => multiSigController.getAccounts(req, res, next));
-router.get('/accounts/:accountId', (req, res, next) => multiSigController.getAccount(req, res, next));
-router.put('/accounts/:accountId', (req, res, next) => multiSigController.updateAccount(req, res, next));
-router.post('/accounts/:accountId/deploy', (req, res, next) => multiSigController.deployContract(req, res, next));
+  // Apply auth middleware to all multi-sig routes
+  router.use(authMiddleware(config.JWT_SECRET));
 
-// Member routes
-router.post('/accounts/:accountId/members', (req, res, next) => multiSigController.addMember(req, res, next));
-router.delete('/accounts/:accountId/members/:memberId', (req, res, next) => multiSigController.removeMember(req, res, next));
+  const asyncHandler = (fn: (req: Request, res: Response, next: NextFunction, authUserId?: string) => Promise<void>) => 
+    (req: Request, res: Response, next: NextFunction) => {
+      fn(req, res, next, req.user?.id).catch(next);
+  };
 
-// Transaction routes
-router.post('/transactions', (req, res, next) => multiSigController.createTransaction(req, res, next));
-router.get('/transactions/:transactionId', (req, res, next) => multiSigController.getTransaction(req, res, next));
-router.get('/accounts/:accountId/transactions', (req, res, next) => multiSigController.getTransactions(req, res, next));
-router.post('/transactions/:transactionId/approve', (req, res, next) => multiSigController.approveTransaction(req, res, next));
-router.post('/transactions/:transactionId/reject', (req, res, next) => multiSigController.rejectTransaction(req, res, next));
+  // Account routes
+  router.post('/accounts', asyncHandler((req, res, next, authUserId) => controller.createAccount(req, res, next, authUserId)));
+  router.get('/accounts', asyncHandler((req, res, next, authUserId) => controller.getAccounts(req, res, next, authUserId))); // Changed from /user/:userId
+  router.get('/accounts/:accountId', asyncHandler((req, res, next, authUserId) => controller.getAccount(req, res, next, authUserId)));
+  router.put('/accounts/:accountId', asyncHandler((req, res, next, authUserId) => controller.updateAccount(req, res, next, authUserId)));
+  router.post('/accounts/:accountId/deploy', asyncHandler((req, res, next, authUserId) => controller.deployContract(req, res, next, authUserId)));
 
-export default router;
+  // Member routes
+  router.post('/accounts/:accountId/members', asyncHandler((req, res, next, authUserId) => controller.addMember(req, res, next, authUserId)));
+  router.delete('/accounts/:accountId/members/:memberId', asyncHandler((req, res, next, authUserId) => controller.removeMember(req, res, next, authUserId)));
+
+  // Transaction routes
+  router.post('/transactions', asyncHandler((req, res, next, authUserId) => controller.createTransaction(req, res, next, authUserId)));
+  router.get('/transactions/:transactionId', asyncHandler((req, res, next, authUserId) => controller.getTransaction(req, res, next, authUserId)));
+  router.get('/accounts/:accountId/transactions', asyncHandler((req, res, next, authUserId) => controller.getTransactions(req, res, next, authUserId)));
+  router.post('/transactions/:transactionId/approve', asyncHandler((req, res, next, authUserId) => controller.approveTransaction(req, res, next, authUserId)));
+  router.post('/transactions/:transactionId/reject', asyncHandler((req, res, next, authUserId) => controller.rejectTransaction(req, res, next, authUserId)));
+
+  return router;
+}
+

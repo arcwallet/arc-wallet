@@ -1,0 +1,51 @@
+import { Request, Response, NextFunction } from 'express';
+import { randomBytes } from 'crypto';
+
+const CSRF_HEADER = 'X-CSRF-Token';
+const CSRF_COOKIE_NAME = '_csrf';
+
+/**
+ * Generates a CSRF token and sets it as a cookie on the response.
+ * This should be readable by client-side JavaScript.
+ */
+export const setCsrfCookie = (req: Request, res: Response, next: NextFunction) => {
+  const csrfToken = req.cookies[CSRF_COOKIE_NAME];
+
+  if (!csrfToken) {
+    const newCsrfToken = randomBytes(16).toString('hex');
+    res.cookie(CSRF_COOKIE_NAME, newCsrfToken, {
+      // httpOnly: false - Client-side script needs to read this
+      // sameSite: 'lax' is a good default
+    });
+  }
+  next();
+};
+
+/**
+ * Validates the CSRF token for state-changing methods (POST, PUT, DELETE, PATCH).
+ * The client must send the token from the cookie in the X-CSRF-Token header.
+ */
+export const validateCsrfToken = (req: Request, res: Response, next: NextFunction) => {
+  const isStateChangingMethod = ['POST', 'PUT', 'DELETE', 'PATCH'].includes(req.method);
+
+  if (isStateChangingMethod) {
+    const csrfTokenFromHeader = req.header(CSRF_HEADER);
+    const csrfTokenFromCookie = req.cookies[CSRF_COOKIE_NAME];
+
+    if (!csrfTokenFromHeader || !csrfTokenFromCookie || csrfTokenFromHeader !== csrfTokenFromCookie) {
+      console.warn('CSRF token validation failed.', {
+        url: req.url,
+        ip: req.ip,
+        header: csrfTokenFromHeader,
+        cookie: csrfTokenFromCookie,
+      });
+      return res.status(403).json({
+        success: false,
+        error: 'Invalid CSRF token',
+        code: 'CSRF_VALIDATION_FAILED'
+      });
+    }
+  }
+
+  next();
+};

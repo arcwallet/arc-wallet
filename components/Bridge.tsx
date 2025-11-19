@@ -156,11 +156,11 @@ const Bridge: React.FC = () => {
       const amountNumber = Number(amount);
       const now = new Date();
 
-      // Add to activity feed
+      // Add to activity feed - use Bridge type so ActivityContext doesn't poll these cross-chain transactions
       if (direction === 'arc-to-sepolia' && sourceTxHash) {
         addActivity({
           id: sourceTxHash,
-          type: TransactionType.Sent,
+          type: TransactionType.Bridge,
           description: `Bridge ${selectedToken.symbol} from Arc to Sepolia`,
           timestamp: 'Just now',
           date: now,
@@ -179,8 +179,8 @@ const Bridge: React.FC = () => {
       if (direction === 'sepolia-to-arc' && destinationTxHash) {
         addActivity({
           id: destinationTxHash,
-          type: TransactionType.Received,
-          description: `Bridge ${selectedToken.symbol} from Sepolia`,
+          type: TransactionType.Bridge,
+          description: `Bridge ${selectedToken.symbol} from Sepolia to Arc`,
           timestamp: 'Just now',
           date: now,
           amount: amountNumber,

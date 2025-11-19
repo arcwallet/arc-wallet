@@ -12,7 +12,61 @@ import { WalletProvider, useWallet } from './contexts/WalletContext';
 import { ArcAccountProvider } from './contexts/ArcAccountContext';
 import { ActivityProvider } from './contexts/ActivityContext';
 import { MultiSigProvider } from './contexts/MultiSigContext';
+// Self-custodial wallet imports
+import { SelfCustodialWalletProvider, useSelfCustodialWallet } from './contexts/SelfCustodialWalletContext';
+import WalletSetup from './components/WalletSetup';
+import UnlockWallet from './components/UnlockWallet';
 
+// Self-custodial wallet experience - new architecture
+const SelfCustodialWalletExperience: React.FC = () => {
+  const {
+    hasWallet,
+    isUnlocked,
+    isAuthenticated,
+    registerPasskey,
+    logout,
+    deleteWallet
+  } = useSelfCustodialWallet();
+  const { logout: sessionLogout } = useSession();
+
+  const handleComplete = async () => {
+    // After wallet creation/import, register passkey for identity
+    try {
+      await registerPasskey();
+    } catch (error) {
+      console.error('Passkey registration failed:', error);
+      // User can still use the wallet without passkey
+    }
+  };
+
+  const handleUnlock = () => {
+    // Wallet unlocked, show dashboard
+  };
+
+  const handleReset = () => {
+    // Wallet reset, go back to setup
+  };
+
+  const handleLogout = async () => {
+    await sessionLogout();
+    logout();
+  };
+
+  // No wallet - show setup
+  if (!hasWallet) {
+    return <WalletSetup onComplete={handleComplete} />;
+  }
+
+  // Wallet exists but locked - show unlock
+  if (!isUnlocked) {
+    return <UnlockWallet onUnlock={handleUnlock} onReset={handleReset} />;
+  }
+
+  // Wallet unlocked - show dashboard
+  return <WalletDashboard />;
+};
+
+// Legacy wallet experience - existing architecture
 const WalletExperience: React.FC<{ email: string }> = ({ email }) => {
   const { isAuthenticated, activateWithPrivateKey, loginWithPasskey, isConnecting, logout: walletLogout } = useWallet();
   const { logout: sessionLogout } = useSession();
@@ -46,6 +100,9 @@ const RootView: React.FC = () => {
   const { email, loading, verifyMagicToken, verifyingToken, message } = useSession();
   const [tokenHandled, setTokenHandled] = useState(false);
   const [currentPath, setCurrentPath] = useState(window.location.pathname);
+
+  // Feature flag for self-custodial mode
+  const useSelfCustodial = true; // Set to true to enable self-custodial wallet
 
   // Listen for path changes
   useEffect(() => {
@@ -98,31 +155,38 @@ const RootView: React.FC = () => {
     return <LoginPage />;
   }
 
+  // Use self-custodial or legacy wallet experience
+  if (useSelfCustodial) {
+    return <SelfCustodialWalletExperience />;
+  }
+
   return <WalletExperience email={email} />;
 };
 
 const App: React.FC = () => (
   <ErrorBoundary>
     <SessionProvider>
-      <WalletProvider>
-        <ArcAccountProvider>
-          <ActivityProvider>
-            <MultiSigProvider>
-              <div className="auth-wrapper">
-                <React.Suspense fallback={
-                  <div className="fullpage-login">
-                    <div className="login-content">
-                      <p className="login-message muted">Loading…</p>
+      <SelfCustodialWalletProvider>
+        <WalletProvider>
+          <ArcAccountProvider>
+            <ActivityProvider>
+              <MultiSigProvider>
+                <div className="auth-wrapper">
+                  <React.Suspense fallback={
+                    <div className="fullpage-login">
+                      <div className="login-content">
+                        <p className="login-message muted">Loading…</p>
+                      </div>
                     </div>
-                  </div>
-                }>
-                  <RootView />
-                </React.Suspense>
-              </div>
-            </MultiSigProvider>
-          </ActivityProvider>
-        </ArcAccountProvider>
-      </WalletProvider>
+                  }>
+                    <RootView />
+                  </React.Suspense>
+                </div>
+              </MultiSigProvider>
+            </ActivityProvider>
+          </ArcAccountProvider>
+        </WalletProvider>
+      </SelfCustodialWalletProvider>
     </SessionProvider>
   </ErrorBoundary>
 );

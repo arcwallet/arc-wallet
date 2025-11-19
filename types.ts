@@ -10,6 +10,7 @@ export enum TransactionType {
   Received = 'Received',
   Contract = 'Contract',
   Swap = 'Swap',
+  Bridge = 'Bridge',
 }
 
 export interface Approval {

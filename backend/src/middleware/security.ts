@@ -22,6 +22,13 @@ const rateLimiters = {
     duration: 3600, // Per hour
   }),
 
+  // Stricter rate limiter for recovery endpoints
+  recovery: new RateLimiterMemory({
+    points: 3,           // Max 3 attempts
+    duration: 3600,      // Per hour
+    blockDuration: 300000 // 5 minute cooldown
+  }),
+
   // Moderate rate limiter for bridge operations
   bridge: new RateLimiterMemory({
     points: 20, // Number of requests
@@ -32,7 +39,7 @@ const rateLimiters = {
 /**
  * General rate limiting middleware
  */
-export const rateLimitMiddleware = (type: 'general' | 'auth' | 'registration' | 'bridge' = 'general') => {
+export const rateLimitMiddleware = (type: 'general' | 'auth' | 'registration' | 'bridge' | 'recovery' = 'general') => {
   const disabled = process.env.DISABLE_RATE_LIMIT === 'true' || process.env.NODE_ENV !== 'production';
   return async (req: Request, res: Response, next: NextFunction) => {
     if (disabled) {
@@ -192,11 +199,27 @@ export const securityHeaders = (req: Request, res: Response, next: NextFunction)
   res.header('X-XSS-Protection', '1; mode=block');
   res.header('Referrer-Policy', 'strict-origin-when-cross-origin');
 
+  // HSTS - Enforce HTTPS (only in production)
+  if (process.env.NODE_ENV === 'production') {
+    res.header('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
+  }
+
+  // Permissions Policy - Restrict browser features
+  res.header(
+    'Permissions-Policy',
+    'accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()'
+  );
+
   // Content Security Policy
   res.header(
     'Content-Security-Policy',
     "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'"
   );
+
+  // Prevent caching of sensitive data
+  res.header('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.header('Pragma', 'no-cache');
+  res.header('Expires', '0');
 
   next();
 };

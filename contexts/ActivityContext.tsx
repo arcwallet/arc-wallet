@@ -149,7 +149,12 @@ export const ActivityProvider: React.FC<{ children: ReactNode }> = ({ children }
   }, [address, setActivities]);
 
   useEffect(() => {
-    const pending = activities.filter((tx) => tx.status === TransactionStatus.Pending && tx.hash);
+    // Filter pending transactions but exclude bridge transactions (they're cross-chain)
+    const pending = activities.filter((tx) =>
+      tx.status === TransactionStatus.Pending &&
+      tx.hash &&
+      tx.type !== TransactionType.Bridge // Don't poll bridge transactions - they're on different chains
+    );
     pendingRef.current = new Set(pending.map((tx) => tx.hash));
   }, [activities]);
 

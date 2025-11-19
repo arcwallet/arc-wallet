@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useWallet } from '../contexts/WalletContext';
 import { useSession } from '../contexts/SessionContext';
+import { useSelfCustodialWallet } from '../contexts/SelfCustodialWalletContext';
 import { passkeyClient, type SessionKeySummary } from '../services/passkeyClient';
 import { WalletIcon, CopyIcon, AddIcon, LaptopIcon, PhoneIcon, ChevronDownIcon } from './Icons';
 
@@ -238,6 +239,7 @@ const OrganizationRolesSection: React.FC = () => (
 
 const RecoverySection: React.FC = () => {
     const { sessionKey, verifyWithPasskey } = useWallet();
+    const { getPrivateKey, getMnemonic, isUnlocked } = useSelfCustodialWallet();
     const [showPrivateKey, setShowPrivateKey] = useState(false);
     const [copied, setCopied] = useState(false);
     const [showModal, setShowModal] = useState(false);
@@ -249,6 +251,9 @@ const RecoverySection: React.FC = () => {
     });
     const [holdProgress, setHoldProgress] = useState(0);
     const [isHolding, setIsHolding] = useState(false);
+
+    // Use self-custodial wallet if unlocked, otherwise fall back to legacy
+    const walletPrivateKey = isUnlocked ? getPrivateKey() : sessionKey?.privateKey;
 
     // Auto-hide private key after 60 seconds
     useEffect(() => {
@@ -262,8 +267,8 @@ const RecoverySection: React.FC = () => {
     }, [showPrivateKey]);
 
     const handleCopyPrivateKey = () => {
-        if (sessionKey?.privateKey) {
-            navigator.clipboard.writeText(sessionKey.privateKey);
+        if (walletPrivateKey) {
+            navigator.clipboard.writeText(walletPrivateKey);
             setCopied(true);
             setTimeout(() => setCopied(false), 2000);
         }
@@ -335,11 +340,11 @@ const RecoverySection: React.FC = () => {
         }
     };
 
-    if (!sessionKey?.privateKey) {
+    if (!walletPrivateKey) {
         return (
             <div className="flex flex-col items-start gap-3 rounded-xl bg-[#151A22]/70 p-5 sm:p-6">
                 <h3 className="text-base font-semibold text-[#E6EEF3]">Wallet Backup</h3>
-                <p className="text-sm text-[#A7B4C8]">No wallet connected. Sign in to view backup options.</p>
+                <p className="text-sm text-[#A7B4C8]">No wallet connected or wallet locked. Unlock to view backup options.</p>
             </div>
         );
     }
@@ -390,7 +395,7 @@ const RecoverySection: React.FC = () => {
 
                         <div className="relative flex items-center gap-2 rounded-lg border border-[#ff6b81]/50 bg-[#091325] px-3 py-3">
                             <p className="flex-1 font-mono text-sm text-[#E6EEF3] break-all select-all">
-                                {sessionKey.privateKey}
+                                {walletPrivateKey}
                             </p>
                             <button
                                 onClick={handleCopyPrivateKey}

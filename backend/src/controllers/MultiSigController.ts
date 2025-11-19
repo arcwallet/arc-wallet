@@ -7,18 +7,23 @@ import { ApiError, MultiSigAccount, MultiSigMember, MultiSigTransaction, MultiSi
 export class MultiSigController {
   private db: Database;
 
-  constructor() {
-    this.db = new Database(process.env.DB_PATH || './data/passkeys.db');
+  constructor(db: Database) {
+    this.db = db;
+  }
+
+  private async _isMember(accountId: string, userId: string, roles: string[] = ['owner', 'signer', 'viewer']): Promise<boolean> {
+    const members = await this.db.getMultiSigMembers(accountId);
+    return members.some(m => m.userId === userId && m.status === 'active' && roles.includes(m.role));
   }
 
   // Create a new multi-sig account
-  async createAccount(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async createAccount(req: Request, res: Response, next: NextFunction, authUserId?: string): Promise<void> {
     try {
       const { name, requiredSignatures, members } = req.body;
-      const createdBy = req.body.userId; // Should come from auth middleware
+      const createdBy = authUserId;
 
       if (!name || !requiredSignatures || !createdBy) {
-        throw new ApiError('Missing required fields: name, requiredSignatures, userId', 400, 'INVALID_REQUEST');
+        throw new ApiError('Missing required fields: name, requiredSignatures, and authenticated user', 400, 'INVALID_REQUEST');
       }
 
       if (!members || !Array.isArray(members) || members.length === 0) {
@@ -83,12 +88,12 @@ export class MultiSigController {
   }
 
   // Get accounts for a user
-  async getAccounts(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async getAccounts(req: Request, res: Response, next: NextFunction, authUserId?: string): Promise<void> {
     try {
-      const { userId } = req.params;
+      const userId = authUserId;
 
       if (!userId) {
-        throw new ApiError('User ID is required', 400, 'INVALID_REQUEST');
+        throw new ApiError('User ID is required', 401, 'UNAUTHORIZED');
       }
 
       const accounts = await this.db.getMultiSigAccountsByUser(userId);
@@ -118,9 +123,15 @@ export class MultiSigController {
   }
 
   // Get single account details
-  async getAccount(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async getAccount(req: Request, res: Response, next: NextFunction, authUserId?: string): Promise<void> {
     try {
       const { accountId } = req.params;
+      if (!authUserId) { throw new ApiError('User not authenticated', 401, 'UNAUTHORIZED'); }
+
+      // Authorization check
+      if (!await this._isMember(accountId, authUserId)) {
+        throw new ApiError('You are not a member of this account', 403, 'FORBIDDEN');
+      }
 
       const account = await this.db.getMultiSigAccount(accountId);
       if (!account) {
@@ -144,25 +155,25 @@ export class MultiSigController {
   }
 
   // Update account (threshold, name)
-  async updateAccount(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async updateAccount(req: Request, res: Response, next: NextFunction, authUserId?: string): Promise<void> {
     try {
       const { accountId } = req.params;
-      const { name, requiredSignatures, userId } = req.body;
+      const { name, requiredSignatures } = req.body;
+      if (!authUserId) { throw new ApiError('User not authenticated', 401, 'UNAUTHORIZED'); }
+
+      // Authorization check: User must be an owner
+      if (!await this._isMember(accountId, authUserId, ['owner'])) {
+        throw new ApiError('Only owners can update account settings', 403, 'FORBIDDEN');
+      }
 
       const account = await this.db.getMultiSigAccount(accountId);
       if (!account) {
         throw new ApiError('Account not found', 404, 'NOT_FOUND');
       }
 
-      // Check if user is owner
-      const members = await this.db.getMultiSigMembers(accountId);
-      const userMember = members.find(m => m.userId === userId);
-      if (!userMember || userMember.role !== 'owner') {
-        throw new ApiError('Only owners can update account settings', 403, 'FORBIDDEN');
-      }
-
       // Validate new threshold
       if (requiredSignatures !== undefined) {
+        const members = await this.db.getMultiSigMembers(accountId);
         const activeMembers = members.filter(m => m.status === 'active');
         if (requiredSignatures > activeMembers.length) {
           throw new ApiError('Required signatures cannot exceed number of active members', 400, 'INVALID_THRESHOLD');
@@ -176,7 +187,9 @@ export class MultiSigController {
       if (name) updates.name = name;
       if (requiredSignatures) updates.requiredSignatures = requiredSignatures;
 
-      await this.db.updateMultiSigAccount(accountId, updates);
+      if (Object.keys(updates).length > 0) {
+        await this.db.updateMultiSigAccount(accountId, updates);
+      }
 
       const updatedAccount = await this.db.getMultiSigAccount(accountId);
 
@@ -190,24 +203,24 @@ export class MultiSigController {
   }
 
   // Add member to account
-  async addMember(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async addMember(req: Request, res: Response, next: NextFunction, authUserId?: string): Promise<void> {
     try {
       const { accountId } = req.params;
-      const { email, role, userId: requesterId } = req.body;
+      const { email, role } = req.body;
+      if (!authUserId) { throw new ApiError('User not authenticated', 401, 'UNAUTHORIZED'); }
+
+      // Authorization check: User must be an owner
+      if (!await this._isMember(accountId, authUserId, ['owner'])) {
+        throw new ApiError('Only owners can add members', 403, 'FORBIDDEN');
+      }
 
       const account = await this.db.getMultiSigAccount(accountId);
       if (!account) {
         throw new ApiError('Account not found', 404, 'NOT_FOUND');
       }
 
-      // Check if requester is owner
-      const members = await this.db.getMultiSigMembers(accountId);
-      const requester = members.find(m => m.userId === requesterId);
-      if (!requester || requester.role !== 'owner') {
-        throw new ApiError('Only owners can add members', 403, 'FORBIDDEN');
-      }
-
       // Check if email already exists in account
+      const members = await this.db.getMultiSigMembers(accountId);
       const existingMember = members.find(m => m.email === email && m.status !== 'removed');
       if (existingMember) {
         throw new ApiError('This email is already a member of this account', 400, 'MEMBER_EXISTS');
@@ -234,10 +247,15 @@ export class MultiSigController {
   }
 
   // Remove member from account
-  async removeMember(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async removeMember(req: Request, res: Response, next: NextFunction, authUserId?: string): Promise<void> {
     try {
       const { accountId, memberId } = req.params;
-      const { userId: requesterId } = req.body;
+      if (!authUserId) { throw new ApiError('User not authenticated', 401, 'UNAUTHORIZED'); }
+
+      // Authorization check: User must be an owner
+      if (!await this._isMember(accountId, authUserId, ['owner'])) {
+        throw new ApiError('Only owners can remove members', 403, 'FORBIDDEN');
+      }
 
       const account = await this.db.getMultiSigAccount(accountId);
       if (!account) {
@@ -246,12 +264,6 @@ export class MultiSigController {
 
       const members = await this.db.getMultiSigMembers(accountId);
 
-      // Check if requester is owner
-      const requester = members.find(m => m.userId === requesterId);
-      if (!requester || requester.role !== 'owner') {
-        throw new ApiError('Only owners can remove members', 403, 'FORBIDDEN');
-      }
-
       // Find member to remove
       const memberToRemove = members.find(m => m.id === memberId);
       if (!memberToRemove) {
@@ -259,7 +271,7 @@ export class MultiSigController {
       }
 
       // Cannot remove yourself if you're the only owner
-      if (memberToRemove.userId === requesterId) {
+      if (memberToRemove.userId === authUserId) {
         const owners = members.filter(m => m.role === 'owner' && m.status === 'active');
         if (owners.length === 1) {
           throw new ApiError('Cannot remove the only owner', 400, 'INVALID_OPERATION');
@@ -288,7 +300,7 @@ export class MultiSigController {
   }
 
   // Create a transaction request
-  async createTransaction(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async createTransaction(req: Request, res: Response, next: NextFunction, authUserId?: string): Promise<void> {
     try {
       const {
         accountId,
@@ -297,29 +309,25 @@ export class MultiSigController {
         tokenAddress,
         tokenSymbol,
         data,
-        description,
-        submitterId
+        description
       } = req.body;
+      const submitterId = authUserId;
 
       if (!accountId || !targetAddress || !value || !submitterId) {
         throw new ApiError('Missing required fields', 400, 'INVALID_REQUEST');
       }
-
-      // Validate target address
       if (!ethers.isAddress(targetAddress)) {
         throw new ApiError('Invalid target address', 400, 'INVALID_ADDRESS');
+      }
+
+      // Authorization check: User must be an owner or signer
+      if (!await this._isMember(accountId, submitterId, ['owner', 'signer'])) {
+        throw new ApiError('You do not have permission to create transactions', 403, 'FORBIDDEN');
       }
 
       const account = await this.db.getMultiSigAccount(accountId);
       if (!account) {
         throw new ApiError('Account not found', 404, 'NOT_FOUND');
-      }
-
-      // Check if submitter is a member with signing rights
-      const members = await this.db.getMultiSigMembers(accountId);
-      const submitter = members.find(m => m.userId === submitterId && m.status === 'active');
-      if (!submitter || submitter.role === 'viewer') {
-        throw new ApiError('You do not have permission to create transactions', 403, 'FORBIDDEN');
       }
 
       // 24 hour expiration
@@ -371,13 +379,19 @@ export class MultiSigController {
   }
 
   // Get transaction details
-  async getTransaction(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async getTransaction(req: Request, res: Response, next: NextFunction, authUserId?: string): Promise<void> {
     try {
       const { transactionId } = req.params;
+      if (!authUserId) { throw new ApiError('User not authenticated', 401, 'UNAUTHORIZED'); }
 
       const transaction = await this.db.getMultiSigTransaction(transactionId);
       if (!transaction) {
         throw new ApiError('Transaction not found', 404, 'NOT_FOUND');
+      }
+
+      // Authorization check
+      if (!await this._isMember(transaction.accountId, authUserId)) {
+        throw new ApiError('You are not a member of this account', 403, 'FORBIDDEN');
       }
 
       const signatures = await this.db.getMultiSigSignatures(transactionId);
@@ -399,10 +413,16 @@ export class MultiSigController {
   }
 
   // Get transactions for an account
-  async getTransactions(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async getTransactions(req: Request, res: Response, next: NextFunction, authUserId?: string): Promise<void> {
     try {
       const { accountId } = req.params;
       const { status } = req.query;
+      if (!authUserId) { throw new ApiError('User not authenticated', 401, 'UNAUTHORIZED'); }
+
+      // Authorization check
+      if (!await this._isMember(accountId, authUserId)) {
+        throw new ApiError('You are not a member of this account', 403, 'FORBIDDEN');
+      }
 
       // Expire old transactions first
       await this.db.expireOldMultiSigTransactions();
@@ -415,7 +435,7 @@ export class MultiSigController {
       let transactions = await this.db.getMultiSigTransactionsByAccount(accountId);
 
       if (status) {
-        transactions = transactions.filter(tx => tx.status === status);
+        transactions = transactions.filter(tx => tx.status === (status as string));
       }
 
       // Add signature info to each transaction
@@ -442,45 +462,36 @@ export class MultiSigController {
   }
 
   // Approve a transaction
-  async approveTransaction(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async approveTransaction(req: Request, res: Response, next: NextFunction, authUserId?: string): Promise<void> {
     try {
       const { transactionId } = req.params;
-      const { userId, signerAddress } = req.body;
+      const { signerAddress } = req.body;
+      const userId = authUserId;
 
-      if (!userId) {
-        throw new ApiError('User ID is required', 400, 'INVALID_REQUEST');
-      }
+      if (!userId) { throw new ApiError('User not authenticated', 401, 'UNAUTHORIZED'); }
 
       const transaction = await this.db.getMultiSigTransaction(transactionId);
       if (!transaction) {
         throw new ApiError('Transaction not found', 404, 'NOT_FOUND');
       }
-
       if (transaction.status !== 'pending') {
         throw new ApiError(`Transaction is ${transaction.status}`, 400, 'INVALID_STATUS');
       }
-
-      // Check if expired
       if (new Date(transaction.expiresAt) < new Date()) {
         await this.db.updateMultiSigTransaction(transactionId, { status: 'expired' });
         throw new ApiError('Transaction has expired', 400, 'TRANSACTION_EXPIRED');
       }
 
-      // Check if user is a member
-      const members = await this.db.getMultiSigMembers(transaction.accountId);
-      const member = members.find(m => m.userId === userId && m.status === 'active');
-      if (!member || member.role === 'viewer') {
+      // Authorization check: User must be an owner or signer
+      if (!await this._isMember(transaction.accountId, userId, ['owner', 'signer'])) {
         throw new ApiError('You do not have permission to approve transactions', 403, 'FORBIDDEN');
       }
 
-      // Check if already signed
       const signatures = await this.db.getMultiSigSignatures(transactionId);
-      const existingSignature = signatures.find(s => s.signerId === userId);
-      if (existingSignature) {
-        throw new ApiError('You have already signed this transaction', 400, 'ALREADY_SIGNED');
+      if (signatures.some(s => s.signerId === userId)) {
+        throw new ApiError('You have already voted on this transaction', 400, 'ALREADY_SIGNED');
       }
 
-      // Add signature
       await this.db.addMultiSigSignature({
         id: uuidv4(),
         transactionId,
@@ -489,10 +500,8 @@ export class MultiSigController {
         status: 'approved'
       });
 
-      // Check if we have enough signatures
       const account = await this.db.getMultiSigAccount(transaction.accountId);
       const approvalCount = await this.db.getApprovalCount(transactionId);
-
       let executed = false;
       if (account && approvalCount >= account.requiredSignatures) {
         // TODO: Execute transaction on-chain
@@ -514,39 +523,31 @@ export class MultiSigController {
   }
 
   // Reject a transaction
-  async rejectTransaction(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async rejectTransaction(req: Request, res: Response, next: NextFunction, authUserId?: string): Promise<void> {
     try {
       const { transactionId } = req.params;
-      const { userId, signerAddress } = req.body;
-
-      if (!userId) {
-        throw new ApiError('User ID is required', 400, 'INVALID_REQUEST');
-      }
+      const { signerAddress } = req.body;
+      const userId = authUserId;
+      if (!userId) { throw new ApiError('User not authenticated', 401, 'UNAUTHORIZED'); }
 
       const transaction = await this.db.getMultiSigTransaction(transactionId);
       if (!transaction) {
         throw new ApiError('Transaction not found', 404, 'NOT_FOUND');
       }
-
       if (transaction.status !== 'pending') {
         throw new ApiError(`Transaction is ${transaction.status}`, 400, 'INVALID_STATUS');
       }
 
-      // Check if user is a member
-      const members = await this.db.getMultiSigMembers(transaction.accountId);
-      const member = members.find(m => m.userId === userId && m.status === 'active');
-      if (!member || member.role === 'viewer') {
+      // Authorization check: User must be an owner or signer
+      if (!await this._isMember(transaction.accountId, userId, ['owner', 'signer'])) {
         throw new ApiError('You do not have permission to reject transactions', 403, 'FORBIDDEN');
       }
 
-      // Check if already signed
       const signatures = await this.db.getMultiSigSignatures(transactionId);
-      const existingSignature = signatures.find(s => s.signerId === userId);
-      if (existingSignature) {
+      if (signatures.some(s => s.signerId === userId)) {
         throw new ApiError('You have already voted on this transaction', 400, 'ALREADY_SIGNED');
       }
 
-      // Add rejection
       await this.db.addMultiSigSignature({
         id: uuidv4(),
         transactionId,
@@ -555,19 +556,19 @@ export class MultiSigController {
         status: 'rejected'
       });
 
-      // Check if transaction should be rejected (more rejections than possible approvals)
       const account = await this.db.getMultiSigAccount(transaction.accountId);
       const allSignatures = await this.db.getMultiSigSignatures(transactionId);
       const rejectionCount = allSignatures.filter(s => s.status === 'rejected').length;
-      const activeMembers = members.filter(m => m.status === 'active' && m.role !== 'viewer');
-      const maxPossibleApprovals = activeMembers.length - rejectionCount;
-
       let rejected = false;
-      if (account && maxPossibleApprovals < account.requiredSignatures) {
-        await this.db.updateMultiSigTransaction(transactionId, { status: 'rejected' });
-        rejected = true;
+      if (account) {
+        const members = await this.db.getMultiSigMembers(transaction.accountId);
+        const activeMembers = members.filter(m => m.status === 'active' && m.role !== 'viewer');
+        const maxPossibleApprovals = activeMembers.length - rejectionCount;
+        if (maxPossibleApprovals < account.requiredSignatures) {
+          await this.db.updateMultiSigTransaction(transactionId, { status: 'rejected' });
+          rejected = true;
+        }
       }
-
       res.json({
         success: true,
         data: {
@@ -581,27 +582,25 @@ export class MultiSigController {
   }
 
   // Deploy multi-sig contract (set address)
-  async deployContract(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async deployContract(req: Request, res: Response, next: NextFunction, authUserId?: string): Promise<void> {
     try {
       const { accountId } = req.params;
-      const { address, userId } = req.body;
+      const { address } = req.body;
+      if (!authUserId) { throw new ApiError('User not authenticated', 401, 'UNAUTHORIZED'); }
 
       if (!address || !ethers.isAddress(address)) {
         throw new ApiError('Valid contract address is required', 400, 'INVALID_ADDRESS');
+      }
+
+      // Authorization check: User must be an owner
+      if (!await this._isMember(accountId, authUserId, ['owner'])) {
+        throw new ApiError('Only owners can deploy contracts', 403, 'FORBIDDEN');
       }
 
       const account = await this.db.getMultiSigAccount(accountId);
       if (!account) {
         throw new ApiError('Account not found', 404, 'NOT_FOUND');
       }
-
-      // Check if user is owner
-      const members = await this.db.getMultiSigMembers(accountId);
-      const userMember = members.find(m => m.userId === userId);
-      if (!userMember || userMember.role !== 'owner') {
-        throw new ApiError('Only owners can deploy contracts', 403, 'FORBIDDEN');
-      }
-
       if (account.address) {
         throw new ApiError('Contract already deployed', 400, 'ALREADY_DEPLOYED');
       }

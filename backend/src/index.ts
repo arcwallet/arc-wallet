@@ -9,10 +9,11 @@ import { SessionKeyManager } from './utils/SessionKeyManager.js';
 import { createPasskeyRoutes } from './routes/passkeys.js';
 import { createMagicLinkRouter } from './routes/magicLink.js';
 import { createBridgeRoutes } from './routes/bridge.js';
-import multiSigRoutes from './routes/multiSig.js';
+import { createMultiSigRoutes } from './routes/multiSig.js';
 import { createMagicLinkMailer } from './services/magicLinkMailer.js';
 import { loadConfig, validateConfig } from './utils/config.js';
 import { cookieMiddleware } from './middleware/cookies.js';
+import { setCsrfCookie, validateCsrfToken } from './middleware/csrf.js';
 import {
   errorHandler,
   securityHeaders,
@@ -70,6 +71,8 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieMiddleware);
+app.use(setCsrfCookie);
+app.use(validateCsrfToken);
 
 // Security headers
 app.use(securityHeaders);
@@ -86,14 +89,14 @@ app.use(healthCheck);
 app.use(rateLimitMiddleware('general'));
 
 // Routes
-app.use(createMagicLinkRouter(config, magicLinkMailer));
+app.use(createMagicLinkRouter(config, magicLinkMailer, db));
 app.use('/passkeys', createPasskeyRoutes(db, config));
 app.use(createBridgeRoutes(db, {
   NODE_ENV: config.NODE_ENV,
   ARC_RPC_URL: config.ARC_RPC_URL,
   SEPOLIA_RPC_URL: config.SEPOLIA_RPC_URL,
 }));
-app.use('/multisig', multiSigRoutes);
+app.use('/multisig', createMultiSigRoutes(db, config));
 
 // Root endpoint
 app.get('/', (req: Request, res: Response) => {

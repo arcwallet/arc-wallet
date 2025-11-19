@@ -12,6 +12,7 @@ import Bridge from './Bridge';
 // import Bridge from './Bridge';
 import { Transaction } from '../types';
 import { useWallet } from '../contexts/WalletContext';
+import { useSelfCustodialWallet } from '../contexts/SelfCustodialWalletContext';
 import { useArcAccount } from '../contexts/ArcAccountContext';
 import type { AccountSnapshot } from '../services/arcRpcClient';
 import { formatBlockTime } from '../utils/format';
@@ -45,7 +46,10 @@ interface NotificationDropdownProps {
 
 const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ isOpen, onClose, onNavigateToTransactions }) => {
   const { activities } = useActivity();
+  // Get address from self-custodial context first
+  const { address: selfCustodialAddress } = useSelfCustodialWallet();
   const { sessionKey } = useWallet();
+  const walletAddress = selfCustodialAddress || sessionKey?.address;
 
   if (!isOpen) return null;
 
@@ -73,7 +77,7 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ isOpen, onC
     const systemNotifications = [];
 
     // Session expiry warning
-    if (sessionKey?.address) {
+    if (walletAddress) {
       systemNotifications.push({
         id: 'session-warning',
         title: 'Session Active',
@@ -85,7 +89,7 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ isOpen, onC
 
     // Combine activity and system notifications
     return [...activityNotifications, ...systemNotifications].slice(0, 5);
-  }, [activities, sessionKey]);
+  }, [activities, walletAddress]);
 
   return (
     <>
@@ -142,7 +146,12 @@ interface DashboardHeaderPropsWithNav extends DashboardHeaderProps {
 }
 
 const DashboardHeader: React.FC<DashboardHeaderPropsWithNav> = ({ account, isRefreshing, onRefresh, error, onNavigate }) => {
-  const { address, logout } = useWallet();
+  // Get address from self-custodial context first
+  const { address: selfCustodialAddress, lockWallet } = useSelfCustodialWallet();
+  const { address: legacyAddress, logout: legacyLogout } = useWallet();
+  const address = selfCustodialAddress || legacyAddress;
+  const logout = selfCustodialAddress ? lockWallet : legacyLogout;
+
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [hasCopiedAddress, setHasCopiedAddress] = useState(false);
   const { activities } = useActivity();
@@ -302,9 +311,11 @@ interface TokenAssetData {
 }
 
 const AssetsTable: React.FC<AssetsTableProps> = ({ balanceDisplay, isLoading }) => {
+  // Get address from self-custodial context first
+  const { address: selfCustodialAddress } = useSelfCustodialWallet();
   const { sessionKey } = useWallet();
-  
-  
+  const walletAddress = selfCustodialAddress || sessionKey?.address;
+
   const [tokenBalances, setTokenBalances] = useState<TokenBalance[]>([]);
   const [isLoadingTokens, setIsLoadingTokens] = useState(false);
   const [prices, setPrices] = useState<TokenPrices>({});
@@ -313,7 +324,7 @@ const AssetsTable: React.FC<AssetsTableProps> = ({ balanceDisplay, isLoading }) 
   useEffect(() => {
     const fetchTokenBalances = async () => {
       const addresses: string[] = [];
-      if (sessionKey?.address) addresses.push(sessionKey.address);
+      if (walletAddress) addresses.push(walletAddress);
       if (addresses.length === 0) {
         setTokenBalances([]);
         return;
@@ -359,7 +370,7 @@ const AssetsTable: React.FC<AssetsTableProps> = ({ balanceDisplay, isLoading }) 
     // Refresh every 30 seconds
     const interval = setInterval(fetchTokenBalances, 30000);
     return () => clearInterval(interval);
-  }, [sessionKey?.address]);
+  }, [walletAddress]);
 
   const rows = useMemo(() => {
     if (tokenBalances.length === 0) {
@@ -499,7 +510,11 @@ const WalletDashboard: React.FC = () => {
   const [selectedTransactionId, setSelectedTransactionId] = useState<string | null>(null);
   const [isBalanceHidden, setIsBalanceHidden] = useState(false);
 
-  const { address, sessionKey } = useWallet();
+  // Get address from self-custodial context first, fall back to legacy wallet
+  const { address: selfCustodialAddress, lockWallet } = useSelfCustodialWallet();
+  const { address: legacyAddress, sessionKey } = useWallet();
+  const address = selfCustodialAddress || legacyAddress;
+
   const { snapshot, formattedBalance, isLoading: isAccountLoading, error: accountError, refresh, lastUpdated } = useArcAccount();
 
   const { activities: transactions } = useActivity();

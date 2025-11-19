@@ -13,14 +13,22 @@ import {
   MultiSigTransaction,
   MultiSigSignature
 } from '../types/index.js';
+import { encryptPrivateKey, decryptPrivateKey } from '../utils/encryption.js';
 
 type RunResult = sqlite3.RunResult;
 
 export class Database {
   private db: sqlite3.Database;
   private ready: Promise<void>;
+  private encryptionKey: string;
 
-  constructor(dbPath: string) {
+  constructor(dbPath: string, encryptionKey?: string) {
+    // Use provided key or fall back to environment variable
+    this.encryptionKey = encryptionKey || process.env.DB_ENCRYPTION_KEY || '';
+
+    if (!this.encryptionKey) {
+      console.warn('⚠️ WARNING: DB_ENCRYPTION_KEY not set. Private keys will be stored unencrypted!');
+    }
     // Ensure directory exists
     const dir = path.dirname(dbPath);
     if (!fs.existsSync(dir)) {
@@ -78,6 +86,7 @@ export class Database {
         id TEXT PRIMARY KEY,
         user_id TEXT NOT NULL,
         private_key TEXT NOT NULL,
+        private_key_iv TEXT,
         address TEXT NOT NULL,
         expires_at DATETIME NOT NULL,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -127,6 +136,15 @@ export class Database {
         expires_at DATETIME NOT NULL,
         used BOOLEAN NOT NULL DEFAULT 0,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Used tokens for one-time magic links
+    await run(`
+      CREATE TABLE IF NOT EXISTS used_tokens (
+        token_hash TEXT PRIMARY KEY,
+        used_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        expires_at DATETIME NOT NULL
       )
     `);
 
@@ -347,14 +365,21 @@ export class Database {
     const run: any = promisify(this.db.run.bind(this.db));
     const get: any = promisify(this.db.get.bind(this.db));
 
+    if (!this.encryptionKey) {
+      throw new Error('DB_ENCRYPTION_KEY must be set to encrypt session keys.');
+    }
+
+    const { encrypted, iv } = encryptPrivateKey(sessionKey.privateKey);
+
     const now = new Date();
     await run(
-      `INSERT INTO session_keys (id, user_id, private_key, address, expires_at, created_at)
-       VALUES (?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO session_keys (id, user_id, private_key, private_key_iv, address, expires_at, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [
         sessionKey.id,
         sessionKey.userId,
-        sessionKey.privateKey,
+        encrypted,
+        iv,
         sessionKey.address,
         sessionKey.expiresAt.toISOString(),
         now.toISOString()
@@ -384,6 +409,14 @@ export class Database {
       'SELECT * FROM session_keys WHERE LOWER(address) = LOWER(?) AND expires_at > ? ORDER BY created_at DESC LIMIT 1',
       [address, new Date().toISOString()]
     );
+    return sessionKey ? this.mapSessionKey(sessionKey) : null;
+  }
+
+  async getSessionKeyById(id: string): Promise<SessionKey | null> {
+    await this.waitForReady();
+    const get: any = promisify(this.db.get.bind(this.db));
+
+    const sessionKey = await get('SELECT * FROM session_keys WHERE id = ?', [id]);
     return sessionKey ? this.mapSessionKey(sessionKey) : null;
   }
 
@@ -485,10 +518,37 @@ export class Database {
   }
 
   private mapSessionKey(row: any): SessionKey {
+    // Decrypt private key when retrieving
+    let privateKey = row.private_key;
+    if (this.encryptionKey && privateKey && row.private_key_iv) {
+      try {
+        privateKey = decryptPrivateKey(privateKey, row.private_key_iv);
+      } catch (error) {
+        console.error('FATAL: Failed to decrypt private key for session key ID:', row.id, error);
+        // In a real app, you might want to handle this more gracefully,
+        // but failing to decrypt is a critical error.
+        throw new Error('Could not decrypt session key. Check encryption key and data integrity.');
+      }
+    } else if (this.encryptionKey && privateKey && !row.private_key_iv) {
+        // This case handles data that was encrypted with the old, insecure method.
+        // It's a migration path. For new data, this branch won't be hit.
+        console.warn(`WARNING: Session key ${row.id} is using legacy encryption. It should be re-encrypted.`);
+        try {
+            // Assuming the old decrypt function is available for migration.
+            // If not, this will fail. Let's assume it is not for now.
+            // privateKey = oldDecrypt(privateKey, this.encryptionKey);
+            throw new Error(`Legacy key found but no migration path for decryption is available for key ID: ${row.id}`);
+        } catch (error) {
+            console.error(`FATAL: Failed to decrypt legacy key ${row.id}`, error);
+            throw new Error('Could not decrypt legacy session key.');
+        }
+    }
+
+
     return {
       id: row.id,
       userId: row.user_id,
-      privateKey: row.private_key,
+      privateKey: privateKey,
       address: row.address,
       expiresAt: new Date(row.expires_at),
       createdAt: new Date(row.created_at)
@@ -727,6 +787,24 @@ export class Database {
     const run: any = promisify(this.db.run.bind(this.db));
 
     await run('DELETE FROM recovery_tokens WHERE expires_at < ? OR used = 1', [new Date().toISOString()]);
+  }
+
+  // One-time token operations
+  async markTokenUsed(tokenHash: string, expiresAt: Date): Promise<void> {
+    const run: any = promisify(this.db.run.bind(this.db));
+    await run(
+      'INSERT INTO used_tokens (token_hash, expires_at) VALUES (?, ?)',
+      [tokenHash, expiresAt.toISOString()]
+    );
+  }
+
+  async isTokenUsed(tokenHash: string): Promise<boolean> {
+    const get: any = promisify(this.db.get.bind(this.db));
+    const result = await get(
+      'SELECT * FROM used_tokens WHERE token_hash = ? AND expires_at > ?',
+      [tokenHash, new Date().toISOString()]
+    );
+    return !!result;
   }
 
   // Multi-sig account operations

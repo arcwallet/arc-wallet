@@ -6,6 +6,7 @@ import {
   validateRequestBody,
   sanitizeInput
 } from '../middleware/security.js';
+import { authMiddleware } from '../middleware/auth.js';
 import { EnvConfig } from '../types/index.js';
 
 export function createPasskeyRoutes(db: Database, config: EnvConfig): Router {
@@ -88,9 +89,21 @@ export function createPasskeyRoutes(db: Database, config: EnvConfig): Router {
    */
   router.get(
     '/session-keys/:userId',
+    authMiddleware(config.JWT_SECRET),
     rateLimitMiddleware('general'),
     async (req: Request, res: Response, next: NextFunction) => {
       try {
+        const { userId } = req.params;
+    
+        // Verify user owns this data
+        if (req.user?.id !== userId) {
+          return res.status(403).json({
+            success: false,
+            error: 'Forbidden',
+            code: 'FORBIDDEN'
+          });
+        }
+
         await passkeyController.getSessionKeys(req, res);
       } catch (error) {
         next(error);
@@ -104,10 +117,12 @@ export function createPasskeyRoutes(db: Database, config: EnvConfig): Router {
    */
   router.delete(
     '/session-keys/:sessionKeyId',
+    authMiddleware(config.JWT_SECRET),
     rateLimitMiddleware('general'),
     async (req: Request, res: Response, next: NextFunction) => {
       try {
-        await passkeyController.revokeSessionKey(req, res);
+        // Pass authenticated user's ID to the controller for ownership check
+        await passkeyController.revokeSessionKey(req, res, req.user?.id);
       } catch (error) {
         next(error);
       }
@@ -117,9 +132,21 @@ export function createPasskeyRoutes(db: Database, config: EnvConfig): Router {
   // Devices management
   router.get(
     '/devices/:userId',
+    authMiddleware(config.JWT_SECRET),
     rateLimitMiddleware('general'),
     async (req, res, next) => {
       try {
+        const { userId } = req.params;
+    
+        // Verify user owns this data
+        if (req.user?.id !== userId) {
+          return res.status(403).json({
+            success: false,
+            error: 'Forbidden',
+            code: 'FORBIDDEN'
+          });
+        }
+
         await passkeyController.getDevices(req, res);
       } catch (error) {
         next(error);
@@ -129,10 +156,11 @@ export function createPasskeyRoutes(db: Database, config: EnvConfig): Router {
 
   router.delete(
     '/devices/:credentialId',
+    authMiddleware(config.JWT_SECRET),
     rateLimitMiddleware('general'),
     async (req, res, next) => {
       try {
-        await passkeyController.deleteDevice(req, res);
+        await passkeyController.deleteDevice(req, res, req.user?.id);
       } catch (error) {
         next(error);
       }
@@ -145,7 +173,7 @@ export function createPasskeyRoutes(db: Database, config: EnvConfig): Router {
    */
   router.post(
     '/recovery/start',
-    rateLimitMiddleware('registration'),
+    rateLimitMiddleware('recovery'),
     validateRequestBody(['email']),
     async (req: Request, res: Response, next: NextFunction) => {
       try {
@@ -162,7 +190,7 @@ export function createPasskeyRoutes(db: Database, config: EnvConfig): Router {
    */
   router.post(
     '/recovery/verify',
-    rateLimitMiddleware('auth'),
+    rateLimitMiddleware('recovery'),
     validateRequestBody(['token']),
     async (req: Request, res: Response, next: NextFunction) => {
       try {
@@ -179,7 +207,7 @@ export function createPasskeyRoutes(db: Database, config: EnvConfig): Router {
    */
   router.post(
     '/recovery/complete',
-    rateLimitMiddleware('auth'),
+    rateLimitMiddleware('recovery'),
     validateRequestBody(['token']),
     async (req: Request, res: Response, next: NextFunction) => {
       try {

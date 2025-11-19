@@ -66,6 +66,22 @@ export interface BridgeHistoryResponse {
 /**
  * Start a bridge transaction
  */
+export interface BridgeApiResponse {
+  success: boolean;
+  data?: any;
+  error?: string;
+  code?: string;
+}
+
+export class BridgeApiError extends Error {
+  code: string;
+  constructor(message: string, code: string) {
+    super(message);
+    this.code = code;
+    this.name = 'BridgeApiError';
+  }
+}
+
 export async function startBridge(request: StartBridgeRequest): Promise<StartBridgeResponse> {
   try {
     const response = await fetch(`${API_BASE_URL}/bridge/start`, {
@@ -79,12 +95,26 @@ export async function startBridge(request: StartBridgeRequest): Promise<StartBri
     const data = await response.json();
 
     if (!response.ok) {
-      throw new Error(data.error || `HTTP ${response.status}`);
+      // Throw a custom error with the error code from the API
+      const errorCode = data.code || 'BRIDGE_START_ERROR';
+      const errorMessage = data.error || `HTTP ${response.status}`;
+      const error = new BridgeApiError(errorMessage, errorCode);
+      throw error;
     }
 
     return data;
   } catch (error: any) {
     console.error('Bridge start error:', error);
+
+    // If it's our custom error, preserve the code
+    if (error instanceof BridgeApiError) {
+      return {
+        success: false,
+        error: error.message,
+        code: error.code,
+      };
+    }
+
     return {
       success: false,
       error: error.message || 'Failed to start bridge transaction',

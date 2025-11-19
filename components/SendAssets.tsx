@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { isAddress } from 'ethers';
 import { useArcAccount } from '../contexts/ArcAccountContext';
 import { useWallet } from '../contexts/WalletContext';
+import { useSelfCustodialWallet } from '../contexts/SelfCustodialWalletContext';
 import { useActivity } from '../contexts/ActivityContext';
 import { formatUSDCAmount } from '../utils/format';
 import {
@@ -21,8 +22,14 @@ const TX_EXPLORER_BASE = 'https://testnet.arcscan.app/tx/';
 
 const SendAssets: React.FC = () => {
   const { snapshot, isLoading } = useArcAccount();
+  // Get private key from self-custodial context first, fall back to legacy
+  const { address: selfCustodialAddress, getPrivateKey } = useSelfCustodialWallet();
   const { sessionKey, verifyWithPasskey } = useWallet();
   const { addActivity } = useActivity();
+
+  // Use self-custodial wallet address/key if available
+  const walletAddress = selfCustodialAddress || walletAddress;
+  const walletPrivateKey = selfCustodialAddress ? getPrivateKey() : sessionKey?.privateKey;
   const [amount, setAmount] = useState('');
   const [recipient, setRecipient] = useState('');
   const [selectedToken, setSelectedToken] = useState<TokenInfo>(getAllSupportedTokens()[0]);
@@ -48,7 +55,7 @@ const SendAssets: React.FC = () => {
 
   const listAddresses = () => {
     const addresses: string[] = [];
-    if (sessionKey?.address) addresses.push(sessionKey.address);
+    if (walletAddress) addresses.push(walletAddress);
     return addresses;
   };
 
@@ -86,7 +93,7 @@ const SendAssets: React.FC = () => {
     };
 
     fetchTokenBalance();
-  }, [selectedToken, sessionKey?.address]);
+  }, [selectedToken, walletAddress]);
 
   // On mount or address change: auto-select the token that has non-zero balance on Arc Testnet
   useEffect(() => {
@@ -111,7 +118,7 @@ const SendAssets: React.FC = () => {
       }
     };
     void chooseTokenWithBalance();
-  }, [sessionKey?.address]);
+  }, [walletAddress]);
   const amountNumber = parseFloat(amount) || 0;
   const feeDisplay = feeEstimate ? formatUSDCAmount(feeEstimate).display : isEstimating ? 'Estimating…' : '-';
   const feeNumber = feeEstimate ? Number(feeEstimate) / 1e18 : 0;
@@ -120,14 +127,14 @@ const SendAssets: React.FC = () => {
   const usingSmartAccount = false;
 
   useEffect(() => {
-    const shouldEstimate = sessionKey && isAddress(recipient) && amountNumber > 0;
+    const shouldEstimate = walletAddress && isAddress(recipient) && amountNumber > 0;
     if (!shouldEstimate) {
       setFeeEstimate(null);
       return;
     }
     let cancelled = false;
     setIsEstimating(true);
-    const estimatePromise = estimateNativeTransfer({ from: sessionKey.address, to: recipient, amount });
+    const estimatePromise = estimateNativeTransfer({ from: walletAddress, to: recipient, amount });
 
     estimatePromise
       .then((estimate) => {
@@ -149,15 +156,15 @@ const SendAssets: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [sessionKey, recipient, amount, amountNumber]);
+  }, [walletAddress, recipient, amount, amountNumber]);
 
   const isRecipientValid = recipient ? isAddress(recipient) : false;
-  const hasSession = Boolean(sessionKey);
+  const hasSession = Boolean(walletAddress);
   const canSubmit = hasSession && isRecipientValid && amountNumber > 0 && amountNumber <= balance && !isSubmitting;
 
   const handleSubmit = async () => {
-    if (!sessionKey) {
-      setSubmitError('Passkey session missing. Please sign in again.');
+    if (!walletAddress || !walletPrivateKey) {
+      setSubmitError('Wallet not available. Please unlock your wallet.');
       return;
     }
     if (!isRecipientValid) {
@@ -198,7 +205,7 @@ const SendAssets: React.FC = () => {
       let hash: string;
       let submissionKind: 'transaction' | 'userOp';
       const result = await executeNativeTransfer({
-        sessionPrivateKey: sessionKey.privateKey,
+        sessionPrivateKey: walletPrivateKey,
         to: recipient,
         amount,
       });
@@ -221,7 +228,7 @@ const SendAssets: React.FC = () => {
           usdValue: -amountNumber,
           status: TransactionStatus.Completed,
           hash,
-          from: sessionKey.address,
+          from: walletAddress,
           to: recipient,
           networkFee: 0,
           approvals: {
@@ -242,7 +249,7 @@ const SendAssets: React.FC = () => {
           usdValue: -amountNumber,
           status: TransactionStatus.Pending,
           hash,
-          from: sessionKey.address,
+          from: walletAddress,
           to: recipient,
           networkFee: 0,
           approvals: {

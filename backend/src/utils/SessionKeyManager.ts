@@ -51,6 +51,13 @@ export class SessionKeyManager {
   }
 
   /**
+   * Get a session key by its ID
+   */
+  async getSessionKeyById(sessionKeyId: string): Promise<SessionKey | null> {
+    return this.db.getSessionKeyById(sessionKeyId);
+  }
+
+  /**
    * Revoke a specific session key
    */
   async revokeSessionKey(sessionKeyId: string): Promise<void> {
