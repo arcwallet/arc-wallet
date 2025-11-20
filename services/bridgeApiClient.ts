@@ -5,6 +5,12 @@
 
 const API_BASE_URL = import.meta.env.VITE_PASSKEY_API_URL || 'http://localhost:4000';
 
+// Get CSRF token from cookie
+const getCsrfToken = (): string | null => {
+  const match = document.cookie.match(/(?:^|; )_csrf=([^;]*)/);
+  return match ? decodeURIComponent(match[1]) : null;
+};
+
 export interface StartBridgeRequest {
   userId: string;
   sessionKeyAddress: string;
@@ -84,11 +90,17 @@ export class BridgeApiError extends Error {
 
 export async function startBridge(request: StartBridgeRequest): Promise<StartBridgeResponse> {
   try {
+    const csrfToken = getCsrfToken();
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (csrfToken) {
+      headers['X-CSRF-Token'] = csrfToken;
+    }
+
     const response = await fetch(`${API_BASE_URL}/bridge/start`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
       credentials: 'include',
       body: JSON.stringify(request),
     });
