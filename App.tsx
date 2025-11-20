@@ -13,6 +13,7 @@ import { ArcAccountProvider } from './contexts/ArcAccountContext';
 import { ActivityProvider } from './contexts/ActivityContext';
 import { MultiSigProvider } from './contexts/MultiSigContext';
 import { IdentityProvider } from './contexts/IdentityContext';
+import { PrivacyProvider } from './contexts/PrivacyContext';
 // Self-custodial wallet imports
 import { SelfCustodialWalletProvider, useSelfCustodialWallet } from './contexts/SelfCustodialWalletContext';
 import WalletSetup from './components/WalletSetup';
@@ -173,19 +174,21 @@ const App: React.FC = () => (
           <ArcAccountProvider>
             <ActivityProvider>
               <IdentityProvider>
-                <MultiSigProvider>
-                  <div className="auth-wrapper">
-                    <React.Suspense fallback={
-                      <div className="fullpage-login">
-                        <div className="login-content">
-                          <p className="login-message muted">Loading…</p>
+                <PrivacyProvider>
+                  <MultiSigProvider>
+                    <div className="auth-wrapper">
+                      <React.Suspense fallback={
+                        <div className="fullpage-login">
+                          <div className="login-content">
+                            <p className="login-message muted">Loading…</p>
+                          </div>
                         </div>
-                      </div>
-                    }>
-                      <RootView />
-                    </React.Suspense>
-                  </div>
-                </MultiSigProvider>
+                      }>
+                        <RootView />
+                      </React.Suspense>
+                    </div>
+                  </MultiSigProvider>
+                </PrivacyProvider>
               </IdentityProvider>
             </ActivityProvider>
           </ArcAccountProvider>

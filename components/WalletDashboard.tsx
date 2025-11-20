@@ -19,6 +19,7 @@ import { useArcAccount } from '../contexts/ArcAccountContext';
 import type { AccountSnapshot } from '../services/arcRpcClient';
 import { formatBlockTime } from '../utils/format';
 import { useActivity } from '../contexts/ActivityContext';
+import { usePrivacy } from '../contexts/PrivacyContext';
 import {
   RefreshIcon,
   WalletIcon,
@@ -152,6 +153,7 @@ const DashboardHeader: React.FC<DashboardHeaderPropsWithNav> = ({ account, isRef
   const { address: legacyAddress, logout: legacyLogout } = useWallet();
   const address = selfCustodialAddress || legacyAddress;
   const logout = selfCustodialAddress ? lockWallet : legacyLogout;
+  const { isPrivacyMode } = usePrivacy();
 
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [hasCopiedAddress, setHasCopiedAddress] = useState(false);
@@ -172,6 +174,12 @@ const DashboardHeader: React.FC<DashboardHeaderPropsWithNav> = ({ account, isRef
           <div className="size-2 rounded-full bg-green-500" />
           <p className="text-sm font-medium text-[#A7B4C8]">Arc Testnet</p>
         </div>
+        {isPrivacyMode && (
+          <div className="flex items-center gap-2 rounded-lg bg-purple-500/10 border border-purple-500/30 px-3 py-1.5">
+            <LockIcon size={14} className="text-purple-400" />
+            <p className="text-sm font-medium text-purple-400">Privacy Mode</p>
+          </div>
+        )}
         {address && (
           <button
             onClick={() => {
