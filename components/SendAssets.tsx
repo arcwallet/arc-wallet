@@ -28,7 +28,7 @@ const SendAssets: React.FC = () => {
   const { addActivity } = useActivity();
 
   // Use self-custodial wallet address/key if available
-  const walletAddress = selfCustodialAddress || walletAddress;
+  const walletAddress = selfCustodialAddress || sessionKey?.address;
   const walletPrivateKey = selfCustodialAddress ? getPrivateKey() : sessionKey?.privateKey;
   const [amount, setAmount] = useState('');
   const [recipient, setRecipient] = useState('');

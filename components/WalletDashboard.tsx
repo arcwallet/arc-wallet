@@ -7,8 +7,10 @@ import ReceiveAssets from './ReceiveAssets';
 import Settings from './Settings';
 import MultiSigDashboard from './MultiSigDashboard';
 import Faucet from './Faucet';
-import SwapSimple from './SwapSimple';
+import SwapScreen from './SwapScreen';
 import Bridge from './Bridge';
+import IdentityScreen from './IdentityScreen';
+import AgentScreen from './AgentScreen';
 // import Bridge from './Bridge';
 import { Transaction } from '../types';
 import { useWallet } from '../contexts/WalletContext';
@@ -315,6 +317,7 @@ const AssetsTable: React.FC<AssetsTableProps> = ({ balanceDisplay, isLoading }) 
   const { sessionKey } = useWallet();
   const walletAddress = selfCustodialAddress || sessionKey?.address;
 
+  const [activeTab, setActiveTab] = useState<'tokens' | 'rwa'>('tokens');
   const [tokenBalances, setTokenBalances] = useState<TokenBalance[]>([]);
   const [isLoadingTokens, setIsLoadingTokens] = useState(false);
   const [prices, setPrices] = useState<TokenPrices>({});
@@ -372,6 +375,30 @@ const AssetsTable: React.FC<AssetsTableProps> = ({ balanceDisplay, isLoading }) 
   }, [walletAddress]);
 
   const rows = useMemo(() => {
+    if (activeTab === 'rwa') {
+      // Mock RWA Data
+      return [
+        {
+          name: 'BlackRock USD Inst. Digital Liquidity Fund',
+          ticker: 'BUIDL',
+          price: '$1.00',
+          change: '+0.01%',
+          balance: '0.00',
+          value: '$0.00',
+          icon: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/00/BlackRock_wordmark.svg/2560px-BlackRock_wordmark.svg.png',
+        },
+        {
+          name: 'Ondo US Dollar Yield',
+          ticker: 'USDY',
+          price: '$1.05',
+          change: '+0.02%',
+          balance: '0.00',
+          value: '$0.00',
+          icon: 'https://images.crunchbase.com/image/upload/c_lpad,f_auto,q_auto:eco,dpr_1/v14/organization/logos/8f9b8e8e-8e8e-4e8e-8e8e-8e8e8e8e8e8e.png', // Placeholder
+        }
+      ];
+    }
+
     if (tokenBalances.length === 0) {
       // Fallback to supported tokens with zero balances
       return getAllSupportedTokens().map((token): TokenAssetData => {
@@ -404,12 +431,25 @@ const AssetsTable: React.FC<AssetsTableProps> = ({ balanceDisplay, isLoading }) 
         icon: tokenBalance.token.icon || 'https://mintcdn.com/arc-docs/FYqE2_-PsObv0l4x/logo/Arc_Logo_FC.svg?fit=max&auto=format',
       };
     });
-  }, [tokenBalances, prices]);
+  }, [tokenBalances, prices, activeTab]);
 
   return (
     <div className="mt-8">
       <div className="flex items-center justify-between">
-        <h3 className="text-xl font-bold text-[#E6EEF3]">My Assets</h3>
+        <div className="flex gap-6">
+          <button
+            onClick={() => setActiveTab('tokens')}
+            className={`text-xl font-bold transition-colors ${activeTab === 'tokens' ? 'text-[#E6EEF3]' : 'text-[#A7B4C8] hover:text-white'}`}
+          >
+            My Assets
+          </button>
+          <button
+            onClick={() => setActiveTab('rwa')}
+            className={`text-xl font-bold transition-colors ${activeTab === 'rwa' ? 'text-[#E6EEF3]' : 'text-[#A7B4C8] hover:text-white'}`}
+          >
+            Real World Assets
+          </button>
+        </div>
       </div>
       <div className="mt-4 flow-root">
         <div className="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
@@ -428,8 +468,12 @@ const AssetsTable: React.FC<AssetsTableProps> = ({ balanceDisplay, isLoading }) 
                   <tr key={asset.name}>
                     <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm sm:pl-0">
                       <div className="flex items-center">
-                        <div className="h-10 w-10 flex-shrink-0">
-                          <img className="h-10 w-10 rounded-full" src={asset.icon} alt={`${asset.name} logo`} />
+                        <div className="h-10 w-10 flex-shrink-0 bg-white/5 rounded-full flex items-center justify-center overflow-hidden">
+                          {asset.icon.startsWith('http') ? (
+                            <img className="h-10 w-10 object-cover" src={asset.icon} alt={`${asset.name} logo`} />
+                          ) : (
+                            <span className="text-xs font-bold text-[#A7B4C8]">{asset.ticker.slice(0, 2)}</span>
+                          )}
                         </div>
                         <div className="ml-4">
                           <div className="font-medium text-[#E6EEF3]">{asset.name}</div>
@@ -466,6 +510,15 @@ const AssetsTable: React.FC<AssetsTableProps> = ({ balanceDisplay, isLoading }) 
                 ))}
               </tbody>
             </table>
+            {activeTab === 'rwa' && rows.length === 2 && (
+              <div className="mt-8 p-6 bg-white/5 rounded-xl text-center">
+                <p className="text-[#E6EEF3] font-medium mb-2">Start Investing in Real World Assets</p>
+                <p className="text-[#A7B4C8] text-sm mb-4">Access tokenized treasuries, real estate, and private credit directly on Arc.</p>
+                <button className="px-4 py-2 bg-primary text-primary-text rounded-lg font-medium hover:bg-primary/90 transition-colors">
+                  Explore Market
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -588,7 +641,7 @@ const WalletDashboard: React.FC = () => {
       case 'Receive':
         return <ReceiveAssets />;
       case 'Swap':
-        return <SwapSimple />;
+        return <SwapScreen />;
       case 'Bridge':
         return <Bridge />;
       case 'Transactions':
@@ -597,6 +650,10 @@ const WalletDashboard: React.FC = () => {
         return <MultiSigDashboard />;
       case 'Faucet':
         return <Faucet />;
+      case 'Identity':
+        return <IdentityScreen />;
+      case 'Agent':
+        return <AgentScreen />;
       case 'Settings':
         return <Settings />;
       default:

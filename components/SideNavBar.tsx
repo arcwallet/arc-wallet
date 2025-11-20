@@ -7,7 +7,9 @@ import {
   BridgeIcon,
   TransactionsIcon,
   MultiSigIcon,
-  FaucetIcon
+  FaucetIcon,
+  VerifiedIcon,
+  RobotIcon
 } from './Icons';
 
 interface NavItemProps {
@@ -29,6 +31,8 @@ const getIconComponent = (iconName: string) => {
     case 'receipt_long': return <TransactionsIcon {...iconProps} />;
     case 'group': return <MultiSigIcon {...iconProps} />;
     case 'water_drop': return <FaucetIcon {...iconProps} />;
+    case 'verified': return <VerifiedIcon {...iconProps} />;
+    case 'smart_toy': return <RobotIcon {...iconProps} />;
     default: return <DashboardIcon {...iconProps} />;
   }
 };
@@ -46,8 +50,8 @@ const NavItem: React.FC<NavItemProps> = ({ icon, label, active = false, onClick 
 };
 
 interface SideNavBarProps {
-    currentPage: string;
-    onNavigate: (page: string) => void;
+  currentPage: string;
+  onNavigate: (page: string) => void;
 }
 
 
@@ -60,23 +64,25 @@ const SideNavBar: React.FC<SideNavBarProps> = ({ currentPage, onNavigate }) => {
     { id: 'Bridge', icon: 'link', label: 'Bridge' },
     { id: 'Transactions', icon: 'receipt_long', label: 'Transactions' },
     { id: 'Multi-Sig', icon: 'group', label: 'Multi-Sig' },
+    { id: 'Identity', icon: 'verified', label: 'Identity' },
+    { id: 'Agent', icon: 'smart_toy', label: 'AI Agent' },
     { id: 'Faucet', icon: 'water_drop', label: 'Faucet' },
   ];
-  
+
   return (
     <aside className="hidden md:flex w-64 flex-col border-r border-white/10 bg-[#091325]/50 p-4">
-        <div className="flex items-center gap-3 p-3">
-            <img src="/arcwalletlogo.png" alt="Arc Wallet" className="h-10 w-10 object-contain" />
-            <h1 className="text-[#E6EEF3] text-lg font-bold">Arc Wallet</h1>
-        </div>
-        <nav className="mt-8 flex flex-1 flex-col gap-2">
-            {navItems.map(item => (
-                 <NavItem key={item.id} icon={item.icon} label={item.label} active={currentPage === item.id} onClick={() => onNavigate(item.id)} />
-            ))}
-        </nav>
-        <div className="mt-auto flex flex-col gap-2">
-            <NavItem icon="settings" label="Settings" active={currentPage === 'Settings'} onClick={() => onNavigate('Settings')} />
-        </div>
+      <div className="flex items-center gap-3 p-3">
+        <img src="/arcwalletlogo.png" alt="Arc Wallet" className="h-10 w-10 object-contain" />
+        <h1 className="text-[#E6EEF3] text-lg font-bold">Arc Wallet</h1>
+      </div>
+      <nav className="mt-8 flex flex-1 flex-col gap-2">
+        {navItems.map(item => (
+          <NavItem key={item.id} icon={item.icon} label={item.label} active={currentPage === item.id} onClick={() => onNavigate(item.id)} />
+        ))}
+      </nav>
+      <div className="mt-auto flex flex-col gap-2">
+        <NavItem icon="settings" label="Settings" active={currentPage === 'Settings'} onClick={() => onNavigate('Settings')} />
+      </div>
     </aside>
   );
 };
