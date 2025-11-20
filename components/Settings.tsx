@@ -198,44 +198,56 @@ const NetworkSection: React.FC = () => (
     </div>
 );
 
-const OrganizationRolesSection: React.FC = () => (
-    <div className="flex flex-col gap-4 rounded-xl bg-[#151A22] p-5 sm:p-6">
-        <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
-            <h3 className="text-lg font-semibold text-[#E6EEF3]">Organization Roles</h3>
-            <button className="flex h-10 w-full shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-lg bg-[#9EBBE4] px-4 text-sm font-semibold text-[#091325] hover:bg-[#B9D1ED] sm:w-auto">
-                <span className="truncate">Manage Roles</span>
-            </button>
+const OrganizationRolesSection: React.FC = () => {
+    const { address } = useSelfCustodialWallet();
+    const { email } = useSession();
+
+    return (
+        <div className="flex flex-col gap-4 rounded-xl bg-[#151A22] p-5 sm:p-6">
+            <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
+                <h3 className="text-lg font-semibold text-[#E6EEF3]">Organization Roles</h3>
+                <button
+                    onClick={() => alert('Role management coming soon! For now, use Multi-Sig wallets for team collaboration.')}
+                    className="flex h-10 w-full shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-lg bg-[#9EBBE4] px-4 text-sm font-semibold text-[#091325] hover:bg-[#B9D1ED] sm:w-auto"
+                >
+                    <span className="truncate">Manage Roles</span>
+                </button>
+            </div>
+            <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                    <thead className="border-b border-[#2B3440]">
+                        <tr>
+                            <th className="py-2.5 pr-4 font-medium text-[#A7B4C8]">Member</th>
+                            <th className="py-2.5 px-4 font-medium text-[#A7B4C8]">Role</th>
+                            <th className="py-2.5 pl-4 font-medium text-[#A7B4C8]">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#2B3440]">
+                        {address ? (
+                            <tr>
+                                <td className="py-3.5 pr-4 font-mono text-[#E6EEF3]">
+                                    {address.slice(0, 6)}...{address.slice(-4)}
+                                    {email && <div className="text-xs text-[#A7B4C8] mt-1">{email}</div>}
+                                </td>
+                                <td className="px-4 py-3.5 text-[#E6EEF3]">Owner</td>
+                                <td className="py-3.5 pl-4 text-green-400">Active</td>
+                            </tr>
+                        ) : (
+                            <tr>
+                                <td colSpan={3} className="py-6 text-center text-[#A7B4C8]">
+                                    No wallet connected. Connect your wallet to see your role.
+                                </td>
+                            </tr>
+                        )}
+                    </tbody>
+                </table>
+            </div>
+            <p className="text-xs text-[#A7B4C8]">
+                For team collaboration with multiple members, use Multi-Sig wallets from the sidebar.
+            </p>
         </div>
-        <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-                <thead className="border-b border-[#2B3440]">
-                    <tr>
-                        <th className="py-2.5 pr-4 font-medium text-[#A7B4C8]">Member</th>
-                        <th className="py-2.5 px-4 font-medium text-[#A7B4C8]">Role</th>
-                        <th className="py-2.5 pl-4 font-medium text-[#A7B4C8]">Status</th>
-                    </tr>
-                </thead>
-                <tbody className="divide-y divide-[#2B3440]">
-                    <tr>
-                        <td className="py-3.5 pr-4 font-mono text-[#E6EEF3]">0x8a1b…eFc9</td>
-                        <td className="px-4 py-3.5 text-[#E6EEF3]">Owner</td>
-                        <td className="py-3.5 pl-4 text-[#E6EEF3]">Active</td>
-                    </tr>
-                    <tr>
-                        <td className="py-3.5 pr-4 font-mono text-[#E6EEF3]">0x3fD4…bA72</td>
-                        <td className="px-4 py-3.5 text-[#E6EEF3]">Member</td>
-                        <td className="py-3.5 pl-4 text-[#E6EEF3]">Active</td>
-                    </tr>
-                    <tr>
-                        <td className="py-3.5 pr-4 font-mono text-[#E6EEF3]">0x5c7e…dD01</td>
-                        <td className="px-4 py-3.5 text-[#E6EEF3]">Member</td>
-                        <td className="py-3.5 pl-4 text-[#E6EEF3]">Pending</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-    </div>
-);
+    );
+};
 
 const RecoverySection: React.FC = () => {
     const { sessionKey, verifyWithPasskey } = useWallet();
@@ -516,8 +528,8 @@ const RecoverySection: React.FC = () => {
                                     onTouchEnd={handleHoldEnd}
                                     disabled={!allChecksConfirmed || isVerifying}
                                     className={`relative w-full py-4 rounded-lg font-semibold text-base transition-all overflow-hidden ${allChecksConfirmed
-                                            ? 'bg-gradient-to-r from-[#ff6b81] to-[#ff4757] hover:from-[#ff7a8e] hover:to-[#ff5767] text-white cursor-pointer'
-                                            : 'bg-[#2B3440] text-[#5a6573] cursor-not-allowed'
+                                        ? 'bg-gradient-to-r from-[#ff6b81] to-[#ff4757] hover:from-[#ff7a8e] hover:to-[#ff5767] text-white cursor-pointer'
+                                        : 'bg-[#2B3440] text-[#5a6573] cursor-not-allowed'
                                         }`}
                                 >
                                     <div
