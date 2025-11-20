@@ -15,7 +15,7 @@ const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
 
 type CookieRequest = Request & { cookies?: Record<string, string> };
 
-const COOKIE_BASE_OPTIONS = (isProd: boolean, cookieDomain?: string) => ({
+const COOKIE_BASE_OPTIONS = (isProd: boolean) => ({
   httpOnly: true,
   // Use 'none' for cross-domain cookies in production (required for cross-site requests)
   // Use 'lax' for local development
@@ -23,7 +23,6 @@ const COOKIE_BASE_OPTIONS = (isProd: boolean, cookieDomain?: string) => ({
   secure: isProd,              // Only secure in production (HTTPS required)
   maxAge: 4 * 60 * 60 * 1000,  // 4 hours
   path: '/',
-  domain: cookieDomain,        // e.g., '.arcwallet.network' for subdomain sharing
 });
 
 const sanitizeEmail = (email: unknown): string | null => {
@@ -164,7 +163,7 @@ export const createMagicLinkRouter = (config: EnvConfig, mailer: MagicLinkMailer
 
     const user = userStore.findOrCreate(payload.email);
     const session = sessionStore.create(user, SESSION_TTL_MS);
-    res.cookie(SESSION_COOKIE_NAME, session.id, COOKIE_BASE_OPTIONS(config.NODE_ENV === 'production', config.COOKIE_DOMAIN));
+    res.cookie(SESSION_COOKIE_NAME, session.id, COOKIE_BASE_OPTIONS(config.NODE_ENV === 'production'));
     res.json({ success: true });
   });
 
@@ -202,7 +201,7 @@ export const createMagicLinkRouter = (config: EnvConfig, mailer: MagicLinkMailer
   router.post('/api/logout', (req, res) => {
     const sessionId = (req as CookieRequest).cookies?.[SESSION_COOKIE_NAME];
     sessionStore.delete(sessionId);
-    res.clearCookie(SESSION_COOKIE_NAME, COOKIE_BASE_OPTIONS(config.NODE_ENV === 'production', config.COOKIE_DOMAIN));
+    res.clearCookie(SESSION_COOKIE_NAME, COOKIE_BASE_OPTIONS(config.NODE_ENV === 'production'));
     const acceptsHtml = (req.headers.accept || '').includes('text/html');
     if (acceptsHtml) {
       return res.redirect('/login');
