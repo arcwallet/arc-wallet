@@ -19,6 +19,8 @@ import { TransactionStatus, TransactionType } from '../types';
 import { ExpandIcon, ContactIcon } from './Icons';
 import { getAllSupportedTokens, TokenInfo, formatTokenAmount } from '../config/tokens';
 import { tokenService } from '../services/tokenService';
+import { paymasterClient } from '../services/paymasterClient';
+import { GasSponsorshipIndicator, GasFeeBadge } from './GasSponsorshipIndicator';
 
 const TX_EXPLORER_BASE = 'https://testnet.arcscan.app/tx/';
 
@@ -44,6 +46,8 @@ const SendAssets: React.FC = () => {
   const [feeEstimate, setFeeEstimate] = useState<bigint | null>(null);
   const [isEstimating, setIsEstimating] = useState(false);
   const [encryptedAmountPreview, setEncryptedAmountPreview] = useState<string | null>(null);
+  const [isGasSponsored, setIsGasSponsored] = useState(false);
+  const [checkingSponsorship, setCheckingSponsorship] = useState(false);
 
   const balance = useMemo(() => {
     return parseFloat(tokenBalance) || 0;
@@ -161,6 +165,33 @@ const SendAssets: React.FC = () => {
       cancelled = true;
     };
   }, [walletAddress, recipient, amount, amountNumber]);
+
+  // Check gas sponsorship eligibility
+  useEffect(() => {
+    const checkSponsorship = async () => {
+      if (!walletAddress || !feeEstimate) {
+        setIsGasSponsored(false);
+        return;
+      }
+
+      setCheckingSponsorship(true);
+      try {
+        const canSponsor = await paymasterClient.canSponsor(
+          walletAddress,
+          feeEstimate.toString()
+        );
+        setIsGasSponsored(canSponsor);
+      } catch (error) {
+        console.error('Error checking sponsorship:', error);
+        setIsGasSponsored(false);
+      } finally {
+        setCheckingSponsorship(false);
+      }
+    };
+
+    void checkSponsorship();
+  }, [walletAddress, feeEstimate]);
+
 
   const isRecipientValid = recipient ? isAddress(recipient) : false;
   const hasSession = Boolean(walletAddress);
@@ -349,10 +380,18 @@ const SendAssets: React.FC = () => {
                 <span className="text-purple-400 text-lg">🔒</span>
                 <span className="text-sm font-semibold text-purple-400">Private Transaction</span>
               </div>
-              <p className="text-xs text-purple-300/80 leading-relaxed">
-                Amount will be encrypted using FHE. Only you and authorized view key holders can see the amount.
+              <p className="text-xs text-purple-300/80">
+                Transaction amount will be encrypted on-chain
               </p>
             </div>
+          )}
+
+          {/* Gas Sponsorship Indicator */}
+          {isGasSponsored && (
+            <GasSponsorshipIndicator
+              isSponsored={true}
+              estimatedGas={feeDisplay !== 'Estimating…' && feeDisplay !== '-' ? feeDisplay : undefined}
+            />
           )}
 
           <div className="flex flex-col gap-2.5 text-sm">
@@ -376,7 +415,14 @@ const SendAssets: React.FC = () => {
             </div>
             <div className="flex justify-between">
               <span className="text-text-secondary">Network Fee</span>
-              <span className="text-text-primary font-medium">{amountNumber > 0 ? feeDisplay : '-'}</span>
+              {amountNumber > 0 ? (
+                <GasFeeBadge
+                  isSponsored={isGasSponsored}
+                  gasFee={feeDisplay}
+                />
+              ) : (
+                <span className="text-text-primary font-medium">-</span>
+              )}
             </div>
             <div className="my-2 border-t border-dashed border-border-color" />
             <div className="flex justify-between">
