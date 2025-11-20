@@ -11,6 +11,7 @@ import { createMagicLinkRouter } from './routes/magicLink.js';
 import { createWalletRouter } from './routes/wallet.js';
 import { createBridgeRoutes } from './routes/bridge.js';
 import { createMultiSigRoutes } from './routes/multiSig.js';
+import paymasterRouter from './routes/paymaster.js';
 import { createMagicLinkMailer } from './services/magicLinkMailer.js';
 import { MagicSessionStore } from './magicLink/SessionStore.js';
 import { loadConfig, validateConfig } from './utils/config.js';
@@ -101,6 +102,7 @@ app.use(createBridgeRoutes(db, {
   SEPOLIA_RPC_URL: config.SEPOLIA_RPC_URL,
 }, magicSessionStore));
 app.use('/multisig', createMultiSigRoutes(db, config));
+app.use('/api/paymaster', paymasterRouter);
 
 // Root endpoint
 app.get('/', (req: Request, res: Response) => {
