@@ -4,6 +4,8 @@ import { useArcAccount } from '../contexts/ArcAccountContext';
 import { useWallet } from '../contexts/WalletContext';
 import { useSelfCustodialWallet } from '../contexts/SelfCustodialWalletContext';
 import { useActivity } from '../contexts/ActivityContext';
+import { usePrivacy } from '../contexts/PrivacyContext';
+import { encryptAmount, serializeEncryptedAmount } from '../services/fheService';
 import { formatUSDCAmount } from '../utils/format';
 import {
   estimateNativeTransfer,
@@ -26,6 +28,7 @@ const SendAssets: React.FC = () => {
   const { address: selfCustodialAddress, getPrivateKey } = useSelfCustodialWallet();
   const { sessionKey, verifyWithPasskey } = useWallet();
   const { addActivity } = useActivity();
+  const { isPrivacyMode, fheKeypair } = usePrivacy();
 
   // Use self-custodial wallet address/key if available
   const walletAddress = selfCustodialAddress || sessionKey?.address;
@@ -40,6 +43,7 @@ const SendAssets: React.FC = () => {
   const [submissionKind, setSubmissionKind] = useState<'transaction' | 'userOp'>('transaction');
   const [feeEstimate, setFeeEstimate] = useState<bigint | null>(null);
   const [isEstimating, setIsEstimating] = useState(false);
+  const [encryptedAmountPreview, setEncryptedAmountPreview] = useState<string | null>(null);
 
   const balance = useMemo(() => {
     return parseFloat(tokenBalance) || 0;
@@ -337,10 +341,32 @@ const SendAssets: React.FC = () => {
         </label>
         <div className="mt-2 rounded-lg border border-border-color bg-input-bg/50 p-4">
           <h3 className="text-sm font-medium text-text-secondary mb-3">Transaction Summary</h3>
+
+          {/* Privacy Mode Indicator */}
+          {isPrivacyMode && (
+            <div className="mb-3 rounded-lg bg-purple-500/10 border border-purple-500/30 p-3">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-purple-400 text-lg">🔒</span>
+                <span className="text-sm font-semibold text-purple-400">Private Transaction</span>
+              </div>
+              <p className="text-xs text-purple-300/80 leading-relaxed">
+                Amount will be encrypted using FHE. Only you and authorized view key holders can see the amount.
+              </p>
+            </div>
+          )}
+
           <div className="flex flex-col gap-2.5 text-sm">
             <div className="flex justify-between">
               <span className="text-text-secondary">Sending</span>
-              <span className="text-text-primary font-medium">{amountNumber > 0 ? `${amountNumber} USDC` : '-'}</span>
+              <span className="text-text-primary font-medium">
+                {isPrivacyMode && amountNumber > 0 ? (
+                  <span className="flex items-center gap-1.5">
+                    <span className="text-purple-400">🔒 Encrypted</span>
+                  </span>
+                ) : (
+                  amountNumber > 0 ? `${amountNumber} USDC` : '-'
+                )}
+              </span>
             </div>
             <div className="flex justify-between">
               <span className="text-text-secondary">Execution Route</span>
