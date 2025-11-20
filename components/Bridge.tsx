@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { useWallet } from '../contexts/WalletContext';
+import { useSelfCustodialWallet } from '../contexts/SelfCustodialWalletContext';
 import { useActivity } from '../contexts/ActivityContext';
 import { TransactionStatus, TransactionType } from '../types';
 import { SpinnerIcon } from './Icons';
@@ -26,7 +26,7 @@ const DIRECTIONS: { id: BridgeDirection; label: string; description: string }[] 
 const PRIMARY_TOKEN_DECIMALS = 6;
 
 const Bridge: React.FC = () => {
-  const { sessionKey, userId, verifyWithPasskey, logout } = useWallet();
+  const { address, userId, loginWithPasskey, logout } = useSelfCustodialWallet();
   const { addActivity } = useActivity();
   const [needsReauth, setNeedsReauth] = useState(false);
 
@@ -43,8 +43,8 @@ const Bridge: React.FC = () => {
 
   const canSubmit = useMemo(() => {
     const normalized = Number(amount);
-    return Boolean(sessionKey?.address) && Boolean(userId) && normalized > 0 && !Number.isNaN(normalized) && !isSubmitting;
-  }, [sessionKey, userId, amount, isSubmitting]);
+    return Boolean(address) && Boolean(userId) && normalized > 0 && !Number.isNaN(normalized) && !isSubmitting;
+  }, [address, userId, amount, isSubmitting]);
 
   const normalizeAmount = (raw: string): string | null => {
     if (raw == null) return null;
@@ -63,7 +63,7 @@ const Bridge: React.FC = () => {
   };
 
   const handleBridge = async () => {
-    if (!sessionKey?.address || !userId) {
+    if (!address || !userId) {
       setStatusVariant('error');
       setStatusMessage('Session not found. Please sign in with your passkey.');
       return;
@@ -88,7 +88,7 @@ const Bridge: React.FC = () => {
       // Step 1: Start bridge via backend
       const startResponse = await startBridge({
         userId,
-        sessionKeyAddress: sessionKey.address,
+        sessionKeyAddress: address,
         amount: normalized,
         direction,
         token: 'USDC',
@@ -168,7 +168,7 @@ const Bridge: React.FC = () => {
           usdValue: selectedToken.symbol === 'USDC' ? -amountNumber : -amountNumber * 1.07,
           status: TransactionStatus.Completed,
           hash: sourceTxHash,
-          from: sessionKey.address,
+          from: address,
           to: 'Sepolia Bridge',
           networkFee: 0,
           approvals: { required: 0, list: [] },
@@ -188,7 +188,7 @@ const Bridge: React.FC = () => {
           status: TransactionStatus.Completed,
           hash: destinationTxHash,
           from: 'Sepolia Bridge',
-          to: sessionKey.address,
+          to: address,
           networkFee: 0,
           approvals: { required: 0, list: [] },
         });
@@ -199,10 +199,10 @@ const Bridge: React.FC = () => {
 
       // Check if we need to re-authenticate
       if (errorCode === 'SESSION_KEY_NOT_FOUND' ||
-          errorCode === 'SESSION_KEY_EXPIRED' ||
-          errorCode === 'SESSION_KEY_USER_MISMATCH' ||
-          message.includes('Session key') ||
-          message.includes('re-authenticate')) {
+        errorCode === 'SESSION_KEY_EXPIRED' ||
+        errorCode === 'SESSION_KEY_USER_MISMATCH' ||
+        message.includes('Session key') ||
+        message.includes('re-authenticate')) {
         setNeedsReauth(true);
       }
 
@@ -223,7 +223,7 @@ const Bridge: React.FC = () => {
     try {
       setStatusVariant('info');
       setStatusMessage('Re-authenticating with passkey...');
-      await verifyWithPasskey();
+      await loginWithPasskey();
       setNeedsReauth(false);
       setStatusVariant('success');
       setStatusMessage('Re-authentication successful! You can now try the bridge operation again.');
@@ -252,11 +252,10 @@ const Bridge: React.FC = () => {
                 key={option.id}
                 type="button"
                 onClick={() => setDirection(option.id)}
-                className={`rounded-xl border px-4 py-4 text-left transition-colors ${
-                  option.id === direction
+                className={`rounded-xl border px-4 py-4 text-left transition-colors ${option.id === direction
                     ? 'border-primary bg-primary/10 text-primary'
                     : 'border-white/10 bg-transparent text-text-primary hover:border-primary/40 hover:bg-primary/5'
-                }`}
+                  }`}
               >
                 <p className="text-base font-semibold">{option.label}</p>
                 <p className="text-xs text-text-secondary mt-1">{option.description}</p>
@@ -291,19 +290,19 @@ const Bridge: React.FC = () => {
             </div>
             <label className="flex flex-col gap-2">
               <span className="text-sm font-medium text-text-secondary">Amount ({selectedToken.symbol})</span>
-            <input
-              type="text"
-              inputMode="decimal"
-              value={amount}
-              onChange={(event) => setAmount(event.target.value)}
-              className="form-input h-12 rounded-lg border border-white/10 bg-[#0f1729] px-4 text-text-primary focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
-              placeholder="e.g. 1.5 or 1,5"
-            />
-            {amountError && <span className="text-xs text-accent-orange">{amountError}</span>}
-          </label>
-          <p className="text-xs text-text-secondary">
-            Ensure your session key controls {selectedToken.symbol} on the selected source chain. Bridging uses the same private key across Sepolia and Arc.
-          </p>
+              <input
+                type="text"
+                inputMode="decimal"
+                value={amount}
+                onChange={(event) => setAmount(event.target.value)}
+                className="form-input h-12 rounded-lg border border-white/10 bg-[#0f1729] px-4 text-text-primary focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
+                placeholder="e.g. 1.5 or 1,5"
+              />
+              {amountError && <span className="text-xs text-accent-orange">{amountError}</span>}
+            </label>
+            <p className="text-xs text-text-secondary">
+              Ensure your session key controls {selectedToken.symbol} on the selected source chain. Bridging uses the same private key across Sepolia and Arc.
+            </p>
           </div>
         </div>
 
@@ -319,13 +318,12 @@ const Bridge: React.FC = () => {
 
         {statusMessage && (
           <div
-            className={`rounded-lg border px-4 py-3 text-sm text-left ${
-              statusVariant === 'error'
+            className={`rounded-lg border px-4 py-3 text-sm text-left ${statusVariant === 'error'
                 ? 'border-red-400/50 bg-red-500/10 text-red-200'
                 : statusVariant === 'success'
-                ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-200'
-                : 'border-white/10 bg-white/5 text-text-secondary'
-            }`}
+                  ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-200'
+                  : 'border-white/10 bg-white/5 text-text-secondary'
+              }`}
           >
             {statusMessage}
             {progressItem && <div className="mt-1 text-xs text-text-secondary">{progressItem}</div>}
