@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useMultiSig } from '../contexts/MultiSigContext';
-import { useWallet } from '../contexts/WalletContext';
 import { useSession } from '../contexts/SessionContext';
 import { formatUnits, parseUnits } from 'ethers';
 import '../styles/multisig.css';
@@ -158,7 +157,7 @@ const MultiSigDashboard: React.FC = () => {
 
   const handleBack = () => {
     // Clear selection by selecting empty string
-    selectAccount('').catch(() => {});
+    selectAccount('').catch(() => { });
   };
 
   // Account list view

@@ -2,16 +2,19 @@ import { Router, Request, Response } from 'express';
 import { body, param, query, validationResult } from 'express-validator';
 import { Database } from '../models/Database.js';
 import { rateLimitMiddleware } from '../middleware/security.js';
-import { authMiddleware } from '../middleware/auth.js';
+import { MagicSessionStore } from '../magicLink/SessionStore.js';
 // Note: Bridge execution moved to client-side for self-custodial architecture
 // BridgeKit and signing now happens in frontend/services/bridgeService.ts
+
+const SESSION_COOKIE_NAME = 'arcwallet_session';
 
 export interface BridgeConfig {
   NODE_ENV: string;
   ARC_RPC_URL: string;
   SEPOLIA_RPC_URL: string;
-  JWT_SECRET: string;
 }
+
+type CookieRequest = Request & { cookies?: Record<string, string> };
 
 /**
  * Bridge Routes
@@ -22,11 +25,36 @@ export interface BridgeConfig {
  * Backend only tracks transaction status and history.
  * Private keys NEVER leave the browser.
  */
-export function createBridgeRoutes(db: Database, config: BridgeConfig): Router {
+export function createBridgeRoutes(db: Database, config: BridgeConfig, sessionStore: MagicSessionStore): Router {
   const router = Router();
 
   // Apply rate limiting to all bridge routes
   router.use(rateLimitMiddleware('bridge'));
+
+  // Session-based authentication middleware
+  const requireSession = async (req: Request, res: Response, next: Function) => {
+    const sessionId = (req as CookieRequest).cookies?.[SESSION_COOKIE_NAME];
+    if (!sessionId) {
+      return res.status(401).json({
+        success: false,
+        error: 'Unauthorized - No session',
+        code: 'UNAUTHORIZED'
+      });
+    }
+
+    const session = sessionStore.get(sessionId);
+    if (!session) {
+      return res.status(401).json({
+        success: false,
+        error: 'Session expired or invalid',
+        code: 'UNAUTHORIZED'
+      });
+    }
+
+    // Attach user to request
+    (req as any).user = { id: session.userId, email: session.email };
+    next();
+  };
 
   /**
    * POST /bridge/start
@@ -36,7 +64,7 @@ export function createBridgeRoutes(db: Database, config: BridgeConfig): Router {
    */
   router.post(
     '/bridge/start',
-    authMiddleware(config.JWT_SECRET),
+    requireSession,
     [
       body('walletAddress').isString().notEmpty().withMessage('walletAddress is required'),
       body('amount').isString().notEmpty().withMessage('amount is required'),
@@ -55,7 +83,7 @@ export function createBridgeRoutes(db: Database, config: BridgeConfig): Router {
       }
 
       const { walletAddress, amount, direction, token } = req.body;
-      const userId = req.user?.id;
+      const userId = (req as any).user?.id;
 
       if (!userId) {
         return res.status(401).json({ success: false, error: 'User not authenticated', code: 'UNAUTHORIZED' });
@@ -103,7 +131,7 @@ export function createBridgeRoutes(db: Database, config: BridgeConfig): Router {
    */
   router.put(
     '/bridge/update/:transactionId',
-    authMiddleware(config.JWT_SECRET),
+    requireSession,
     [
       param('transactionId').isInt({ min: 1 }).withMessage('Invalid transaction ID'),
       body('status').isIn(['pending', 'approving', 'burning', 'attestation', 'minting', 'completed', 'failed']).withMessage('Invalid status'),
@@ -139,7 +167,7 @@ export function createBridgeRoutes(db: Database, config: BridgeConfig): Router {
           status,
           sourceTxHash,
           destinationTxHash,
-errorMessage
+          errorMessage
         });
 
         console.log(`🌉 [BRIDGE ${transactionId}] Status updated: ${status}`);
@@ -170,7 +198,7 @@ errorMessage
    */
   router.get(
     '/bridge/status/:transactionId',
-    authMiddleware(config.JWT_SECRET),
+    requireSession,
     [
       param('transactionId').isInt({ min: 1 }).withMessage('Invalid transaction ID')
     ],
@@ -197,7 +225,7 @@ errorMessage
             code: 'TRANSACTION_NOT_FOUND'
           });
         }
-        
+
         // Ownership check
         if (transaction.userId !== authUserId) {
           return res.status(403).json({ success: false, error: 'Forbidden', code: 'FORBIDDEN' });
@@ -236,7 +264,7 @@ errorMessage
    */
   router.get(
     '/bridge/history/:userId',
-    authMiddleware(config.JWT_SECRET),
+    requireSession,
     [
       param('userId').isString().notEmpty().withMessage('Invalid user ID'),
       query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be 1-100'),

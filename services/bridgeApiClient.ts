@@ -89,6 +89,7 @@ export async function startBridge(request: StartBridgeRequest): Promise<StartBri
       headers: {
         'Content-Type': 'application/json',
       },
+      credentials: 'include',
       body: JSON.stringify(request),
     });
 
@@ -128,7 +129,9 @@ export async function startBridge(request: StartBridgeRequest): Promise<StartBri
  */
 export async function getBridgeStatus(transactionId: number): Promise<BridgeStatusResponse> {
   try {
-    const response = await fetch(`${API_BASE_URL}/bridge/status/${transactionId}`);
+    const response = await fetch(`${API_BASE_URL}/bridge/status/${transactionId}`, {
+      credentials: 'include',
+    });
     const data = await response.json();
 
     if (!response.ok) {
@@ -156,7 +159,8 @@ export async function getBridgeHistory(
 ): Promise<BridgeHistoryResponse> {
   try {
     const response = await fetch(
-      `${API_BASE_URL}/bridge/history/${userId}?limit=${limit}&offset=${offset}`
+      `${API_BASE_URL}/bridge/history/${userId}?limit=${limit}&offset=${offset}`,
+      { credentials: 'include' }
     );
     const data = await response.json();
 
