@@ -3,8 +3,14 @@
  * Frontend service for multi-sig wallet operations
  */
 
-const API_BASE_URL = ((import.meta.env.VITE_API_BASE_URL ?? import.meta.env.VITE_API_URL) || '').replace(/\/$/, '');
+const API_BASE_URL = ((import.meta as any).env.VITE_PASSKEY_API_URL ?? ((import.meta as any).env.PROD ? `${window.location.origin}/api` : 'http://localhost:4000')).replace(/\/$/, '');
 const resolveUrl = (path: string) => (API_BASE_URL ? `${API_BASE_URL}${path}` : path);
+
+// Get CSRF token from cookie
+const getCsrfToken = (): string | null => {
+  const match = document.cookie.match(/(?:^|; )_csrf=([^;]*)/);
+  return match ? decodeURIComponent(match[1]) : null;
+};
 
 // Types
 export interface MultiSigAccount {
@@ -72,11 +78,17 @@ interface ApiResponse<T> {
 
 // Helper functions
 async function postJSON<T>(endpoint: string, data: any): Promise<ApiResponse<T>> {
+  const csrfToken = getCsrfToken();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (csrfToken) {
+    headers['X-CSRF-Token'] = csrfToken;
+  }
+
   const response = await fetch(resolveUrl(endpoint), {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers,
     credentials: 'include',
     body: JSON.stringify(data),
   });
@@ -91,11 +103,17 @@ async function postJSON<T>(endpoint: string, data: any): Promise<ApiResponse<T>>
 }
 
 async function getJSON<T>(endpoint: string): Promise<ApiResponse<T>> {
+  const csrfToken = getCsrfToken();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (csrfToken) {
+    headers['X-CSRF-Token'] = csrfToken;
+  }
+
   const response = await fetch(resolveUrl(endpoint), {
     method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers,
     credentials: 'include',
   });
 
@@ -109,11 +127,17 @@ async function getJSON<T>(endpoint: string): Promise<ApiResponse<T>> {
 }
 
 async function putJSON<T>(endpoint: string, data: any): Promise<ApiResponse<T>> {
+  const csrfToken = getCsrfToken();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (csrfToken) {
+    headers['X-CSRF-Token'] = csrfToken;
+  }
+
   const response = await fetch(resolveUrl(endpoint), {
     method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers,
     credentials: 'include',
     body: JSON.stringify(data),
   });
@@ -128,11 +152,17 @@ async function putJSON<T>(endpoint: string, data: any): Promise<ApiResponse<T>> 
 }
 
 async function deleteJSON<T>(endpoint: string, data?: any): Promise<ApiResponse<T>> {
+  const csrfToken = getCsrfToken();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (csrfToken) {
+    headers['X-CSRF-Token'] = csrfToken;
+  }
+
   const response = await fetch(resolveUrl(endpoint), {
     method: 'DELETE',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers,
     credentials: 'include',
     body: data ? JSON.stringify(data) : undefined,
   });
