@@ -58,9 +58,9 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ isOpen, onC
     const activityNotifications = activities.slice(0, 3).map((activity, index) => {
       const timeAgo = new Date().getTime() - activity.date.getTime();
       const timeString = timeAgo < 60000 ? 'Just now' :
-                        timeAgo < 3600000 ? `${Math.floor(timeAgo / 60000)} min ago` :
-                        timeAgo < 86400000 ? `${Math.floor(timeAgo / 3600000)} hours ago` :
-                        `${Math.floor(timeAgo / 86400000)} days ago`;
+        timeAgo < 3600000 ? `${Math.floor(timeAgo / 60000)} min ago` :
+          timeAgo < 86400000 ? `${Math.floor(timeAgo / 3600000)} hours ago` :
+            `${Math.floor(timeAgo / 86400000)} days ago`;
 
       const isPositive = activity.amount > 0;
 
@@ -105,11 +105,10 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ isOpen, onC
             notifications.map((notification) => (
               <div key={notification.id} className="p-4 border-b border-white/5 hover:bg-white/5 transition-colors">
                 <div className="flex items-start gap-3">
-                  <div className={`w-2 h-2 rounded-full mt-2 flex-shrink-0 ${
-                    notification.type === 'success' ? 'bg-green-400' :
+                  <div className={`w-2 h-2 rounded-full mt-2 flex-shrink-0 ${notification.type === 'success' ? 'bg-green-400' :
                     notification.type === 'warning' ? 'bg-yellow-400' :
-                    'bg-blue-400'
-                  }`} />
+                      'bg-blue-400'
+                    }`} />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-[#E6EEF3] truncate">{notification.title}</p>
                     <p className="text-sm text-[#A7B4C8] mt-1 leading-relaxed">{notification.message}</p>
@@ -520,6 +519,47 @@ const WalletDashboard: React.FC = () => {
   const { activities: transactions } = useActivity();
   const isLoadingTransactions = false;
 
+  // State for total balance from all tokens
+  const [totalBalance, setTotalBalance] = useState<string | null>(null);
+  const [isLoadingTotalBalance, setIsLoadingTotalBalance] = useState(false);
+
+  // Calculate total balance from all tokens
+  useEffect(() => {
+    const calculateTotalBalance = async () => {
+      if (!address) {
+        setTotalBalance(null);
+        return;
+      }
+
+      setIsLoadingTotalBalance(true);
+      try {
+        const tokenBalances = await tokenService.getAllTokenBalances(address, 'testnet', 'arcTestnet');
+        const symbols = getAllSupportedTokens().map(t => t.symbol);
+        const prices = await tokenService.getTokenPrices(symbols);
+
+        let total = 0;
+        for (const tb of tokenBalances) {
+          const qty = parseFloat(tb.formattedBalance);
+          const priceUsd = prices[tb.token.symbol]?.usd ?? (tb.token.symbol === 'USDC' ? 1.0 : 1.07);
+          total += qty * priceUsd;
+        }
+
+        setTotalBalance(`$${total.toFixed(2)}`);
+      } catch (error) {
+        console.error('Error calculating total balance:', error);
+        setTotalBalance(formattedBalance); // Fallback to USDC balance
+      } finally {
+        setIsLoadingTotalBalance(false);
+      }
+    };
+
+    calculateTotalBalance();
+
+    // Refresh every 30 seconds
+    const interval = setInterval(calculateTotalBalance, 30000);
+    return () => clearInterval(interval);
+  }, [address, formattedBalance]);
+
   const selectedTransaction = useMemo(() => transactions.find((tx) => tx.id === selectedTransactionId) ?? null, [transactions, selectedTransactionId]);
 
   const handleNavigate = (page: string) => {
@@ -533,12 +573,12 @@ const WalletDashboard: React.FC = () => {
         return (
           <DashboardHome
             onNavigate={handleNavigate}
-            balanceDisplay={formattedBalance}
-            isLoading={isAccountLoading}
+            balanceDisplay={totalBalance ?? formattedBalance}
+            isLoading={isAccountLoading || isLoadingTotalBalance}
             lastUpdated={lastUpdated}
             error={accountError}
             onRefresh={refresh}
-            isRefreshing={isAccountLoading}
+            isRefreshing={isAccountLoading || isLoadingTotalBalance}
             isHidden={isBalanceHidden}
             toggleHidden={() => setIsBalanceHidden((prev) => !prev)}
           />
@@ -563,12 +603,12 @@ const WalletDashboard: React.FC = () => {
         return (
           <DashboardHome
             onNavigate={handleNavigate}
-            balanceDisplay={formattedBalance}
-            isLoading={isAccountLoading}
+            balanceDisplay={totalBalance ?? formattedBalance}
+            isLoading={isAccountLoading || isLoadingTotalBalance}
             lastUpdated={lastUpdated}
             error={accountError}
             onRefresh={refresh}
-            isRefreshing={isAccountLoading}
+            isRefreshing={isAccountLoading || isLoadingTotalBalance}
             isHidden={isBalanceHidden}
             toggleHidden={() => setIsBalanceHidden((prev) => !prev)}
           />
