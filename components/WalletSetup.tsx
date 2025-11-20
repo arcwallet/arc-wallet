@@ -3,18 +3,24 @@
  * Self-custodial wallet creation and import
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useSelfCustodialWallet } from '../contexts/SelfCustodialWalletContext';
 
-type SetupStep = 'choice' | 'create' | 'import' | 'backup' | 'confirm';
+type SetupStep = 'choice' | 'create' | 'import' | 'backup';
 
 interface WalletSetupProps {
   onComplete: () => void;
 }
 
 const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
-  const { createWallet, importWallet, markBackedUp } = useSelfCustodialWallet();
+  const {
+    createWallet,
+    importWallet,
+    needsBackup,
+    getMnemonic,
+    markBackedUp
+  } = useSelfCustodialWallet();
 
   const [step, setStep] = useState<SetupStep>('choice');
   const [password, setPassword] = useState('');
@@ -23,7 +29,19 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
   const [mnemonic, setMnemonic] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [backupConfirmed, setBackupConfirmed] = useState(false);
+
+  // Check for existing mnemonic needing backup
+  useEffect(() => {
+    if (needsBackup) {
+      const existingMnemonic = getMnemonic();
+      if (existingMnemonic) {
+        setMnemonic(existingMnemonic);
+        setStep('backup');
+      }
+    }
+  }, [needsBackup, getMnemonic]);
 
   // Handle wallet creation
   const handleCreate = async () => {

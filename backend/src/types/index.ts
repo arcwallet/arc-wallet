@@ -10,6 +10,7 @@ export interface User {
   username: string;
   displayName: string;
   walletAddress?: string;
+  encryptedWallet?: string;
   createdAt: Date;
   updatedAt: Date;
 }

@@ -8,8 +8,12 @@ interface ArcAccountContextValue extends UseArcAccountSnapshotState {
 
 const ArcAccountContext = createContext<ArcAccountContextValue | undefined>(undefined);
 
+import { useSelfCustodialWallet } from './SelfCustodialWalletContext';
+
 export const ArcAccountProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const { address } = useWallet();
+  const { address: legacyAddress } = useWallet();
+  const { address: selfCustodialAddress } = useSelfCustodialWallet();
+  const address = selfCustodialAddress || legacyAddress;
   const snapshotState = useArcAccountSnapshot(address);
 
   return (

@@ -59,10 +59,18 @@ export class Database {
         username TEXT UNIQUE NOT NULL,
         display_name TEXT NOT NULL,
         wallet_address TEXT,
+        encrypted_wallet TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )
     `);
+
+    // Migration: Add encrypted_wallet column if it doesn't exist
+    try {
+      await run('ALTER TABLE users ADD COLUMN encrypted_wallet TEXT');
+    } catch (error) {
+      // Ignore error if column already exists
+    }
 
     // Passkey credentials table
     await run(`
@@ -256,17 +264,51 @@ export class Database {
   async getUserById(id: string): Promise<User | null> {
     await this.waitForReady();
     const get: any = promisify(this.db.get.bind(this.db));
+    const result = await get('SELECT * FROM users WHERE id = ?', [id]);
+    if (!result) return null;
 
-    const user = await get('SELECT * FROM users WHERE id = ?', [id]);
-    return user ? this.mapUser(user) : null;
+    return {
+      id: result.id,
+      username: result.username,
+      displayName: result.display_name,
+      walletAddress: result.wallet_address,
+      encryptedWallet: result.encrypted_wallet,
+      createdAt: new Date(result.created_at),
+      updatedAt: new Date(result.updated_at)
+    };
   }
 
   async getUserByUsername(username: string): Promise<User | null> {
     await this.waitForReady();
     const get: any = promisify(this.db.get.bind(this.db));
+    const result = await get('SELECT * FROM users WHERE username = ?', [username]);
+    if (!result) return null;
 
-    const user = await get('SELECT * FROM users WHERE username = ?', [username]);
-    return user ? this.mapUser(user) : null;
+    return {
+      id: result.id,
+      username: result.username,
+      displayName: result.display_name,
+      walletAddress: result.wallet_address,
+      encryptedWallet: result.encrypted_wallet,
+      createdAt: new Date(result.created_at),
+      updatedAt: new Date(result.updated_at)
+    };
+  }
+
+  async updateEncryptedWallet(userId: string, encryptedWallet: string): Promise<void> {
+    await this.waitForReady();
+    const run: any = promisify(this.db.run.bind(this.db));
+    await run(
+      'UPDATE users SET encrypted_wallet = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      [encryptedWallet, userId]
+    );
+  }
+
+  async getEncryptedWallet(userId: string): Promise<string | null> {
+    await this.waitForReady();
+    const get: any = promisify(this.db.get.bind(this.db));
+    const result = await get('SELECT encrypted_wallet FROM users WHERE id = ?', [userId]);
+    return result ? result.encrypted_wallet : null;
   }
 
   async updateUser(id: string, updates: Partial<Omit<User, 'id' | 'createdAt' | 'updatedAt'>>): Promise<User | null> {

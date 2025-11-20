@@ -8,9 +8,11 @@ import { Database } from './models/Database.js';
 import { SessionKeyManager } from './utils/SessionKeyManager.js';
 import { createPasskeyRoutes } from './routes/passkeys.js';
 import { createMagicLinkRouter } from './routes/magicLink.js';
+import { createWalletRouter } from './routes/wallet.js';
 import { createBridgeRoutes } from './routes/bridge.js';
 import { createMultiSigRoutes } from './routes/multiSig.js';
 import { createMagicLinkMailer } from './services/magicLinkMailer.js';
+import { MagicSessionStore } from './magicLink/SessionStore.js';
 import { loadConfig, validateConfig } from './utils/config.js';
 import { cookieMiddleware } from './middleware/cookies.js';
 import { setCsrfCookie, validateCsrfToken } from './middleware/csrf.js';
@@ -34,6 +36,7 @@ const magicLinkMailer = createMagicLinkMailer({
   fromAddress: process.env.EMAIL_FROM_ADDRESS,
   fromName: process.env.EMAIL_FROM_NAME ?? 'Arc Wallet',
 });
+const magicSessionStore = new MagicSessionStore();
 
 // Create Express app
 const app = express();
@@ -89,7 +92,8 @@ app.use(healthCheck);
 app.use(rateLimitMiddleware('general'));
 
 // Routes
-app.use(createMagicLinkRouter(config, magicLinkMailer, db));
+app.use(createMagicLinkRouter(config, magicLinkMailer, db, magicSessionStore));
+app.use('/api/wallet', createWalletRouter(db, config, magicSessionStore));
 app.use('/passkeys', createPasskeyRoutes(db, config));
 app.use(createBridgeRoutes(db, {
   NODE_ENV: config.NODE_ENV,

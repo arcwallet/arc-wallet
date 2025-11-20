@@ -25,7 +25,8 @@ const SelfCustodialWalletExperience: React.FC = () => {
     isAuthenticated,
     registerPasskey,
     logout,
-    deleteWallet
+    deleteWallet,
+    needsBackup
   } = useSelfCustodialWallet();
   const { logout: sessionLogout } = useSession();
 
@@ -52,8 +53,8 @@ const SelfCustodialWalletExperience: React.FC = () => {
     logout();
   };
 
-  // No wallet - show setup
-  if (!hasWallet) {
+  // No wallet or needs backup - show setup
+  if (!hasWallet || needsBackup) {
     return <WalletSetup onComplete={handleComplete} />;
   }
 
@@ -127,7 +128,7 @@ const RootView: React.FC = () => {
         window.history.replaceState({}, '', url);
         setTokenHandled(true);
       })
-      .catch(() => {});
+      .catch(() => { });
   }, [tokenHandled, verifyMagicToken, currentPath]);
 
   // Show recovery page if on /recovery path

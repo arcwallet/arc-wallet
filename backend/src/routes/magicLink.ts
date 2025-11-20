@@ -61,10 +61,9 @@ const renderTemplate = (title: string, body: string) => `<!doctype html>
   </body>
 </html>`;
 
-export const createMagicLinkRouter = (config: EnvConfig, mailer: MagicLinkMailer, db: Database) => {
+export const createMagicLinkRouter = (config: EnvConfig, mailer: MagicLinkMailer, db: Database, sessionStore: MagicSessionStore) => {
   const router = Router();
   const userStore = new MagicUserStore(path.join(process.cwd(), 'data'));
-  const sessionStore = new MagicSessionStore();
   const tokenService = new MagicLinkService(config.SESSION_SECRET);
   const baseUrl = config.MAGIC_LINK_BASE_URL || `http://localhost:${config.PORT}`;
   const staticDir = path.join(process.cwd(), 'public');

@@ -117,9 +117,23 @@ export const SelfCustodialWalletProvider: React.FC<{ children: ReactNode }> = ({
         const parsed = JSON.parse(authState);
         setIsAuthenticated(parsed.isAuthenticated);
         setAddress(parsed.address);
-      } catch {}
+      } catch { }
     }
   }, []);
+
+  // Upload encrypted wallet to backend
+  const backupWallet = async (encrypted: any) => {
+    try {
+      await fetch('/api/wallet/backup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ encryptedWallet: JSON.stringify(encrypted) }),
+      });
+    } catch (error) {
+      console.error('Failed to backup wallet:', error);
+      // Don't fail the flow, just log error
+    }
+  };
 
   // Create new wallet (generates key locally)
   const createWallet = useCallback(async (password: string): Promise<{ address: string; mnemonic: string }> => {
@@ -136,6 +150,9 @@ export const SelfCustodialWalletProvider: React.FC<{ children: ReactNode }> = ({
       // Encrypt and save locally
       const encrypted = await encryptWallet(walletData, password);
       saveEncryptedWallet(encrypted);
+
+      // Backup to backend
+      await backupWallet(encrypted);
 
       // Update state
       setAddress(walletData.address);
@@ -176,6 +193,9 @@ export const SelfCustodialWalletProvider: React.FC<{ children: ReactNode }> = ({
       // Encrypt and save locally
       const encrypted = await encryptWallet(walletData, password);
       saveEncryptedWallet(encrypted);
+
+      // Backup to backend
+      await backupWallet(encrypted);
 
       // Update state
       setAddress(walletData.address);
@@ -226,6 +246,13 @@ export const SelfCustodialWalletProvider: React.FC<{ children: ReactNode }> = ({
         isAuthenticated: true,
         address,
       }));
+
+      // Ensure wallet is backed up after registration
+      const encrypted = loadEncryptedWallet();
+      if (encrypted) {
+        await backupWallet(encrypted);
+      }
+
     } catch (error) {
       if (error instanceof PasskeyClientError && error.status === 400) {
         // Already registered, try to authenticate
@@ -254,18 +281,38 @@ export const SelfCustodialWalletProvider: React.FC<{ children: ReactNode }> = ({
 
     setIsAuthenticated(true);
 
+    // Check if we need to restore wallet from backend
+    if (!hasStoredWallet()) {
+      try {
+        const backupResp = await fetch('/api/wallet/backup');
+        if (backupResp.ok) {
+          const { encryptedWallet } = await backupResp.json();
+          if (encryptedWallet) {
+            // Restore to local storage
+            const parsed = JSON.parse(encryptedWallet);
+            saveEncryptedWallet(parsed);
+            setHasWallet(true);
+            // Note: Wallet is still locked, user needs to enter password
+          }
+        }
+      } catch (error) {
+        console.error('Failed to restore wallet backup:', error);
+      }
+    }
+
     // Save auth state
     sessionStorage.setItem(AUTH_STATE_KEY, JSON.stringify({
       isAuthenticated: true,
-      address,
+      address, // Might be null if just restored
     }));
   }, [address, currentEmail]);
 
   // Login with passkey (public)
   const loginWithPasskey = useCallback(async () => {
-    if (!hasWallet) {
-      throw new Error('No wallet found. Create or import a wallet first.');
-    }
+    // Allow login even if no local wallet (to restore from backup)
+    // if (!hasWallet) {
+    //   throw new Error('No wallet found. Create or import a wallet first.');
+    // }
 
     setIsConnecting(true);
 
@@ -280,7 +327,7 @@ export const SelfCustodialWalletProvider: React.FC<{ children: ReactNode }> = ({
     } finally {
       setIsConnecting(false);
     }
-  }, [hasWallet, loginWithPasskeyInternal]);
+  }, [loginWithPasskeyInternal]);
 
   // Unlock wallet with password
   const unlockWallet = useCallback(async (password: string) => {
