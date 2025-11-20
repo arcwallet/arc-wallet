@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useWallet } from '../contexts/WalletContext';
+import { useArcAccount } from '../contexts/ArcAccountContext';
 import { CopyIcon, ChevronDownIcon } from './Icons';
 import QRCode from 'qrcode';
 import { getAllSupportedTokens, TokenInfo } from '../config/tokens';
 
 const ReceiveAssets: React.FC = () => {
-    const { address } = useWallet();
+    const { address } = useArcAccount();
     const walletAddress = address || "0x0000000000000000000000000000000000000000";
     const [copyButtonText, setCopyButtonText] = useState('Copy Address');
     const [selectedToken, setSelectedToken] = useState<TokenInfo>(getAllSupportedTokens()[0]);
@@ -44,7 +44,7 @@ const ReceiveAssets: React.FC = () => {
             {/* Wallet Address Card */}
             <div className="w-full flex items-center justify-between gap-4 rounded-lg bg-surface p-4 shadow-md">
                 <p className="text-text-primary text-base font-medium leading-tight truncate">{address ? `${address.slice(0, 6)}...${address.slice(-4)}` : 'No Wallet Connected'}</p>
-                <button 
+                <button
                     onClick={handleCopyAddress}
                     className="flex-shrink-0 text-text-primary hover:text-primary transition-colors disabled:opacity-50"
                     aria-label="Copy wallet address"
@@ -56,7 +56,7 @@ const ReceiveAssets: React.FC = () => {
 
             {/* SingleButton */}
             <div className="w-full flex px-0 py-2 mt-2">
-                <button 
+                <button
                     onClick={handleCopyAddress}
                     disabled={!address}
                     className="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-12 px-5 flex-1 bg-primary hover:bg-primary/90 text-primary-text text-base font-bold leading-normal tracking-[0.015em] transition-colors shadow-lg shadow-black/20 disabled:opacity-50"

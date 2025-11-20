@@ -1,10 +1,10 @@
 import React, { useMemo, useState } from 'react';
-import { useWallet } from '../contexts/WalletContext';
+import { useArcAccount } from '../contexts/ArcAccountContext';
 import { formatUSDCAmount } from '../utils/format';
 import { CopyIcon, CheckCircleIcon } from './Icons';
 
 const Faucet: React.FC = () => {
-    const { address } = useWallet();
+    const { address } = useArcAccount();
     const walletAddress = address || "0x0000000000000000000000000000000000000000";
 
     const [statusMessage] = useState('Circle testnet faucet limits requests to 10 USDC per hour.');
@@ -39,13 +39,13 @@ const Faucet: React.FC = () => {
                     <label className="flex flex-col">
                         <p className="text-text-secondary text-sm font-medium leading-normal pb-2">Your Wallet Address</p>
                         <div className="flex w-full flex-1 items-center">
-                            <input 
-                                className="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden border-none bg-transparent p-0 text-text-primary placeholder:text-text-secondary focus:outline-0 focus:ring-0 font-mono" 
-                                readOnly 
+                            <input
+                                className="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden border-none bg-transparent p-0 text-text-primary placeholder:text-text-secondary focus:outline-0 focus:ring-0 font-mono"
+                                readOnly
                                 value={address ? walletAddress : 'No Wallet Connected'}
                             />
-                            <button 
-                                onClick={handleCopyAddress} 
+                            <button
+                                onClick={handleCopyAddress}
                                 disabled={!address}
                                 className="text-text-secondary transition-colors hover:text-text-primary disabled:opacity-50"
                             >
@@ -54,10 +54,10 @@ const Faucet: React.FC = () => {
                         </div>
                     </label>
                 </div>
-                
+
                 {/* Primary Action Button */}
                 <div className="flex w-full flex-col items-center gap-2">
-                    <button 
+                    <button
                         onClick={handleOpenFaucet}
                         disabled={!address}
                         className="flex h-12 w-full min-w-[84px] cursor-pointer items-center justify-center overflow-hidden rounded-lg bg-primary px-5 text-base font-bold leading-normal tracking-[0.015em] text-primary-text transition-colors hover:bg-primary/90 disabled:opacity-70 disabled:cursor-not-allowed"
