@@ -6,7 +6,7 @@ import { passkeyClient, type SessionKeySummary } from '../services/passkeyClient
 import { WalletIcon, CopyIcon, AddIcon, LaptopIcon, PhoneIcon, ChevronDownIcon } from './Icons';
 
 const WalletIdentitySection: React.FC = () => {
-    const { address } = useWallet();
+    const { address } = useSelfCustodialWallet();
     const walletAddress = address || "0x0000000000000000000000000000000000000000";
 
     const handleCopy = () => {
@@ -22,7 +22,7 @@ const WalletIdentitySection: React.FC = () => {
                 <div className="flex min-w-0 items-center gap-3 rounded-lg border border-[#2B3440] bg-[#091325]/50 px-3 py-2">
                     <WalletIcon size={20} className="text-[#A7B4C8]" />
                     <p className="flex-1 truncate font-mono text-sm text-[#E6EEF3]">{address ? walletAddress : 'No Wallet Connected'}</p>
-                    <button 
+                    <button
                         onClick={handleCopy}
                         disabled={!address}
                         className="flex shrink-0 items-center justify-center rounded-md p-1.5 text-[#A7B4C8] hover:bg-white/10 hover:text-[#E6EEF3] disabled:opacity-50"
@@ -30,7 +30,7 @@ const WalletIdentitySection: React.FC = () => {
                         <CopyIcon size={18} />
                     </button>
                 </div>
-                <button 
+                <button
                     disabled={!address}
                     className="flex h-10 w-full shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-lg border border-[#2B3440] bg-transparent px-4 text-sm font-medium text-[#E6EEF3] hover:bg-white/5 sm:w-auto disabled:opacity-50"
                 >
@@ -139,7 +139,7 @@ const SecuritySection: React.FC = () => {
                             const isCurrent = currentAddress && k.address.toLowerCase() === currentAddress;
                             return (
                                 <tr key={k.id} className={isCurrent ? 'bg-white/5' : ''}>
-                                    <td className="px-4 py-3 font-mono text-[#E6EEF3]">{`${k.address.slice(0,6)}...${k.address.slice(-4)}`}{isCurrent && <span className="ml-2 text-green-400">(current)</span>}</td>
+                                    <td className="px-4 py-3 font-mono text-[#E6EEF3]">{`${k.address.slice(0, 6)}...${k.address.slice(-4)}`}{isCurrent && <span className="ml-2 text-green-400">(current)</span>}</td>
                                     <td className="px-4 py-3 text-[#E6EEF3]">{new Date(k.createdAt).toLocaleString()}</td>
                                     <td className="px-4 py-3 text-[#E6EEF3]">{new Date(k.expiresAt).toLocaleString()}</td>
                                     <td className="px-4 py-3 text-right">
@@ -168,7 +168,7 @@ const SecuritySection: React.FC = () => {
                         )}
                         {devices.map((d) => (
                             <tr key={d.id}>
-                                <td className="px-4 py-3 text-[#E6EEF3] break-all">{d.credentialID.slice(0,12)}…{d.credentialID.slice(-8)}</td>
+                                <td className="px-4 py-3 text-[#E6EEF3] break-all">{d.credentialID.slice(0, 12)}…{d.credentialID.slice(-8)}</td>
                                 <td className="px-4 py-3 text-[#E6EEF3]">{(d.transports || []).join(', ') || '—'}</td>
                                 <td className="px-4 py-3 text-[#E6EEF3]">{new Date(d.createdAt).toLocaleString()}</td>
                                 <td className="px-4 py-3 text-right">
@@ -515,11 +515,10 @@ const RecoverySection: React.FC = () => {
                                     onTouchStart={handleHoldStart}
                                     onTouchEnd={handleHoldEnd}
                                     disabled={!allChecksConfirmed || isVerifying}
-                                    className={`relative w-full py-4 rounded-lg font-semibold text-base transition-all overflow-hidden ${
-                                        allChecksConfirmed
+                                    className={`relative w-full py-4 rounded-lg font-semibold text-base transition-all overflow-hidden ${allChecksConfirmed
                                             ? 'bg-gradient-to-r from-[#ff6b81] to-[#ff4757] hover:from-[#ff7a8e] hover:to-[#ff5767] text-white cursor-pointer'
                                             : 'bg-[#2B3440] text-[#5a6573] cursor-not-allowed'
-                                    }`}
+                                        }`}
                                 >
                                     <div
                                         className="absolute inset-0 bg-white/20 transition-all"
@@ -529,10 +528,10 @@ const RecoverySection: React.FC = () => {
                                         {isVerifying
                                             ? 'Verifying with Passkey...'
                                             : isHolding
-                                            ? 'Keep Holding...'
-                                            : allChecksConfirmed
-                                            ? 'Hold to Reveal Private Key'
-                                            : 'Confirm All Warnings Above'}
+                                                ? 'Keep Holding...'
+                                                : allChecksConfirmed
+                                                    ? 'Hold to Reveal Private Key'
+                                                    : 'Confirm All Warnings Above'}
                                     </span>
                                 </button>
                                 {allChecksConfirmed && !isVerifying && (
@@ -593,32 +592,32 @@ const SessionInfoSection: React.FC = () => {
 
 
 const Settings: React.FC = () => {
-  return (
-    <>
-      <div className="w-full">
-        {/* PageHeading */}
-        <div className="mb-8 sm:mb-12">
-          <div className="flex flex-wrap justify-between gap-3">
-            <div className="flex min-w-72 flex-col gap-2 sm:gap-3">
-              <h1 className="text-3xl sm:text-4xl font-bold leading-tight tracking-tight text-text-primary">Settings</h1>
-              <p className="text-base font-normal leading-normal text-text-secondary">Manage your security, network, and organization settings.</p>
+    return (
+        <>
+            <div className="w-full">
+                {/* PageHeading */}
+                <div className="mb-8 sm:mb-12">
+                    <div className="flex flex-wrap justify-between gap-3">
+                        <div className="flex min-w-72 flex-col gap-2 sm:gap-3">
+                            <h1 className="text-3xl sm:text-4xl font-bold leading-tight tracking-tight text-text-primary">Settings</h1>
+                            <p className="text-base font-normal leading-normal text-text-secondary">Manage your security, network, and organization settings.</p>
+                        </div>
+                    </div>
+                </div>
+                {/* Settings Sections */}
+                <div className="flex flex-col gap-8">
+                    <WalletIdentitySection />
+                    <SecuritySection />
+                    <NetworkSection />
+                    <OrganizationRolesSection />
+                    <RecoverySection />
+                </div>
             </div>
-          </div>
-        </div>
-        {/* Settings Sections */}
-        <div className="flex flex-col gap-8">
-          <WalletIdentitySection />
-          <SecuritySection />
-          <NetworkSection />
-          <OrganizationRolesSection />
-          <RecoverySection />
-        </div>
-      </div>
-      <div className="mt-8">
-        <SessionInfoSection />
-      </div>
-    </>
-  );
+            <div className="mt-8">
+                <SessionInfoSection />
+            </div>
+        </>
+    );
 };
 
 export default Settings;
