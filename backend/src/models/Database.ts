@@ -530,18 +530,18 @@ export class Database {
         throw new Error('Could not decrypt session key. Check encryption key and data integrity.');
       }
     } else if (this.encryptionKey && privateKey && !row.private_key_iv) {
-        // This case handles data that was encrypted with the old, insecure method.
-        // It's a migration path. For new data, this branch won't be hit.
-        console.warn(`WARNING: Session key ${row.id} is using legacy encryption. It should be re-encrypted.`);
-        try {
-            // Assuming the old decrypt function is available for migration.
-            // If not, this will fail. Let's assume it is not for now.
-            // privateKey = oldDecrypt(privateKey, this.encryptionKey);
-            throw new Error(`Legacy key found but no migration path for decryption is available for key ID: ${row.id}`);
-        } catch (error) {
-            console.error(`FATAL: Failed to decrypt legacy key ${row.id}`, error);
-            throw new Error('Could not decrypt legacy session key.');
-        }
+      // This case handles data that was encrypted with the old, insecure method.
+      // It's a migration path. For new data, this branch won't be hit.
+      console.warn(`WARNING: Session key ${row.id} is using legacy encryption. It should be re-encrypted.`);
+      try {
+        // Assuming the old decrypt function is available for migration.
+        // If not, this will fail. Let's assume it is not for now.
+        // privateKey = oldDecrypt(privateKey, this.encryptionKey);
+        throw new Error(`Legacy key found but no migration path for decryption is available for key ID: ${row.id}`);
+      } catch (error) {
+        console.error(`FATAL: Failed to decrypt legacy key ${row.id}`, error);
+        throw new Error('Could not decrypt legacy session key.');
+      }
     }
 
 
@@ -606,7 +606,7 @@ export class Database {
           now,
           now
         ],
-        function(this: RunResult, err) {
+        function (this: RunResult, err) {
           if (err) reject(err);
           else resolve(this.lastID);
         }
@@ -750,7 +750,7 @@ export class Database {
       this.db.run(
         'DELETE FROM passkey_credentials WHERE user_id = ?',
         [user.id],
-        function(err) {
+        function (err) {
           if (err) reject(err);
           else resolve({ changes: this.changes });
         }
@@ -772,7 +772,7 @@ export class Database {
       this.db.run(
         'DELETE FROM session_keys WHERE user_id = ?',
         [user.id],
-        function(err) {
+        function (err) {
           if (err) reject(err);
           else resolve({ changes: this.changes });
         }
@@ -791,6 +791,7 @@ export class Database {
 
   // One-time token operations
   async markTokenUsed(tokenHash: string, expiresAt: Date): Promise<void> {
+    await this.waitForReady();
     const run: any = promisify(this.db.run.bind(this.db));
     await run(
       'INSERT INTO used_tokens (token_hash, expires_at) VALUES (?, ?)',
@@ -799,6 +800,7 @@ export class Database {
   }
 
   async isTokenUsed(tokenHash: string): Promise<boolean> {
+    await this.waitForReady();
     const get: any = promisify(this.db.get.bind(this.db));
     const result = await get(
       'SELECT * FROM used_tokens WHERE token_hash = ? AND expires_at > ?',
@@ -981,7 +983,7 @@ export class Database {
       this.db.run(
         `UPDATE multi_sig_transactions SET status = 'expired' WHERE status = 'pending' AND expires_at < ?`,
         [new Date().toISOString()],
-        function(err) {
+        function (err) {
           if (err) reject(err);
           else resolve({ changes: this.changes });
         }

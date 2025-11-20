@@ -17,8 +17,9 @@ type CookieRequest = Request & { cookies?: Record<string, string> };
 
 const COOKIE_BASE_OPTIONS = (isProd: boolean, cookieDomain?: string) => ({
   httpOnly: true,
-  // Use 'none' for cross-domain cookies in production, 'lax' for same-domain
-  sameSite: (isProd && cookieDomain ? 'none' : 'lax') as 'none' | 'lax',
+  // Use 'none' for cross-domain cookies in production (required for cross-site requests)
+  // Use 'lax' for local development
+  sameSite: (isProd ? 'none' : 'lax') as 'none' | 'lax',
   secure: isProd,              // Only secure in production (HTTPS required)
   maxAge: 4 * 60 * 60 * 1000,  // 4 hours
   path: '/',
