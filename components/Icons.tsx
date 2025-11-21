@@ -5,6 +5,22 @@ interface IconProps {
   size?: number;
 }
 
+export const LogoIcon = ({ className }: { className?: string }) => (
+  <svg viewBox="0 0 100 100" fill="currentColor" className={className}>
+    <path d="M 50 10 L 15 90 L 30 90 L 40 65 L 60 65 L 70 90 L 85 90 L 50 10 Z M 43 55 L 50 35 L 57 55 L 43 55 Z" fill="currentColor" />
+    {/* Simulated keyhole cutout in the 'A' shape */}
+    <circle cx="50" cy="45" r="6" fill="#0f172a" />
+    <rect x="47" y="45" width="6" height="10" fill="#0f172a" />
+  </svg>
+);
+
+export const ArrowUpRightIcon = ({ className }: { className?: string }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <line x1="7" y1="17" x2="17" y2="7"></line>
+    <polyline points="7 7 17 7 17 17"></polyline>
+  </svg>
+);
+
 export const DashboardIcon: React.FC<IconProps> = ({ className = "", size = 20 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
     <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
