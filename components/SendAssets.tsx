@@ -1,8 +1,10 @@
+
 import React, { useEffect, useMemo, useState } from 'react';
-import { isAddress } from 'ethers';
+import { isAddress, parseUnits } from 'ethers';
 import { useArcAccount } from '../contexts/ArcAccountContext';
 import { useWallet } from '../contexts/WalletContext';
 import { useSelfCustodialWallet } from '../contexts/SelfCustodialWalletContext';
+
 import { useActivity } from '../contexts/ActivityContext';
 import { usePrivacy } from '../contexts/PrivacyContext';
 import { encryptAmount, serializeEncryptedAmount } from '../services/fheService';
@@ -10,6 +12,7 @@ import { formatUSDCAmount } from '../utils/format';
 import {
   estimateNativeTransfer,
   estimateSmartAccountExecute,
+  estimateSmartAccountBatchExecute,
 } from '../services/transactionService';
 import {
   executeNativeTransfer,
@@ -21,8 +24,9 @@ import { getAllSupportedTokens, TokenInfo, formatTokenAmount } from '../config/t
 import { tokenService } from '../services/tokenService';
 import { paymasterClient } from '../services/paymasterClient';
 import { GasSponsorshipIndicator, GasFeeBadge } from './GasSponsorshipIndicator';
+import { BatchTransfer } from './BatchTransfer';
+import { TX_EXPLORER_URL } from '../config/app.config';
 
-const TX_EXPLORER_BASE = 'https://testnet.arcscan.app/tx/';
 
 const SendAssets: React.FC = () => {
   const { snapshot, isLoading } = useArcAccount();
@@ -48,6 +52,10 @@ const SendAssets: React.FC = () => {
   const [encryptedAmountPreview, setEncryptedAmountPreview] = useState<string | null>(null);
   const [isGasSponsored, setIsGasSponsored] = useState(false);
   const [checkingSponsorship, setCheckingSponsorship] = useState(false);
+
+  // Batch Mode State
+  const [isBatchMode, setIsBatchMode] = useState(false);
+  const [batchTransactions, setBatchTransactions] = useState<{ to: string; amount: string; data?: string }[]>([]);
 
   const balance = useMemo(() => {
     return parseFloat(tokenBalance) || 0;
@@ -134,85 +142,103 @@ const SendAssets: React.FC = () => {
 
   const usingSmartAccount = false;
 
+  // Estimate fees
   useEffect(() => {
-    const shouldEstimate = walletAddress && isAddress(recipient) && amountNumber > 0;
-    if (!shouldEstimate) {
-      setFeeEstimate(null);
-      return;
-    }
-    let cancelled = false;
-    setIsEstimating(true);
-    const estimatePromise = estimateNativeTransfer({ from: walletAddress, to: recipient, amount });
+    const estimateFees = async () => {
+      if (!walletAddress || !walletPrivateKey) return;
 
-    estimatePromise
-      .then((estimate) => {
-        if (!cancelled) {
-          setFeeEstimate(estimate.totalFeeWei);
-        }
-      })
-      .catch((error) => {
-        console.warn('Fee estimation failed', error);
-        if (!cancelled) {
+      // Skip estimation if inputs are invalid
+      if (isBatchMode) {
+        if (batchTransactions.length === 0 || !batchTransactions.every(tx => isAddress(tx.to) && parseFloat(tx.amount) > 0)) {
           setFeeEstimate(null);
+          return;
         }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setIsEstimating(false);
+      } else {
+        if (!isAddress(recipient) || !amount || parseFloat(amount) <= 0) {
+          setFeeEstimate(null);
+          return;
         }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [walletAddress, recipient, amount, amountNumber]);
-
-  // Check gas sponsorship eligibility
-  useEffect(() => {
-    const checkSponsorship = async () => {
-      if (!walletAddress || !feeEstimate) {
-        setIsGasSponsored(false);
-        return;
       }
 
+      setIsEstimating(true);
       setCheckingSponsorship(true);
       try {
-        const canSponsor = await paymasterClient.canSponsor(
-          walletAddress,
-          feeEstimate.toString()
-        );
+        // Check paymaster eligibility
+        const canSponsor = await paymasterClient.canSponsor(walletAddress, '0');
         setIsGasSponsored(canSponsor);
+
+        // Estimate gas
+        let estimate: bigint;
+        if (isBatchMode) {
+          const batchEst = await estimateSmartAccountBatchExecute({
+            sessionPrivateKey: walletPrivateKey,
+            smartAccountAddress: walletAddress,
+            transactions: batchTransactions.map(t => ({
+              to: t.to,
+              value: parseUnits(t.amount, selectedToken.decimals), // Assuming all are same token for now or handled
+              data: t.data || '0x'
+            }))
+          });
+          estimate = batchEst.gasLimit;
+        } else {
+          const est = await estimateSmartAccountExecute({
+            sessionPrivateKey: walletPrivateKey,
+            smartAccountAddress: walletAddress,
+            to: recipient,
+            amount: amount,
+            data: '0x'
+          });
+          estimate = est.gasLimit;
+        }
+        setFeeEstimate(estimate);
       } catch (error) {
-        console.error('Error checking sponsorship:', error);
-        setIsGasSponsored(false);
+        console.warn('Fee estimation failed', error);
       } finally {
+        setIsEstimating(false);
         setCheckingSponsorship(false);
       }
     };
 
-    void checkSponsorship();
-  }, [walletAddress, feeEstimate]);
+    const timer = setTimeout(estimateFees, 500);
+    return () => clearTimeout(timer);
+  }, [recipient, amount, walletAddress, isBatchMode, batchTransactions, walletPrivateKey]);
 
 
   const isRecipientValid = recipient ? isAddress(recipient) : false;
   const hasSession = Boolean(walletAddress);
   const canSubmit = hasSession && isRecipientValid && amountNumber > 0 && amountNumber <= balance && !isSubmitting;
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (!walletAddress || !walletPrivateKey) {
       setSubmitError('Wallet not available. Please unlock your wallet.');
       return;
     }
-    if (!isRecipientValid) {
-      setSubmitError('Recipient address is not valid.');
-      return;
-    }
-    if (amountNumber <= 0) {
-      setSubmitError('Enter an amount greater than zero.');
-      return;
-    }
-    if (amountNumber > balance) {
-      setSubmitError('Amount exceeds available balance.');
-      return;
+
+    // Validation
+    if (isBatchMode) {
+      if (batchTransactions.some(tx => !isAddress(tx.to) || !tx.amount || parseFloat(tx.amount) <= 0)) {
+        setSubmitError('Invalid batch transactions: ensure all recipients are valid and amounts are greater than zero.');
+        return;
+      }
+      const totalBatchAmount = batchTransactions.reduce((acc, tx) => acc + parseFloat(tx.amount), 0);
+      if (totalBatchAmount > balance) {
+        setSubmitError('Total batch amount exceeds available balance.');
+        return;
+      }
+    } else {
+      if (!isRecipientValid) {
+        setSubmitError('Recipient address is not valid.');
+        return;
+      }
+      if (amountNumber <= 0) {
+        setSubmitError('Enter an amount greater than zero.');
+        return;
+      }
+      if (amountNumber > balance) {
+        setSubmitError('Amount exceeds available balance.');
+        return;
+      }
     }
 
     setIsSubmitting(true);
@@ -233,23 +259,45 @@ const SendAssets: React.FC = () => {
         } else if (passkeyMsg.toLowerCase().includes('challenge')) {
           throw new Error('Authentication challenge expired. Please try again.');
         } else {
-          throw new Error(`Passkey verification failed: ${passkeyMsg || 'Unknown error'}`);
+          throw new Error(`Passkey verification failed: ${passkeyMsg || 'Unknown error'} `);
         }
       }
 
       let hash: string;
-      let submissionKind: 'transaction' | 'userOp';
-      const result = await executeNativeTransfer({
-        sessionPrivateKey: walletPrivateKey,
-        to: recipient,
-        amount,
-      });
-      hash = result.hash;
-      submissionKind = result.kind;
-      setSubmissionKind(result.kind);
+      let kind: 'transaction' | 'userOp' = 'transaction';
+
+      if (isBatchMode) {
+        // Prepare batch transactions
+        const transactions = batchTransactions.map(tx => ({
+          to: tx.to,
+          value: parseUnits(tx.amount, selectedToken.decimals),
+          data: tx.data || '0x'
+        }));
+
+        // Execute batch via Smart Account
+        const result = await executeSmartAccountTransferWithFallback({
+          smartAccountAddress: walletAddress,
+          sessionPrivateKey: walletPrivateKey,
+          to: '0x0000000000000000000000000000000000000000',
+          amount: '0',
+          transactions // Pass transactions array
+        });
+        hash = result.hash;
+        kind = result.kind;
+      } else {
+        // Single transfer
+        const result = await executeSmartAccountTransferWithFallback({
+          smartAccountAddress: walletAddress,
+          sessionPrivateKey: walletPrivateKey,
+          to: recipient,
+          amount,
+          data: '0x'
+        });
+        hash = result.hash;
+        kind = result.kind;
+      }
 
       setTxHash(hash);
-      setAmount('');
 
       if (submissionKind === 'transaction') {
         const activity = {
@@ -276,7 +324,7 @@ const SendAssets: React.FC = () => {
         const activity = {
           id: hash,
           type: TransactionType.Sent,
-          description: `User operation submitted (${hash.slice(0, 10)}…)`,
+          description: `User operation submitted(${hash.slice(0, 10)}…)`,
           timestamp: 'Just now',
           date: new Date(),
           amount: -amountNumber,
@@ -441,7 +489,7 @@ const SendAssets: React.FC = () => {
           submissionKind === 'transaction' ? (
             <p className="text-sm text-primary text-center">
               Transaction submitted:{' '}
-              <a className="underline" href={`${TX_EXPLORER_BASE}${txHash}`} target="_blank" rel="noreferrer">
+              <a className="underline" href={`${TX_EXPLORER_URL}${txHash}`} target="_blank" rel="noreferrer">
                 View on ArcScan
               </a>
             </p>

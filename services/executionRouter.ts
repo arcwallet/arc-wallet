@@ -7,6 +7,12 @@ type BundlerExecutor = (params: {
   smartAccountAddress: string;
   to: string;
   amount: string;
+  data?: string;
+  transactions?: {
+    to: string;
+    value: bigint;
+    data: string;
+  }[];
 }) => Promise<{ userOpHash: string }>;
 
 type DirectExecutor = (params: {
@@ -14,6 +20,12 @@ type DirectExecutor = (params: {
   smartAccountAddress: string;
   to: string;
   amount: string;
+  data?: string;
+  transactions?: {
+    to: string;
+    value: bigint;
+    data: string;
+  }[];
 }) => Promise<string>;
 
 type BundlerAvailability = () => Promise<boolean> | boolean;
@@ -25,6 +37,13 @@ const defaultBundlerExecutor: BundlerExecutor = async (params) => {
 
 const defaultDirectExecutor: DirectExecutor = async (params) => {
   const module = await import('./transactionService.ts');
+  if (params.transactions && params.transactions.length > 0) {
+    return module.sendSmartAccountBatchExecute({
+      sessionPrivateKey: params.sessionPrivateKey,
+      smartAccountAddress: params.smartAccountAddress,
+      transactions: params.transactions
+    });
+  }
   return module.sendSmartAccountExecute(params);
 };
 
@@ -38,6 +57,12 @@ export async function executeSmartAccountTransferWithFallback(params: {
   smartAccountAddress: string;
   to: string;
   amount: string;
+  data?: string;
+  transactions?: {
+    to: string;
+    value: bigint;
+    data: string;
+  }[];
   forceBundler?: boolean;
   bundlerExecutor?: BundlerExecutor;
   directExecutor?: DirectExecutor;
@@ -48,6 +73,8 @@ export async function executeSmartAccountTransferWithFallback(params: {
     smartAccountAddress,
     to,
     amount,
+    data,
+    transactions,
     forceBundler,
     bundlerExecutor = defaultBundlerExecutor,
     directExecutor = defaultDirectExecutor,
@@ -64,6 +91,8 @@ export async function executeSmartAccountTransferWithFallback(params: {
         smartAccountAddress,
         to,
         amount,
+        data,
+        transactions,
       });
       return { kind: 'userOp', hash: userOpHash };
     } catch (error) {
@@ -76,6 +105,7 @@ export async function executeSmartAccountTransferWithFallback(params: {
     smartAccountAddress,
     to,
     amount,
+    data,
   });
   return { kind: 'transaction', hash: txHash };
 }

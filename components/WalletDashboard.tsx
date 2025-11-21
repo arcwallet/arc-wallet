@@ -31,7 +31,8 @@ import {
   SendIcon,
   ReceiveIcon
 } from './Icons';
-import { getAllSupportedTokens, TokenInfo } from '../config/tokens';
+import { formatTokenAmount, getAllSupportedTokens, TokenInfo } from '../config/tokens';
+import { DEFAULT_TOKEN_ICON } from '../config/app.config';
 import { tokenService, TokenBalance, TokenPrices } from '../services/tokenService';
 
 interface DashboardHeaderProps {
@@ -418,7 +419,7 @@ const AssetsTable: React.FC<AssetsTableProps> = ({ balanceDisplay, isLoading }) 
           change: '+0.00%',
           balance: '0.00',
           value: '$0.00',
-          icon: token.icon || 'https://mintcdn.com/arc-docs/FYqE2_-PsObv0l4x/logo/Arc_Logo_FC.svg?fit=max&auto=format',
+          icon: token.icon || DEFAULT_TOKEN_ICON,
         };
       });
     }
@@ -436,7 +437,7 @@ const AssetsTable: React.FC<AssetsTableProps> = ({ balanceDisplay, isLoading }) 
         change: '+0.00%',
         balance: `${qty.toFixed(2)} ${tokenBalance.token.symbol}`,
         value: `$${value.toFixed(2)}`,
-        icon: tokenBalance.token.icon || 'https://mintcdn.com/arc-docs/FYqE2_-PsObv0l4x/logo/Arc_Logo_FC.svg?fit=max&auto=format',
+        icon: tokenBalance.token.icon || DEFAULT_TOKEN_ICON,
       };
     });
   }, [tokenBalances, prices, activeTab]);

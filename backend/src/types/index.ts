@@ -107,6 +107,29 @@ export interface MultiSigSignature {
   signedAt: Date;
 }
 
+export interface OAuthAccount {
+  id: string;
+  userId: string;
+  provider: string;
+  providerId: string;
+  email: string;
+  name: string;
+  picture?: string;
+  accessToken: string;
+  refreshToken?: string;
+  tokenExpiresAt?: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface OAuthState {
+  state: string;
+  provider: string;
+  redirectUrl?: string;
+  createdAt: number;
+  expiresAt: number;
+}
+
 // API Request/Response Types
 export interface RegistrationStartRequest {
   username: string;

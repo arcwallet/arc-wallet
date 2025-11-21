@@ -1,4 +1,4 @@
-import { AbiCoder, Contract, JsonRpcProvider, Wallet, keccak256, parseUnits, toBeHex } from 'ethers';
+import { AbiCoder, Contract, JsonRpcProvider, Wallet, keccak256, parseUnits, toBeHex, Interface } from 'ethers';
 import { ARC_SMART_ACCOUNT_ABI } from './smartAccountService.ts';
 import { getProvider, getFeeSettings, RPC_URL } from './transactionService.ts';
 
@@ -33,9 +33,14 @@ export interface UserOperation {
 interface SendUserOperationParams {
   sessionPrivateKey: string;
   smartAccountAddress: string;
-  to: string;
-  amount: string;
+  to?: string;
+  amount?: string;
   data?: string;
+  transactions?: {
+    to: string;
+    value: bigint;
+    data: string;
+  }[];
 }
 
 const DEFAULT_VERIFICATION_GAS_LIMIT = 200_000n;
@@ -100,23 +105,47 @@ export async function sendSmartAccountUserOperation(
     throw new Error('ENTRY_POINT is not configured. Set VITE_ARC_ENTRY_POINT before using bundler flow.');
   }
 
-  const provider: JsonRpcProvider = getProvider();
-  const sessionWallet = new Wallet(params.sessionPrivateKey, provider);
-  const smartAccount = new Contract(params.smartAccountAddress, ARC_SMART_ACCOUNT_ABI, provider);
-  const value = parseUnits(params.amount || '0', 18);
-  const callData = smartAccount.interface.encodeFunctionData('execute', [
-    params.to,
-    value,
-    params.data ?? '0x',
-  ]);
+  const provider = new JsonRpcProvider(RPC_URL);
+  const entryPointContract = new Contract(ENTRY_POINT, ['function getNonce(address,uint192) view returns (uint256)'], provider);
+  const nonce = await entryPointContract.getNonce(params.smartAccountAddress, 0);
 
-  const nonce: bigint = await smartAccount.getUserOpNonce();
+  let callData: string;
+  const smartAccount = new Contract(params.smartAccountAddress, ARC_SMART_ACCOUNT_ABI, provider); // Keep smartAccount for gas estimation
+
+  if (params.transactions && params.transactions.length > 0) {
+    // Batch execution
+    const { batchService } = await import('../backend/src/services/batchService.ts');
+    callData = batchService.encodeBatchData(params.transactions);
+  } else if (params.to && params.amount) {
+    // Single execution
+    const accountInterface = new Interface(ARC_SMART_ACCOUNT_ABI);
+    callData = accountInterface.encodeFunctionData('execute', [
+      params.to,
+      parseUnits(params.amount, 18),
+      params.data ?? '0x',
+    ]);
+  } else {
+    throw new Error('Invalid parameters: Provide either transactions array or to/amount');
+  }
+
+  const initCode = '0x'; // Account assumed deployedunt.getUserOpNonce();
   const { maxFeePerGas, maxPriorityFeePerGas } = await getFeeSettings(provider);
 
   let callGasLimit = DEFAULT_VERIFICATION_GAS_LIMIT;
   try {
-    const estimate = await smartAccount.estimateGas.execute(params.to, value, params.data ?? '0x');
-    callGasLimit = estimate;
+    // Adjust gas estimation based on execution type
+    if (params.transactions && params.transactions.length > 0) {
+      // For batch execution, estimate gas for executeBatch
+      const { batchService } = await import('../backend/src/services/batchService.ts');
+      const encodedBatchData = batchService.encodeBatchData(params.transactions);
+      const estimate = await smartAccount.estimateGas.executeBatch(encodedBatchData);
+      callGasLimit = estimate;
+    } else if (params.to && params.amount) {
+      // For single execution, estimate gas for execute
+      const value = parseUnits(params.amount || '0', 18);
+      const estimate = await smartAccount.estimateGas.execute(params.to, value, params.data ?? '0x');
+      callGasLimit = estimate;
+    }
   } catch (error) {
     console.warn('Failed to estimate userOp call gas limit, using default', error);
   }

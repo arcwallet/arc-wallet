@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useArcAccount } from '../contexts/ArcAccountContext';
+import { CIRCLE_FAUCET_URL } from '../config/app.config';
 import { formatUSDCAmount } from '../utils/format';
 import { CopyIcon, CheckCircleIcon } from './Icons';
 
@@ -10,7 +11,7 @@ const Faucet: React.FC = () => {
     const [statusMessage] = useState('Circle testnet faucet limits requests to 10 USDC per hour.');
     const [isCopied, setIsCopied] = useState(false);
 
-    const circleFaucetUrl = useMemo(() => 'https://faucet.circle.com/', []);
+    const circleFaucetUrl = useMemo(() => CIRCLE_FAUCET_URL, []);
 
     const handleCopyAddress = () => {
         if (!address) return;

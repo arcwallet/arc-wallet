@@ -85,6 +85,15 @@ contract ArcSmartAccount {
         return returndata;
     }
 
+    function executeBatch(address[] calldata dest, uint256[] calldata value, bytes[] calldata func) external onlyAuthorised {
+        require(dest.length == value.length && value.length == func.length, "wrong array lengths");
+        for (uint256 i = 0; i < dest.length; i++) {
+            (bool success, bytes memory returndata) = dest[i].call{value: value[i]}(func[i]);
+            require(success, string(returndata));
+            emit Executed(dest[i], value[i], func[i]);
+        }
+    }
+
     function validateUserOp(
         IEntryPoint.UserOperation calldata userOp,
         bytes32 userOpHash,

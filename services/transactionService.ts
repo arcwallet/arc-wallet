@@ -146,6 +146,70 @@ export async function sendSmartAccountExecute(params: {
   return receipt.hash;
 }
 
+export async function estimateSmartAccountBatchExecute(params: {
+  sessionPrivateKey: string;
+  smartAccountAddress: string;
+  transactions: {
+    to: string;
+    value: bigint;
+    data: string;
+  }[];
+}): Promise<FeeEstimate> {
+  const provider = getProvider();
+  const wallet = new Wallet(params.sessionPrivateKey, provider);
+  const contract = new Contract(params.smartAccountAddress, ARC_SMART_ACCOUNT_ABI, wallet);
+
+  const dests = params.transactions.map(t => t.to);
+  const values = params.transactions.map(t => t.value);
+  const funcs = params.transactions.map(t => t.data);
+
+  const { maxFeePerGas, maxPriorityFeePerGas } = await getFeeSettings(provider);
+
+  let gasLimit = DEFAULT_SMART_ACCOUNT_GAS_LIMIT;
+  try {
+    const estimate = await contract.estimateGas.executeBatch(dests, values, funcs);
+    gasLimit = estimate;
+  } catch (error) {
+    console.warn('Smart account batch gas estimation failed, using default limit', error);
+  }
+
+  const totalFeeWei = maxFeePerGas > 0n ? maxFeePerGas * gasLimit : 0n;
+
+  return {
+    gasLimit,
+    maxFeePerGas,
+    maxPriorityFeePerGas,
+    totalFeeWei,
+  };
+}
+
+export async function sendSmartAccountBatchExecute(params: {
+  sessionPrivateKey: string;
+  smartAccountAddress: string;
+  transactions: {
+    to: string;
+    value: bigint;
+    data: string;
+  }[];
+}): Promise<string> {
+  const provider = getProvider();
+  const wallet = new Wallet(params.sessionPrivateKey, provider);
+  const contract = new Contract(params.smartAccountAddress, ARC_SMART_ACCOUNT_ABI, wallet);
+
+  const dests = params.transactions.map(t => t.to);
+  const values = params.transactions.map(t => t.value);
+  const funcs = params.transactions.map(t => t.data);
+
+  const { maxFeePerGas, maxPriorityFeePerGas } = await getFeeSettings(provider);
+
+  const tx = await contract.executeBatch(dests, values, funcs, {
+    maxFeePerGas: maxFeePerGas || undefined,
+    maxPriorityFeePerGas: maxPriorityFeePerGas || undefined,
+  });
+  const receipt = await tx.wait();
+  return receipt.hash;
+}
+
 export async function ensureAccountHasBalance(params: {
   funderPrivateKey: string;
   targetAddress: string;

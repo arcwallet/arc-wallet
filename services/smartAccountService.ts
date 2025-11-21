@@ -1,14 +1,16 @@
 import { JsonRpcProvider, Wallet, ContractFactory, Contract, type Provider, type Signer } from 'ethers';
-import artifact from '../artifacts/ArcSmartAccount.json' assert { type: 'json' };
+import artifact from '../hh-artifacts/contracts/ArcSmartAccount.sol/ArcSmartAccount.json' assert { type: 'json' };
 
 const RPC_URL = import.meta.env.VITE_ARC_RPC_URL ?? 'https://rpc.testnet.arc.network';
 const ENTRY_POINT = import.meta.env.VITE_ARC_ENTRY_POINT ?? '0x0000000000000000000000000000000000000000';
 
 const getProvider = () => new JsonRpcProvider(RPC_URL);
-const { abi, evm } = artifact as { abi: any; evm: { bytecode: { object: string } } };
+
+// Hardhat artifact structure: { abi, bytecode, ... }
+const { abi, bytecode } = artifact as { abi: any; bytecode: string };
 
 export const ARC_SMART_ACCOUNT_ABI = abi;
-export const ARC_SMART_ACCOUNT_BYTECODE = evm.bytecode.object;
+export const ARC_SMART_ACCOUNT_BYTECODE = bytecode;
 
 const getSmartAccountInstance = (address: string, runner?: Provider | Signer) =>
   new Contract(address, ARC_SMART_ACCOUNT_ABI, runner ?? getProvider());

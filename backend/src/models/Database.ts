@@ -11,7 +11,9 @@ import {
   MultiSigAccount,
   MultiSigMember,
   MultiSigTransaction,
-  MultiSigSignature
+  MultiSigSignature,
+  OAuthAccount,
+  OAuthState
 } from '../types/index.js';
 import { encryptPrivateKey, decryptPrivateKey } from '../utils/encryption.js';
 
@@ -220,6 +222,50 @@ export class Database {
       )
     `);
 
+    // OAuth accounts table
+    await run(`
+      CREATE TABLE IF NOT EXISTS oauth_accounts (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        provider TEXT NOT NULL,
+        provider_id TEXT NOT NULL,
+        email TEXT,
+        name TEXT,
+        picture TEXT,
+        access_token TEXT,
+        refresh_token TEXT,
+        token_expires_at INTEGER,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        UNIQUE(provider, provider_id)
+      )
+    `);
+
+    // OAuth state tokens (for CSRF protection)
+    await run(`
+      CREATE TABLE IF NOT EXISTS oauth_states (
+        state TEXT PRIMARY KEY,
+        provider TEXT NOT NULL,
+        redirect_url TEXT,
+        created_at INTEGER NOT NULL,
+        expires_at INTEGER NOT NULL
+      )
+    `);
+
+    // Token metadata cache table
+    await run(`
+      CREATE TABLE IF NOT EXISTS token_metadata (
+        address TEXT PRIMARY KEY,
+        symbol TEXT NOT NULL,
+        name TEXT NOT NULL,
+        decimals INTEGER NOT NULL,
+        chain_id INTEGER DEFAULT 1,
+        last_updated DATETIME DEFAULT CURRENT_TIMESTAMP,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
     // Create indexes
     await run('CREATE INDEX IF NOT EXISTS idx_users_username ON users (username)');
     await run('CREATE INDEX IF NOT EXISTS idx_passkeys_user_id ON passkey_credentials (user_id)');
@@ -238,6 +284,8 @@ export class Database {
     await run('CREATE INDEX IF NOT EXISTS idx_multi_sig_transactions_account ON multi_sig_transactions (account_id)');
     await run('CREATE INDEX IF NOT EXISTS idx_multi_sig_transactions_status ON multi_sig_transactions (status)');
     await run('CREATE INDEX IF NOT EXISTS idx_multi_sig_signatures_transaction ON multi_sig_signatures (transaction_id)');
+    await run('CREATE INDEX IF NOT EXISTS idx_token_metadata_address ON token_metadata (address)');
+    await run('CREATE INDEX IF NOT EXISTS idx_token_metadata_chain ON token_metadata (chain_id)');
   }
 
   async waitForReady(): Promise<void> {
@@ -799,7 +847,160 @@ export class Database {
       );
     });
 
-    return result.changes || 0;
+    return result.changes;
+  }
+
+  // OAuth operations
+  async createOAuthAccount(account: OAuthAccount): Promise<void> {
+    await this.waitForReady();
+    const run: any = promisify(this.db.run.bind(this.db));
+
+    await run(
+      `INSERT INTO oauth_accounts (
+        id, user_id, provider, provider_id, email, name, picture,
+        access_token, refresh_token, token_expires_at, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        account.id,
+        account.userId,
+        account.provider,
+        account.providerId,
+        account.email,
+        account.name,
+        account.picture,
+        account.accessToken,
+        account.refreshToken,
+        account.tokenExpiresAt,
+        account.createdAt,
+        account.updatedAt
+      ]
+    );
+  }
+
+  async getOAuthAccount(provider: string, providerId: string): Promise<OAuthAccount | null> {
+    await this.waitForReady();
+    const get: any = promisify(this.db.get.bind(this.db));
+
+    const row = await get(
+      'SELECT * FROM oauth_accounts WHERE provider = ? AND provider_id = ?',
+      [provider, providerId]
+    );
+
+    if (!row) return null;
+
+    return {
+      id: row.id,
+      userId: row.user_id,
+      provider: row.provider,
+      providerId: row.provider_id,
+      email: row.email,
+      name: row.name,
+      picture: row.picture,
+      accessToken: row.access_token,
+      refreshToken: row.refresh_token,
+      tokenExpiresAt: row.token_expires_at,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    };
+  }
+
+  async getOAuthAccountsByUserId(userId: string): Promise<OAuthAccount[]> {
+    await this.waitForReady();
+    const all: any = promisify(this.db.all.bind(this.db));
+
+    const rows = await all('SELECT * FROM oauth_accounts WHERE user_id = ?', [userId]);
+
+    return rows.map((row: any) => ({
+      id: row.id,
+      userId: row.user_id,
+      provider: row.provider,
+      providerId: row.provider_id,
+      email: row.email,
+      name: row.name,
+      picture: row.picture,
+      accessToken: row.access_token,
+      refreshToken: row.refresh_token,
+      tokenExpiresAt: row.token_expires_at,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    }));
+  }
+
+  async updateOAuthTokens(accountId: string, tokens: { accessToken: string; refreshToken?: string; expiresAt?: number }): Promise<void> {
+    await this.waitForReady();
+    const run: any = promisify(this.db.run.bind(this.db));
+
+    const updates = ['access_token = ?', 'updated_at = ?'];
+    const values = [tokens.accessToken, Date.now()];
+
+    if (tokens.refreshToken) {
+      updates.push('refresh_token = ?');
+      values.push(tokens.refreshToken);
+    }
+
+    if (tokens.expiresAt) {
+      updates.push('token_expires_at = ?');
+      values.push(tokens.expiresAt);
+    }
+
+    values.push(accountId);
+
+    await run(
+      `UPDATE oauth_accounts SET ${updates.join(', ')} WHERE id = ?`,
+      values
+    );
+  }
+
+  async deleteOAuthAccount(userId: string, provider: string): Promise<void> {
+    await this.waitForReady();
+    const run: any = promisify(this.db.run.bind(this.db));
+
+    await run(
+      'DELETE FROM oauth_accounts WHERE user_id = ? AND provider = ?',
+      [userId, provider]
+    );
+  }
+
+  async createOAuthState(state: OAuthState): Promise<void> {
+    await this.waitForReady();
+    const run: any = promisify(this.db.run.bind(this.db));
+
+    await run(
+      `INSERT INTO oauth_states (state, provider, redirect_url, created_at, expires_at)
+       VALUES (?, ?, ?, ?, ?)`,
+      [state.state, state.provider, state.redirectUrl, state.createdAt, state.expiresAt]
+    );
+  }
+
+  async getOAuthState(state: string): Promise<OAuthState | null> {
+    await this.waitForReady();
+    const get: any = promisify(this.db.get.bind(this.db));
+
+    const row = await get('SELECT * FROM oauth_states WHERE state = ?', [state]);
+
+    if (!row) return null;
+
+    return {
+      state: row.state,
+      provider: row.provider,
+      redirectUrl: row.redirect_url,
+      createdAt: row.created_at,
+      expiresAt: row.expires_at
+    };
+  }
+
+  async deleteOAuthState(state: string): Promise<void> {
+    await this.waitForReady();
+    const run: any = promisify(this.db.run.bind(this.db));
+
+    await run('DELETE FROM oauth_states WHERE state = ?', [state]);
+  }
+
+  async cleanupExpiredOAuthStates(): Promise<void> {
+    await this.waitForReady();
+    const run: any = promisify(this.db.run.bind(this.db));
+
+    await run('DELETE FROM oauth_states WHERE expires_at <= ?', [Date.now()]);
   }
 
   async deleteSessionKeysByEmail(email: string): Promise<number> {
@@ -1124,6 +1325,74 @@ export class Database {
       status: row.status,
       signedAt: new Date(row.signed_at)
     };
+  }
+
+  // Token metadata operations
+  async getTokenMetadata(address: string): Promise<any | null> {
+    await this.waitForReady();
+    const get: any = promisify(this.db.get.bind(this.db));
+
+    const normalized = address.toLowerCase();
+    const row = await get('SELECT * FROM token_metadata WHERE address = ?', [normalized]);
+
+    if (!row) return null;
+
+    return {
+      address: row.address,
+      symbol: row.symbol,
+      name: row.name,
+      decimals: row.decimals,
+      chainId: row.chain_id,
+      lastUpdated: new Date(row.last_updated),
+      createdAt: new Date(row.created_at)
+    };
+  }
+
+  async saveTokenMetadata(metadata: {
+    address: string;
+    symbol: string;
+    name: string;
+    decimals: number;
+    chainId?: number;
+  }): Promise<void> {
+    await this.waitForReady();
+    const run: any = promisify(this.db.run.bind(this.db));
+
+    const normalized = metadata.address.toLowerCase();
+    const now = new Date().toISOString();
+
+    await run(
+      `INSERT OR REPLACE INTO token_metadata 
+       (address, symbol, name, decimals, chain_id, last_updated, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, COALESCE((SELECT created_at FROM token_metadata WHERE address = ?), ?))`,
+      [
+        normalized,
+        metadata.symbol,
+        metadata.name,
+        metadata.decimals,
+        metadata.chainId || 1,
+        now,
+        normalized,
+        now
+      ]
+    );
+  }
+
+  async getAllTokenMetadata(): Promise<any[]> {
+    await this.waitForReady();
+    const all: any = promisify(this.db.all.bind(this.db));
+
+    const rows = await all('SELECT * FROM token_metadata ORDER BY created_at DESC');
+
+    return rows.map((row: any) => ({
+      address: row.address,
+      symbol: row.symbol,
+      name: row.name,
+      decimals: row.decimals,
+      chainId: row.chain_id,
+      lastUpdated: new Date(row.last_updated),
+      createdAt: new Date(row.created_at)
+    }));
   }
 
   async close(): Promise<void> {

@@ -6,6 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useSelfCustodialWallet } from '../contexts/SelfCustodialWalletContext';
+import { SocialLoginButtons } from './SocialLoginButtons';
 
 type SetupStep = 'choice' | 'create' | 'import' | 'backup';
 
@@ -32,7 +33,7 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [backupConfirmed, setBackupConfirmed] = useState(false);
 
-  // Check for existing mnemonic needing backup
+  // Check for existing mnemonic needing backup and URL errors
   useEffect(() => {
     if (needsBackup) {
       const existingMnemonic = getMnemonic();
@@ -40,6 +41,15 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
         setMnemonic(existingMnemonic);
         setStep('backup');
       }
+    }
+
+    // Check for error in URL (e.g. from OAuth failure)
+    const params = new URLSearchParams(window.location.search);
+    const errorParam = params.get('error');
+    if (errorParam) {
+      setError(decodeURIComponent(errorParam));
+      // Clean up URL
+      window.history.replaceState({}, '', window.location.pathname);
     }
   }, [needsBackup, getMnemonic]);
 
@@ -142,7 +152,18 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
         </button>
       </div>
 
-      <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/30">
+      <div className="relative my-6">
+        <div className="absolute inset-0 flex items-center">
+          <div className="w-full border-t border-white/10"></div>
+        </div>
+        <div className="relative flex justify-center text-sm">
+          <span className="px-2 bg-[#0f1729] text-text-secondary">Or continue with</span>
+        </div>
+      </div>
+
+      <SocialLoginButtons />
+
+      <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/30 mt-6">
         <p className="text-sm text-amber-200">
           <strong>Self-Custodial:</strong> Your private keys are encrypted and stored only on this device.
           We never have access to your keys.

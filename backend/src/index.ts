@@ -11,8 +11,13 @@ import { createMagicLinkRouter } from './routes/magicLink.js';
 import { createWalletRouter } from './routes/wallet.js';
 import { createBridgeRoutes } from './routes/bridge.js';
 import { createMultiSigRoutes } from './routes/multiSig.js';
+import { createOAuthRouter } from './routes/oauth.js';
 import paymasterRouter from './routes/paymaster.js';
+import { createHistoryRouter } from './routes/history.js';
+import { createWebhookRouter } from './routes/webhooks.js';
 import { createMagicLinkMailer } from './services/magicLinkMailer.js';
+import { IndexerService } from './services/indexerService.js';
+import { webhookService } from './services/webhookService.js';
 import { MagicSessionStore } from './magicLink/SessionStore.js';
 import { loadConfig, validateConfig } from './utils/config.js';
 import { cookieMiddleware } from './middleware/cookies.js';
@@ -101,8 +106,16 @@ app.use(createBridgeRoutes(db, {
   ARC_RPC_URL: config.ARC_RPC_URL,
   SEPOLIA_RPC_URL: config.SEPOLIA_RPC_URL,
 }, magicSessionStore));
+app.use('/auth', createOAuthRouter(db, config, magicSessionStore));
 app.use('/multisig', createMultiSigRoutes(db, config));
 app.use('/api/paymaster', paymasterRouter);
+app.use('/api/history', createHistoryRouter());
+app.use('/api/webhooks', createWebhookRouter());
+
+// Initialize and start indexer service
+const indexerService = new IndexerService(db);
+indexerService.start();
+webhookService.start();
 
 // Root endpoint
 app.get('/', (req: Request, res: Response) => {

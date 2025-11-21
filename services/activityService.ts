@@ -2,6 +2,7 @@ import { formatEther, formatUnits, Interface } from 'ethers';
 import { getProvider } from './transactionService';
 import type { Transaction } from '../types';
 import { TransactionStatus, TransactionType } from '../types';
+import { API_ENDPOINTS } from '../config/app.config';
 import { SUPPORTED_TOKENS } from '../config/tokens';
 
 const provider = getProvider();
@@ -54,6 +55,31 @@ function formatRelativeTime(timestampMs: number): string {
   return relativeTimeFormatter.format(diffDays, 'day');
 }
 
+/**
+ * Activity Service
+ * Fetches transaction history from the indexer backend
+ */
+
+const fetchActivityHistory = async (address: string, limit: number = 20): Promise<any[]> => {
+  try {
+    const normalizedAddress = address.toLowerCase();
+    const response = await fetch(API_ENDPOINTS.history(normalizedAddress, limit));
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch history');
+    }
+
+    const json = await response.json();
+    if (!json.success) {
+      throw new Error(json.error || 'Failed to fetch history');
+    }
+    return json.data;
+  } catch (error) {
+    console.error('Error fetching activity history from indexer:', error);
+    return [];
+  }
+};
+
 export async function fetchRecentTransactions(
   address: string,
   options: FetchOptions = {},
@@ -63,165 +89,33 @@ export async function fetchRecentTransactions(
     return [];
   }
 
+  try {
+    const limit = options.maxTransactions ?? 50;
+    const data = await fetchActivityHistory(normalizedAddress, limit);
+    return data.map((tx: any) => {
+      const isSent = tx.from_address.toLowerCase() === normalizedAddress;
+      const amount = parseFloat(formatUnits(tx.value, 18)); // Assuming 18 decimals for now, TODO: Handle tokens
 
-
-  const maxTransactions = options.maxTransactions ?? 50; // Increased from 30
-  const maxBlocks = options.maxBlocks ?? MAX_BLOCKS_DEFAULT;
-
-  const latestBlock = await callWithRateLimit(provider.getBlockNumber());
-
-
-  const transactions: Transaction[] = [];
-  const seenTxHashes = new Set<string>();
-
-  // Get all token contract addresses for filtering
-  const tokenAddresses = Object.values(SUPPORTED_TOKENS)
-    .flatMap(token => [
-      token.networks.testnet?.arcTestnet?.toLowerCase(),
-      token.networks.testnet?.sepolia?.toLowerCase(),
-    ])
-    .filter((addr): addr is string => Boolean(addr));
-
-  let scannedBlocks = 0;
-  let currentBlock = latestBlock;
-
-  while (scannedBlocks < maxBlocks && transactions.length < maxTransactions && currentBlock >= 0) {
-    let block;
-    try {
-      block = await callWithRateLimit(provider.getBlock(currentBlock, true));
-    } catch (error) {
-      if (error instanceof RateLimitError) {
-        throw error;
-      }
-      console.warn('Failed to load block', currentBlock, error);
-      currentBlock -= 1;
-      scannedBlocks += 1;
-      continue;
-    }
-
-    currentBlock -= 1;
-    scannedBlocks += 1;
-
-    if (!block || !block.transactions) {
-      continue;
-    }
-
-    for (const tx of block.transactions) {
-      if (transactions.length >= maxTransactions) {
-        break;
-      }
-
-      if (seenTxHashes.has(tx.hash)) {
-        continue;
-      }
-
-      const from = tx.from?.toLowerCase();
-      const to = tx.to?.toLowerCase();
-      const timestampMs = Number(block.timestamp) * 1000;
-
-      // Check for native transfers
-      if (from === normalizedAddress || to === normalizedAddress) {
-        const valueWei = tx.value ?? 0n;
-        if (valueWei > 0n) {
-          const direction = from === normalizedAddress ? TransactionType.Sent : TransactionType.Received;
-          const amount = parseFloat(formatEther(valueWei));
-          const feeWei = (tx.gasPrice ?? 0n) * (tx.gasLimit ?? 0n);
-          const fee = parseFloat(formatUnits(feeWei, 18));
-
-          seenTxHashes.add(tx.hash);
-          transactions.push({
-            id: tx.hash,
-            type: direction,
-            description: direction === TransactionType.Sent ? 'ARC sent' : 'ARC received',
-            timestamp: formatRelativeTime(timestampMs),
-            date: new Date(timestampMs),
-            amount: direction === TransactionType.Sent ? -amount : amount,
-            currency: 'ARC',
-            usdValue: amount * 0.1, // Placeholder price
-            status: TransactionStatus.Completed,
-            hash: tx.hash,
-            from: tx.from ?? '',
-            to: tx.to ?? '',
-            networkFee: fee,
-            approvals: { required: 0, list: [] },
-          });
-          continue;
-        }
-      }
-
-      // Check for ERC-20 token transfers
-      if (to && tokenAddresses.includes(to) && tx.data && tx.data.length > 10) {
-        try {
-          // Get transaction receipt to check logs
-          const receipt = await callWithRateLimit(provider.getTransactionReceipt(tx.hash));
-          if (!receipt) continue;
-
-          for (const log of receipt.logs) {
-            // Check if this is a Transfer event
-            if (log.topics[0] !== ERC20_TRANSFER_TOPIC) continue;
-
-            const parsedLog = ERC20_INTERFACE.parseLog({
-              topics: log.topics as string[],
-              data: log.data,
-            });
-
-            if (!parsedLog) continue;
-
-            const logFrom = parsedLog.args.from?.toLowerCase();
-            const logTo = parsedLog.args.to?.toLowerCase();
-            const value = parsedLog.args.value;
-
-            // Check if this transfer involves our address
-            if (logFrom !== normalizedAddress && logTo !== normalizedAddress) {
-              continue;
-            }
-
-            // Find which token this is
-            const token = Object.values(SUPPORTED_TOKENS).find(
-              t => t.networks.testnet?.arcTestnet?.toLowerCase() === log.address.toLowerCase()
-            );
-
-            if (!token) continue;
-
-            const direction = logFrom === normalizedAddress ? TransactionType.Sent : TransactionType.Received;
-            const amount = parseFloat(formatUnits(value, token.decimals));
-            const feeWei = receipt.gasUsed * (receipt.effectiveGasPrice ?? 0n);
-            const fee = parseFloat(formatUnits(feeWei, 18));
-
-            // Estimate USD value
-            const usdPrice = token.symbol === 'USDC' ? 1.0 : token.symbol === 'EURC' ? 1.07 : 1.0;
-            const usdValue = amount * usdPrice;
-
-            seenTxHashes.add(tx.hash);
-            transactions.push({
-              id: `${tx.hash}-${log.index}`,
-              type: direction,
-              description: direction === TransactionType.Sent
-                ? `${token.symbol} sent`
-                : `${token.symbol} received`,
-              timestamp: formatRelativeTime(timestampMs),
-              date: new Date(timestampMs),
-              amount: direction === TransactionType.Sent ? -amount : amount,
-              currency: token.symbol,
-              usdValue,
-              status: TransactionStatus.Completed,
-              hash: tx.hash,
-              from: logFrom,
-              to: logTo,
-              networkFee: fee,
-              approvals: { required: 0, list: [] },
-            });
-          }
-        } catch (error) {
-          // Silently skip if we can't parse this transaction
-          console.warn('Failed to parse token transfer', tx.hash, error);
-        }
-      }
-    }
+      return {
+        id: tx.hash,
+        type: isSent ? TransactionType.Sent : TransactionType.Received,
+        description: isSent ? 'Sent' : 'Received', // Simplified description
+        timestamp: formatRelativeTime(tx.timestamp * 1000),
+        date: new Date(tx.timestamp * 1000),
+        amount: isSent ? -amount : amount,
+        currency: 'ARC', // Default to ARC for now
+        usdValue: amount * 0.1, // Placeholder
+        status: tx.status === 1 ? TransactionStatus.Completed : TransactionStatus.Failed,
+        hash: tx.hash,
+        from: tx.from_address,
+        to: tx.to_address,
+        networkFee: parseFloat(tx.gas_price || '0'), // Simplified
+        approvals: { required: 0, list: [] },
+      };
+    });
+  } catch (error) {
+    console.error('Error fetching transactions from indexer:', error);
+    // Fallback to empty array or handle error
+    return [];
   }
-
-
-
-  transactions.sort((a, b) => b.date.getTime() - a.date.getTime());
-  return transactions.slice(0, maxTransactions);
 }

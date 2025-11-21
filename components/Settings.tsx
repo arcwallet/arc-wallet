@@ -5,6 +5,7 @@ import { useSelfCustodialWallet } from '../contexts/SelfCustodialWalletContext';
 import { usePrivacy } from '../contexts/PrivacyContext';
 import { passkeyClient, type SessionKeySummary } from '../services/passkeyClient';
 import { WalletIcon, CopyIcon, AddIcon, LaptopIcon, PhoneIcon, ChevronDownIcon } from './Icons';
+import { LinkedAccountsManager } from './LinkedAccountsManager';
 
 const WalletIdentitySection: React.FC = () => {
     const { address } = useSelfCustodialWallet();
@@ -777,6 +778,17 @@ const Settings: React.FC = () => {
                     <PrivacySection />
                     <OrganizationRolesSection />
                     <RecoverySection />
+                    <div className="h-px bg-divider my-8" />
+
+                    <LinkedAccountsManager />
+
+                    <div className="h-px bg-divider my-8" />
+
+                    <WebhookManager />
+
+                    <div className="h-px bg-divider my-8" />
+
+                    <NotificationManager />
                 </div>
             </div>
             <div className="mt-8">
