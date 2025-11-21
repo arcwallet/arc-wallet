@@ -58,26 +58,26 @@ const SwapScreen: React.FC = () => {
 
     return (
         <div className="max-w-md mx-auto mt-8">
-            <h2 className="text-2xl font-bold text-[#E6EEF3] mb-6">Stablecoin FX</h2>
+            <h2 className="text-2xl font-bold text-white mb-6">Stablecoin FX</h2>
 
-            <div className="bg-[#151A22] p-6 rounded-xl border border-white/5 relative">
+            <div className="bg-slate-900/60 backdrop-blur-sm p-6 rounded-xl border border-slate-500/50 relative shadow-xl">
                 {/* From Token */}
                 <div className="mb-4">
-                    <label className="text-[#A7B4C8] text-sm mb-2 block">From</label>
-                    <div className="flex items-center gap-4 bg-white/5 p-3 rounded-lg">
+                    <label className="text-slate-400 text-sm mb-2 block">From</label>
+                    <div className="flex items-center gap-4 bg-slate-900/40 border border-slate-500/30 p-3 rounded-lg transition-all hover:border-blue-400/50">
                         <select
                             value={fromToken.symbol}
                             onChange={(e) => setFromToken(tokens.find(t => t.symbol === e.target.value) || fromToken)}
-                            className="bg-transparent text-[#E6EEF3] font-bold outline-none cursor-pointer"
+                            className="bg-transparent text-white font-bold outline-none cursor-pointer focus:text-blue-400 transition-colors"
                         >
-                            {tokens.map(t => <option key={t.symbol} value={t.symbol}>{t.symbol}</option>)}
+                            {tokens.map(t => <option key={t.symbol} value={t.symbol} className="bg-slate-900 text-white">{t.symbol}</option>)}
                         </select>
                         <input
                             type="number"
                             value={amount}
                             onChange={(e) => setAmount(e.target.value)}
                             placeholder="0.00"
-                            className="bg-transparent text-right text-[#E6EEF3] text-xl font-bold w-full outline-none"
+                            className="bg-transparent text-right text-white text-xl font-bold w-full outline-none placeholder:text-slate-600"
                         />
                     </div>
                 </div>
@@ -86,7 +86,7 @@ const SwapScreen: React.FC = () => {
                 <div className="absolute left-1/2 top-[42%] -translate-x-1/2 -translate-y-1/2 z-10">
                     <button
                         onClick={handleSwitch}
-                        className="bg-[#091325] border border-white/10 p-2 rounded-full text-[#A7B4C8] hover:text-white transition-colors"
+                        className="bg-slate-800 border border-slate-500/50 p-2 rounded-full text-slate-400 hover:text-white hover:border-blue-400 hover:bg-slate-700 transition-all shadow-lg"
                     >
                         <SwapIcon size={20} />
                     </button>
@@ -94,16 +94,16 @@ const SwapScreen: React.FC = () => {
 
                 {/* To Token */}
                 <div className="mt-8">
-                    <label className="text-[#A7B4C8] text-sm mb-2 block">To (Estimated)</label>
-                    <div className="flex items-center gap-4 bg-white/5 p-3 rounded-lg">
+                    <label className="text-slate-400 text-sm mb-2 block">To (Estimated)</label>
+                    <div className="flex items-center gap-4 bg-slate-900/40 border border-slate-500/30 p-3 rounded-lg">
                         <select
                             value={toToken.symbol}
                             onChange={(e) => setToToken(tokens.find(t => t.symbol === e.target.value) || toToken)}
-                            className="bg-transparent text-[#E6EEF3] font-bold outline-none cursor-pointer"
+                            className="bg-transparent text-white font-bold outline-none cursor-pointer focus:text-blue-400 transition-colors"
                         >
-                            {tokens.map(t => <option key={t.symbol} value={t.symbol}>{t.symbol}</option>)}
+                            {tokens.map(t => <option key={t.symbol} value={t.symbol} className="bg-slate-900 text-white">{t.symbol}</option>)}
                         </select>
-                        <div className="text-right text-[#E6EEF3] text-xl font-bold w-full">
+                        <div className="text-right text-white text-xl font-bold w-full">
                             {loading ? <SpinnerIcon size={20} /> : quote?.toAmount || '0.00'}
                         </div>
                     </div>
@@ -111,12 +111,12 @@ const SwapScreen: React.FC = () => {
 
                 {/* Quote Details */}
                 {quote && (
-                    <div className="mt-4 p-3 bg-white/5 rounded-lg text-sm">
-                        <div className="flex justify-between text-[#A7B4C8] mb-1">
+                    <div className="mt-4 p-3 bg-slate-900/40 border border-slate-500/30 rounded-lg text-sm">
+                        <div className="flex justify-between text-slate-400 mb-1">
                             <span>Rate</span>
                             <span>1 {fromToken.symbol} = {quote.rate} {toToken.symbol}</span>
                         </div>
-                        <div className="flex justify-between text-[#A7B4C8]">
+                        <div className="flex justify-between text-slate-400">
                             <span>Fee</span>
                             <span>{quote.fee} {fromToken.symbol}</span>
                         </div>
@@ -127,9 +127,9 @@ const SwapScreen: React.FC = () => {
                 <button
                     onClick={handleSwap}
                     disabled={!quote || swapping || loading}
-                    className={`w-full mt-6 py-3 rounded-lg font-bold text-lg transition-colors ${!quote || swapping
-                        ? 'bg-white/10 text-[#A7B4C8] cursor-not-allowed'
-                        : 'bg-primary text-primary-text hover:bg-primary/90'
+                    className={`w-full mt-6 py-3 rounded-lg font-bold text-lg transition-all shadow-[0_0_20px_rgba(255,255,255,0.1)] hover:shadow-[0_0_30px_rgba(255,255,255,0.2)] ${!quote || swapping
+                        ? 'bg-slate-800 text-slate-500 cursor-not-allowed shadow-none'
+                        : 'bg-slate-200 text-slate-900 hover:bg-white'
                         }`}
                 >
                     {swapping ? 'Swapping...' : 'Swap'}

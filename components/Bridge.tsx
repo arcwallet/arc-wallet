@@ -236,39 +236,40 @@ const Bridge: React.FC = () => {
 
   return (
     <div className="w-full max-w-3xl mx-auto px-6 py-10 space-y-10">
-      <div className="space-y-3 text-center">
-        <h2 className="text-text-primary text-4xl font-black leading-tight tracking-[-0.03em]">Bridge USDC</h2>
-        <p className="text-text-secondary text-base">
-          Transfer USDC between <span className="text-primary font-semibold">Arc Testnet</span> and <span className="text-primary font-semibold">Ethereum Sepolia</span> using Circle CCTP.
+
+      <div className="mb-8 text-center">
+        <h2 className="text-white text-4xl font-black leading-tight tracking-[-0.03em]">Bridge USDC</h2>
+        <p className="text-slate-400 text-base mt-2">
+          Transfer USDC between <span className="text-blue-400 font-semibold">Arc Testnet</span> and <span className="text-blue-400 font-semibold">Ethereum Sepolia</span> using Circle CCTP.
         </p>
       </div>
 
       <div className="grid gap-6">
-        <div className="rounded-xl border border-white/10 bg-[#151A22] p-6 space-y-4">
-          <p className="text-sm font-medium text-text-secondary">Bridge Direction</p>
+        <div className="rounded-xl border border-slate-500/50 bg-slate-900/60 backdrop-blur-sm p-6 space-y-4">
+          <p className="text-sm font-medium text-slate-400">Bridge Direction</p>
           <div className="grid sm:grid-cols-2 gap-3">
             {DIRECTIONS.map((option) => (
               <button
                 key={option.id}
                 type="button"
                 onClick={() => setDirection(option.id)}
-                className={`rounded-xl border px-4 py-4 text-left transition-colors ${option.id === direction
-                    ? 'border-primary bg-primary/10 text-primary'
-                    : 'border-white/10 bg-transparent text-text-primary hover:border-primary/40 hover:bg-primary/5'
+                className={`rounded-xl border px-4 py-4 text-left transition-all ${option.id === direction
+                  ? 'border-blue-400 bg-blue-400/10 text-blue-400 shadow-[0_0_15px_rgba(96,165,250,0.2)]'
+                  : 'border-slate-500/30 bg-transparent text-slate-300 hover:border-blue-400/50 hover:bg-blue-400/5'
                   }`}
               >
                 <p className="text-base font-semibold">{option.label}</p>
-                <p className="text-xs text-text-secondary mt-1">{option.description}</p>
+                <p className="text-xs text-slate-400 mt-1">{option.description}</p>
               </button>
             ))}
           </div>
         </div>
 
-        <div className="rounded-xl border border-white/10 bg-[#151A22] p-6 space-y-4">
+        <div className="rounded-xl border border-slate-500/50 bg-slate-900/60 backdrop-blur-sm p-6 space-y-4">
           <div className="space-y-4">
             <div>
-              <label className="text-sm font-medium text-text-secondary">Token</label>
-              <div className="mt-1 w-full rounded-lg border border-white/10 bg-[#0f1729] px-4 py-3 text-text-primary flex items-center gap-3">
+              <label className="text-sm font-medium text-slate-400">Token</label>
+              <div className="mt-1 w-full rounded-lg border border-slate-500/30 bg-slate-900/40 px-4 py-3 text-slate-100 flex items-center gap-3">
                 <div className="flex items-center gap-3">
                   <img
                     src="/icons/usdc.svg"
@@ -277,52 +278,51 @@ const Bridge: React.FC = () => {
                   />
                   <div>
                     <p className="font-semibold text-base">USDC</p>
-                    <p className="text-xs text-text-secondary">USD Coin</p>
+                    <p className="text-xs text-slate-400">USD Coin</p>
                   </div>
                 </div>
-                <div className="ml-auto text-xs text-text-secondary bg-white/5 px-3 py-1.5 rounded-full">
+                <div className="ml-auto text-xs text-slate-300 bg-white/5 px-3 py-1.5 rounded-full border border-white/10">
                   Arc Testnet ↔ Sepolia
                 </div>
               </div>
-              <p className="text-xs text-text-secondary mt-2">
+              <p className="text-xs text-slate-400 mt-2">
                 ✓ Only USDC is supported for bridge between Arc Testnet and Ethereum Sepolia
               </p>
             </div>
             <label className="flex flex-col gap-2">
-              <span className="text-sm font-medium text-text-secondary">Amount ({selectedToken.symbol})</span>
+              <span className="text-sm font-medium text-slate-400">Amount ({selectedToken.symbol})</span>
               <input
                 type="text"
                 inputMode="decimal"
                 value={amount}
                 onChange={(event) => setAmount(event.target.value)}
-                className="form-input h-12 rounded-lg border border-white/10 bg-[#0f1729] px-4 text-text-primary focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
+                className="form-input h-12 rounded-lg border border-slate-500/50 bg-slate-900/40 px-4 text-white focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400 transition-all placeholder:text-slate-500"
                 placeholder="e.g. 1.5 or 1,5"
               />
               {amountError && <span className="text-xs text-accent-orange">{amountError}</span>}
             </label>
-            <p className="text-xs text-text-secondary">
+            <p className="text-xs text-slate-400">
               Ensure your session key controls {selectedToken.symbol} on the selected source chain. Bridging uses the same private key across Sepolia and Arc.
             </p>
           </div>
         </div>
 
-        <motion.button
-          whileTap={{ scale: canSubmit ? 0.98 : 1 }}
+        <button
           onClick={handleBridge}
           disabled={!canSubmit}
-          className="flex items-center justify-center gap-2 h-12 rounded-lg bg-primary text-primary-text text-base font-semibold transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+          className="flex items-center justify-center gap-2 h-14 rounded-lg bg-slate-200 hover:bg-white text-slate-900 text-lg font-semibold transition-all shadow-[0_0_20px_rgba(255,255,255,0.1)] hover:shadow-[0_0_30px_rgba(255,255,255,0.2)] disabled:cursor-not-allowed disabled:opacity-50"
         >
           {isSubmitting && <SpinnerIcon size={20} />}
           <span>{isSubmitting ? `Bridging ${selectedToken.symbol}…` : `Bridge ${selectedToken.symbol} ${directionDetails?.label ?? ''}`}</span>
-        </motion.button>
+        </button>
 
         {statusMessage && (
           <div
             className={`rounded-lg border px-4 py-3 text-sm text-left ${statusVariant === 'error'
-                ? 'border-red-400/50 bg-red-500/10 text-red-200'
-                : statusVariant === 'success'
-                  ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-200'
-                  : 'border-white/10 bg-white/5 text-text-secondary'
+              ? 'border-red-400/50 bg-red-500/10 text-red-200'
+              : statusVariant === 'success'
+                ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-200'
+                : 'border-white/10 bg-white/5 text-text-secondary'
               }`}
           >
             {statusMessage}
