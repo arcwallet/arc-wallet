@@ -216,43 +216,45 @@ class IndexerService {
                                     webhookService.trigger(from, 'Transfer', payload);
                                     webhookService.trigger(to, 'Transfer', payload);
 
-                                    // Trigger Push Notifications for ERC20 with formatted amounts
-                                    try {
-                                        const metadata = await this.tokenMetadataService.getTokenMetadata(tokenAddress);
-                                        const formattedAmount = metadata
-                                            ? this.tokenMetadataService.formatTokenAmount(value, metadata.decimals)
-                                            : value;
+                                    // Trigger Push Notifications for ERC20 with formatted amounts (async)
+                                    (async () => {
+                                        try {
+                                            const metadata = await this.tokenMetadataService.getTokenMetadata(tokenAddress);
+                                            const formattedAmount = metadata
+                                                ? this.tokenMetadataService.formatTokenAmount(value, metadata.decimals)
+                                                : value;
 
-                                        const tokenSymbol = metadata?.symbol || 'tokens';
-                                        const tokenName = metadata?.name || 'Unknown Token';
+                                            const tokenSymbol = metadata?.symbol || 'tokens';
+                                            const tokenName = metadata?.name || 'Unknown Token';
 
-                                        pushService.sendNotification(to, {
-                                            title: 'Incoming Token Transfer',
-                                            body: `You received ${formattedAmount} ${tokenSymbol} from ${from.slice(0, 6)}...${from.slice(-4)}`,
-                                            icon: '/icon-192x192.png',
-                                            data: {
-                                                type: 'erc20_transfer',
-                                                from,
-                                                to,
-                                                value: formattedAmount,
-                                                rawValue: value,
-                                                tokenAddress,
-                                                tokenSymbol,
-                                                tokenName,
-                                                txHash: tx.hash
-                                            }
-                                        });
+                                            pushService.sendNotification(to, {
+                                                title: 'Incoming Token Transfer',
+                                                body: `You received ${formattedAmount} ${tokenSymbol} from ${from.slice(0, 6)}...${from.slice(-4)}`,
+                                                icon: '/icon-192x192.png',
+                                                data: {
+                                                    type: 'erc20_transfer',
+                                                    from,
+                                                    to,
+                                                    value: formattedAmount,
+                                                    rawValue: value,
+                                                    tokenAddress,
+                                                    tokenSymbol,
+                                                    tokenName,
+                                                    txHash: tx.hash
+                                                }
+                                            });
 
-                                        console.log(`📨 ERC20 notification sent: ${formattedAmount} ${tokenSymbol} to ${to.slice(0, 6)}...`);
-                                    } catch (notifError) {
-                                        console.error('Error sending ERC20 notification:', notifError);
-                                        // Fallback to basic notification
-                                        pushService.sendNotification(to, {
-                                            title: 'Incoming Token Transfer',
-                                            body: `You received tokens from ${from.slice(0, 6)}...${from.slice(-4)}`,
-                                            icon: '/icon-192x192.png'
-                                        });
-                                    }
+                                            console.log(`📨 ERC20 notification sent: ${formattedAmount} ${tokenSymbol} to ${to.slice(0, 6)}...`);
+                                        } catch (notifError) {
+                                            console.error('Error sending ERC20 notification:', notifError);
+                                            // Fallback to basic notification
+                                            pushService.sendNotification(to, {
+                                                title: 'Incoming Token Transfer',
+                                                body: `You received tokens from ${from.slice(0, 6)}...${from.slice(-4)}`,
+                                                icon: '/icon-192x192.png'
+                                            });
+                                        }
+                                    })();
 
                                 } catch (e) {
                                     console.error('Error parsing ERC20 log:', e);
