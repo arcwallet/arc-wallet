@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import crypto from 'crypto';
-import db from '../db/indexer';
+import db from '../db/indexer.js';
 
 interface Webhook {
     id: string;

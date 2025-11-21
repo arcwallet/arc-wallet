@@ -1,5 +1,5 @@
 import { ethers } from 'ethers';
-import db from '../db/indexer';
+import db from '../db/indexer.js';
 import { webhookService } from './webhookService';
 import { pushService } from './pushService';
 import { TokenMetadataService } from './tokenMetadataService.js';
