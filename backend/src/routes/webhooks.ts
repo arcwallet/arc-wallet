@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { webhookService } from '../services/webhookService';
+import { webhookService } from '../services/webhookService.js';
 
 export const createWebhookRouter = () => {
     const router = Router();

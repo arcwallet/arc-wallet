@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { pushService } from '../services/pushService';
+import { pushService } from '../services/pushService.js';
 
 export const createNotificationRouter = () => {
     const router = Router();

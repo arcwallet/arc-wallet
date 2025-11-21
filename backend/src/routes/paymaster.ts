@@ -1,6 +1,6 @@
 import express from 'express';
-import { paymasterService } from '../services/paymasterService';
-import { policyEngine } from '../services/policyEngine';
+import { paymasterService } from '../services/paymasterService.js';
+import { policyEngine } from '../services/policyEngine.js';
 import { ethers } from 'ethers';
 
 const router = express.Router();
