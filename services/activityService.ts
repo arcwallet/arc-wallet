@@ -3,7 +3,7 @@ import { getProvider } from './transactionService';
 import type { Transaction } from '../types';
 import { TransactionStatus, TransactionType } from '../types';
 import { API_ENDPOINTS } from '../config/app.config';
-import { SUPPORTED_TOKENS } from '../config/tokens';
+import { SUPPORTED_TOKENS, getTokenByAddress } from '../config/tokens';
 
 const provider = getProvider();
 const RATE_LIMIT_ERROR_CODE = -32007;
@@ -65,6 +65,10 @@ const fetchActivityHistory = async (address: string, limit: number = 20): Promis
     const normalizedAddress = address.toLowerCase();
     const response = await fetch(API_ENDPOINTS.history(normalizedAddress, limit));
 
+    if (response.status === 429) {
+      throw new RateLimitError('Rate limit exceeded');
+    }
+
     if (!response.ok) {
       throw new Error('Failed to fetch history');
     }
@@ -94,7 +98,20 @@ export async function fetchRecentTransactions(
     const data = await fetchActivityHistory(normalizedAddress, limit);
     return data.map((tx: any) => {
       const isSent = tx.from_address.toLowerCase() === normalizedAddress;
-      const amount = parseFloat(formatUnits(tx.value, 18)); // Assuming 18 decimals for now, TODO: Handle tokens
+
+      // Determine decimals and symbol
+      let decimals = 18;
+      let symbol = 'ARC';
+
+      if (tx.token_address) {
+        const token = getTokenByAddress(tx.token_address);
+        if (token) {
+          decimals = token.decimals;
+          symbol = token.symbol;
+        }
+      }
+
+      const amount = parseFloat(formatUnits(tx.value, decimals));
 
       return {
         id: tx.hash,
@@ -103,7 +120,7 @@ export async function fetchRecentTransactions(
         timestamp: formatRelativeTime(tx.timestamp * 1000),
         date: new Date(tx.timestamp * 1000),
         amount: isSent ? -amount : amount,
-        currency: 'ARC', // Default to ARC for now
+        currency: symbol,
         usdValue: amount * 0.1, // Placeholder
         status: tx.status === 1 ? TransactionStatus.Completed : TransactionStatus.Failed,
         hash: tx.hash,

@@ -7,6 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useSelfCustodialWallet } from '../contexts/SelfCustodialWalletContext';
 import { SocialLoginButtons } from './SocialLoginButtons';
+import { validatePassword, getPasswordStrengthLabel, getPasswordStrengthColor } from '../utils/passwordValidation';
 
 type SetupStep = 'choice' | 'create' | 'import' | 'backup';
 
@@ -20,7 +21,8 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
     importWallet,
     needsBackup,
     getMnemonic,
-    markBackedUp
+    markBackedUp,
+    isConnecting
   } = useSelfCustodialWallet();
 
   const [step, setStep] = useState<SetupStep>('choice');
@@ -29,9 +31,18 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
   const [importInput, setImportInput] = useState('');
   const [mnemonic, setMnemonic] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [backupConfirmed, setBackupConfirmed] = useState(false);
+  const [passwordStrength, setPasswordStrength] = useState({ isValid: false, score: 0, feedback: [] as string[] });
+
+  // Update password strength on password change
+  useEffect(() => {
+    if (password) {
+      setPasswordStrength(validatePassword(password));
+    } else {
+      setPasswordStrength({ isValid: false, score: 0, feedback: [] });
+    }
+  }, [password]);
 
   // Check for existing mnemonic needing backup and URL errors
   useEffect(() => {
@@ -55,8 +66,8 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
 
   // Handle wallet creation
   const handleCreate = async () => {
-    if (password.length < 8) {
-      setError('Password must be at least 8 characters');
+    if (!passwordStrength.isValid) {
+      setError(passwordStrength.feedback.join('. '));
       return;
     }
 
@@ -65,7 +76,6 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
       return;
     }
 
-    setIsLoading(true);
     setError(null);
 
     try {
@@ -74,15 +84,13 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
       setStep('backup');
     } catch (err: any) {
       setError(err.message || 'Failed to create wallet');
-    } finally {
-      setIsLoading(false);
     }
   };
 
   // Handle wallet import
   const handleImport = async () => {
-    if (password.length < 8) {
-      setError('Password must be at least 8 characters');
+    if (!passwordStrength.isValid) {
+      setError(passwordStrength.feedback.join('. '));
       return;
     }
 
@@ -96,7 +104,6 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
       return;
     }
 
-    setIsLoading(true);
     setError(null);
 
     try {
@@ -104,8 +111,6 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
       onComplete();
     } catch (err: any) {
       setError(err.message || 'Failed to import wallet');
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -194,6 +199,34 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
             placeholder="Minimum 8 characters"
             className="w-full h-12 rounded-lg border border-white/10 bg-[#0f1729] px-4 text-text-primary focus:border-primary focus:outline-none"
           />
+          {password && (
+            <div className="mt-2 space-y-1">
+              <div className="flex items-center gap-2">
+                <div className="flex-1 h-2 bg-white/10 rounded-full overflow-hidden">
+                  <div
+                    className="h-full transition-all duration-300"
+                    style={{
+                      width: `${(passwordStrength.score / 4) * 100}%`,
+                      backgroundColor: getPasswordStrengthColor(passwordStrength.score)
+                    }}
+                  />
+                </div>
+                <span
+                  className="text-xs font-medium"
+                  style={{ color: getPasswordStrengthColor(passwordStrength.score) }}
+                >
+                  {getPasswordStrengthLabel(passwordStrength.score)}
+                </span>
+              </div>
+              {passwordStrength.feedback.length > 0 && (
+                <ul className="text-xs text-text-secondary space-y-0.5">
+                  {passwordStrength.feedback.map((msg, i) => (
+                    <li key={i}>• {msg}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
         </div>
 
         <div>
@@ -223,10 +256,10 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
           <motion.button
             whileTap={{ scale: 0.98 }}
             onClick={handleCreate}
-            disabled={isLoading}
+            disabled={isConnecting}
             className="flex-1 h-12 rounded-lg bg-primary text-primary-text font-semibold disabled:opacity-50"
           >
-            {isLoading ? 'Creating...' : 'Create Wallet'}
+            {isConnecting ? 'Creating...' : 'Create Wallet'}
           </motion.button>
         </div>
       </div>
@@ -297,10 +330,10 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
           <motion.button
             whileTap={{ scale: 0.98 }}
             onClick={handleImport}
-            disabled={isLoading}
+            disabled={isConnecting}
             className="flex-1 h-12 rounded-lg bg-primary text-primary-text font-semibold disabled:opacity-50"
           >
-            {isLoading ? 'Importing...' : 'Import Wallet'}
+            {isConnecting ? 'Importing...' : 'Import Wallet'}
           </motion.button>
         </div>
       </div>

@@ -1,7 +1,7 @@
 import { parseUnits } from 'ethers';
 
-const CIRCLE_API_BASE_URL = import.meta.env.VITE_CIRCLE_WALLETS_API_URL || 'https://api.circle.com/v1/w3s/developer';
-const DEBUG = import.meta.env.VITE_SWAP_DEBUG === 'true';
+const CIRCLE_API_BASE_URL = (import.meta as any).env.VITE_CIRCLE_WALLETS_API_URL || 'https://api.circle.com/v1/w3s/developer';
+const DEBUG = (import.meta as any).env.VITE_SWAP_DEBUG === 'true';
 
 export interface CircleApiConfig {
   apiKey: string;
@@ -42,7 +42,7 @@ export class CircleApiService {
 
   private generateIdempotencyKey(): string {
     // Use browser-compatible UUID generation
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
       const r = Math.random() * 16 | 0;
       const v = c === 'x' ? r : (r & 0x3 | 0x8);
       return v.toString(16);
@@ -55,7 +55,7 @@ export class CircleApiService {
     if (this.encryptionCache && Date.now() - this.encryptionCache.fetchedAt < 10 * 60 * 1000) {
       return this.encryptionCache.publicKey;
     }
-    const res = await fetch(`${CIRCLE_API_BASE_URL.replace('/developer','')}/encryption/public`, {
+    const res = await fetch(`${CIRCLE_API_BASE_URL.replace('/developer', '')}/encryption/public`, {
       headers: {
         'Authorization': `Bearer ${this.config.apiKey}`,
       },
@@ -106,7 +106,7 @@ export class CircleApiService {
   async executeContractTransaction(params: SwapTransactionParams): Promise<CircleTransactionResponse> {
     try {
       if (DEBUG) {
-        console.log('🔄 Circle API: Executing contract transaction', params);
+        console.debug('🔄 Circle API: Executing contract transaction', params);
       }
 
       const entitySecretCiphertext = await this.encryptEntitySecret(this.config.entitySecret);
@@ -127,7 +127,7 @@ export class CircleApiService {
       };
 
       if (DEBUG) {
-        console.log('📤 Circle API Request:', requestBody);
+        console.debug('📤 Circle API Request:', requestBody);
       }
 
       const response = await fetch(`${CIRCLE_API_BASE_URL}/transactions/contractExecution`, {
@@ -147,7 +147,7 @@ export class CircleApiService {
       const result = await response.json();
 
       if (DEBUG) {
-        console.log('📥 Circle API Response:', result);
+        console.debug('📥 Circle API Response:', result);
       }
 
       return result.data;
@@ -207,8 +207,8 @@ let circleApiService: CircleApiService | null = null;
 
 export function getCircleApiService(): CircleApiService {
   if (!circleApiService) {
-    const apiKey = import.meta.env.VITE_CIRCLE_API_KEY;
-    const entitySecret = import.meta.env.VITE_CIRCLE_ENTITY_SECRET;
+    const apiKey = (import.meta as any).env.VITE_CIRCLE_API_KEY;
+    const entitySecret = (import.meta as any).env.VITE_CIRCLE_ENTITY_SECRET;
 
     if (!apiKey || !entitySecret) {
       throw new Error('Circle API credentials not configured. Please set VITE_CIRCLE_API_KEY and VITE_CIRCLE_ENTITY_SECRET environment variables.');

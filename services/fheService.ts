@@ -241,23 +241,25 @@ function generateMockProof(amount: bigint, publicKey: string): string {
 export function exampleEncryptDecrypt() {
     // Generate keypair
     const keypair = generateFHEKeypair();
-    console.log('FHE Keypair:', keypair);
 
     // Encrypt amount (e.g., 1.5 ETH = 1500000000000000000 wei)
     const amount = BigInt('1500000000000000000');
+    // console.log('FHE Keypair:', keypair);
+
+    // Encrypt
     const encrypted = encryptAmount(amount, keypair.publicKey);
-    console.log('Encrypted:', encrypted);
+    // console.log('Encrypted:', encrypted);
 
-    // Decrypt amount
+    // Decrypt
     const decrypted = decryptAmount(encrypted, keypair.privateKey);
-    console.log('Decrypted:', decrypted.toString());
-    console.log('Match:', amount === decrypted);
+    // console.log('Decrypted:', decrypted.toString());
+    // console.log('Match:', amount === decrypted);
 
-    // Generate view key
+    // Create view key
     const viewKey = generateViewKey(keypair.privateKey);
-    console.log('View Key:', viewKey);
+    // console.log('View Key:', viewKey);
 
-    // Decrypt with view key
+    // Decrypt with view key (mock)
     const decryptedWithView = decryptWithViewKey(encrypted, viewKey);
-    console.log('Decrypted with View Key:', decryptedWithView.toString());
+    // console.log('Decrypted with View Key:', decryptedWithView.toString());
 }

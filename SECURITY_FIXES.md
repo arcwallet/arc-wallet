@@ -647,3 +647,33 @@ AWS_SECRETS_MANAGER_ARN=arn:aws:secretsmanager:us-east-1:123456789012:secret:arc
 6. **Dependency updates** - Keep dependencies up to date
 7. **Security testing** - Run tests on every commit
 
+---
+
+## Implemented Security Improvements (Sprint 2 & 3)
+
+### 1. CSRF Token Refresh Mechanism
+- **Implementation:** Centralized `csrfService.ts` created.
+- **Behavior:** Automatically refreshes CSRF tokens on 403 errors and retries requests.
+- **Files:** `services/csrfService.ts`, `services/multiSigClient.ts`, `services/bridgeApiClient.ts`, `services/sessionApi.ts`.
+
+### 2. Client-Side Rate Limiting
+- **Implementation:** Explicit handling of HTTP 429 responses in `activityService.ts`.
+- **Behavior:** Throws `RateLimitError` to trigger cooldown logic in `ActivityContext`.
+- **Files:** `services/activityService.ts`, `contexts/ActivityContext.tsx`.
+
+### 3. Global Error Handling
+- **Implementation:** Global `unhandledrejection` handler in `App.tsx`.
+- **Behavior:** Catches and logs unhandled async errors to prevent silent failures.
+- **Files:** `App.tsx`.
+
+### 4. Secure Loading States
+- **Implementation:** Unified `isConnecting` state in `WalletSetup`.
+- **Behavior:** Prevents multiple concurrent wallet creation/import attempts.
+- **Files:** `components/WalletSetup.tsx`, `contexts/SelfCustodialWalletContext.tsx`.
+
+### 5. Console Log Cleanup
+- **Implementation:** Removed sensitive or unnecessary logs from production builds.
+- **Behavior:** Uses `console.debug` with `DEBUG` flag or removes logs entirely.
+- **Files:** `services/fheService.ts`, `services/circleApiService.ts`.
+
+

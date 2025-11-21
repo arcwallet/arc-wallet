@@ -6,11 +6,7 @@
 const API_BASE_URL = ((import.meta as any).env.VITE_PASSKEY_API_URL ?? ((import.meta as any).env.PROD ? `${window.location.origin}/api` : 'http://localhost:4000')).replace(/\/$/, '');
 const resolveUrl = (path: string) => (API_BASE_URL ? `${API_BASE_URL}${path}` : path);
 
-// Get CSRF token from cookie
-const getCsrfToken = (): string | null => {
-  const match = document.cookie.match(/(?:^|; )_csrf=([^;]*)/);
-  return match ? decodeURIComponent(match[1]) : null;
-};
+import { getCsrfToken, refreshCsrfToken } from './csrfService';
 
 // Types
 export interface MultiSigAccount {
@@ -77,7 +73,7 @@ interface ApiResponse<T> {
 }
 
 // Helper functions
-async function postJSON<T>(endpoint: string, data: any): Promise<ApiResponse<T>> {
+async function postJSON<T>(endpoint: string, data: any, isRetry = false): Promise<ApiResponse<T>> {
   const csrfToken = getCsrfToken();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -93,6 +89,20 @@ async function postJSON<T>(endpoint: string, data: any): Promise<ApiResponse<T>>
     body: JSON.stringify(data),
   });
 
+  // Handle CSRF token expiration
+  if (response.status === 403 && !isRetry) {
+    const clone = response.clone();
+    try {
+      const errorBody = await clone.json();
+      if (errorBody.code === 'CSRF_VALIDATION_FAILED' || errorBody.error === 'Invalid CSRF token') {
+        await refreshCsrfToken();
+        return postJSON<T>(endpoint, data, true);
+      }
+    } catch (e) {
+      // Ignore JSON parse error
+    }
+  }
+
   const result = await response.json();
 
   if (!response.ok) {
@@ -102,7 +112,7 @@ async function postJSON<T>(endpoint: string, data: any): Promise<ApiResponse<T>>
   return result;
 }
 
-async function getJSON<T>(endpoint: string): Promise<ApiResponse<T>> {
+async function getJSON<T>(endpoint: string, isRetry = false): Promise<ApiResponse<T>> {
   const csrfToken = getCsrfToken();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -117,6 +127,20 @@ async function getJSON<T>(endpoint: string): Promise<ApiResponse<T>> {
     credentials: 'include',
   });
 
+  // Handle CSRF token expiration
+  if (response.status === 403 && !isRetry) {
+    const clone = response.clone();
+    try {
+      const errorBody = await clone.json();
+      if (errorBody.code === 'CSRF_VALIDATION_FAILED' || errorBody.error === 'Invalid CSRF token') {
+        await refreshCsrfToken();
+        return getJSON<T>(endpoint, true);
+      }
+    } catch (e) {
+      // Ignore JSON parse error
+    }
+  }
+
   const result = await response.json();
 
   if (!response.ok) {
@@ -126,7 +150,7 @@ async function getJSON<T>(endpoint: string): Promise<ApiResponse<T>> {
   return result;
 }
 
-async function putJSON<T>(endpoint: string, data: any): Promise<ApiResponse<T>> {
+async function putJSON<T>(endpoint: string, data: any, isRetry = false): Promise<ApiResponse<T>> {
   const csrfToken = getCsrfToken();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -142,6 +166,20 @@ async function putJSON<T>(endpoint: string, data: any): Promise<ApiResponse<T>> 
     body: JSON.stringify(data),
   });
 
+  // Handle CSRF token expiration
+  if (response.status === 403 && !isRetry) {
+    const clone = response.clone();
+    try {
+      const errorBody = await clone.json();
+      if (errorBody.code === 'CSRF_VALIDATION_FAILED' || errorBody.error === 'Invalid CSRF token') {
+        await refreshCsrfToken();
+        return putJSON<T>(endpoint, data, true);
+      }
+    } catch (e) {
+      // Ignore JSON parse error
+    }
+  }
+
   const result = await response.json();
 
   if (!response.ok) {
@@ -151,7 +189,7 @@ async function putJSON<T>(endpoint: string, data: any): Promise<ApiResponse<T>> 
   return result;
 }
 
-async function deleteJSON<T>(endpoint: string, data?: any): Promise<ApiResponse<T>> {
+async function deleteJSON<T>(endpoint: string, data?: any, isRetry = false): Promise<ApiResponse<T>> {
   const csrfToken = getCsrfToken();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -166,6 +204,20 @@ async function deleteJSON<T>(endpoint: string, data?: any): Promise<ApiResponse<
     credentials: 'include',
     body: data ? JSON.stringify(data) : undefined,
   });
+
+  // Handle CSRF token expiration
+  if (response.status === 403 && !isRetry) {
+    const clone = response.clone();
+    try {
+      const errorBody = await clone.json();
+      if (errorBody.code === 'CSRF_VALIDATION_FAILED' || errorBody.error === 'Invalid CSRF token') {
+        await refreshCsrfToken();
+        return deleteJSON<T>(endpoint, data, true);
+      }
+    } catch (e) {
+      // Ignore JSON parse error
+    }
+  }
 
   const result = await response.json();
 

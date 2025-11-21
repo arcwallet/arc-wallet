@@ -169,7 +169,7 @@ export const ActivityProvider: React.FC<{ children: ReactNode }> = ({ children }
       const updates: Array<{ hash: string; status: TransactionStatus; date?: Date; fee?: number }> = [];
 
       await Promise.all(
-        pendingHashes.map(async (hash) => {
+        pendingHashes.map(async (hash: string) => {
           try {
             const receipt = await provider.getTransactionReceipt(hash);
             if (!receipt) {
@@ -179,10 +179,10 @@ export const ActivityProvider: React.FC<{ children: ReactNode }> = ({ children }
             const status =
               receipt.status === 0 ? TransactionStatus.Failed : TransactionStatus.Completed;
             const fee =
-              receipt.gasUsed && receipt.effectiveGasPrice
+              receipt.gasUsed && receipt.gasPrice
                 ? parseFloat(
-                    formatUnits(receipt.gasUsed * receipt.effectiveGasPrice, 18),
-                  )
+                  formatUnits(receipt.gasUsed * receipt.gasPrice, 18),
+                )
                 : undefined;
             updates.push({
               hash,
@@ -232,7 +232,8 @@ export const ActivityProvider: React.FC<{ children: ReactNode }> = ({ children }
       cancelled = true;
       window.clearInterval(interval);
     };
-  }, [setActivities]);
+  }, []); // Empty deps - setActivities is stable, pendingRef is a ref
+
 
   const addActivity = useCallback(
     (activity: Transaction) => {

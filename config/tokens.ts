@@ -129,6 +129,17 @@ export const getTokenContractAddress = (
   return token.contractAddresses[network]?.[chain];
 };
 
+export const getTokenByAddress = (address: string): TokenInfo | undefined => {
+  const normalizedAddress = address.toLowerCase();
+  return Object.values(SUPPORTED_TOKENS).find((token) => {
+    return Object.values(token.contractAddresses).some((networkConfig) => {
+      return Object.values(networkConfig).some((contractAddress) => {
+        return contractAddress?.toLowerCase() === normalizedAddress;
+      });
+    });
+  });
+};
+
 export const getAllSupportedTokens = (): TokenInfo[] => {
   return Object.values(SUPPORTED_TOKENS).sort((a, b) => a.displayPriority - b.displayPriority);
 };

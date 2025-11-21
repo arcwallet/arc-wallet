@@ -6,6 +6,8 @@ import { usePrivacy } from '../contexts/PrivacyContext';
 import { passkeyClient, type SessionKeySummary } from '../services/passkeyClient';
 import { WalletIcon, CopyIcon, AddIcon, LaptopIcon, PhoneIcon, ChevronDownIcon } from './Icons';
 import { LinkedAccountsManager } from './LinkedAccountsManager';
+import WebhookManager from './WebhookManager';
+import NotificationManager from './NotificationManager';
 
 const WalletIdentitySection: React.FC = () => {
     const { address } = useSelfCustodialWallet();

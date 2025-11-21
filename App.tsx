@@ -166,36 +166,47 @@ const RootView: React.FC = () => {
   return <WalletExperience email={email} />;
 };
 
-const App: React.FC = () => (
-  <ErrorBoundary>
-    <SessionProvider>
-      <SelfCustodialWalletProvider>
-        <WalletProvider>
-          <ArcAccountProvider>
-            <ActivityProvider>
-              <IdentityProvider>
-                <PrivacyProvider>
-                  <MultiSigProvider>
-                    <div className="auth-wrapper">
-                      <React.Suspense fallback={
-                        <div className="fullpage-login">
-                          <div className="login-content">
-                            <p className="login-message muted">Loading…</p>
+const App: React.FC = () => {
+  useEffect(() => {
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      console.error('🚨 Unhandled Promise Rejection:', event.reason);
+    };
+
+    window.addEventListener('unhandledrejection', handleUnhandledRejection);
+    return () => window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+  }, []);
+
+  return (
+    <ErrorBoundary>
+      <SessionProvider>
+        <SelfCustodialWalletProvider>
+          <WalletProvider>
+            <ArcAccountProvider>
+              <ActivityProvider>
+                <IdentityProvider>
+                  <PrivacyProvider>
+                    <MultiSigProvider>
+                      <div className="auth-wrapper">
+                        <React.Suspense fallback={
+                          <div className="fullpage-login">
+                            <div className="login-content">
+                              <p className="login-message muted">Loading…</p>
+                            </div>
                           </div>
-                        </div>
-                      }>
-                        <RootView />
-                      </React.Suspense>
-                    </div>
-                  </MultiSigProvider>
-                </PrivacyProvider>
-              </IdentityProvider>
-            </ActivityProvider>
-          </ArcAccountProvider>
-        </WalletProvider>
-      </SelfCustodialWalletProvider>
-    </SessionProvider>
-  </ErrorBoundary>
-);
+                        }>
+                          <RootView />
+                        </React.Suspense>
+                      </div>
+                    </MultiSigProvider>
+                  </PrivacyProvider>
+                </IdentityProvider>
+              </ActivityProvider>
+            </ArcAccountProvider>
+          </WalletProvider>
+        </SelfCustodialWalletProvider>
+      </SessionProvider>
+    </ErrorBoundary>
+  );
+};
 
 export default App;

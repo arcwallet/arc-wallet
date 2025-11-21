@@ -1,11 +1,7 @@
 const API_BASE = ((import.meta as any).env.VITE_PASSKEY_API_URL ?? ((import.meta as any).env.PROD ? `${window.location.origin}/api` : 'http://localhost:4000')).replace(/\/$/, '');
 const resolveUrl = (path: string) => `${API_BASE}${path}`;
 
-// Get CSRF token from cookie
-const getCsrfToken = (): string | null => {
-  const match = document.cookie.match(/(?:^|; )_csrf=([^;]*)/);
-  return match ? decodeURIComponent(match[1]) : null;
-};
+import { getCsrfToken, refreshCsrfToken } from './csrfService';
 
 interface ApiResponse<T = unknown> {
   success: boolean;
@@ -29,7 +25,7 @@ const handleResponse = async <T>(response: Response): Promise<T> => {
 };
 
 export const sessionApi = {
-  async sendLink(email: string, timeoutMs = 30000) {
+  async sendLink(email: string, timeoutMs = 30000, isRetry = false) {
     const controller = new AbortController();
     const timer = window.setTimeout(() => controller.abort(), timeoutMs);
     try {
@@ -45,6 +41,21 @@ export const sessionApi = {
         body: JSON.stringify({ email }),
         signal: controller.signal,
       });
+
+      // Handle CSRF token expiration
+      if (response.status === 403 && !isRetry) {
+        const clone = response.clone();
+        try {
+          const errorBody = await clone.json();
+          if (errorBody.code === 'CSRF_VALIDATION_FAILED' || errorBody.error === 'Invalid CSRF token') {
+            await refreshCsrfToken();
+            return sessionApi.sendLink(email, timeoutMs, true);
+          }
+        } catch (e) {
+          // Ignore JSON parse error
+        }
+      }
+
       return handleResponse<ApiResponse>(response);
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') {
@@ -56,7 +67,7 @@ export const sessionApi = {
     }
   },
 
-  async verify(token: string, timeoutMs = 15000) {
+  async verify(token: string, timeoutMs = 15000, isRetry = false) {
     const controller = new AbortController();
     const timer = window.setTimeout(() => controller.abort(), timeoutMs);
     try {
@@ -72,6 +83,21 @@ export const sessionApi = {
         body: JSON.stringify({ token }),
         signal: controller.signal,
       });
+
+      // Handle CSRF token expiration
+      if (response.status === 403 && !isRetry) {
+        const clone = response.clone();
+        try {
+          const errorBody = await clone.json();
+          if (errorBody.code === 'CSRF_VALIDATION_FAILED' || errorBody.error === 'Invalid CSRF token') {
+            await refreshCsrfToken();
+            return sessionApi.verify(token, timeoutMs, true);
+          }
+        } catch (e) {
+          // Ignore JSON parse error
+        }
+      }
+
       return handleResponse<ApiResponse>(response);
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') {
@@ -84,6 +110,7 @@ export const sessionApi = {
   },
 
   async getSession(timeoutMs = 3000): Promise<{ email: string } | null> {
+    // getSession is used for refreshing token, so no retry logic here to avoid loops
     const controller = new AbortController();
     const timer = window.setTimeout(() => controller.abort(), timeoutMs);
     try {
@@ -107,7 +134,7 @@ export const sessionApi = {
     }
   },
 
-  async logout() {
+  async logout(isRetry = false) {
     const csrfToken = getCsrfToken();
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (csrfToken) {
@@ -118,6 +145,21 @@ export const sessionApi = {
       credentials: 'include',
       headers,
     });
+
+    // Handle CSRF token expiration
+    if (response.status === 403 && !isRetry) {
+      const clone = response.clone();
+      try {
+        const errorBody = await clone.json();
+        if (errorBody.code === 'CSRF_VALIDATION_FAILED' || errorBody.error === 'Invalid CSRF token') {
+          await refreshCsrfToken();
+          return sessionApi.logout(true);
+        }
+      } catch (e) {
+        // Ignore JSON parse error
+      }
+    }
+
     return handleResponse<ApiResponse>(response);
   },
 };

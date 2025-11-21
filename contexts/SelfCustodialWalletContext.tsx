@@ -121,19 +121,7 @@ export const SelfCustodialWalletProvider: React.FC<{ children: ReactNode }> = ({
     }
   }, []);
 
-  // Upload encrypted wallet to backend
-  const backupWallet = async (encrypted: any) => {
-    try {
-      await fetch('/api/wallet/backup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ encryptedWallet: JSON.stringify(encrypted) }),
-      });
-    } catch (error) {
-      console.error('Failed to backup wallet:', error);
-      // Don't fail the flow, just log error
-    }
-  };
+
 
   // Create new wallet (generates key locally)
   const createWallet = useCallback(async (password: string): Promise<{ address: string; mnemonic: string }> => {
@@ -150,9 +138,6 @@ export const SelfCustodialWalletProvider: React.FC<{ children: ReactNode }> = ({
       // Encrypt and save locally
       const encrypted = await encryptWallet(walletData, password);
       saveEncryptedWallet(encrypted);
-
-      // Backup to backend
-      await backupWallet(encrypted);
 
       // Update state
       setAddress(walletData.address);
@@ -194,9 +179,6 @@ export const SelfCustodialWalletProvider: React.FC<{ children: ReactNode }> = ({
       const encrypted = await encryptWallet(walletData, password);
       saveEncryptedWallet(encrypted);
 
-      // Backup to backend
-      await backupWallet(encrypted);
-
       // Update state
       setAddress(walletData.address);
       setPrivateKey(walletData.privateKey);
@@ -212,58 +194,6 @@ export const SelfCustodialWalletProvider: React.FC<{ children: ReactNode }> = ({
       setIsConnecting(false);
     }
   }, []);
-
-  // Register passkey (for identity, not wallet)
-  const registerPasskey = useCallback(async () => {
-    if (!address) {
-      throw new Error('Create or import a wallet first');
-    }
-
-    setIsConnecting(true);
-
-    try {
-      const username = currentEmail || `user-${address.slice(0, 8)}`;
-      const displayName = currentEmail || username;
-
-      // Register passkey with backend
-      const startResp = await passkeyClient.beginRegistration(username, displayName);
-      const options = startResp.data?.options;
-      const credential = await createRegistrationCredential(options);
-      const finishResp = await passkeyClient.finishRegistration(username, credential);
-
-      // Get user ID from backend
-      const responseData = finishResp.data as { user?: { id: string; username: string; displayName: string } } | undefined;
-      const user = responseData?.user;
-      if (user?.id) {
-        localStorage.setItem(USER_ID_KEY, user.id);
-        setUserId(user.id);
-      }
-
-      setIsAuthenticated(true);
-
-      // Save auth state
-      sessionStorage.setItem(AUTH_STATE_KEY, JSON.stringify({
-        isAuthenticated: true,
-        address,
-      }));
-
-      // Ensure wallet is backed up after registration
-      const encrypted = loadEncryptedWallet();
-      if (encrypted) {
-        await backupWallet(encrypted);
-      }
-
-    } catch (error) {
-      if (error instanceof PasskeyClientError && error.status === 400) {
-        // Already registered, try to authenticate
-        await loginWithPasskeyInternal();
-        return;
-      }
-      throw error;
-    } finally {
-      setIsConnecting(false);
-    }
-  }, [address, currentEmail]);
 
   // Login with passkey (internal)
   const loginWithPasskeyInternal = useCallback(async () => {
@@ -306,6 +236,52 @@ export const SelfCustodialWalletProvider: React.FC<{ children: ReactNode }> = ({
       address, // Might be null if just restored
     }));
   }, [address, currentEmail]);
+
+  // Register passkey (for identity, not wallet)
+  const registerPasskey = useCallback(async () => {
+    if (!address) {
+      throw new Error('Create or import a wallet first');
+    }
+
+    setIsConnecting(true);
+
+    try {
+      const username = currentEmail || `user-${address.slice(0, 8)}`;
+      const displayName = currentEmail || username;
+
+      // Register passkey with backend
+      const startResp = await passkeyClient.beginRegistration(username, displayName);
+      const options = startResp.data?.options;
+      const credential = await createRegistrationCredential(options);
+      const finishResp = await passkeyClient.finishRegistration(username, credential);
+
+      // Get user ID from backend
+      const responseData = finishResp.data as { user?: { id: string; username: string; displayName: string } } | undefined;
+      const user = responseData?.user;
+      if (user?.id) {
+        localStorage.setItem(USER_ID_KEY, user.id);
+        setUserId(user.id);
+      }
+
+      setIsAuthenticated(true);
+
+      // Save auth state
+      sessionStorage.setItem(AUTH_STATE_KEY, JSON.stringify({
+        isAuthenticated: true,
+        address,
+      }));
+
+    } catch (error) {
+      if (error instanceof PasskeyClientError && error.status === 400) {
+        // Already registered, try to authenticate
+        await loginWithPasskeyInternal();
+        return;
+      }
+      throw error;
+    } finally {
+      setIsConnecting(false);
+    }
+  }, [address, currentEmail, loginWithPasskeyInternal]);
 
   // Login with passkey (public)
   const loginWithPasskey = useCallback(async () => {

@@ -3,13 +3,9 @@
  * Communicates with backend bridge endpoints
  */
 
-const API_BASE_URL = import.meta.env.VITE_PASSKEY_API_URL || 'http://localhost:4000';
+const API_BASE_URL = (import.meta as any).env.VITE_PASSKEY_API_URL || 'http://localhost:4000';
 
-// Get CSRF token from cookie
-const getCsrfToken = (): string | null => {
-  const match = document.cookie.match(/(?:^|; )_csrf=([^;]*)/);
-  return match ? decodeURIComponent(match[1]) : null;
-};
+import { getCsrfToken, refreshCsrfToken } from './csrfService';
 
 export interface StartBridgeRequest {
   userId: string;
@@ -88,7 +84,7 @@ export class BridgeApiError extends Error {
   }
 }
 
-export async function startBridge(request: StartBridgeRequest): Promise<StartBridgeResponse> {
+export async function startBridge(request: StartBridgeRequest, isRetry = false): Promise<StartBridgeResponse> {
   try {
     const csrfToken = getCsrfToken();
     const headers: Record<string, string> = {
@@ -104,6 +100,20 @@ export async function startBridge(request: StartBridgeRequest): Promise<StartBri
       credentials: 'include',
       body: JSON.stringify(request),
     });
+
+    // Handle CSRF token expiration
+    if (response.status === 403 && !isRetry) {
+      const clone = response.clone();
+      try {
+        const errorBody = await clone.json();
+        if (errorBody.code === 'CSRF_VALIDATION_FAILED' || errorBody.error === 'Invalid CSRF token') {
+          await refreshCsrfToken();
+          return startBridge(request, true);
+        }
+      } catch (e) {
+        // Ignore JSON parse error
+      }
+    }
 
     const data = await response.json();
 
