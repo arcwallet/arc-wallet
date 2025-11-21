@@ -31,7 +31,7 @@ const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="relative w-full h-screen flex flex-col items-center justify-center overflow-hidden">
+    <div className="fixed inset-0 w-full h-full flex flex-col items-center justify-center overflow-hidden bg-transparent">
       {/* Background Pattern */}
       <div className="absolute inset-0 z-0">
         <WaveBackground />
@@ -39,7 +39,7 @@ const LoginPage: React.FC = () => {
 
       {/* Top Left Logo */}
       <div className="absolute top-8 left-8 z-20 opacity-90 hover:opacity-100 transition-opacity cursor-pointer">
-        <img src={arcLogo} alt="Arc Wallet" className="w-12 h-12 drop-shadow-[0_0_15px_rgba(255,255,255,0.5)]" />
+        <img src={arcLogo} alt="Arc Wallet" className="w-20 h-20 object-contain drop-shadow-[0_0_20px_rgba(255,255,255,0.6)]" />
       </div>
 
       {/* Login Container */}
