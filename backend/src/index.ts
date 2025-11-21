@@ -18,6 +18,7 @@ import { createWebhookRouter } from './routes/webhooks.js';
 import { createMagicLinkMailer } from './services/magicLinkMailer.js';
 import { IndexerService } from './services/indexerService.js';
 import { webhookService } from './services/webhookService.js';
+import { initIndexerDB } from './db/indexer.js';
 import { MagicSessionStore } from './magicLink/SessionStore.js';
 import { loadConfig, validateConfig } from './utils/config.js';
 import { cookieMiddleware } from './middleware/cookies.js';
@@ -112,7 +113,12 @@ app.use('/api/paymaster', paymasterRouter);
 app.use('/api/history', createHistoryRouter());
 app.use('/api/webhooks', createWebhookRouter());
 
+// Initialize indexer database
+console.log('🔧 Initializing indexer database...');
+initIndexerDB();
+
 // Initialize and start indexer service
+console.log('🚀 Starting indexer service...');
 const indexerService = new IndexerService(db);
 indexerService.start();
 webhookService.start();
