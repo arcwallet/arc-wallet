@@ -1,6 +1,10 @@
 import React from 'react';
 
-export const WaveBackground: React.FC = () => {
+interface WaveBackgroundProps {
+    showAnimation?: boolean;
+}
+
+export const WaveBackground: React.FC<WaveBackgroundProps> = ({ showAnimation = false }) => {
     // Create 20 concentric layers for the keyhole tunnel effect
     const layers = Array.from({ length: 20 }, (_, i) => i);
 
@@ -88,10 +92,10 @@ export const WaveBackground: React.FC = () => {
                                     strokeWidth={0.5 / scale}
                                     strokeLinecap="round"
                                     strokeLinejoin="round"
-                                    className="animate-keyhole-sequence"
+                                    className={showAnimation ? "animate-keyhole-sequence" : ""}
                                     style={{
                                         animationDelay: `${delay}s`,
-                                        opacity: 0.15 // Base dim state
+                                        opacity: showAnimation ? 0.15 : 0.3 // Higher base opacity if static
                                     }}
                                 />
                             </g>

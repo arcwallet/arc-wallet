@@ -123,22 +123,22 @@ const NotificationManager: React.FC = () => {
     return (
         <div className="flex flex-col gap-6">
             <div className="flex flex-col gap-2">
-                <h2 className="text-xl font-bold text-text-primary">Push Notifications</h2>
-                <p className="text-text-secondary text-sm">
+                <h2 className="text-xl font-bold text-white">Push Notifications</h2>
+                <p className="text-slate-400 text-sm">
                     Get notified about incoming transactions even when the app is closed.
                 </p>
             </div>
 
-            <div className="flex items-center justify-between bg-surface p-4 rounded-xl border border-divider">
+            <div className="flex items-center justify-between bg-slate-900/40 backdrop-blur-sm p-4 rounded-xl border border-slate-500/30 shadow-sm">
                 <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-full ${isSubscribed ? 'bg-primary/20 text-primary' : 'bg-white/5 text-text-secondary'}`}>
+                    <div className={`p-2 rounded-full ${isSubscribed ? 'bg-blue-500/20 text-blue-400' : 'bg-slate-700/50 text-slate-400'}`}>
                         <BellIcon size={24} />
                     </div>
                     <div className="flex flex-col">
-                        <span className="font-medium text-text-primary">
+                        <span className="font-medium text-slate-100">
                             {isSubscribed ? 'Notifications Enabled' : 'Enable Notifications'}
                         </span>
-                        <span className="text-xs text-text-secondary">
+                        <span className="text-xs text-slate-400">
                             {isSubscribed ? 'You will receive alerts for wallet activity.' : 'Allow browser notifications to stay updated.'}
                         </span>
                     </div>
@@ -148,7 +148,7 @@ const NotificationManager: React.FC = () => {
                     {isSubscribed && (
                         <button
                             onClick={sendTestNotification}
-                            className="text-sm text-primary hover:underline px-2"
+                            className="text-sm text-blue-400 hover:text-blue-300 hover:underline px-2 transition-colors"
                         >
                             Test
                         </button>
@@ -157,9 +157,9 @@ const NotificationManager: React.FC = () => {
                     <button
                         onClick={isSubscribed ? unsubscribeUser : subscribeUser}
                         disabled={isLoading}
-                        className={`px-4 py-2 rounded-lg font-medium transition-colors ${isSubscribed
-                            ? 'bg-white/5 text-text-secondary hover:bg-white/10'
-                            : 'bg-primary text-white hover:bg-primary/90'
+                        className={`px-4 py-2 rounded-lg font-medium transition-all shadow-sm ${isSubscribed
+                            ? 'bg-slate-700/50 text-slate-300 hover:bg-slate-700 hover:text-white border border-slate-500/30'
+                            : 'bg-slate-200 text-slate-900 hover:bg-white hover:shadow-md'
                             }`}
                     >
                         {isLoading ? 'Processing...' : isSubscribed ? 'Disable' : 'Enable'}

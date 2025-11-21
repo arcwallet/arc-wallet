@@ -9,7 +9,8 @@ import {
   MultiSigIcon,
   FaucetIcon,
   VerifiedIcon,
-  RobotIcon
+  RobotIcon,
+  SettingsIcon
 } from './Icons';
 
 interface NavItemProps {
@@ -33,16 +34,17 @@ const getIconComponent = (iconName: string) => {
     case 'water_drop': return <FaucetIcon {...iconProps} />;
     case 'verified': return <VerifiedIcon {...iconProps} />;
     case 'smart_toy': return <RobotIcon {...iconProps} />;
+    case 'settings': return <SettingsIcon {...iconProps} />;
     default: return <DashboardIcon {...iconProps} />;
   }
 };
 
 const NavItem: React.FC<NavItemProps> = ({ icon, label, active = false, onClick }) => {
-  const activeClasses = 'bg-[#151A22] text-[#E6EEF3] font-semibold';
-  const inactiveClasses = 'text-[#A7B4C8] hover:bg-[#151A22]/60 font-medium';
+  const activeClasses = 'bg-blue-500/10 text-blue-400 border-l-2 border-blue-400 font-semibold';
+  const inactiveClasses = 'text-slate-400 hover:bg-white/5 hover:text-slate-200 font-medium border-l-2 border-transparent';
 
   return (
-    <a onClick={onClick} className={`flex items-center gap-3 rounded-lg px-3 py-2.5 cursor-pointer transition-colors ${active ? activeClasses : inactiveClasses}`}>
+    <a onClick={onClick} className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-all ${active ? activeClasses : inactiveClasses}`}>
       {getIconComponent(icon)}
       <p className="text-sm">{label}</p>
     </a>
@@ -70,12 +72,12 @@ const SideNavBar: React.FC<SideNavBarProps> = ({ currentPage, onNavigate }) => {
   ];
 
   return (
-    <aside className="hidden md:flex w-64 flex-col border-r border-white/10 bg-[#091325]/50 p-4">
-      <div className="flex items-center gap-3 p-3">
-        <img src="/arcwalletlogo.png" alt="Arc Wallet" className="h-10 w-10 object-contain" />
-        <h1 className="text-[#E6EEF3] text-lg font-bold">Arc Wallet</h1>
+    <aside className="hidden md:flex w-64 flex-col border-r border-slate-500/30 bg-slate-900/80 backdrop-blur-md">
+      <div className="flex items-center gap-3 p-6 border-b border-slate-500/30">
+        <img src="/arcwalletlogo.png" alt="Arc Wallet" className="h-8 w-8 object-contain" />
+        <h1 className="text-white text-lg font-bold tracking-wide">Arc Wallet</h1>
       </div>
-      <nav className="mt-8 flex flex-1 flex-col gap-2">
+      <nav className="mt-6 flex flex-1 flex-col gap-1">
         {navItems.map(item => (
           <NavItem key={item.id} icon={item.icon} label={item.label} active={currentPage === item.id} onClick={() => onNavigate(item.id)} />
         ))}

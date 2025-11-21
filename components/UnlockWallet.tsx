@@ -62,7 +62,7 @@ const UnlockWallet: React.FC<UnlockWalletProps> = ({ onUnlock, onReset }) => {
     <div className="fixed inset-0 w-full h-full flex flex-col items-center justify-center overflow-hidden bg-transparent">
       {/* Background Pattern */}
       <div className="absolute inset-0 z-0">
-        <WaveBackground />
+        <WaveBackground showAnimation={true} />
       </div>
 
       {/* Top Left Logo */}
