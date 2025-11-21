@@ -57,9 +57,12 @@ class PaymasterService {
 
         if (!this.paymasterAddress) {
             console.warn('⚠️  PAYMASTER_ADDRESS not set. Paymaster features disabled.');
+            // Don't initialize contract with empty address - causes ENS error
+            this.paymasterContract = null as any; // Will be checked in isEnabled()
+            return;
         }
 
-        // Initialize contract
+        // Initialize contract only if address is set
         this.paymasterContract = new ethers.Contract(
             this.paymasterAddress,
             this.paymasterABI,
