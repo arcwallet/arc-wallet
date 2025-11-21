@@ -163,7 +163,7 @@ const DashboardHeader: React.FC<DashboardHeaderPropsWithNav> = ({ account, isRef
   const lastUpdated = account ? formatBlockTime(account.latestBlock.timestamp) : '—';
 
   return (
-    <header className="flex h-20 items-center justify-between gap-4 border-b border-white/10 px-8 py-3">
+    <header className="flex h-20 items-center justify-between gap-4 border-b border-slate-500/30 px-8 py-3 backdrop-blur-sm bg-slate-900/40">
       <div />
       <div className="flex items-center gap-4">
         <div className="hidden lg:flex flex-col text-right">
@@ -171,9 +171,9 @@ const DashboardHeader: React.FC<DashboardHeaderPropsWithNav> = ({ account, isRef
           <p className="text-sm font-semibold text-[#E6EEF3]">{isRefreshing ? <ShimmerBar width="70px" /> : account ? `#${account.latestBlock.number.toLocaleString()}` : '—'}</p>
           <p className="text-xs text-[#A7B4C8]">{isRefreshing ? <ShimmerBar width="60px" /> : lastUpdated}</p>
         </div>
-        <div className="flex items-center gap-2 rounded-lg bg-[#151A22] px-3 py-1.5">
+        <div className="flex items-center gap-2 rounded-lg bg-slate-900/60 backdrop-blur-sm border border-slate-600/30 px-3 py-1.5">
           <div className="size-2 rounded-full bg-green-500" />
-          <p className="text-sm font-medium text-[#A7B4C8]">Arc Testnet</p>
+          <p className="text-sm font-medium text-slate-400">Arc Testnet</p>
         </div>
         {isPrivacyMode && (
           <div className="flex items-center gap-2 rounded-lg bg-purple-500/10 border border-purple-500/30 px-3 py-1.5">
@@ -188,7 +188,7 @@ const DashboardHeader: React.FC<DashboardHeaderPropsWithNav> = ({ account, isRef
               setHasCopiedAddress(true);
               setTimeout(() => setHasCopiedAddress(false), 2000);
             }}
-            className="hidden sm:flex items-center gap-2 rounded-lg bg-surface px-3 py-1.5 border border-divider text-left hover:bg-white/10 transition-colors"
+            className="hidden sm:flex items-center gap-2 rounded-lg bg-slate-900/60 backdrop-blur-sm px-3 py-1.5 border border-slate-500/50 text-left hover:border-blue-400 transition-all"
             title="Copy wallet address"
           >
             <WalletIcon size={16} className="text-text-secondary" />
@@ -250,7 +250,7 @@ const BalanceOverview: React.FC<BalanceOverviewProps> = ({ onNavigate, balanceDi
   const updatedAt = lastUpdated ? new Date(lastUpdated).toLocaleTimeString() : '—';
 
   return (
-    <div className="flex flex-col gap-6 rounded-xl bg-[#151A22] p-6">
+    <div className="flex flex-col gap-6 rounded-xl bg-slate-900/60 backdrop-blur-sm border border-slate-500/50 p-6">
       <div className="flex items-start justify-between">
         <div className="flex flex-col gap-2">
           <p className="text-base font-medium text-[#A7B4C8]">Total Balance</p>
@@ -288,14 +288,14 @@ const BalanceOverview: React.FC<BalanceOverviewProps> = ({ onNavigate, balanceDi
       <div className="flex gap-4">
         <button
           onClick={() => onNavigate('Send')}
-          className="flex h-12 flex-1 items-center justify-center gap-2 px-5 text-base font-bold bg-primary text-primary-text rounded-lg shadow-lg hover:bg-primary/90 transition-colors"
+          className="flex h-12 flex-1 items-center justify-center gap-2 px-5 text-base font-semibold bg-slate-200 hover:bg-white text-slate-900 rounded-lg shadow-[0_0_20px_rgba(255,255,255,0.1)] hover:shadow-[0_0_30px_rgba(255,255,255,0.2)] transition-all"
         >
           <SendIcon size={20} />
           <span className="truncate">Send</span>
         </button>
         <button
           onClick={() => onNavigate('Receive')}
-          className="flex h-12 flex-1 items-center justify-center gap-2 px-5 text-base font-bold bg-primary text-primary-text rounded-lg shadow-lg hover:bg-primary/90 transition-colors"
+          className="flex h-12 flex-1 items-center justify-center gap-2 px-5 text-base font-semibold bg-slate-200 hover:bg-white text-slate-900 rounded-lg shadow-[0_0_20px_rgba(255,255,255,0.1)] hover:shadow-[0_0_30px_rgba(255,255,255,0.2)] transition-all"
         >
           <ReceiveIcon size={20} />
           <span className="truncate">Receive</span>
