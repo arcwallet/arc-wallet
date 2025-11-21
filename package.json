@@ -21,6 +21,8 @@
     "create-bridge-kit": "^1.0.3",
     "ethers": "^6.15.0",
     "framer-motion": "^12.23.24",
+    "glob": "^9.3.5",
+    "lru-cache": "^11.2.2",
     "qrcode": "^1.5.4",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
