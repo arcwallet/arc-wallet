@@ -138,22 +138,8 @@ const RootView: React.FC = () => {
     return <RecoveryPage />;
   }
 
-  if (loading || verifyingToken) {
-    return (
-      <div className="fullpage-login">
-        <div className="login-logo-container">
-          <img src={arcWalletLoginLogo} alt="Arc Wallet" className="login-logo" />
-        </div>
-        <div className="login-content">
-          <p className="login-message muted">
-            {verifyingToken ? 'Verifying your magic link…' : 'Checking your session…'}
-          </p>
-          {message && <p className="login-message error">{message}</p>}
-        </div>
-      </div>
-    );
-  }
-
+  // Show login page directly even during loading/verification
+  // The login page will handle its own state
   if (!email) {
     return <LoginPage />;
   }
