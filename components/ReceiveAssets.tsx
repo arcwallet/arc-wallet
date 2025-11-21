@@ -42,7 +42,7 @@ const ReceiveAssets: React.FC = () => {
             </div>
 
             {/* Wallet Address Card */}
-            <div className="w-full flex items-center justify-between gap-4 rounded-lg bg-surface p-4 shadow-md">
+            <div className="w-full flex items-center justify-between gap-4 rounded-lg bg-slate-900/60 backdrop-blur-sm border border-slate-500/50 p-4 shadow-md">
                 <p className="text-text-primary text-base font-medium leading-tight truncate">{address ? `${address.slice(0, 6)}...${address.slice(-4)}` : 'No Wallet Connected'}</p>
                 <button
                     onClick={handleCopyAddress}
@@ -59,7 +59,7 @@ const ReceiveAssets: React.FC = () => {
                 <button
                     onClick={handleCopyAddress}
                     disabled={!address}
-                    className="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-12 px-5 flex-1 bg-primary hover:bg-primary/90 text-primary-text text-base font-bold leading-normal tracking-[0.015em] transition-colors shadow-lg shadow-black/20 disabled:opacity-50"
+                    className="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-12 px-5 flex-1 bg-slate-200 hover:bg-white text-slate-900 text-base font-semibold leading-normal tracking-[0.015em] transition-all shadow-[0_0_20px_rgba(255,255,255,0.1)] hover:shadow-[0_0_30px_rgba(255,255,255,0.2)] disabled:opacity-50"
                 >
                     <span className="truncate">{copyButtonText}</span>
                 </button>
@@ -76,7 +76,7 @@ const ReceiveAssets: React.FC = () => {
                             const token = getAllSupportedTokens().find(t => t.symbol === e.target.value);
                             if (token) setSelectedToken(token);
                         }}
-                        className="w-full appearance-none rounded-lg border border-border-color bg-surface px-4 py-3 text-text-primary focus:border-primary focus:ring-primary/50 focus:ring-2 transition-all"
+                        className="w-full appearance-none rounded-lg border border-slate-500/50 bg-slate-900/60 backdrop-blur-sm px-4 py-3 text-white focus:border-blue-400 focus:ring-blue-400/50 focus:ring-1 transition-all"
                     >
                         {getAllSupportedTokens().map((token) => (
                             <option key={token.symbol} value={token.symbol}>

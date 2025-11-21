@@ -373,7 +373,7 @@ const SendAssets: React.FC = () => {
                 const token = getAllSupportedTokens().find(t => t.symbol === e.target.value);
                 if (token) setSelectedToken(token);
               }}
-              className="form-select flex w-full appearance-none resize-none overflow-hidden rounded-lg text-text-primary focus:outline-none border border-border-color bg-input-bg h-14 p-3.5 pr-10 text-base font-normal leading-normal focus:border-primary focus:ring-2 focus:ring-primary/50"
+              className="form-select flex w-full appearance-none resize-none overflow-hidden rounded-lg text-white focus:outline-none border border-slate-500/50 bg-slate-900/60 backdrop-blur-sm h-14 p-3.5 pr-10 text-base font-normal leading-normal focus:border-blue-400 focus:ring-1 focus:ring-blue-400 transition-all"
             >
               {getAllSupportedTokens().map((token) => (
                 <option key={token.symbol} value={token.symbol}>
@@ -389,7 +389,7 @@ const SendAssets: React.FC = () => {
           <p className="text-sm font-medium leading-normal pb-2 text-text-secondary">Amount</p>
           <div className="relative flex w-full flex-1 items-stretch">
             <input
-              className="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/50 border border-border-color bg-input-bg h-14 placeholder:text-text-secondary/70 p-3.5 text-base font-normal leading-normal"
+              className="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded-lg text-white focus:outline-none focus:ring-1 focus:ring-blue-400 border border-slate-500/50 bg-slate-900/60 backdrop-blur-sm h-14 placeholder:text-slate-400 p-3.5 text-base font-normal leading-normal transition-all"
               placeholder="0.00"
               step="any"
               type="number"
@@ -408,17 +408,17 @@ const SendAssets: React.FC = () => {
           <p className="text-sm font-medium leading-normal pb-2 text-text-secondary">Send To</p>
           <div className="flex w-full flex-1 items-stretch rounded-lg">
             <input
-              className="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded-l-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/50 border border-border-color bg-input-bg h-14 placeholder:text-text-secondary/70 p-3.5 pr-2 text-base font-normal leading-normal"
+              className="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded-l-lg text-white focus:outline-none focus:ring-1 focus:ring-blue-400 border border-slate-500/50 bg-slate-900/60 backdrop-blur-sm h-14 placeholder:text-slate-400 p-3.5 pr-2 text-base font-normal leading-normal transition-all"
               placeholder="Enter recipient wallet address"
               value={recipient}
               onChange={(e) => setRecipient(e.target.value)}
             />
-            <div className="text-text-secondary flex items-center justify-center rounded-r-lg border border-l-0 border-border-color bg-input-bg px-3.5">
+            <div className="text-slate-400 flex items-center justify-center rounded-r-lg border border-l-0 border-slate-500/50 bg-slate-900/60 backdrop-blur-sm px-3.5">
               <ContactIcon size={20} />
             </div>
           </div>
         </label>
-        <div className="mt-2 rounded-lg border border-border-color bg-input-bg/50 p-4">
+        <div className="mt-2 rounded-lg border border-slate-500/50 bg-slate-900/60 backdrop-blur-sm p-4">
           <h3 className="text-sm font-medium text-text-secondary mb-3">Transaction Summary</h3>
 
           {/* Privacy Mode Indicator */}
@@ -503,7 +503,7 @@ const SendAssets: React.FC = () => {
           <button
             onClick={handleSubmit}
             disabled={!canSubmit}
-            className="flex w-full cursor-pointer items-center justify-center overflow-hidden rounded-lg h-14 bg-primary text-primary-text text-lg font-bold leading-normal tracking-wide transition-all hover:opacity-90 hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 shadow-lg"
+            className="flex w-full cursor-pointer items-center justify-center overflow-hidden rounded-lg h-14 bg-slate-200 hover:bg-white text-slate-900 text-lg font-semibold leading-normal tracking-wide transition-all shadow-[0_0_20px_rgba(255,255,255,0.1)] hover:shadow-[0_0_30px_rgba(255,255,255,0.2)] disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSubmitting ? (
               <span className="flex items-center gap-2">
