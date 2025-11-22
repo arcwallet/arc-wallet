@@ -22,7 +22,7 @@ const SessionContext = createContext<SessionContextValue | undefined>(undefined)
 export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [state, setState] = useState<SessionState>({
     email: null,
-    loading: true,
+    loading: false,
     requestStatus: 'idle',
     message: null,
     verifyingToken: false,
