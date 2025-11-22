@@ -139,8 +139,8 @@ const AgentScreen: React.FC<AgentScreenProps> = ({ onExecuteIntent }) => {
         <div className="flex flex-col h-[calc(100vh-140px)] max-w-3xl mx-auto">
             <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-slate-700 to-slate-900 flex items-center justify-center border border-slate-500/50">
-                        <span className="text-xl">✨</span>
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-slate-700 to-slate-900 flex items-center justify-center border border-slate-500/50 overflow-hidden">
+                        <img src="/arc-agent-logo.png" alt="Arc Agent" className="w-full h-full object-cover" />
                     </div>
                     <div>
                         <h2 className="text-2xl font-bold text-[#E6EEF3]">Arc Agent</h2>
