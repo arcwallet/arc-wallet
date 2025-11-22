@@ -114,7 +114,7 @@ export async function sendSmartAccountUserOperation(
 
   if (params.transactions && params.transactions.length > 0) {
     // Batch execution
-    const { batchService } = await import('../backend/src/services/batchService.ts');
+    const { batchService } = await import('./batchService.ts');
     callData = batchService.encodeBatchData(params.transactions);
   } else if (params.to && params.amount) {
     // Single execution
@@ -136,7 +136,7 @@ export async function sendSmartAccountUserOperation(
     // Adjust gas estimation based on execution type
     if (params.transactions && params.transactions.length > 0) {
       // For batch execution, estimate gas for executeBatch
-      const { batchService } = await import('../backend/src/services/batchService.ts');
+      const { batchService } = await import('./batchService.ts');
       const encodedBatchData = batchService.encodeBatchData(params.transactions);
       const estimate = await smartAccount.estimateGas.executeBatch(encodedBatchData);
       callGasLimit = estimate;
