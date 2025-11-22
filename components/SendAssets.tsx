@@ -345,40 +345,33 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
           const { getTokenContractAddress } = await import('../config/tokens');
           const tokenAddress = getTokenContractAddress(tokenInfo.symbol, 'testnet', 'arcTestnet');
 
-          // Handle placeholder/invalid address for Demo/Testnet
-          if (tokenAddress === '0x3600000000000000000000000000000000000000') {
-            console.warn('[WARNING] Using placeholder USDC address. Simulating transaction success.');
-            // Simulate success for demo purposes since the contract doesn't exist
-            await new Promise(resolve => setTimeout(resolve, 1500)); // Fake delay
-            hash = '0x' + Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
-            kind = 'transaction';
-
-            // Manually update local balance for demo feel
-            const newBalance = Math.max(0, balance - amountNumber);
-            setTokenBalance(newBalance.toString());
-          } else if (tokenAddress) {
-            // Encode ERC20 transfer(address,uint256) calldata
-            const { Interface, parseUnits } = await import('ethers');
-            const iface = new Interface([
-              'function transfer(address to, uint256 amount) returns (bool)'
-            ]);
-            const amountWei = parseUnits(amount, tokenInfo.decimals);
-            transferData = iface.encodeFunctionData('transfer', [recipient, amountWei]);
-            transferTo = tokenAddress; // Call token contract
-            transferAmount = '0'; // No native ETH value
-
-            const result = await executeSmartAccountTransferWithFallback({
-              smartAccountAddress: walletAddress,
-              sessionPrivateKey: walletPrivateKey,
-              to: transferTo,
-              amount: transferAmount,
-              data: transferData
-            });
-            hash = result.hash;
-            kind = result.kind;
-          } else {
+          if (!tokenAddress) {
             throw new Error(`Token contract address not found for ${tokenInfo.symbol}`);
           }
+
+          // Encode ERC20 transfer(address,uint256) calldata
+          const { Interface, parseUnits } = await import('ethers');
+          const iface = new Interface([
+            'function transfer(address to, uint256 amount) returns (bool)'
+          ]);
+          const amountWei = parseUnits(amount, tokenInfo.decimals);
+          transferData = iface.encodeFunctionData('transfer', [recipient, amountWei]);
+          transferTo = tokenAddress; // Call token contract
+          transferAmount = '0'; // No native ETH value
+
+          console.log(`[SEND] Transferring ${amount} ${tokenInfo.symbol} to ${recipient}`);
+          console.log(`[SEND] Token contract: ${tokenAddress}`);
+          console.log(`[SEND] Amount (wei): ${amountWei.toString()}`);
+
+          const result = await executeSmartAccountTransferWithFallback({
+            smartAccountAddress: walletAddress,
+            sessionPrivateKey: walletPrivateKey,
+            to: transferTo,
+            amount: transferAmount,
+            data: transferData
+          });
+          hash = result.hash;
+          kind = result.kind;
         } else {
           // Native ETH transfer
           transferAmount = amount;
