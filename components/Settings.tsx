@@ -4,7 +4,7 @@ import { useSession } from '../contexts/SessionContext';
 import { useSelfCustodialWallet } from '../contexts/SelfCustodialWalletContext';
 
 import { passkeyClient, type SessionKeySummary } from '../services/passkeyClient';
-import { WalletIcon, CopyIcon, AddIcon, LaptopIcon, PhoneIcon, ChevronDownIcon } from './Icons';
+import { WalletIcon, CopyIcon, AddIcon, LaptopIcon, PhoneIcon, ChevronDownIcon, LockIcon } from './Icons';
 
 import WebhookManager from './WebhookManager';
 import NotificationManager from './NotificationManager';
@@ -278,7 +278,8 @@ const OrganizationRolesSection: React.FC = () => {
 const RecoverySection: React.FC = () => {
     const { sessionKey, verifyWithPasskey } = useWallet();
     const { getPrivateKey, getMnemonic, isUnlocked } = useSelfCustodialWallet();
-    const [showPrivateKey, setShowPrivateKey] = useState(false);
+    const [showSecret, setShowSecret] = useState(false);
+    const [activeTab, setActiveTab] = useState<'privateKey' | 'seedPhrase'>('privateKey');
     const [copied, setCopied] = useState(false);
     const [showModal, setShowModal] = useState(false);
     const [isVerifying, setIsVerifying] = useState(false);
@@ -292,21 +293,23 @@ const RecoverySection: React.FC = () => {
 
     // Use self-custodial wallet if unlocked, otherwise fall back to legacy
     const walletPrivateKey = isUnlocked ? getPrivateKey() : sessionKey?.privateKey;
+    const walletMnemonic = isUnlocked ? getMnemonic() : null;
 
-    // Auto-hide private key after 60 seconds
+    // Auto-hide secret after 60 seconds
     useEffect(() => {
-        if (showPrivateKey) {
+        if (showSecret) {
             const timer = setTimeout(() => {
-                setShowPrivateKey(false);
+                setShowSecret(false);
                 setShowModal(false);
             }, 60000);
             return () => clearTimeout(timer);
         }
-    }, [showPrivateKey]);
+    }, [showSecret]);
 
-    const handleCopyPrivateKey = () => {
-        if (walletPrivateKey) {
-            navigator.clipboard.writeText(walletPrivateKey);
+    const handleCopy = () => {
+        const textToCopy = activeTab === 'privateKey' ? walletPrivateKey : walletMnemonic;
+        if (textToCopy) {
+            navigator.clipboard.writeText(textToCopy);
             setCopied(true);
             setTimeout(() => setCopied(false), 2000);
         }
@@ -320,7 +323,7 @@ const RecoverySection: React.FC = () => {
 
     const handleCloseModal = () => {
         setShowModal(false);
-        setShowPrivateKey(false);
+        setShowSecret(false);
         setConfirmationChecks({ understand: false, noShare: false, responsibility: false });
         setHoldProgress(0);
     };
@@ -339,11 +342,10 @@ const RecoverySection: React.FC = () => {
             if (progress >= 100) {
                 clearInterval(interval);
                 setIsHolding(false);
-                handleRevealPrivateKey();
+                handleRevealSecret();
             }
-        }, 30); // 1.5 seconds total (30ms * 50 steps)
+        }, 30); // 1.5 seconds total
 
-        // Store interval ID to clear on mouse up
         (window as any).__holdInterval = interval;
     };
 
@@ -357,21 +359,20 @@ const RecoverySection: React.FC = () => {
         }
     };
 
-    const handleRevealPrivateKey = async () => {
-        if (showPrivateKey) {
-            setShowPrivateKey(false);
+    const handleRevealSecret = async () => {
+        if (showSecret) {
+            setShowSecret(false);
             setShowModal(false);
             return;
         }
 
-        // Verify with passkey first
         setIsVerifying(true);
         try {
             await verifyWithPasskey();
-            setShowPrivateKey(true);
+            setShowSecret(true);
         } catch (error) {
             console.error('Passkey verification failed:', error);
-            alert('Passkey verification failed. You must authenticate to view your private key.');
+            alert('Passkey verification failed. You must authenticate to view your backup.');
             setShowModal(false);
         } finally {
             setIsVerifying(false);
@@ -393,69 +394,128 @@ const RecoverySection: React.FC = () => {
                 <div className="flex w-full items-start justify-between">
                     <div className="flex flex-col gap-1">
                         <h3 className="text-base font-semibold text-slate-100">Wallet Backup</h3>
-                        <p className="text-sm text-slate-400">Securely export your private key</p>
+                        <p className="text-sm text-slate-400">Securely export your Private Key or Seed Phrase</p>
                     </div>
                 </div>
 
-                {/* Security Warning */}
-                <div className="w-full rounded-lg border border-[#ff6b81]/30 bg-[#ff6b81]/10 p-4">
-                    <div className="flex gap-2">
-                        <span className="text-[#ff6b81]">⚠️</span>
+                {/* Professional Security Warning (Blue/Amber) */}
+                <div className="w-full rounded-lg border border-blue-500/30 bg-blue-500/10 p-4 relative overflow-hidden">
+                    <div className="absolute top-0 right-0 p-4 opacity-10">
+                        <LockIcon size={64} className="text-blue-400" />
+                    </div>
+                    <div className="flex gap-3 relative z-10">
+                        <div className="p-2 bg-blue-500/20 rounded-lg h-fit">
+                            <span className="text-xl">🛡️</span>
+                        </div>
                         <div className="flex flex-col gap-1">
-                            <p className="text-sm font-semibold text-[#ff6b81]">Critical Security Warning</p>
-                            <p className="text-xs text-[#ffb3be]">
-                                Your private key controls your wallet. Never share it. Revealing requires authentication and multiple confirmations.
+                            <p className="text-sm font-semibold text-blue-100">Sensitive Information</p>
+                            <p className="text-xs text-blue-200/80 leading-relaxed max-w-lg">
+                                Your Private Key and Seed Phrase give full access to your funds.
+                                Never share them with anyone. Arc Wallet support will <span className="font-bold text-amber-400">NEVER</span> ask for them.
                             </p>
                         </div>
                     </div>
                 </div>
 
                 {/* Reveal Button */}
-                <button
-                    onClick={handleOpenModal}
-                    className="w-full sm:w-auto px-6 py-3 rounded-lg bg-slate-800/40 hover:bg-slate-700/40 text-slate-100 font-medium text-sm transition-colors border border-slate-600/30"
-                >
-                    Reveal Private Key
-                </button>
+                {!showSecret && (
+                    <button
+                        onClick={handleOpenModal}
+                        className="w-full sm:w-auto px-6 py-3 rounded-lg bg-slate-800/60 hover:bg-slate-700/60 text-slate-100 font-medium text-sm transition-all border border-slate-600/30 hover:border-blue-500/50 hover:shadow-[0_0_15px_rgba(59,130,246,0.1)] flex items-center justify-center gap-2"
+                    >
+                        <span className="text-lg">🔐</span>
+                        Reveal Secret Recovery
+                    </button>
+                )}
 
-                {/* Private Key Display (only when revealed) */}
-                {showPrivateKey && (
-                    <div className="w-full flex flex-col gap-3 p-4 rounded-lg border-2 border-[#ff6b81] bg-[#ff6b81]/5">
-                        <div className="flex items-center justify-between">
-                            <label className="text-sm font-semibold text-[#ff6b81]">⚠️ Private Key (visible for 60 seconds)</label>
+                {/* Secret Display (only when revealed) */}
+                {showSecret && (
+                    <div className="w-full flex flex-col gap-4 p-1 rounded-xl bg-slate-950/50 border border-slate-800">
+                        {/* Tabs */}
+                        <div className="flex p-1 gap-1 bg-slate-900/50 rounded-lg">
                             <button
-                                onClick={() => { setShowPrivateKey(false); setShowModal(false); }}
-                                className="text-sm font-medium text-[#ff6b81] hover:text-[#ff8a9a]"
+                                onClick={() => setActiveTab('privateKey')}
+                                className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${activeTab === 'privateKey'
+                                    ? 'bg-slate-800 text-white shadow-sm'
+                                    : 'text-slate-400 hover:text-slate-200'
+                                    }`}
                             >
-                                Hide Now
+                                Private Key
                             </button>
+                            {walletMnemonic && (
+                                <button
+                                    onClick={() => setActiveTab('seedPhrase')}
+                                    className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${activeTab === 'seedPhrase'
+                                        ? 'bg-slate-800 text-white shadow-sm'
+                                        : 'text-slate-400 hover:text-slate-200'
+                                        }`}
+                                >
+                                    Seed Phrase
+                                </button>
+                            )}
                         </div>
 
-                        <div className="relative flex items-center gap-2 rounded-lg border border-[#ff6b81]/50 bg-slate-900 px-3 py-3">
-                            <p className="flex-1 font-mono text-sm text-slate-100 break-all select-all">
-                                {walletPrivateKey}
-                            </p>
-                            <button
-                                onClick={handleCopyPrivateKey}
-                                className="flex shrink-0 items-center justify-center rounded-md p-1.5 text-[#ff6b81] hover:bg-white/10 hover:text-[#ff8a9a]"
-                                title="Copy to clipboard"
-                            >
-                                <CopyIcon size={18} />
-                            </button>
-                        </div>
+                        <div className="px-4 pb-4 flex flex-col gap-4">
+                            <div className="flex items-center justify-between">
+                                <label className="text-xs font-semibold text-amber-400 flex items-center gap-1.5">
+                                    <span>⚠️</span>
+                                    Visible for 60 seconds
+                                </label>
+                                <button
+                                    onClick={() => { setShowSecret(false); setShowModal(false); }}
+                                    className="text-xs font-medium text-slate-400 hover:text-white transition-colors"
+                                >
+                                    Hide Now
+                                </button>
+                            </div>
 
-                        {copied && (
-                            <p className="text-xs text-[#6de4b4]">✓ Copied to clipboard</p>
-                        )}
+                            {activeTab === 'privateKey' ? (
+                                <div className="relative flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-3 group hover:border-slate-600 transition-colors">
+                                    <p className="flex-1 font-mono text-sm text-slate-300 break-all select-all">
+                                        {walletPrivateKey}
+                                    </p>
+                                    <button
+                                        onClick={handleCopy}
+                                        className="flex shrink-0 items-center justify-center rounded-md p-2 text-slate-400 hover:bg-white/10 hover:text-white transition-all"
+                                        title="Copy Private Key"
+                                    >
+                                        <CopyIcon size={18} />
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="relative">
+                                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                                        {walletMnemonic?.split(' ').map((word, idx) => (
+                                            <div key={idx} className="flex items-center gap-2 bg-slate-900/80 border border-slate-700 rounded-md px-2 py-1.5">
+                                                <span className="text-xs text-slate-500 font-mono w-4">{idx + 1}.</span>
+                                                <span className="text-sm text-slate-200 font-medium">{word}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <button
+                                        onClick={handleCopy}
+                                        className="absolute top-2 right-2 p-2 bg-slate-800/80 hover:bg-slate-700 rounded-md text-slate-400 hover:text-white border border-slate-600/50 backdrop-blur-sm transition-all"
+                                        title="Copy Seed Phrase"
+                                    >
+                                        <CopyIcon size={16} />
+                                    </button>
+                                </div>
+                            )}
 
-                        <div className="rounded-lg border border-slate-600/30 bg-slate-900/50 p-3">
-                            <h4 className="text-sm font-semibold text-slate-100 mb-2">Backup Instructions:</h4>
-                            <ul className="text-xs text-slate-400 space-y-1 list-disc list-inside">
-                                <li>Store in a password manager (1Password, Bitwarden, etc.)</li>
-                                <li>Write on paper and store in a safe place</li>
-                                <li>Never save in cloud storage or email</li>
-                                <li>Keep multiple secure backups</li>
-                            </ul>
+                            {copied && (
+                                <p className="text-xs text-emerald-400 text-center font-medium animate-pulse">
+                                    ✓ Copied to clipboard
+                                </p>
+                            )}
+
+                            <div className="rounded-lg border border-slate-800 bg-slate-900/30 p-3">
+                                <h4 className="text-xs font-semibold text-slate-300 mb-2">Security Best Practices:</h4>
+                                <ul className="text-xs text-slate-500 space-y-1 list-disc list-inside">
+                                    <li>Write down on paper and store in a fireproof safe.</li>
+                                    <li>Do not take a screenshot or photo.</li>
+                                    <li>Do not save in unencrypted cloud storage.</li>
+                                </ul>
+                            </div>
                         </div>
                     </div>
                 )}
@@ -463,89 +523,77 @@ const RecoverySection: React.FC = () => {
 
             {/* Security Modal */}
             {showModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-                    <div className="w-full max-w-lg bg-slate-900 border border-slate-500/50 rounded-2xl shadow-2xl overflow-hidden">
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+                    <div className="w-full max-w-lg bg-[#0f172a] border border-slate-700 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
                         {/* Modal Header */}
-                        <div className="bg-gradient-to-r from-[#ff6b81] to-[#ff4757] p-6">
-                            <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+                        <div className="bg-gradient-to-r from-blue-600 to-cyan-600 p-6 relative overflow-hidden">
+                            <div className="absolute -right-4 -top-4 opacity-20 rotate-12">
+                                <LockIcon size={120} className="text-white" />
+                            </div>
+                            <h2 className="text-2xl font-bold text-white flex items-center gap-2 relative z-10">
                                 <span className="text-3xl">🔐</span>
-                                Private Key Access
+                                Secure Backup
                             </h2>
-                            <p className="text-white/90 text-sm mt-1">Maximum security verification required</p>
+                            <p className="text-blue-100/90 text-sm mt-1 relative z-10">Authentication required to reveal secrets</p>
                         </div>
 
                         {/* Modal Content */}
                         <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
-                            {/* Critical Warning */}
-                            <div className="bg-[#ff6b81]/10 border-2 border-[#ff6b81] rounded-lg p-4">
-                                <p className="text-[#ff6b81] font-bold text-lg mb-2">⚠️ EXTREME DANGER ⚠️</p>
-                                <p className="text-[#ffb3be] text-sm leading-relaxed">
-                                    Your private key is like the master password to your bank account. Anyone who obtains it can steal ALL your funds immediately and permanently. There is NO way to reverse or recover stolen funds.
-                                </p>
-                            </div>
-
-                            {/* Risks List */}
-                            <div className="space-y-3">
-                                <h3 className="text-slate-100 font-semibold text-base">You could lose everything if:</h3>
-                                <div className="space-y-2">
-                                    {[
-                                        'Someone sees your screen while the key is visible',
-                                        'You save it in an unsecured location (screenshots, notes, cloud)',
-                                        'Malware or keyloggers capture it from your device',
-                                        'You accidentally share or send it to someone',
-                                        'A camera or recording device captures your screen'
-                                    ].map((risk, idx) => (
-                                        <div key={idx} className="flex gap-2 text-sm text-slate-400">
-                                            <span className="text-[#ff6b81] shrink-0">•</span>
-                                            <span>{risk}</span>
-                                        </div>
-                                    ))}
+                            {/* Warning */}
+                            <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-4 flex gap-3">
+                                <span className="text-2xl">⚠️</span>
+                                <div>
+                                    <p className="text-amber-400 font-bold text-sm mb-1">Handle with Extreme Care</p>
+                                    <p className="text-amber-200/70 text-xs leading-relaxed">
+                                        Anyone with your Private Key or Seed Phrase can steal your funds.
+                                        Arc Wallet cannot recover lost funds if these secrets are compromised.
+                                    </p>
                                 </div>
                             </div>
 
                             {/* Confirmation Checkboxes */}
-                            <div className="space-y-3 border-t border-slate-600/30 pt-4">
-                                <p className="text-slate-100 font-medium text-sm">You must confirm you understand:</p>
+                            <div className="space-y-3 pt-2">
+                                <p className="text-slate-100 font-medium text-sm">Please confirm to proceed:</p>
 
-                                <label className="flex items-start gap-3 cursor-pointer group">
+                                <label className="flex items-start gap-3 cursor-pointer group p-3 rounded-lg hover:bg-white/5 transition-colors border border-transparent hover:border-slate-700">
                                     <input
                                         type="checkbox"
                                         checked={confirmationChecks.understand}
                                         onChange={(e) => setConfirmationChecks(prev => ({ ...prev, understand: e.target.checked }))}
-                                        className="mt-1 w-4 h-4 rounded border-slate-600 bg-slate-800 text-[#6c7cff] focus:ring-2 focus:ring-[#6c7cff] focus:ring-offset-0"
+                                        className="mt-0.5 w-4 h-4 rounded border-slate-600 bg-slate-800 text-blue-500 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0"
                                     />
-                                    <span className="text-sm text-slate-400 group-hover:text-slate-100">
-                                        I understand that anyone with my private key can steal all my funds permanently
+                                    <span className="text-sm text-slate-400 group-hover:text-slate-200 transition-colors">
+                                        I understand that sharing this secret allows anyone to access my funds.
                                     </span>
                                 </label>
 
-                                <label className="flex items-start gap-3 cursor-pointer group">
+                                <label className="flex items-start gap-3 cursor-pointer group p-3 rounded-lg hover:bg-white/5 transition-colors border border-transparent hover:border-slate-700">
                                     <input
                                         type="checkbox"
                                         checked={confirmationChecks.noShare}
                                         onChange={(e) => setConfirmationChecks(prev => ({ ...prev, noShare: e.target.checked }))}
-                                        className="mt-1 w-4 h-4 rounded border-slate-600 bg-slate-800 text-[#6c7cff] focus:ring-2 focus:ring-[#6c7cff] focus:ring-offset-0"
+                                        className="mt-0.5 w-4 h-4 rounded border-slate-600 bg-slate-800 text-blue-500 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0"
                                     />
-                                    <span className="text-sm text-slate-400 group-hover:text-slate-100">
-                                        I will never share this key with anyone, including Arc Wallet support
+                                    <span className="text-sm text-slate-400 group-hover:text-slate-200 transition-colors">
+                                        I will never share this with anyone claiming to be Support.
                                     </span>
                                 </label>
 
-                                <label className="flex items-start gap-3 cursor-pointer group">
+                                <label className="flex items-start gap-3 cursor-pointer group p-3 rounded-lg hover:bg-white/5 transition-colors border border-transparent hover:border-slate-700">
                                     <input
                                         type="checkbox"
                                         checked={confirmationChecks.responsibility}
                                         onChange={(e) => setConfirmationChecks(prev => ({ ...prev, responsibility: e.target.checked }))}
-                                        className="mt-1 w-4 h-4 rounded border-slate-600 bg-slate-800 text-[#6c7cff] focus:ring-2 focus:ring-[#6c7cff] focus:ring-offset-0"
+                                        className="mt-0.5 w-4 h-4 rounded border-slate-600 bg-slate-800 text-blue-500 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0"
                                     />
-                                    <span className="text-sm text-slate-400 group-hover:text-slate-100">
-                                        I take full responsibility for securing this key and understand Arc Wallet cannot help if it's compromised
+                                    <span className="text-sm text-slate-400 group-hover:text-slate-200 transition-colors">
+                                        I take full responsibility for the security of this backup.
                                     </span>
                                 </label>
                             </div>
 
                             {/* Hold to Reveal Button */}
-                            <div className="space-y-2 border-t border-slate-600/30 pt-4">
+                            <div className="space-y-2 pt-2">
                                 <button
                                     onMouseDown={handleHoldStart}
                                     onMouseUp={handleHoldEnd}
@@ -553,38 +601,39 @@ const RecoverySection: React.FC = () => {
                                     onTouchStart={handleHoldStart}
                                     onTouchEnd={handleHoldEnd}
                                     disabled={!allChecksConfirmed || isVerifying}
-                                    className={`relative w-full py-4 rounded-lg font-semibold text-base transition-all overflow-hidden ${allChecksConfirmed
-                                        ? 'bg-gradient-to-r from-[#ff6b81] to-[#ff4757] hover:from-[#ff7a8e] hover:to-[#ff5767] text-white cursor-pointer'
+                                    className={`relative w-full py-4 rounded-xl font-bold text-base transition-all overflow-hidden shadow-lg ${allChecksConfirmed
+                                        ? 'bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white cursor-pointer shadow-blue-900/20'
                                         : 'bg-slate-800 text-slate-500 cursor-not-allowed'
                                         }`}
                                 >
                                     <div
-                                        className="absolute inset-0 bg-white/20 transition-all"
+                                        className="absolute inset-0 bg-white/20 transition-all ease-linear"
                                         style={{ width: `${holdProgress}%` }}
                                     />
-                                    <span className="relative z-10">
-                                        {isVerifying
-                                            ? 'Verifying with Passkey...'
-                                            : isHolding
-                                                ? 'Keep Holding...'
-                                                : allChecksConfirmed
-                                                    ? 'Hold to Reveal Private Key'
-                                                    : 'Confirm All Warnings Above'}
+                                    <span className="relative z-10 flex items-center justify-center gap-2">
+                                        {isVerifying ? (
+                                            <>
+                                                <span className="animate-spin">⏳</span> Verifying...
+                                            </>
+                                        ) : isHolding ? (
+                                            'Keep Holding...'
+                                        ) : allChecksConfirmed ? (
+                                            <>
+                                                <span>👆</span> Hold to Reveal
+                                            </>
+                                        ) : (
+                                            'Confirm All Above'
+                                        )}
                                     </span>
                                 </button>
-                                {allChecksConfirmed && !isVerifying && (
-                                    <p className="text-xs text-center text-slate-400">
-                                        Hold the button for 1.5 seconds, then authenticate with your passkey
-                                    </p>
-                                )}
                             </div>
                         </div>
 
                         {/* Modal Footer */}
-                        <div className="bg-slate-900 p-4 border-t border-slate-600/30">
+                        <div className="bg-slate-950 p-4 border-t border-slate-800 flex justify-center">
                             <button
                                 onClick={handleCloseModal}
-                                className="w-full py-2 text-sm font-medium text-slate-400 hover:text-slate-100 transition-colors"
+                                className="text-sm font-medium text-slate-500 hover:text-slate-300 transition-colors"
                             >
                                 Cancel
                             </button>

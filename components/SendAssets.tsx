@@ -7,7 +7,7 @@ import { useSelfCustodialWallet } from '../contexts/SelfCustodialWalletContext';
 
 import { useActivity } from '../contexts/ActivityContext';
 import { usePrivacy } from '../contexts/PrivacyContext';
-import { initFHE, encryptAmount, EncryptedAmount } from '../services/fheService';
+import { preparePrivateTransaction, PrivateTransactionData } from '../services/teeService';
 import { formatUSDCAmount } from '../utils/format';
 import {
   estimateNativeTransfer,
@@ -65,16 +65,6 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
   const [encryptedAmountPreview, setEncryptedAmountPreview] = useState<string | null>(null);
   const [isGasSponsored, setIsGasSponsored] = useState(false);
   const [checkingSponsorship, setCheckingSponsorship] = useState(false);
-  const [fheInstance, setFheInstance] = useState<any>(null);
-
-  useEffect(() => {
-    if (isPrivacyMode && !fheInstance) {
-      initFHE(9000).then(instance => {
-        setFheInstance(instance);
-        console.log('FHE Instance initialized');
-      }).catch(err => console.error('Failed to init FHE:', err));
-    }
-  }, [isPrivacyMode]);
 
   // Batch Mode State
   const [isBatchMode, setIsBatchMode] = useState(false);
@@ -289,40 +279,37 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
         }
       }
 
-      // FHE Encryption Logic (Real)
+
+      // TEE Privacy Logic (Simulation Mode)
       if (isPrivacyMode) {
         try {
-          if (!fheInstance) {
-            throw new Error('FHE Instance not ready');
-          }
-
           const amountWei = parseUnits(amount, selectedToken.decimals);
 
-          // Use a real contract address if available, or the recipient/token address for binding
+          // Get token contract address if applicable
           const contractAddress = selectedToken.symbol !== 'ETH' ?
             (await import('../config/tokens')).getTokenContractAddress(selectedToken.symbol, 'testnet', 'arcTestnet') :
             '0x0000000000000000000000000000000000000000';
 
-          if (!contractAddress) throw new Error('Contract address required for FHE');
-
-          const encrypted = await encryptAmount(
-            fheInstance,
-            contractAddress,
-            walletAddress,
-            amountWei
+          // Prepare private transaction using TEE simulation
+          const privateData = await preparePrivateTransaction(
+            amountWei,
+            recipient,
+            contractAddress || undefined
           );
 
-          console.log('🔐 Encrypted Amount (Real FHE):', encrypted);
-          console.log('Handles:', encrypted.handles);
-          console.log('Proof:', encrypted.inputProof);
+          console.log('🔒 TEE Private Transaction (Simulation):', privateData);
+          console.log('Encrypted Amount:', privateData.encryptedAmount);
+          console.log('Proof:', privateData.proof);
+          console.log('Method:', privateData.metadata?.method);
 
-        } catch (fheError) {
-          console.error('FHE Encryption failed:', fheError);
-          setSubmitError('Privacy Mode encryption failed. Please try again.');
+        } catch (teeError) {
+          console.error('TEE Privacy preparation failed:', teeError);
+          setSubmitError('Privacy Mode preparation failed. Please try again.');
           setIsSubmitting(false);
           return;
         }
       }
+
 
       let hash: string;
       let kind: 'transaction' | 'userOp' = 'transaction';

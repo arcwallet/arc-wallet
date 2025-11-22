@@ -1,4 +1,4 @@
-import { paymasterService } from '../backend/services/paymasterService';
+import { BACKEND_URL } from '../config/app.config';
 
 /**
  * Paymaster Client
@@ -27,8 +27,7 @@ class PaymasterClient {
     private baseUrl: string;
 
     constructor() {
-        // Use environment variable or fallback to current origin
-        this.baseUrl = (import.meta as any).env?.VITE_BACKEND_URL || window.location.origin;
+        this.baseUrl = BACKEND_URL;
     }
 
     /**
