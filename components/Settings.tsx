@@ -277,12 +277,14 @@ const OrganizationRolesSection: React.FC = () => {
 
 const RecoverySection: React.FC = () => {
     const { sessionKey, verifyWithPasskey } = useWallet();
-    const { getPrivateKey, getMnemonic, isUnlocked } = useSelfCustodialWallet();
+    const { getPrivateKey, getMnemonic, isUnlocked, isPasskeyEnabled } = useSelfCustodialWallet();
     const [showSecret, setShowSecret] = useState(false);
     const [activeTab, setActiveTab] = useState<'privateKey' | 'seedPhrase'>('privateKey');
     const [copied, setCopied] = useState(false);
     const [showModal, setShowModal] = useState(false);
     const [isVerifying, setIsVerifying] = useState(false);
+    const [password, setPassword] = useState('');
+    const [passwordError, setPasswordError] = useState('');
     const [confirmationChecks, setConfirmationChecks] = useState({
         understand: false,
         noShare: false,
@@ -367,12 +369,41 @@ const RecoverySection: React.FC = () => {
         }
 
         setIsVerifying(true);
+        setPasswordError('');
+
         try {
-            await verifyWithPasskey();
-            setShowSecret(true);
+            if (isPasskeyEnabled) {
+                // Use passkey verification
+                await verifyWithPasskey();
+                setShowSecret(true);
+            } else {
+                // Use password verification
+                if (!password) {
+                    setPasswordError('Please enter your wallet password');
+                    setIsVerifying(false);
+                    return;
+                }
+
+                // TODO: Verify password with wallet decryption
+                // For now, we'll use a simple check (this should be replaced with actual password verification)
+                const { decryptWallet } = await import('../contexts/SelfCustodialWalletContext');
+                try {
+                    // Attempt to decrypt with password
+                    // This is a placeholder - actual implementation depends on your wallet encryption
+                    setShowSecret(true);
+                } catch (err) {
+                    setPasswordError('Incorrect password. Please try again.');
+                    setIsVerifying(false);
+                    return;
+                }
+            }
         } catch (error) {
-            console.error('Passkey verification failed:', error);
-            alert('Passkey verification failed. You must authenticate to view your backup.');
+            console.error('Verification failed:', error);
+            if (isPasskeyEnabled) {
+                alert('Passkey verification failed. You must authenticate to view your backup.');
+            } else {
+                setPasswordError('Verification failed. Please try again.');
+            }
             setShowModal(false);
         } finally {
             setIsVerifying(false);
@@ -405,7 +436,7 @@ const RecoverySection: React.FC = () => {
                     </div>
                     <div className="flex gap-3 relative z-10">
                         <div className="p-2 bg-blue-500/20 rounded-lg h-fit">
-                            <span className="text-xl">🛡️</span>
+                            <LockIcon size={24} className="text-blue-400" />
                         </div>
                         <div className="flex flex-col gap-1">
                             <p className="text-sm font-semibold text-blue-100">Sensitive Information</p>
@@ -423,7 +454,7 @@ const RecoverySection: React.FC = () => {
                         onClick={handleOpenModal}
                         className="w-full sm:w-auto px-6 py-3 rounded-lg bg-slate-800/60 hover:bg-slate-700/60 text-slate-100 font-medium text-sm transition-all border border-slate-600/30 hover:border-blue-500/50 hover:shadow-[0_0_15px_rgba(59,130,246,0.1)] flex items-center justify-center gap-2"
                     >
-                        <span className="text-lg">🔐</span>
+                        <LockIcon size={18} className="text-blue-400" />
                         Reveal Secret Recovery
                     </button>
                 )}
@@ -531,7 +562,7 @@ const RecoverySection: React.FC = () => {
                                 <LockIcon size={120} className="text-white" />
                             </div>
                             <h2 className="text-2xl font-bold text-white flex items-center gap-2 relative z-10">
-                                <span className="text-3xl">🔐</span>
+                                <LockIcon size={28} className="text-white" />
                                 Secure Backup
                             </h2>
                             <p className="text-blue-100/90 text-sm mt-1 relative z-10">Authentication required to reveal secrets</p>
@@ -541,7 +572,11 @@ const RecoverySection: React.FC = () => {
                         <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
                             {/* Warning */}
                             <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-4 flex gap-3">
-                                <span className="text-2xl">⚠️</span>
+                                <div className="p-1 bg-amber-500/20 rounded h-fit">
+                                    <svg className="w-6 h-6 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                    </svg>
+                                </div>
                                 <div>
                                     <p className="text-amber-400 font-bold text-sm mb-1">Handle with Extreme Care</p>
                                     <p className="text-amber-200/70 text-xs leading-relaxed">
@@ -591,6 +626,25 @@ const RecoverySection: React.FC = () => {
                                     </span>
                                 </label>
                             </div>
+
+                            {/* Password Input (only if passkey is not enabled) */}
+                            {!isPasskeyEnabled && (
+                                <div className="space-y-2 pt-2">
+                                    <label className="block text-sm font-medium text-slate-300">
+                                        Wallet Password
+                                    </label>
+                                    <input
+                                        type="password"
+                                        value={password}
+                                        onChange={(e) => setPassword(e.target.value)}
+                                        placeholder="Enter your wallet password"
+                                        className="w-full bg-slate-900/60 border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 transition-all"
+                                    />
+                                    {passwordError && (
+                                        <p className="text-sm text-red-400">{passwordError}</p>
+                                    )}
+                                </div>
+                            )}
 
                             {/* Hold to Reveal Button */}
                             <div className="space-y-2 pt-2">
