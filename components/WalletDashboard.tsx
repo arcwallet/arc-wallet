@@ -182,12 +182,12 @@ const DashboardHeader: React.FC<DashboardHeaderPropsWithNav> = ({ account, isRef
         </div>
         <div className="flex items-center gap-3 rounded-lg bg-[#151A22] border border-white/10 px-3 py-1.5">
           <div className="flex items-center gap-2">
-            <LockIcon size={14} className={isPrivacyMode ? "text-purple-400" : "text-slate-500"} />
-            <p className={`text-sm font-medium ${isPrivacyMode ? "text-purple-400" : "text-slate-400"}`}>Privacy Mode</p>
+            <LockIcon size={14} className={isPrivacyMode ? "text-blue-400" : "text-slate-500"} />
+            <p className={`text-sm font-medium ${isPrivacyMode ? "text-blue-400" : "text-slate-400"}`}>Privacy Mode</p>
           </div>
           <button
             onClick={togglePrivacyMode}
-            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${isPrivacyMode ? 'bg-purple-500' : 'bg-slate-700'}`}
+            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${isPrivacyMode ? 'bg-blue-500' : 'bg-slate-700'}`}
           >
             <span
               className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${isPrivacyMode ? 'translate-x-4' : 'translate-x-1'}`}
