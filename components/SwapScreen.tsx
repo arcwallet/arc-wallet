@@ -3,11 +3,29 @@ import { SwapIcon, SpinnerIcon } from './Icons';
 import { getAllSupportedTokens, TokenInfo } from '../config/tokens';
 import { swapService, Quote } from '../services/swapService';
 
-const SwapScreen: React.FC = () => {
+interface SwapScreenProps {
+    initialFromToken?: string;
+    initialToToken?: string;
+    initialAmount?: string;
+}
+
+const SwapScreen: React.FC<SwapScreenProps> = ({ initialFromToken, initialToToken, initialAmount = '' }) => {
     const tokens = getAllSupportedTokens();
-    const [fromToken, setFromToken] = useState<TokenInfo>(tokens[0]); // USDC
-    const [toToken, setToToken] = useState<TokenInfo>(tokens[1]);   // ARC
-    const [amount, setAmount] = useState('');
+    const [fromToken, setFromToken] = useState<TokenInfo>(() => {
+        if (initialFromToken) {
+            const found = tokens.find(t => t.symbol.toUpperCase() === initialFromToken.toUpperCase());
+            if (found) return found;
+        }
+        return tokens[0];
+    });
+    const [toToken, setToToken] = useState<TokenInfo>(() => {
+        if (initialToToken) {
+            const found = tokens.find(t => t.symbol.toUpperCase() === initialToToken.toUpperCase());
+            if (found) return found;
+        }
+        return tokens[1];
+    });
+    const [amount, setAmount] = useState(initialAmount);
     const [quote, setQuote] = useState<Quote | null>(null);
     const [loading, setLoading] = useState(false);
     const [swapping, setSwapping] = useState(false);

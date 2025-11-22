@@ -20,6 +20,8 @@ import { IndexerService } from './services/indexerService.js';
 import { webhookService } from './services/webhookService.js';
 import { initIndexerDB } from './db/indexer.js';
 import { MagicSessionStore } from './magicLink/SessionStore.js';
+import agentRouter from './controllers/agentController.js';
+import { initializeAgentDatabase } from './database/agentDatabase.js';
 import { loadConfig, validateConfig } from './utils/config.js';
 import { cookieMiddleware } from './middleware/cookies.js';
 import { setCsrfCookie, validateCsrfToken } from './middleware/csrf.js';
@@ -112,10 +114,15 @@ app.use('/multisig', createMultiSigRoutes(db, config));
 app.use('/api/paymaster', paymasterRouter);
 app.use('/api/history', createHistoryRouter());
 app.use('/api/webhooks', createWebhookRouter());
+app.use('/api/agent', agentRouter);
 
 // Initialize indexer database
 console.log('🔧 Initializing indexer database...');
 initIndexerDB();
+
+// Initialize agent database
+console.log('🔧 Initializing agent database...');
+initializeAgentDatabase();
 
 // Initialize and start indexer service
 console.log('🚀 Starting indexer service...');

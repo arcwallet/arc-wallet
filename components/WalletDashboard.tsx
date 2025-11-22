@@ -100,7 +100,7 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ isOpen, onC
       {/* Backdrop */}
       <div className="fixed inset-0 z-[60]" onClick={onClose} />
       {/* Dropdown */}
-      <div className="absolute right-0 top-full mt-2 w-80 z-[70] rounded-lg border border-white/10 bg-[#151A22] shadow-lg">
+      <div className="fixed right-8 top-20 mt-2 w-80 z-[90] rounded-lg border border-white/10 bg-[#151A22] shadow-lg">
         <div className="p-4 border-b border-white/10">
           <h3 className="text-lg font-semibold text-[#E6EEF3]">Notifications</h3>
         </div>
@@ -146,6 +146,11 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ isOpen, onC
 
 interface DashboardHeaderPropsWithNav extends DashboardHeaderProps {
   onNavigate: (page: string) => void;
+}
+
+interface AgentIntentData {
+  type: 'SEND' | 'SWAP' | 'CHECK_BALANCE';
+  params: any;
 }
 
 const DashboardHeader: React.FC<DashboardHeaderPropsWithNav> = ({ account, isRefreshing, onRefresh, error, onNavigate }) => {
@@ -528,6 +533,20 @@ const WalletDashboard: React.FC = () => {
   const [currentPage, setCurrentPage] = useState('Dashboard');
   const [selectedTransactionId, setSelectedTransactionId] = useState<string | null>(null);
   const [isBalanceHidden, setIsBalanceHidden] = useState(false);
+  const [agentIntentData, setAgentIntentData] = useState<AgentIntentData | null>(null);
+
+  const handleAgentIntent = (intent: any) => {
+    setAgentIntentData(intent);
+    if (intent.type === 'SEND') {
+      setCurrentPage('Send');
+    } else if (intent.type === 'SWAP') {
+      setCurrentPage('Swap');
+    } else if (intent.type === 'CHECK_BALANCE') {
+      // For balance check, we might just want to stay on Agent screen or go to Dashboard
+      // For now, let's go to Dashboard to show balance
+      setCurrentPage('Dashboard');
+    }
+  };
 
   // Get address from self-custodial context first, fall back to legacy wallet
   const { address: selfCustodialAddress, lockWallet } = useSelfCustodialWallet();
@@ -604,11 +623,23 @@ const WalletDashboard: React.FC = () => {
           />
         );
       case 'Send':
-        return <SendAssets />;
+        return (
+          <SendAssets
+            initialAmount={agentIntentData?.type === 'SEND' ? agentIntentData.params.amount : undefined}
+            initialRecipient={agentIntentData?.type === 'SEND' ? agentIntentData.params.recipient : undefined}
+            initialToken={agentIntentData?.type === 'SEND' ? agentIntentData.params.token : undefined}
+          />
+        );
       case 'Receive':
         return <ReceiveAssets />;
       case 'Swap':
-        return <SwapScreen />;
+        return (
+          <SwapScreen
+            initialFromToken={agentIntentData?.type === 'SWAP' ? agentIntentData.params.fromToken : undefined}
+            initialToToken={agentIntentData?.type === 'SWAP' ? agentIntentData.params.toToken : undefined}
+            initialAmount={agentIntentData?.type === 'SWAP' ? agentIntentData.params.amount : undefined}
+          />
+        );
       case 'Bridge':
         return <Bridge />;
       case 'Transactions':
@@ -620,7 +651,7 @@ const WalletDashboard: React.FC = () => {
       case 'Identity':
         return <IdentityScreen />;
       case 'Agent':
-        return <AgentScreen />;
+        return <AgentScreen onExecuteIntent={handleAgentIntent} />;
       case 'Settings':
         return <Settings />;
       default:
