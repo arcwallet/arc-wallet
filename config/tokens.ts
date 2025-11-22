@@ -62,7 +62,7 @@ export const SUPPORTED_TOKENS: Record<string, TokenInfo> = {
         arcTestnet: '0x3600000000000000000000000000000000000000', // USDC on Arc Testnet (provided)
       },
     },
-    icon: '/icons/usdc.svg',
+    icon: '/usdc-logo.png',
     priceSource: 'coingecko:usd-coin',
     displayPriority: 1,
     swapable: true,
@@ -85,7 +85,7 @@ export const SUPPORTED_TOKENS: Record<string, TokenInfo> = {
         arcTestnet: '0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a', // EURC on Arc Testnet (provided)
       },
     },
-    icon: '/icons/eurc.svg',
+    icon: '/eurc-logo.png',
     priceSource: 'coingecko:euro-coin',
     displayPriority: 2,
     swapable: true,
