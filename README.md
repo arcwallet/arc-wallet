@@ -19,116 +19,9 @@ A modern, self-custodial Web3 wallet built for Arc Network with support for mult
 - **Real-time Balances**: Live token balance updates
 - **Professional UI**: Modern, responsive interface with dark mode
 
-## Development Setup
+## Live Application
 
-### Prerequisites
-- Node.js 18+ and npm
-- A modern browser with WebAuthn support
-
-### Installation
-
-```bash
-# Clone the repository
-git clone https://github.com/arcwallet/arc-wallet.git
-cd arc-wallet
-
-# Install dependencies
-npm install
-
-# Set up environment variables
-cp .env.example .env.local
-# Edit .env.local with your configuration
-
-# Start development server
-npm run dev
-```
-
-### Environment Variables
-
-Create a `.env.local` file with the following variables:
-
-```env
-# Required
-VITE_WALLET_ENCRYPTION_SECRET=your-secret-key-min-16-chars
-VITE_ARC_RPC_URL=https://rpc.testnet.arc.network
-
-# Optional
-VITE_PASSKEY_API_URL=http://localhost:4000
-VITE_API_BASE_URL=http://localhost:4000
-VITE_ARC_ENTRY_POINT=0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789
-VITE_ARC_BUNDLER_URL=https://bundler.example.com
-```
-
-See [.env.example](.env.example) for all available options.
-
-## Backend Setup
-
-The backend handles passkey authentication and magic link emails:
-
-```bash
-cd backend
-npm install
-
-# Configure environment
-cp .env.example .env
-# Edit .env with your settings
-
-# Start backend server
-npm run dev
-```
-
-### Backend Environment Variables
-
-```env
-NODE_ENV=development
-PORT=4000
-ALLOWED_ORIGINS=http://localhost:5173
-RP_ID=localhost
-ORIGIN=http://localhost:5173
-
-# Magic Link
-SENDGRID_API_KEY=your-sendgrid-api-key
-EMAIL_FROM_ADDRESS=noreply@arcwallet.network
-EMAIL_FROM_NAME=Arc Wallet
-MAGIC_LINK_BASE_URL=http://localhost:5173/auth/callback
-
-# Security
-SESSION_SECRET=your-session-secret
-JWT_SECRET=your-jwt-secret
-
-# RPC Endpoints
-ARC_RPC_URL=https://rpc.testnet.arc.network
-SEPOLIA_RPC_URL=https://eth-sepolia.g.alchemy.com/v2/your-key
-```
-
-## Deployment
-
-### Frontend (Vercel)
-
-1. Connect your GitHub repository
-2. Set environment variables in dashboard
-3. Deploy
-
-### Backend (Render)
-
-1. Connect your GitHub repository
-2. Set build command: `cd backend && npm install && npm run build`
-3. Set start command: `cd backend && npm start`
-4. Configure environment variables
-5. Deploy
-
-## Testing
-
-```bash
-# Run all tests
-npm test
-
-# E2E tests
-npm run test:e2e
-
-# Backend tests
-cd backend && npm test
-```
+Visit: **https://app.arcwallet.network**
 
 ## Documentation
 
@@ -157,6 +50,17 @@ We are committed to protecting your privacy:
 
 See our [Privacy Policy](./PRIVACY.md) for details.
 
+## Technology Stack
+
+Built with:
+- React + TypeScript
+- Vite
+- Tailwind CSS
+- ethers.js
+- Circle CCTP
+- WebAuthn/Passkeys
+- ERC-4337 Account Abstraction
+
 ## License
 
 Copyright © 2024 Arc Wallet. All rights reserved.
@@ -173,6 +77,8 @@ See [LICENSE](./LICENSE) for full terms.
 ## Disclaimer
 
 **This software is provided "as is", without warranty of any kind.** Use at your own risk. Always verify transactions and never share your private keys or seed phrase.
+
+Arc Wallet is not responsible for any loss of funds due to user error, security breaches, or technical issues.
 
 ---
 
