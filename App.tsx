@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import './styles/magic.css';
-import arcWalletLoginLogo from './assets/arcwalletloginlogo.png';
 import ErrorBoundary from './components/ErrorBoundary';
 import WalletDashboard from './components/WalletDashboard';
 import WalletSetupScreen from './components/WalletSetupScreen';
