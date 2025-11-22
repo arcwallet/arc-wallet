@@ -243,3 +243,75 @@ export async function ensureAccountHasBalance(params: {
   const receipt = await tx.wait();
   return { toppedUp: true, txHash: receipt.hash };
 }
+
+// ERC-20 Token ABI for transfer function
+const ERC20_ABI = [
+  'function transfer(address to, uint256 amount) returns (bool)',
+  'function balanceOf(address owner) view returns (uint256)',
+  'function decimals() view returns (uint8)',
+];
+
+/**
+ * Send ERC20 tokens directly from EOA wallet
+ */
+export async function sendERC20Transfer(params: {
+  privateKey: string;
+  tokenAddress: string;
+  to: string;
+  amount: string; // amount in token's decimals (e.g., for USDC with 6 decimals)
+  decimals: number;
+}): Promise<string> {
+  const provider = getProvider();
+  const wallet = new Wallet(params.privateKey, provider);
+  const contract = new Contract(params.tokenAddress, ERC20_ABI, wallet);
+
+  // Parse amount according to token decimals
+  const amountWei = parseUnits(params.amount, params.decimals);
+
+  const { maxFeePerGas, maxPriorityFeePerGas } = await getFeeSettings(provider);
+
+  const tx = await contract.transfer(params.to, amountWei, {
+    maxFeePerGas: maxFeePerGas || undefined,
+    maxPriorityFeePerGas: maxPriorityFeePerGas || undefined,
+  });
+
+  const receipt = await tx.wait();
+  return receipt.hash;
+}
+
+/**
+ * Estimate gas for ERC20 token transfer from EOA
+ */
+export async function estimateERC20Transfer(params: {
+  from: string;
+  tokenAddress: string;
+  to: string;
+  amount: string;
+  decimals: number;
+}): Promise<FeeEstimate> {
+  const provider = getProvider();
+  const contract = new Contract(params.tokenAddress, ERC20_ABI, provider);
+
+  const amountWei = parseUnits(params.amount, params.decimals);
+
+  const { maxFeePerGas, maxPriorityFeePerGas } = await getFeeSettings(provider);
+
+  let gasLimit = 65000n; // Default gas limit for ERC20 transfer
+  try {
+    const estimate = await contract.transfer.estimateGas(params.to, amountWei, {
+      from: params.from,
+    });
+    gasLimit = estimate;
+  } catch (error) {
+    console.warn('ERC20 transfer gas estimation failed, using default limit', error);
+  }
+
+  const totalFeeWei = maxFeePerGas > 0n ? maxFeePerGas * gasLimit : 0n;
+
+  return {
+    gasLimit,
+    maxFeePerGas,
+    maxPriorityFeePerGas,
+    totalFeeWei,
+  };
+}

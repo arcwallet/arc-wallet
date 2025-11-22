@@ -44,7 +44,13 @@ const defaultDirectExecutor: DirectExecutor = async (params) => {
       transactions: params.transactions
     });
   }
-  return module.sendSmartAccountExecute(params);
+  return module.sendSmartAccountExecute({
+    sessionPrivateKey: params.sessionPrivateKey,
+    smartAccountAddress: params.smartAccountAddress,
+    to: params.to,
+    amount: params.amount,
+    data: params.data
+  });
 };
 
 const defaultBundlerAvailability: BundlerAvailability = async () => {
@@ -106,6 +112,7 @@ export async function executeSmartAccountTransferWithFallback(params: {
     to,
     amount,
     data,
+    transactions, // Pass transactions parameter
   });
   return { kind: 'transaction', hash: txHash };
 }
@@ -117,5 +124,20 @@ export async function executeNativeTransfer(params: {
 }): Promise<ExecutionResult> {
   const module = await import('./transactionService.ts');
   const hash = await module.sendNativeTransfer(params);
+  return { kind: 'transaction', hash };
+}
+
+/**
+ * Execute ERC20 token transfer from EOA wallet (not Smart Account)
+ */
+export async function executeERC20Transfer(params: {
+  privateKey: string;
+  tokenAddress: string;
+  to: string;
+  amount: string;
+  decimals: number;
+}): Promise<ExecutionResult> {
+  const module = await import('./transactionService.ts');
+  const hash = await module.sendERC20Transfer(params);
   return { kind: 'transaction', hash };
 }

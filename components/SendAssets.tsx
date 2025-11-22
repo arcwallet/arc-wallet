@@ -13,10 +13,12 @@ import {
   estimateNativeTransfer,
   estimateSmartAccountExecute,
   estimateSmartAccountBatchExecute,
+  estimateERC20Transfer,
 } from '../services/transactionService';
 import {
   executeNativeTransfer,
   executeSmartAccountTransferWithFallback,
+  executeERC20Transfer,
 } from '../services/executionRouter';
 import { TransactionStatus, TransactionType } from '../types';
 import { ExpandIcon, ContactIcon, LockIcon } from './Icons';
@@ -176,9 +178,13 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
       setIsEstimating(true);
       setCheckingSponsorship(true);
       try {
-        // Check paymaster eligibility
-        const canSponsor = await paymasterClient.canSponsor(walletAddress, '0');
-        setIsGasSponsored(canSponsor);
+        // Check paymaster eligibility (only for smart accounts)
+        if (usingSmartAccount) {
+          const canSponsor = await paymasterClient.canSponsor(walletAddress, '0');
+          setIsGasSponsored(canSponsor);
+        } else {
+          setIsGasSponsored(false);
+        }
 
         // Estimate gas
         let estimate: bigint;
@@ -188,20 +194,61 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
             smartAccountAddress: walletAddress,
             transactions: batchTransactions.map(t => ({
               to: t.to,
-              value: parseUnits(t.amount, selectedToken.decimals), // Assuming all are same token for now or handled
+              value: parseUnits(t.amount, selectedToken.decimals),
               data: t.data || '0x'
             }))
           });
           estimate = batchEst.gasLimit;
         } else {
-          const est = await estimateSmartAccountExecute({
-            sessionPrivateKey: walletPrivateKey,
-            smartAccountAddress: walletAddress,
-            to: recipient,
-            amount: amount,
-            data: '0x'
-          });
-          estimate = est.gasLimit;
+          // For ERC20 tokens
+          if (selectedToken.symbol !== 'ETH') {
+            if (usingSmartAccount) {
+              // Smart Account gas estimation
+              const est = await estimateSmartAccountExecute({
+                sessionPrivateKey: walletPrivateKey,
+                smartAccountAddress: walletAddress,
+                to: recipient,
+                amount: '0', // No native value for token transfer
+                data: '0x' // Data will be encoded during actual transfer
+              });
+              estimate = est.gasLimit;
+            } else {
+              // EOA ERC20 transfer gas estimation
+              const { getTokenContractAddress } = await import('../config/tokens');
+              const tokenAddress = getTokenContractAddress(selectedToken.symbol, 'testnet', 'arcTestnet');
+              if (tokenAddress) {
+                const est = await estimateERC20Transfer({
+                  from: walletAddress,
+                  tokenAddress,
+                  to: recipient,
+                  amount,
+                  decimals: selectedToken.decimals
+                });
+                estimate = est.totalFeeWei;
+              } else {
+                estimate = 0n;
+              }
+            }
+          } else {
+            // Native ETH transfer
+            if (usingSmartAccount) {
+              const est = await estimateSmartAccountExecute({
+                sessionPrivateKey: walletPrivateKey,
+                smartAccountAddress: walletAddress,
+                to: recipient,
+                amount: amount,
+                data: '0x'
+              });
+              estimate = est.gasLimit;
+            } else {
+              const est = await estimateNativeTransfer({
+                from: walletAddress,
+                to: recipient,
+                amount: amount
+              });
+              estimate = est.totalFeeWei;
+            }
+          }
         }
         setFeeEstimate(estimate);
       } catch (error) {
@@ -333,11 +380,8 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
         hash = result.hash;
         kind = result.kind;
       } else {
-        // Single transfer - need to encode token transfer
+        // Single transfer
         const tokenInfo = selectedToken;
-        let transferData = '0x';
-        let transferTo = recipient;
-        let transferAmount = '0';
 
         // Check if we're transferring a token (not native currency)
         if (tokenInfo.symbol !== 'ETH') {
@@ -349,42 +393,63 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
             throw new Error(`Token contract address not found for ${tokenInfo.symbol}`);
           }
 
-          // Encode ERC20 transfer(address,uint256) calldata
-          const { Interface, parseUnits } = await import('ethers');
-          const iface = new Interface([
-            'function transfer(address to, uint256 amount) returns (bool)'
-          ]);
-          const amountWei = parseUnits(amount, tokenInfo.decimals);
-          transferData = iface.encodeFunctionData('transfer', [recipient, amountWei]);
-          transferTo = tokenAddress; // Call token contract
-          transferAmount = '0'; // No native ETH value
-
           console.log(`[SEND] Transferring ${amount} ${tokenInfo.symbol} to ${recipient}`);
           console.log(`[SEND] Token contract: ${tokenAddress}`);
-          console.log(`[SEND] Amount (wei): ${amountWei.toString()}`);
+          console.log(`[SEND] Using Smart Account: ${usingSmartAccount}`);
 
-          const result = await executeSmartAccountTransferWithFallback({
-            smartAccountAddress: walletAddress,
-            sessionPrivateKey: walletPrivateKey,
-            to: transferTo,
-            amount: transferAmount,
-            data: transferData
-          });
-          hash = result.hash;
-          kind = result.kind;
+          if (usingSmartAccount) {
+            // Smart Account: Encode ERC20 transfer as calldata
+            const { Interface, parseUnits } = await import('ethers');
+            const iface = new Interface([
+              'function transfer(address to, uint256 amount) returns (bool)'
+            ]);
+            const amountWei = parseUnits(amount, tokenInfo.decimals);
+            const transferData = iface.encodeFunctionData('transfer', [recipient, amountWei]);
+
+            console.log(`[SEND] Amount (wei): ${amountWei.toString()}`);
+
+            const result = await executeSmartAccountTransferWithFallback({
+              smartAccountAddress: walletAddress,
+              sessionPrivateKey: walletPrivateKey,
+              to: tokenAddress, // Call token contract
+              amount: '0', // No native ETH value
+              data: transferData
+            });
+            hash = result.hash;
+            kind = result.kind;
+          } else {
+            // EOA: Direct ERC20 transfer
+            const result = await executeERC20Transfer({
+              privateKey: walletPrivateKey,
+              tokenAddress,
+              to: recipient,
+              amount,
+              decimals: tokenInfo.decimals
+            });
+            hash = result.hash;
+            kind = result.kind;
+          }
         } else {
           // Native ETH transfer
-          transferAmount = amount;
-
-          const result = await executeSmartAccountTransferWithFallback({
-            smartAccountAddress: walletAddress,
-            sessionPrivateKey: walletPrivateKey,
-            to: transferTo,
-            amount: transferAmount,
-            data: transferData
-          });
-          hash = result.hash;
-          kind = result.kind;
+          if (usingSmartAccount) {
+            const result = await executeSmartAccountTransferWithFallback({
+              smartAccountAddress: walletAddress,
+              sessionPrivateKey: walletPrivateKey,
+              to: recipient,
+              amount: amount,
+              data: '0x'
+            });
+            hash = result.hash;
+            kind = result.kind;
+          } else {
+            const result = await executeNativeTransfer({
+              sessionPrivateKey: walletPrivateKey,
+              to: recipient,
+              amount: amount
+            });
+            hash = result.hash;
+            kind = result.kind;
+          }
         }
       }
 

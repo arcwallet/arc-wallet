@@ -23,7 +23,7 @@ export function validatePassword(password: string): PasswordStrength {
 
     // Check length
     if (password.length < 8) {
-        feedback.push('En az 8 karakter olmalı');
+        feedback.push('Must be at least 8 characters');
     } else {
         score++;
         if (password.length >= 12) {
@@ -33,21 +33,21 @@ export function validatePassword(password: string): PasswordStrength {
 
     // Check for lowercase
     if (!/[a-z]/.test(password)) {
-        feedback.push('En az bir küçük harf içermeli (a-z)');
+        feedback.push('Must contain at least one lowercase letter (a-z)');
     } else {
         score++;
     }
 
     // Check for uppercase
     if (!/[A-Z]/.test(password)) {
-        feedback.push('En az bir büyük harf içermeli (A-Z)');
+        feedback.push('Must contain at least one uppercase letter (A-Z)');
     } else {
         score++;
     }
 
     // Check for numbers
     if (!/[0-9]/.test(password)) {
-        feedback.push('En az bir rakam içermeli (0-9)');
+        feedback.push('Must contain at least one number (0-9)');
     } else {
         score++;
     }
@@ -56,7 +56,7 @@ export function validatePassword(password: string): PasswordStrength {
     if (/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
         score++; // Bonus for special characters
         if (feedback.length === 0) {
-            feedback.push('Güçlü şifre! Özel karakterler içeriyor.');
+            feedback.push('Strong password! Contains special characters.');
         }
     }
 
@@ -80,15 +80,15 @@ export function getPasswordStrengthLabel(score: number): string {
     switch (score) {
         case 0:
         case 1:
-            return 'Çok Zayıf';
+            return 'Very Weak';
         case 2:
-            return 'Zayıf';
+            return 'Weak';
         case 3:
-            return 'Orta';
+            return 'Medium';
         case 4:
-            return 'Güçlü';
+            return 'Strong';
         default:
-            return 'Bilinmiyor';
+            return 'Unknown';
     }
 }
 

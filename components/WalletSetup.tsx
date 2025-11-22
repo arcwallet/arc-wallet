@@ -9,6 +9,7 @@ import { useSelfCustodialWallet } from '../contexts/SelfCustodialWalletContext';
 import { validatePassword, getPasswordStrengthLabel, getPasswordStrengthColor } from '../utils/passwordValidation';
 import { WaveBackground } from './WaveBackground';
 import arcLogo from '../assets/arclogo.png';
+import { Footer } from './Footer';
 
 type SetupStep = 'choice' | 'create' | 'import' | 'backup';
 
@@ -487,6 +488,8 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
         {step === 'import' && renderImport()}
         {step === 'backup' && renderBackup()}
       </div>
+
+      <Footer />
 
       <style>{`
         @keyframes fade-in {

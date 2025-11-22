@@ -7,6 +7,7 @@ import React, { useState } from 'react';
 import { useSelfCustodialWallet } from '../contexts/SelfCustodialWalletContext';
 import { WaveBackground } from './WaveBackground';
 import arcLogo from '../assets/arclogo.png';
+import { Footer } from './Footer';
 
 interface UnlockWalletProps {
   onUnlock: () => void;
@@ -153,6 +154,8 @@ const UnlockWallet: React.FC<UnlockWalletProps> = ({ onUnlock, onReset }) => {
           </div>
         </div>
       </div>
+
+      <Footer />
 
       <style>{`
         @keyframes fade-in {
