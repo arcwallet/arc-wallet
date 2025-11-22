@@ -49,7 +49,7 @@ export interface AgentResponse {
 }
 
 class GeminiService {
-    private client: GoogleGenerativeAI | null = null;
+    private client: any = null;
     private model: any = null;
 
     constructor() {

@@ -507,21 +507,18 @@ const RecoverySection: React.FC = () => {
                                     </button>
                                 </div>
                             ) : (
-                                <div className="relative">
-                                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                                <div className="relative flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-3 group hover:border-slate-600 transition-colors">
+                                    <p className="flex-1 font-mono text-sm text-slate-300 break-all select-all">
                                         {walletMnemonic?.split(' ').map((word, idx) => (
-                                            <div key={idx} className="flex items-center gap-2 bg-slate-900/80 border border-slate-700 rounded-md px-2 py-1.5">
-                                                <span className="text-xs text-slate-500 font-mono w-4">{idx + 1}.</span>
-                                                <span className="text-sm text-slate-200 font-medium">{word}</span>
-                                            </div>
+                                            <span key={idx} className="inline-block mr-2">{word}</span>
                                         ))}
-                                    </div>
+                                    </p>
                                     <button
                                         onClick={handleCopy}
-                                        className="absolute top-2 right-2 p-2 bg-slate-800/80 hover:bg-slate-700 rounded-md text-slate-400 hover:text-white border border-slate-600/50 backdrop-blur-sm transition-all"
+                                        className="flex shrink-0 items-center justify-center rounded-md p-2 text-slate-400 hover:bg-white/10 hover:text-white transition-all"
                                         title="Copy Seed Phrase"
                                     >
-                                        <CopyIcon size={16} />
+                                        <CopyIcon size={18} />
                                     </button>
                                 </div>
                             )}
@@ -638,7 +635,6 @@ const RecoverySection: React.FC = () => {
                                     )}
                                 </div>
                             )}
-
                             {/* Hold to Reveal Button */}
                             <div className="space-y-2 pt-2">
                                 <button
@@ -649,7 +645,7 @@ const RecoverySection: React.FC = () => {
                                     onTouchEnd={handleHoldEnd}
                                     disabled={!allChecksConfirmed || isVerifying}
                                     className={`relative w-full py-4 rounded-xl font-bold text-base transition-all overflow-hidden shadow-lg ${allChecksConfirmed
-                                        ? 'bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white cursor-pointer shadow-blue-900/20'
+                                        ? 'bg-slate-200 hover:bg-white text-slate-900 cursor-pointer shadow-white/20'
                                         : 'bg-slate-800 text-slate-500 cursor-not-allowed'
                                         }`}
                                 >

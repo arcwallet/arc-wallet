@@ -13,6 +13,7 @@
   "dependencies": {
     "@circle-fin/adapter-viem-v2": "^1.1.1",
     "@circle-fin/bridge-kit": "^1.1.2",
+    "@google/generative-ai": "^0.24.1",
     "@sendgrid/mail": "^8.1.6",
     "@simplewebauthn/server": "^10.0.0",
     "@simplewebauthn/types": "^10.0.0",
