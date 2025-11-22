@@ -376,6 +376,7 @@ const RecoverySection: React.FC = () => {
                 // Use passkey verification
                 await verifyWithPasskey();
                 setShowSecret(true);
+                // Keep modal open to show secrets
             } else {
                 // Use password verification
                 if (!password) {
@@ -384,27 +385,19 @@ const RecoverySection: React.FC = () => {
                     return;
                 }
 
-                // TODO: Verify password with wallet decryption
-                // For now, we'll use a simple check (this should be replaced with actual password verification)
-                const { decryptWallet } = await import('../contexts/SelfCustodialWalletContext');
-                try {
-                    // Attempt to decrypt with password
-                    // This is a placeholder - actual implementation depends on your wallet encryption
-                    setShowSecret(true);
-                } catch (err) {
-                    setPasswordError('Incorrect password. Please try again.');
-                    setIsVerifying(false);
-                    return;
-                }
+                // Simple password check - in production, this should verify against encrypted wallet
+                // For now, just reveal if password is provided
+                setShowSecret(true);
+                // Keep modal open to show secrets
             }
         } catch (error) {
             console.error('Verification failed:', error);
             if (isPasskeyEnabled) {
-                alert('Passkey verification failed. You must authenticate to view your backup.');
+                setPasswordError('Passkey verification failed. Please try again.');
             } else {
                 setPasswordError('Verification failed. Please try again.');
             }
-            setShowModal(false);
+            // Don't close modal on error - let user try again
         } finally {
             setIsVerifying(false);
         }
@@ -667,14 +660,16 @@ const RecoverySection: React.FC = () => {
                                     <span className="relative z-10 flex items-center justify-center gap-2">
                                         {isVerifying ? (
                                             <>
-                                                <span className="animate-spin">⏳</span> Verifying...
+                                                <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                </svg>
+                                                Verifying...
                                             </>
                                         ) : isHolding ? (
                                             'Keep Holding...'
                                         ) : allChecksConfirmed ? (
-                                            <>
-                                                <span>👆</span> Hold to Reveal
-                                            </>
+                                            'Hold to Reveal'
                                         ) : (
                                             'Confirm All Above'
                                         )}
