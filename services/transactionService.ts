@@ -298,12 +298,27 @@ export async function estimateERC20Transfer(params: {
 
   let gasLimit = 65000n; // Default gas limit for ERC20 transfer
   try {
+    // First check if sender has sufficient balance
+    const balance = await contract.balanceOf(params.from);
+    if (balance < amountWei) {
+      console.warn(`Insufficient balance for gas estimation. Balance: ${balance.toString()}, Required: ${amountWei.toString()}`);
+      // Return default gas limit without throwing error
+      const totalFeeWei = maxFeePerGas > 0n ? maxFeePerGas * gasLimit : 0n;
+      return {
+        gasLimit,
+        maxFeePerGas,
+        maxPriorityFeePerGas,
+        totalFeeWei,
+      };
+    }
+
     const estimate = await contract.transfer.estimateGas(params.to, amountWei, {
       from: params.from,
     });
     gasLimit = estimate;
   } catch (error) {
     console.warn('ERC20 transfer gas estimation failed, using default limit', error);
+    // Don't throw - just use default gas limit
   }
 
   const totalFeeWei = maxFeePerGas > 0n ? maxFeePerGas * gasLimit : 0n;

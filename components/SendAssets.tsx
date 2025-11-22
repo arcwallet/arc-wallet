@@ -47,6 +47,16 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
   // Use self-custodial wallet address/key if available
   const walletAddress = selfCustodialAddress || sessionKey?.address;
   const walletPrivateKey = selfCustodialAddress ? getPrivateKey() : sessionKey?.privateKey;
+
+  // DEBUG: Log wallet info
+  useEffect(() => {
+    console.log('[SEND DEBUG] Wallet Info:', {
+      selfCustodialAddress,
+      sessionKeyAddress: sessionKey?.address,
+      walletAddress,
+      hasPrivateKey: !!walletPrivateKey
+    });
+  }, [selfCustodialAddress, sessionKey, walletAddress, walletPrivateKey]);
   const [amount, setAmount] = useState(initialAmount);
   const [recipient, setRecipient] = useState(initialRecipient);
   const [selectedToken, setSelectedToken] = useState<TokenInfo>(() => {
@@ -95,14 +105,19 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
     const results: Array<number> = [];
     for (const addr of addresses) {
       try {
+        console.log(`[SEND DEBUG] Fetching ${symbol} balance for address:`, addr);
         const r = await tokenService.getTokenBalance(symbol, addr, 'testnet', 'arcTestnet');
         const val = r ? parseFloat(r.formattedBalance) : 0;
+        console.log(`[SEND DEBUG] ${symbol} balance for ${addr}:`, val, 'raw:', r?.balance.toString());
         if (Number.isFinite(val)) results.push(val);
       } catch (e) {
+        console.error(`[SEND DEBUG] Error fetching ${symbol} balance for ${addr}:`, e);
         // ignore and continue
       }
     }
-    return results.reduce((a, b) => a + b, 0);
+    const total = results.reduce((a, b) => a + b, 0);
+    console.log(`[SEND DEBUG] Total ${symbol} balance:`, total);
+    return total;
   };
 
   // Fetch token balance when selected token or address changes
@@ -216,6 +231,14 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
               // EOA ERC20 transfer gas estimation
               const { getTokenContractAddress } = await import('../config/tokens');
               const tokenAddress = getTokenContractAddress(selectedToken.symbol, 'testnet', 'arcTestnet');
+              console.log('[SEND DEBUG] Gas estimation params:', {
+                from: walletAddress,
+                tokenAddress,
+                to: recipient,
+                amount,
+                decimals: selectedToken.decimals,
+                tokenSymbol: selectedToken.symbol
+              });
               if (tokenAddress) {
                 const est = await estimateERC20Transfer({
                   from: walletAddress,
@@ -224,8 +247,10 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
                   amount,
                   decimals: selectedToken.decimals
                 });
+                console.log('[SEND DEBUG] Gas estimation result:', est);
                 estimate = est.totalFeeWei;
               } else {
+                console.warn('[SEND DEBUG] No token address found for', selectedToken.symbol);
                 estimate = 0n;
               }
             }
