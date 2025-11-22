@@ -6,6 +6,8 @@ import WalletSetupScreen from './components/WalletSetupScreen';
 import WalletSelectionScreen from './components/WalletSelectionScreen';
 import LoginPage from './pages/LoginPage';
 const RecoveryPage = React.lazy(() => import('./pages/RecoveryPage'));
+const PrivacyPolicy = React.lazy(() => import('./pages/PrivacyPolicy'));
+const TermsAndConditions = React.lazy(() => import('./pages/TermsAndConditions'));
 import { SessionProvider, useSession } from './contexts/SessionContext';
 import { WalletProvider, useWallet } from './contexts/WalletContext';
 import { ArcAccountProvider } from './contexts/ArcAccountContext';
@@ -135,6 +137,14 @@ const RootView: React.FC = () => {
   // Show recovery page if on /recovery path
   if (currentPath === '/recovery') {
     return <RecoveryPage />;
+  }
+
+  if (currentPath === '/privacy-policy') {
+    return <PrivacyPolicy />;
+  }
+
+  if (currentPath === '/terms-and-conditions') {
+    return <TermsAndConditions />;
   }
 
   // Show login page directly even during loading/verification

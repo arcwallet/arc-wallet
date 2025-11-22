@@ -7,9 +7,30 @@ export const Footer: React.FC = () => {
                 © 2025 Arc Wallet
             </div>
             <div className="flex gap-8">
-                <a href="#" className="hover:text-slate-300 transition-colors">Home</a>
-                <a href="#" className="hover:text-slate-300 transition-colors">Privacy Policy</a>
-                <a href="#" className="hover:text-slate-300 transition-colors">Terms & Conditions</a>
+                <button
+                    onClick={() => window.location.href = '/'}
+                    className="hover:text-slate-300 transition-colors bg-transparent border-none cursor-pointer p-0 text-sm font-medium text-slate-500"
+                >
+                    Home
+                </button>
+                <button
+                    onClick={() => {
+                        window.history.pushState({}, '', '/privacy-policy');
+                        window.dispatchEvent(new PopStateEvent('popstate'));
+                    }}
+                    className="hover:text-slate-300 transition-colors bg-transparent border-none cursor-pointer p-0 text-sm font-medium text-slate-500"
+                >
+                    Privacy Policy
+                </button>
+                <button
+                    onClick={() => {
+                        window.history.pushState({}, '', '/terms-and-conditions');
+                        window.dispatchEvent(new PopStateEvent('popstate'));
+                    }}
+                    className="hover:text-slate-300 transition-colors bg-transparent border-none cursor-pointer p-0 text-sm font-medium text-slate-500"
+                >
+                    Terms & Conditions
+                </button>
             </div>
         </div>
     );
