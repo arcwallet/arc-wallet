@@ -98,9 +98,9 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ isOpen, onC
   return (
     <>
       {/* Backdrop */}
-      <div className="fixed inset-0 z-40" onClick={onClose} />
+      <div className="fixed inset-0 z-[60]" onClick={onClose} />
       {/* Dropdown */}
-      <div className="absolute right-0 top-full mt-2 w-80 z-50 rounded-lg border border-white/10 bg-[#151A22] shadow-lg">
+      <div className="absolute right-0 top-full mt-2 w-80 z-[70] rounded-lg border border-white/10 bg-[#151A22] shadow-lg">
         <div className="p-4 border-b border-white/10">
           <h3 className="text-lg font-semibold text-[#E6EEF3]">Notifications</h3>
         </div>
