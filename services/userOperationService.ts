@@ -166,6 +166,7 @@ export async function sendSmartAccountUserOperation(
   };
 
   const userOpHash = getUserOpHash(userOp, ENTRY_POINT, network.chainId);
+  const sessionWallet = new Wallet(params.sessionPrivateKey);
   userOp.signature = sessionWallet.signingKey.sign(userOpHash).serialized;
 
   const payload = {
