@@ -14,6 +14,7 @@ import { TransactionStatus, TransactionType } from '../types';
 import { RPC_URL } from '../services/transactionService';
 import { fetchRecentTransactions, RateLimitError } from '../services/activityService';
 import { useWallet } from './WalletContext';
+import { API_ENDPOINTS } from '../config/app.config';
 
 interface ActivityContextValue {
   activities: Transaction[];
@@ -32,6 +33,81 @@ function getProvider(): JsonRpcProvider {
     providerCache.current = new JsonRpcProvider(RPC_URL);
   }
   return providerCache.current;
+}
+
+// Helper function to send notification
+async function sendActivityNotification(userId: string, activity: Transaction) {
+  try {
+    const notificationBody = getNotificationMessage(activity);
+    if (!notificationBody) return; // Skip if no notification needed
+
+    await fetch(API_ENDPOINTS.notifications.test(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId,
+        title: notificationBody.title,
+        body: notificationBody.body,
+        icon: '/icon-192x192.png'
+      })
+    });
+  } catch (error) {
+    console.warn('Failed to send activity notification:', error);
+    // Don't throw - notifications are non-critical
+  }
+}
+
+function getNotificationMessage(activity: Transaction): { title: string; body: string } | null {
+  const amount = Math.abs(activity.amount).toFixed(4);
+  const currency = activity.currency;
+
+  switch (activity.type) {
+    case TransactionType.Received:
+      return {
+        title: '💰 Funds Received',
+        body: `You received ${amount} ${currency}`
+      };
+    case TransactionType.Sent:
+      if (activity.status === TransactionStatus.Completed) {
+        return {
+          title: '✅ Transfer Completed',
+          body: `Sent ${amount} ${currency} successfully`
+        };
+      } else if (activity.status === TransactionStatus.Failed) {
+        return {
+          title: '❌ Transfer Failed',
+          body: `Failed to send ${amount} ${currency}`
+        };
+      }
+      break;
+    case TransactionType.Swap:
+      if (activity.status === TransactionStatus.Completed) {
+        return {
+          title: '🔄 Swap Completed',
+          body: `Swapped ${amount} ${currency} successfully`
+        };
+      } else if (activity.status === TransactionStatus.Failed) {
+        return {
+          title: '❌ Swap Failed',
+          body: `Failed to swap ${amount} ${currency}`
+        };
+      }
+      break;
+    case TransactionType.Bridge:
+      if (activity.status === TransactionStatus.Completed) {
+        return {
+          title: '🌉 Bridge Completed',
+          body: `Bridged ${amount} ${currency} successfully`
+        };
+      } else if (activity.status === TransactionStatus.Failed) {
+        return {
+          title: '❌ Bridge Failed',
+          body: `Failed to bridge ${amount} ${currency}`
+        };
+      }
+      break;
+  }
+  return null;
 }
 
 type StoredTransaction = Omit<Transaction, 'date'> & { date: string };
@@ -204,21 +280,31 @@ export const ActivityProvider: React.FC<{ children: ReactNode }> = ({ children }
         return;
       }
 
-      setActivities((current) =>
-        current.map((tx) => {
+      setActivities((current) => {
+        const updated = current.map((tx) => {
           const update = updates.find((u) => u.hash === tx.hash);
           if (!update) {
             return tx;
           }
-          return {
+          const updatedTx = {
             ...tx,
             status: update.status,
             date: update.date ?? tx.date,
             networkFee:
               typeof update.fee === 'number' ? update.fee : tx.networkFee ?? undefined,
           };
-        }),
-      );
+
+          // Send notification when status changes to completed or failed
+          if (tx.status === TransactionStatus.Pending && update.status !== TransactionStatus.Pending) {
+            if (address) {
+              void sendActivityNotification(address, updatedTx);
+            }
+          }
+
+          return updatedTx;
+        });
+        return updated;
+      });
 
       updates.forEach((update) => {
         pendingRef.current.delete(update.hash);
@@ -246,8 +332,13 @@ export const ActivityProvider: React.FC<{ children: ReactNode }> = ({ children }
       if (activity.status === TransactionStatus.Pending && activity.hash) {
         pendingRef.current.add(activity.hash);
       }
+
+      // Send notification for new activity
+      if (address) {
+        void sendActivityNotification(address, activity);
+      }
     },
-    [setActivities],
+    [setActivities, address],
   );
 
   const clear = useCallback(() => {
