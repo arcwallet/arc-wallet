@@ -1,8 +1,31 @@
 {
   "name": "arc-wallet",
-  "private": true,
-  "version": "0.0.0",
+  "private": false,
+  "version": "1.0.0",
   "type": "module",
+  "license": "MIT",
+  "author": "Arc Wallet Contributors",
+  "description": "A modern, self-custodial Web3 wallet for Arc Network with passkey authentication and cross-chain bridging",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/arc-wallet.git"
+  },
+  "keywords": [
+    "web3",
+    "wallet",
+    "arc-network",
+    "ethereum",
+    "passkey",
+    "webauthn",
+    "self-custodial",
+    "crypto",
+    "blockchain",
+    "defi",
+    "stablecoin",
+    "usdc",
+    "eurc",
+    "bridge"
+  ],
   "scripts": {
     "dev": "vite",
     "build": "vite build",

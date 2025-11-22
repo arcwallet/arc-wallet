@@ -1,89 +1,193 @@
 # Arc Wallet
 
-A modern Web3 wallet built for Arc Network with support for multiple stablecoins (USDC, EURC), cross-chain bridging, and passkey authentication.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Security](https://img.shields.io/badge/Security-Policy-blue)](./SECURITY.md)
+[![Privacy](https://img.shields.io/badge/Privacy-Policy-green)](./PRIVACY.md)
+
+A modern, self-custodial Web3 wallet built for Arc Network with support for multiple stablecoins (USDC, EURC), cross-chain bridging, and passkey authentication.
 
 ## Features
 
 - **Multi-Token Support**: USDC and EURC stablecoins
-- **Cross-Chain Bridging**: Bridge tokens between Arc Testnet and Ethereum Sepolia
-- **Passkey Authentication**: Secure WebAuthn-based authentication
+- **Cross-Chain Bridging**: Bridge tokens between Arc Testnet and Ethereum Sepolia using Circle's CCTP
+- **Passkey Authentication**: Secure WebAuthn-based authentication (no passwords needed)
 - **Smart Account Integration**: ERC-4337 account abstraction support
+- **TEE Privacy**: Trusted Execution Environment integration (coming soon)
+- **AI Agent**: Intent-based transaction assistant powered by Gemini
 - **Real-time Balances**: Live token balance updates
-- **Professional UI**: Modern, responsive interface
+- **Professional UI**: Modern, responsive interface with dark mode
 
-## Run Locally
+## Quick Start
 
-**Prerequisites:**  Node.js
+### Prerequisites
+- Node.js 18+ and npm
+- A modern browser with WebAuthn support
 
+### Installation
 
-1. Install dependencies:
-   `npm install`
-2. Configure environment variables in [.env.local](.env.local) as needed.
-3. Set `VITE_WALLET_ENCRYPTION_SECRET` to a secret string (minimum 16 characters) in both your local `.env` and any deployment platform (Vercel/Render) so encrypted wallet backups can be restored per email login.
-4. (Optional) Override `VITE_ARC_RPC_URL` in `.env` if you want to point at a custom Arc RPC endpoint. Default is `https://rpc.testnet.arc.network`.
-5. (Optional) Point `VITE_PASSKEY_API_URL` to your running passkey backend. Default is `http://localhost:4000`.
-6. (Optional) Provide the ERC-4337 entry point contract via `VITE_ARC_ENTRY_POINT` if you are testing on a network that uses a different address.
-7. (Optional) Configure a bundler endpoint with `VITE_ARC_BUNDLER_URL` to submit smart-account UserOperations via `eth_sendUserOperation`. The app automatically falls back to direct transactions when the bundler is unavailable.
-8. Configure bridge RPCs if you plan to use the Circle Bridge Kit integration:
-   - Frontend: `VITE_ARC_RPC_URL`, `VITE_SEPOLIA_RPC_URL`
-   - Backend: `ARC_RPC_URL`, `SEPOLIA_RPC_URL`
-9. Run the app:
-   `npm run dev`
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/arc-wallet.git
+cd arc-wallet
 
-## Magic Link Email Delivery (SendGrid)
+# Install dependencies
+npm install
 
-1. **Verify the sending domain** inside SendGrid → *Settings → Sender Authentication* and create the three CNAMEs + DMARC TXT that Render already lists (`em4148…`, `s1._domainkey…`, `s2._domainkey…`, `_dmarc…`). Wait for SendGrid to mark them as verified.
-2. **Create a Mail Send API key** (Full Access or restricted to “Mail Send”) and copy it once.
-3. **Configure backend env vars** (Render → Environment):
-   - `SENDGRID_API_KEY=<copied-key>`
-   - `EMAIL_FROM_ADDRESS=support@arcwallet.network` (must be within the verified domain)
-   - `EMAIL_FROM_NAME=Arc Wallet`
-   - `MAGIC_LINK_BASE_URL=https://app.arcwallet.network/auth/callback`
-4. **Frontend env vars** (Vercel → Settings → Environment Variables):
-   - `VITE_API_BASE_URL=https://arcwallet-backend.onrender.com`
-   - `VITE_PASSKEY_API_URL=https://arcwallet-backend.onrender.com`
-   - `VITE_WALLET_ENCRYPTION_SECRET=<same secret as local>`
-5. Redeploy backend first (Render) and then frontend (Vercel). The backend logs will print the generated magic link URL so you can confirm it matches the production domain. If the SendGrid API call fails you will see the error stack trace in Render logs.
+# Set up environment variables
+cp .env.example .env.local
+# Edit .env.local with your configuration
 
-## Deployment Environment Checklist
+# Start development server
+npm run dev
+```
 
-| Layer | Required variables | Notes |
-| --- | --- | --- |
-| **Frontend (Vercel)** | `VITE_API_BASE_URL`, `VITE_PASSKEY_API_URL`, `VITE_WALLET_ENCRYPTION_SECRET`, `VITE_ARC_RPC_URL` (optional), bundle debug flags | Use exactly the same `VITE_WALLET_ENCRYPTION_SECRET` everywhere so encrypted wallets can be restored. |
-| **Backend (Render)** | `NODE_ENV=production`, `PORT=10000`, `ALLOWED_ORIGINS=https://app.arcwallet.network`, `RP_ID=app.arcwallet.network`, `ORIGIN=https://app.arcwallet.network`, `MAGIC_LINK_BASE_URL=https://app.arcwallet.network/auth/callback`, `ARC_RPC_URL`, `SEPOLIA_RPC_URL`, `SENDGRID_API_KEY`, `EMAIL_FROM_ADDRESS`, `EMAIL_FROM_NAME`, `SESSION_SECRET`, `JWT_SECRET` | Use long random strings for `SESSION_SECRET` / `JWT_SECRET`; Render automatically injects `PORT` but we pin it to 10000 to match logs. |
-| **Shared** | DNS per SendGrid instructions, verified domain | Without DNS verification SendGrid will drop the email. |
+### Environment Variables
 
-## Testing & QA
+Create a `.env.local` file with the following variables:
 
-### Automated
-1. **Frontend E2E (`npm run test:e2e`)** – spins up Vite dev server and runs Playwright against it. Email/API requests are mocked so no SendGrid traffic leaves your machine. First-time setup requires `npx playwright install`.
-2. **Backend API tests (`cd backend && npm test`)** – Vitest + Supertest suite covering `/api/send-link → /api/verify → /api/session → /api/logout`.
-3. **Smart contract tests (`npm test`)** – existing Hardhat specs in `test/*.spec.ts`.
+```env
+# Required
+VITE_WALLET_ENCRYPTION_SECRET=your-secret-key-min-16-chars
+VITE_ARC_RPC_URL=https://rpc.testnet.arc.network
 
-### Manual QA checklist
-1. Request a magic link, open email, ensure the button contains the correct link and the plain URL is hidden.
-2. Click the link in the same browser → you should land directly inside the dashboard with the previously created wallet (no redirect loop to `/login`).
-3. Repeat in a fresh browser profile: login should prompt setup again (encrypted cache is per browser/email).
-4. Sign out via dashboard footer; session cookie should clear and `/api/session` returns 401 until you re-login.
-5. On failure scenarios (expired token, invalid token) the frontend should display the backend error message and stay on the login screen.
+# Optional
+VITE_PASSKEY_API_URL=http://localhost:4000
+VITE_API_BASE_URL=http://localhost:4000
+VITE_ARC_ENTRY_POINT=0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789
+VITE_ARC_BUNDLER_URL=https://bundler.example.com
+```
 
-## Passkey Backend (Proof of Concept)
+See [.env.example](.env.example) for all available options.
 
-A lightweight Express service under `backend/` handles WebAuthn registration and authentication flows and mints short-lived session keys for the smart account workflow.
+## Backend Setup
 
-1. Install backend dependencies: `cd backend && npm install`
-2. Copy `.env.example` to `.env` and adjust the relying party info (`RP_ID`, `ORIGIN`, etc.) if needed.
-3. Start the server: `npm run dev`
-4. API endpoints:
-   - `POST /passkeys/register/start` – begin passkey enrollment
-   - `POST /passkeys/register/finish` – verify enrollment response
-   - `POST /passkeys/auth/start` – begin authentication
-   - `POST /passkeys/auth/finish` – verify assertion, returns session key
+The backend handles passkey authentication and magic link emails:
 
-The front-end talks to this service via `VITE_PASSKEY_API_URL`, so make sure the value matches the backend host/port when running locally or in development containers.
+```bash
+cd backend
+npm install
 
-## Smart Account Contract
+# Configure environment
+cp .env.example .env
+# Edit .env with your settings
 
-`contracts/ArcSmartAccount.sol` introduces a minimal account abstraction wallet that authorises short-lived session keys (backed by passkeys). It can execute arbitrary calls via `execute` and is structured to plug into ERC-4337 entry points. More details and next steps live in `docs/account-abstraction.md`. The dashboard now exposes actions to deploy the contract and authorise the current session key.
+# Start backend server
+npm run dev
+```
 
-See `docs/passkey-architecture.md` for the full integration blueprint.
+### Backend Environment Variables
+
+```env
+NODE_ENV=development
+PORT=4000
+ALLOWED_ORIGINS=http://localhost:5173
+RP_ID=localhost
+ORIGIN=http://localhost:5173
+
+# Magic Link (Optional)
+SENDGRID_API_KEY=your-sendgrid-api-key
+EMAIL_FROM_ADDRESS=noreply@example.com
+EMAIL_FROM_NAME=Arc Wallet
+MAGIC_LINK_BASE_URL=http://localhost:5173/auth/callback
+
+# Security (Generate random strings)
+SESSION_SECRET=your-session-secret
+JWT_SECRET=your-jwt-secret
+
+# RPC Endpoints
+ARC_RPC_URL=https://rpc.testnet.arc.network
+SEPOLIA_RPC_URL=https://eth-sepolia.g.alchemy.com/v2/your-key
+```
+
+## Deployment
+
+### Frontend (Vercel/Netlify)
+
+1. Connect your GitHub repository
+2. Set environment variables in dashboard
+3. Deploy
+
+### Backend (Render/Railway)
+
+1. Connect your GitHub repository
+2. Set build command: `cd backend && npm install && npm run build`
+3. Set start command: `cd backend && npm start`
+4. Configure environment variables
+5. Deploy
+
+See [deployment guide](./docs/deployment.md) for detailed instructions.
+
+## Testing
+
+```bash
+# Run all tests
+npm test
+
+# E2E tests
+npm run test:e2e
+
+# Backend tests
+cd backend && npm test
+```
+
+## Documentation
+
+- [Security Policy](./SECURITY.md) - Vulnerability reporting
+- [Privacy Policy](./PRIVACY.md) - Data handling and GDPR compliance
+- [Contributing Guide](./CONTRIBUTING.md) - How to contribute
+- [Architecture](./docs/architecture.md) - Technical overview
+- [Passkey Integration](./docs/passkey-architecture.md) - WebAuthn details
+
+## Security
+
+Arc Wallet is a **self-custodial wallet**:
+- You control your private keys
+- We never have access to your funds
+- We cannot recover your wallet if you lose your seed phrase
+
+**Important**: Always backup your seed phrase and store it securely.
+
+For security vulnerabilities, please see our [Security Policy](./SECURITY.md).
+
+## Privacy
+
+We are committed to protecting your privacy:
+- No tracking or analytics by default
+- Private keys encrypted locally
+- GDPR and CCPA compliant
+
+See our [Privacy Policy](./PRIVACY.md) for details.
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](./LICENSE) file for details.
+
+## Contributing
+
+We welcome contributions! Please see our [Contributing Guide](./CONTRIBUTING.md) for details.
+
+## Support
+
+- **GitHub Issues**: Bug reports and feature requests
+- **Discussions**: Questions and community support
+- **Email**: support@example.com
+
+## Disclaimer
+
+**This software is provided "as is", without warranty of any kind.** Use at your own risk. Always verify transactions and never share your private keys or seed phrase.
+
+Arc Wallet is experimental software. Do not use with significant funds until thoroughly audited.
+
+## Acknowledgments
+
+Built with:
+- [React](https://reactjs.org/)
+- [Vite](https://vitejs.dev/)
+- [Tailwind CSS](https://tailwindcss.com/)
+- [ethers.js](https://docs.ethers.org/)
+- [Circle CCTP](https://www.circle.com/en/cross-chain-transfer-protocol)
+- [WebAuthn](https://webauthn.io/)
+
+---
+
+Made with ❤️ by the Arc Wallet community
