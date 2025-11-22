@@ -77,8 +77,8 @@ const AgentScreen: React.FC = () => {
     return (
         <div className="flex flex-col h-[calc(100vh-140px)] max-w-3xl mx-auto">
             <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-                    <span className="text-xl">🤖</span>
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-slate-700 to-slate-900 flex items-center justify-center border border-slate-500/50">
+                    <span className="text-xl">✨</span>
                 </div>
                 <div>
                     <h2 className="text-2xl font-bold text-[#E6EEF3]">Arc Agent</h2>
@@ -96,8 +96,8 @@ const AgentScreen: React.FC = () => {
                         >
                             <div
                                 className={`max-w-[80%] p-4 rounded-2xl ${msg.sender === 'user'
-                                        ? 'bg-primary text-primary-text rounded-tr-none'
-                                        : 'bg-white/10 text-[#E6EEF3] rounded-tl-none'
+                                    ? 'bg-primary text-primary-text rounded-tr-none'
+                                    : 'bg-white/10 text-[#E6EEF3] rounded-tl-none'
                                     }`}
                             >
                                 <p className="leading-relaxed">{msg.text}</p>
