@@ -1,10 +1,12 @@
 # Arc Wallet
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: Proprietary](https://img.shields.io/badge/License-Proprietary-red.svg)](./LICENSE)
 [![Security](https://img.shields.io/badge/Security-Policy-blue)](./SECURITY.md)
 [![Privacy](https://img.shields.io/badge/Privacy-Policy-green)](./PRIVACY.md)
 
 A modern, self-custodial Web3 wallet built for Arc Network with support for multiple stablecoins (USDC, EURC), cross-chain bridging, and passkey authentication.
+
+> **Note**: This is proprietary software owned by Arc Wallet. All rights reserved.
 
 ## Features
 
@@ -17,7 +19,7 @@ A modern, self-custodial Web3 wallet built for Arc Network with support for mult
 - **Real-time Balances**: Live token balance updates
 - **Professional UI**: Modern, responsive interface with dark mode
 
-## Quick Start
+## Development Setup
 
 ### Prerequisites
 - Node.js 18+ and npm
@@ -27,7 +29,7 @@ A modern, self-custodial Web3 wallet built for Arc Network with support for mult
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/arc-wallet.git
+git clone https://github.com/arcwallet/arc-wallet.git
 cd arc-wallet
 
 # Install dependencies
@@ -84,13 +86,13 @@ ALLOWED_ORIGINS=http://localhost:5173
 RP_ID=localhost
 ORIGIN=http://localhost:5173
 
-# Magic Link (Optional)
+# Magic Link
 SENDGRID_API_KEY=your-sendgrid-api-key
-EMAIL_FROM_ADDRESS=noreply@example.com
+EMAIL_FROM_ADDRESS=noreply@arcwallet.network
 EMAIL_FROM_NAME=Arc Wallet
 MAGIC_LINK_BASE_URL=http://localhost:5173/auth/callback
 
-# Security (Generate random strings)
+# Security
 SESSION_SECRET=your-session-secret
 JWT_SECRET=your-jwt-secret
 
@@ -101,21 +103,19 @@ SEPOLIA_RPC_URL=https://eth-sepolia.g.alchemy.com/v2/your-key
 
 ## Deployment
 
-### Frontend (Vercel/Netlify)
+### Frontend (Vercel)
 
 1. Connect your GitHub repository
 2. Set environment variables in dashboard
 3. Deploy
 
-### Backend (Render/Railway)
+### Backend (Render)
 
 1. Connect your GitHub repository
 2. Set build command: `cd backend && npm install && npm run build`
 3. Set start command: `cd backend && npm start`
 4. Configure environment variables
 5. Deploy
-
-See [deployment guide](./docs/deployment.md) for detailed instructions.
 
 ## Testing
 
@@ -134,7 +134,6 @@ cd backend && npm test
 
 - [Security Policy](./SECURITY.md) - Vulnerability reporting
 - [Privacy Policy](./PRIVACY.md) - Data handling and GDPR compliance
-- [Contributing Guide](./CONTRIBUTING.md) - How to contribute
 - [Architecture](./docs/architecture.md) - Technical overview
 - [Passkey Integration](./docs/passkey-architecture.md) - WebAuthn details
 
@@ -160,34 +159,21 @@ See our [Privacy Policy](./PRIVACY.md) for details.
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](./LICENSE) file for details.
+Copyright © 2024 Arc Wallet. All rights reserved.
 
-## Contributing
+This is proprietary software. Unauthorized copying, distribution, or use is strictly prohibited.
 
-We welcome contributions! Please see our [Contributing Guide](./CONTRIBUTING.md) for details.
+See [LICENSE](./LICENSE) for full terms.
 
 ## Support
 
-- **GitHub Issues**: Bug reports and feature requests
-- **Discussions**: Questions and community support
-- **Email**: support@example.com
+- **Email**: support@arcwallet.network
+- **Website**: https://arcwallet.network
 
 ## Disclaimer
 
 **This software is provided "as is", without warranty of any kind.** Use at your own risk. Always verify transactions and never share your private keys or seed phrase.
 
-Arc Wallet is experimental software. Do not use with significant funds until thoroughly audited.
-
-## Acknowledgments
-
-Built with:
-- [React](https://reactjs.org/)
-- [Vite](https://vitejs.dev/)
-- [Tailwind CSS](https://tailwindcss.com/)
-- [ethers.js](https://docs.ethers.org/)
-- [Circle CCTP](https://www.circle.com/en/cross-chain-transfer-protocol)
-- [WebAuthn](https://webauthn.io/)
-
 ---
 
-Made with ❤️ by the Arc Wallet community
+© 2024 Arc Wallet. All rights reserved.
