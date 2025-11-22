@@ -4,7 +4,7 @@ import { useSession } from '../contexts/SessionContext';
 import { useSelfCustodialWallet } from '../contexts/SelfCustodialWalletContext';
 
 import { passkeyClient, type SessionKeySummary } from '../services/passkeyClient';
-import { WalletIcon, CopyIcon, AddIcon, LaptopIcon, PhoneIcon, ChevronDownIcon, LockIcon } from './Icons';
+import { WalletIcon, CopyIcon, AddIcon, LaptopIcon, PhoneIcon, ChevronDownIcon, LockIcon, KeyIcon } from './Icons';
 
 import WebhookManager from './WebhookManager';
 import NotificationManager from './NotificationManager';
@@ -115,7 +115,7 @@ const SecuritySection: React.FC = () => {
                     <div className="flex items-center justify-between p-4 rounded-lg bg-[#151A22] border border-white/10">
                         <div className="flex items-center gap-3">
                             <div className="p-2 rounded-lg bg-blue-500/10 text-blue-400">
-                                <span className="text-xl">🔑</span>
+                                <KeyIcon size={20} className="text-blue-400" />
                             </div>
                             <div>
                                 <p className="font-medium text-text-primary">Require Passkey</p>
