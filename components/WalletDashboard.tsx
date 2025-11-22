@@ -465,7 +465,7 @@ const AssetsTable: React.FC<AssetsTableProps> = ({ balanceDisplay, isLoading }) 
                     <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm sm:pl-0">
                       <div className="flex items-center">
                         <div className="h-10 w-10 flex-shrink-0 bg-white/5 rounded-full flex items-center justify-center overflow-hidden">
-                          {asset.icon.startsWith('http') ? (
+                          {asset.icon && (asset.icon.startsWith('http') || asset.icon.startsWith('/')) ? (
                             <img className="h-10 w-10 object-cover" src={asset.icon} alt={`${asset.name} logo`} />
                           ) : (
                             <span className="text-xs font-bold text-[#A7B4C8]">{asset.ticker.slice(0, 2)}</span>
