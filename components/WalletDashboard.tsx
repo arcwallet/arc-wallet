@@ -498,22 +498,20 @@ const AssetsTable: React.FC<AssetsTableProps> = ({ balanceDisplay, isLoading }) 
                         </div>
                       ) : (
                         <>
-                          <div className="text-[#E6EEF3]">{asset.price}</div>
-                          <div className={asset.change.startsWith('+') ? 'text-green-400' : 'text-red-400'}>
-                            {asset.change}
-                          </div>
+                          <div className="text-slate-100">{asset.price}</div>
+                          <div className="text-green-400">{asset.change}</div>
                         </>
                       )}
                     </td>
-                    <td className="whitespace-nowrap px-3 py-4 text-sm">
+                    <td className="whitespace-nowrap px-3 py-4 text-sm text-slate-300">{asset.balance}</td>
+                    <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-0">
                       {isLoading || isLoadingTokens ? (
-                        <ShimmerBar width="80px" />
+                        <div className="flex justify-end">
+                          <ShimmerBar width="80px" />
+                        </div>
                       ) : (
-                        <div className="text-[#E6EEF3]">{asset.balance}</div>
+                        <div className="text-slate-100">{asset.value}</div>
                       )}
-                    </td>
-                    <td className="whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-0">
-                      {isLoading || isLoadingTokens ? <ShimmerBar width="90px" /> : asset.value}
                     </td>
                   </tr>
                 ))}

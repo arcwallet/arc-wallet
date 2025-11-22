@@ -6,7 +6,6 @@ const WalletDashboardSimple: React.FC = () => {
   const [activeTab, setActiveTab] = useState('home');
 
   return (
-  return (
     <div className="min-h-screen w-full bg-[#09121D] text-slate-100 font-sans">
       {/* Header */}
       <div className="p-5 border-b border-slate-500/30 bg-slate-900/60 backdrop-blur-sm">
@@ -49,30 +48,54 @@ const WalletDashboardSimple: React.FC = () => {
         )}
 
         {activeTab === 'send' && (
-          <div style={{ textAlign: 'center' }}>
-            <h2>📤 Send Assets</h2>
-            <p>Send functionality coming soon</p>
+          <div className="text-center">
+            <h2 className="text-xl font-semibold mb-4">📤 Send Assets</h2>
+            <div className="bg-slate-900/60 backdrop-blur-sm p-8 rounded-xl border border-slate-500/30 my-5 flex flex-col items-center justify-center min-h-[200px]">
+              <div className="w-16 h-16 bg-slate-800/50 rounded-full flex items-center justify-center mb-4">
+                <span className="text-3xl">📤</span>
+              </div>
+              <p className="text-slate-300 text-lg mb-2">Send functionality coming soon</p>
+              <p className="text-slate-500 text-sm max-w-xs">You'll be able to send tokens to any address on the Arc network.</p>
+            </div>
           </div>
         )}
 
         {activeTab === 'receive' && (
-          <div style={{ textAlign: 'center' }}>
-            <h2>📥 Receive Assets</h2>
-            <p>Receive functionality coming soon</p>
+          <div className="text-center">
+            <h2 className="text-xl font-semibold mb-4">📥 Receive Assets</h2>
+            <div className="bg-slate-900/60 backdrop-blur-sm p-8 rounded-xl border border-slate-500/30 my-5 flex flex-col items-center justify-center min-h-[200px]">
+              <div className="w-16 h-16 bg-slate-800/50 rounded-full flex items-center justify-center mb-4">
+                <span className="text-3xl">📥</span>
+              </div>
+              <p className="text-slate-300 text-lg mb-2">Receive functionality coming soon</p>
+              <p className="text-slate-500 text-sm max-w-xs">View your address and QR code to receive tokens.</p>
+            </div>
           </div>
         )}
 
         {activeTab === 'swap' && (
-          <div style={{ textAlign: 'center' }}>
-            <h2>🔄 Swap Assets</h2>
-            <p>Swap functionality coming soon</p>
+          <div className="text-center">
+            <h2 className="text-xl font-semibold mb-4">🔄 Swap Assets</h2>
+            <div className="bg-slate-900/60 backdrop-blur-sm p-8 rounded-xl border border-slate-500/30 my-5 flex flex-col items-center justify-center min-h-[200px]">
+              <div className="w-16 h-16 bg-slate-800/50 rounded-full flex items-center justify-center mb-4">
+                <span className="text-3xl">🔄</span>
+              </div>
+              <p className="text-slate-300 text-lg mb-2">Swap functionality coming soon</p>
+              <p className="text-slate-500 text-sm max-w-xs">Instantly swap between different tokens with low fees.</p>
+            </div>
           </div>
         )}
 
         {activeTab === 'bridge' && (
-          <div style={{ textAlign: 'center' }}>
-            <h2>🌉 Bridge Assets</h2>
-            <p>Bridge functionality coming soon</p>
+          <div className="text-center">
+            <h2 className="text-xl font-semibold mb-4">🌉 Bridge Assets</h2>
+            <div className="bg-slate-900/60 backdrop-blur-sm p-8 rounded-xl border border-slate-500/30 my-5 flex flex-col items-center justify-center min-h-[200px]">
+              <div className="w-16 h-16 bg-slate-800/50 rounded-full flex items-center justify-center mb-4">
+                <span className="text-3xl">🌉</span>
+              </div>
+              <p className="text-slate-300 text-lg mb-2">Bridge functionality coming soon</p>
+              <p className="text-slate-500 text-sm max-w-xs">Transfer assets between Arc and other networks.</p>
+            </div>
           </div>
         )}
 
