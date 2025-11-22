@@ -297,7 +297,7 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
             contractAddress || undefined
           );
 
-          console.log('🔒 TEE Private Transaction (Simulation):', privateData);
+          console.log('[TEE] Private Transaction (Simulation):', privateData);
           console.log('Encrypted Amount:', privateData.encryptedAmount);
           console.log('Proof:', privateData.proof);
           console.log('Method:', privateData.metadata?.method);
@@ -347,7 +347,7 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
 
           // Handle placeholder/invalid address for Demo/Testnet
           if (tokenAddress === '0x3600000000000000000000000000000000000000') {
-            console.warn('⚠️ Using placeholder USDC address. Simulating transaction success.');
+            console.warn('[WARNING] Using placeholder USDC address. Simulating transaction success.');
             // Simulate success for demo purposes since the contract doesn't exist
             await new Promise(resolve => setTimeout(resolve, 1500)); // Fake delay
             hash = '0x' + Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('');

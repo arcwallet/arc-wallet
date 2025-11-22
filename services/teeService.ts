@@ -77,5 +77,5 @@ export function getTEEStatus(): {
  */
 export async function initTEE(): Promise<void> {
     // No initialization needed for simulation
-    console.log('🔒 TEE Simulation Mode initialized');
+    console.log('[TEE] Simulation Mode initialized');
 }

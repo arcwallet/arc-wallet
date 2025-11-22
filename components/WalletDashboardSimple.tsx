@@ -9,7 +9,7 @@ const WalletDashboardSimple: React.FC = () => {
     <div className="min-h-screen w-full bg-[#09121D] text-slate-100 font-sans">
       {/* Header */}
       <div className="p-5 border-b border-slate-500/30 bg-slate-900/60 backdrop-blur-sm">
-        <h1 className="text-2xl font-bold">🚀 Arc Wallet Dashboard</h1>
+        <h1 className="text-2xl font-bold">Arc Wallet Dashboard</h1>
         <p className="text-slate-400">Welcome to your Arc Wallet!</p>
         {sessionKey && (
           <p className="text-xs text-slate-500 mt-1">
@@ -38,7 +38,7 @@ const WalletDashboardSimple: React.FC = () => {
       <div className="p-5">
         {activeTab === 'home' && (
           <div className="text-center">
-            <h2 className="text-xl font-semibold mb-4">💰 Portfolio</h2>
+            <h2 className="text-xl font-semibold mb-4">Portfolio</h2>
             <div className="bg-slate-900/60 backdrop-blur-sm p-6 rounded-xl border border-slate-500/30 my-5">
               <h3 className="text-slate-400 text-sm uppercase tracking-wide">Total Balance</h3>
               <p className="text-4xl font-light text-white my-2">$0.00 USD</p>
@@ -49,10 +49,10 @@ const WalletDashboardSimple: React.FC = () => {
 
         {activeTab === 'send' && (
           <div className="text-center">
-            <h2 className="text-xl font-semibold mb-4">📤 Send Assets</h2>
-            <div className="bg-slate-900/60 backdrop-blur-sm p-8 rounded-xl border border-slate-500/30 my-5 flex flex-col items-center justify-center min-h-[200px]">
+            <h2 className="text-xl font-semibold mb-4">Send Assets</h2>
+            <div className="flex items-center gap-4 border border-slate-500/30 my-5 flex flex-col items-center justify-center min-h-[200px]">
               <div className="w-16 h-16 bg-slate-800/50 rounded-full flex items-center justify-center mb-4">
-                <span className="text-3xl">📤</span>
+                <span className="text-3xl"></span>
               </div>
               <p className="text-slate-300 text-lg mb-2">Send functionality coming soon</p>
               <p className="text-slate-500 text-sm max-w-xs">You'll be able to send tokens to any address on the Arc network.</p>
@@ -62,10 +62,10 @@ const WalletDashboardSimple: React.FC = () => {
 
         {activeTab === 'receive' && (
           <div className="text-center">
-            <h2 className="text-xl font-semibold mb-4">📥 Receive Assets</h2>
-            <div className="bg-slate-900/60 backdrop-blur-sm p-8 rounded-xl border border-slate-500/30 my-5 flex flex-col items-center justify-center min-h-[200px]">
+            <h2 className="text-xl font-semibold mb-4">Receive Assets</h2>
+            <div className="flex items-center gap-4 border border-slate-500/30 my-5 flex flex-col items-center justify-center min-h-[200px]">
               <div className="w-16 h-16 bg-slate-800/50 rounded-full flex items-center justify-center mb-4">
-                <span className="text-3xl">📥</span>
+                <span className="text-3xl"></span>
               </div>
               <p className="text-slate-300 text-lg mb-2">Receive functionality coming soon</p>
               <p className="text-slate-500 text-sm max-w-xs">View your address and QR code to receive tokens.</p>
@@ -75,10 +75,10 @@ const WalletDashboardSimple: React.FC = () => {
 
         {activeTab === 'swap' && (
           <div className="text-center">
-            <h2 className="text-xl font-semibold mb-4">🔄 Swap Assets</h2>
-            <div className="bg-slate-900/60 backdrop-blur-sm p-8 rounded-xl border border-slate-500/30 my-5 flex flex-col items-center justify-center min-h-[200px]">
+            <h2 className="text-xl font-semibold mb-4">Swap Assets</h2>
+            <div className="flex items-center gap-4 border border-slate-500/30 my-5 flex flex-col items-center justify-center min-h-[200px]">
               <div className="w-16 h-16 bg-slate-800/50 rounded-full flex items-center justify-center mb-4">
-                <span className="text-3xl">🔄</span>
+                <span className="text-3xl"></span>
               </div>
               <p className="text-slate-300 text-lg mb-2">Swap functionality coming soon</p>
               <p className="text-slate-500 text-sm max-w-xs">Instantly swap between different tokens with low fees.</p>
@@ -88,10 +88,10 @@ const WalletDashboardSimple: React.FC = () => {
 
         {activeTab === 'bridge' && (
           <div className="text-center">
-            <h2 className="text-xl font-semibold mb-4">🌉 Bridge Assets</h2>
-            <div className="bg-slate-900/60 backdrop-blur-sm p-8 rounded-xl border border-slate-500/30 my-5 flex flex-col items-center justify-center min-h-[200px]">
+            <h2 className="text-xl font-semibold mb-4">Bridge Assets</h2>
+            <div className="flex items-center gap-4 border border-slate-500/30 my-5 flex flex-col items-center justify-center min-h-[200px]">
               <div className="w-16 h-16 bg-slate-800/50 rounded-full flex items-center justify-center mb-4">
-                <span className="text-3xl">🌉</span>
+                <span className="text-3xl"></span>
               </div>
               <p className="text-slate-300 text-lg mb-2">Bridge functionality coming soon</p>
               <p className="text-slate-500 text-sm max-w-xs">Transfer assets between Arc and other networks.</p>

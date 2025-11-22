@@ -106,7 +106,7 @@ export class CircleApiService {
   async executeContractTransaction(params: SwapTransactionParams): Promise<CircleTransactionResponse> {
     try {
       if (DEBUG) {
-        console.debug('🔄 Circle API: Executing contract transaction', params);
+        console.debug('[Circle API] Executing contract transaction', params);
       }
 
       const entitySecretCiphertext = await this.encryptEntitySecret(this.config.entitySecret);
@@ -127,7 +127,7 @@ export class CircleApiService {
       };
 
       if (DEBUG) {
-        console.debug('📤 Circle API Request:', requestBody);
+        console.debug('[Circle API] Request:', requestBody);
       }
 
       const response = await fetch(`${CIRCLE_API_BASE_URL}/transactions/contractExecution`, {
@@ -147,7 +147,7 @@ export class CircleApiService {
       const result = await response.json();
 
       if (DEBUG) {
-        console.debug('📥 Circle API Response:', result);
+        console.debug('[Circle API] Response:', result);
       }
 
       return result.data;

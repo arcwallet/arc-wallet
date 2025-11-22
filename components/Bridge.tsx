@@ -286,7 +286,7 @@ const Bridge: React.FC = () => {
                 </div>
               </div>
               <p className="text-xs text-slate-400 mt-2">
-                ✓ Only USDC is supported for bridge between Arc Testnet and Ethereum Sepolia
+                Only USDC is supported for bridge between Arc Testnet and Ethereum Sepolia
               </p>
             </div>
             <label className="flex flex-col gap-2">

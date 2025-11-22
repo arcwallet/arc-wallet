@@ -397,7 +397,7 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
 
       <div className="p-6 rounded-lg bg-amber-900/20 border border-amber-500/50 backdrop-blur-sm">
         <p className="text-sm text-amber-200 mb-4">
-          <strong>⚠️ Important:</strong> This is the ONLY way to recover your wallet. Never share it with anyone.
+          <strong>Important:</strong> This is the ONLY way to recover your wallet. Never share it with anyone.
         </p>
       </div>
 
@@ -410,16 +410,16 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
                 navigator.clipboard.writeText(mnemonic);
                 const btn = document.getElementById('copy-seed-btn');
                 if (btn) {
-                  btn.textContent = '✓ Copied!';
+                  btn.textContent = 'Copied!';
                   setTimeout(() => {
-                    btn.textContent = '📋 Copy All';
+                    btn.textContent = 'Copy All';
                   }, 2000);
                 }
               }}
               id="copy-seed-btn"
               className="text-sm px-4 py-2 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 hover:text-blue-200 border border-blue-400/30 transition-all font-medium"
             >
-              📋 Copy All
+              Copy All
             </button>
           </div>
           <div className="p-6 rounded-lg bg-slate-900/60 border border-slate-500/50 backdrop-blur-sm">

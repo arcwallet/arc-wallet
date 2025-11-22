@@ -126,7 +126,7 @@ export async function bridgeUsdcWithSessionKey({
     }
   } catch (error: any) {
     console.error('❌ [BRIDGE] Critical error occurred!');
-    console.error('🔴 [BRIDGE] Error details:', {
+    console.error('[BRIDGE ERROR] Error details:', {
       message: error?.message,
       code: error?.code,
       name: error?.name,
@@ -135,7 +135,7 @@ export async function bridgeUsdcWithSessionKey({
     });
 
     // Log the full error object
-    console.error('🔴 [BRIDGE] Full error object:', error);
+    console.error('[BRIDGE ERROR] Full error object:', error);
 
     // Enhanced error handling
     if (error?.message?.includes('network') || error?.message?.includes('RPC')) {
