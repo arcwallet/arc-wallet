@@ -89,7 +89,7 @@ const LoginPage: React.FC = () => {
         {message && (
           <div className={`mt-4 p-3 rounded-lg backdrop-blur-sm border text-center ${requestStatus === 'error'
             ? 'bg-red-900/20 border-red-500/50 text-red-200'
-            : 'bg-green-900/20 border-green-500/50 text-green-200'
+            : 'bg-blue-900/20 border-blue-500/50 text-blue-200'
             }`}>
             {message}
           </div>
