@@ -2,10 +2,10 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useWallet } from '../contexts/WalletContext';
 import { useSession } from '../contexts/SessionContext';
 import { useSelfCustodialWallet } from '../contexts/SelfCustodialWalletContext';
-import { usePrivacy } from '../contexts/PrivacyContext';
+
 import { passkeyClient, type SessionKeySummary } from '../services/passkeyClient';
 import { WalletIcon, CopyIcon, AddIcon, LaptopIcon, PhoneIcon, ChevronDownIcon } from './Icons';
-import { LinkedAccountsManager } from './LinkedAccountsManager';
+
 import WebhookManager from './WebhookManager';
 import NotificationManager from './NotificationManager';
 
@@ -46,13 +46,13 @@ const WalletIdentitySection: React.FC = () => {
 };
 
 const SecuritySection: React.FC = () => {
-    const { userId, sessionKey, registerPasskeyForCurrentUser } = useWallet();
+    const { userId, isPasskeyEnabled, togglePasskey, registerPasskey, address } = useSelfCustodialWallet();
     const [loading, setLoading] = useState(false);
     const [keys, setKeys] = useState<SessionKeySummary[]>([]);
     const [devices, setDevices] = useState<any[]>([]);
     const [error, setError] = useState<string | null>(null);
 
-    const currentAddress = sessionKey?.address?.toLowerCase();
+    const currentAddress = address?.toLowerCase();
 
     const load = async () => {
         if (!userId) return;
@@ -93,7 +93,7 @@ const SecuritySection: React.FC = () => {
 
     const handleAddDevice = async () => {
         try {
-            await registerPasskeyForCurrentUser();
+            await registerPasskey();
             await load();
             alert('Passkey registered for this user. You can now authenticate on this device.');
         } catch (e: any) {
@@ -112,6 +112,26 @@ const SecuritySection: React.FC = () => {
                     <button onClick={load} disabled={loading} className="flex h-10 items-center justify-center rounded-lg border border-slate-500/50 bg-transparent px-4 text-sm font-medium text-slate-300 hover:bg-white/5 hover:text-white hover:border-slate-400 transition-all disabled:opacity-60">
                         Refresh
                     </button>
+                    <div className="flex items-center justify-between p-4 rounded-lg bg-[#151A22] border border-white/10">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 rounded-lg bg-blue-500/10 text-blue-400">
+                                <span className="text-xl">🔑</span>
+                            </div>
+                            <div>
+                                <p className="font-medium text-text-primary">Require Passkey</p>
+                                <p className="text-sm text-text-secondary">Use passkey for login and transactions</p>
+                            </div>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                            <input
+                                type="checkbox"
+                                className="sr-only peer"
+                                checked={isPasskeyEnabled}
+                                onChange={(e) => togglePasskey(e.target.checked)}
+                            />
+                            <div className="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500"></div>
+                        </label>
+                    </div>
                     <button
                         onClick={handleAddDevice}
                         className="flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-500/50 bg-transparent px-4 text-sm font-medium text-slate-300 hover:bg-white/5 hover:text-white hover:border-slate-400 transition-all"
@@ -202,157 +222,7 @@ const NetworkSection: React.FC = () => (
     </div>
 );
 
-const PrivacySection: React.FC = () => {
-    const { isPrivacyMode, togglePrivacyMode, fheKeypair, viewKeys, createViewKey, revokeViewKey } = usePrivacy();
-    const [showViewKeyModal, setShowViewKeyModal] = useState(false);
-    const [newViewKeyAddress, setNewViewKeyAddress] = useState('');
-    const [newViewKeyName, setNewViewKeyName] = useState('');
 
-    const handleCreateViewKey = () => {
-        if (!newViewKeyAddress) {
-            alert('Please enter an address');
-            return;
-        }
-        createViewKey(newViewKeyAddress, newViewKeyName);
-        setNewViewKeyAddress('');
-        setNewViewKeyName('');
-        setShowViewKeyModal(false);
-    };
-
-    return (
-        <>
-            <div className="flex flex-col gap-4 rounded-xl bg-[#151A22] p-5 sm:p-6">
-                <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
-                    <div className="flex flex-col gap-1">
-                        <h3 className="text-lg font-semibold text-[#E6EEF3]">Privacy Mode (FHE)</h3>
-                        <p className="text-sm text-[#A7B4C8]">Encrypt transaction amounts with Fully Homomorphic Encryption</p>
-                    </div>
-                    <button
-                        onClick={togglePrivacyMode}
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${isPrivacyMode ? 'bg-primary' : 'bg-[#2B3440]'
-                            }`}
-                    >
-                        <span
-                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${isPrivacyMode ? 'translate-x-6' : 'translate-x-1'
-                                }`}
-                        />
-                    </button>
-                </div>
-
-                {isPrivacyMode && fheKeypair && (
-                    <div className="space-y-4">
-                        {/* FHE Public Key */}
-                        <div className="rounded-lg border border-[#2B3440] bg-[#091325]/50 p-4">
-                            <p className="text-sm font-medium text-[#A7B4C8] mb-2">FHE Public Key</p>
-                            <p className="font-mono text-xs text-[#E6EEF3] break-all">{fheKeypair.publicKey}</p>
-                        </div>
-
-                        {/* View Keys Management */}
-                        <div className="rounded-lg border border-[#2B3440] overflow-hidden">
-                            <div className="px-4 py-3 bg-[#0f1724] flex items-center justify-between">
-                                <p className="text-sm font-medium text-[#A7B4C8]">View Keys</p>
-                                <button
-                                    onClick={() => setShowViewKeyModal(true)}
-                                    className="text-sm text-primary hover:text-primary/80"
-                                >
-                                    + Create View Key
-                                </button>
-                            </div>
-                            {viewKeys.length === 0 ? (
-                                <div className="px-4 py-6 text-center text-sm text-[#A7B4C8]">
-                                    No view keys created. Create one to share with auditors.
-                                </div>
-                            ) : (
-                                <table className="w-full text-sm">
-                                    <thead className="bg-[#0f1724] text-[#A7B4C8]">
-                                        <tr>
-                                            <th className="px-4 py-2 text-left">Granted To</th>
-                                            <th className="px-4 py-2 text-left">Created</th>
-                                            <th className="px-4 py-2 text-right">Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-[#2B3440]">
-                                        {viewKeys.map((vk) => (
-                                            <tr key={vk.id}>
-                                                <td className="px-4 py-3 text-[#E6EEF3]">
-                                                    <div className="font-mono text-xs">{vk.grantedTo.slice(0, 10)}...</div>
-                                                    {vk.grantedToName && <div className="text-xs text-[#A7B4C8]">{vk.grantedToName}</div>}
-                                                </td>
-                                                <td className="px-4 py-3 text-[#E6EEF3]">{vk.createdAt.toLocaleDateString()}</td>
-                                                <td className="px-4 py-3 text-right">
-                                                    <button
-                                                        onClick={() => revokeViewKey(vk.id)}
-                                                        className="text-sm text-accent-orange hover:text-accent-orange/80"
-                                                    >
-                                                        Revoke
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            )}
-                        </div>
-
-                        {/* Privacy Info */}
-                        <div className="rounded-lg border border-[#2B3440]/50 bg-[#091325]/30 p-4">
-                            <p className="text-xs text-[#A7B4C8] leading-relaxed">
-                                🔒 When Privacy Mode is enabled, transaction amounts are encrypted using FHE.
-                                Addresses remain visible for compliance, but amounts are hidden from public view.
-                                You can grant view keys to auditors for selective disclosure.
-                            </p>
-                        </div>
-                    </div>
-                )}
-            </div>
-
-            {/* View Key Creation Modal */}
-            {showViewKeyModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-                    <div className="w-full max-w-md bg-[#0F1419] border border-[#2B3440] rounded-2xl p-6">
-                        <h3 className="text-xl font-bold text-[#E6EEF3] mb-4">Create View Key</h3>
-                        <div className="space-y-4">
-                            <div>
-                                <label className="text-sm text-[#A7B4C8] mb-2 block">Auditor Address</label>
-                                <input
-                                    type="text"
-                                    value={newViewKeyAddress}
-                                    onChange={(e) => setNewViewKeyAddress(e.target.value)}
-                                    placeholder="0x..."
-                                    className="w-full bg-[#151A22] border border-[#2B3440] rounded-lg px-4 py-2 text-[#E6EEF3] placeholder-[#A7B4C8] focus:outline-none focus:border-primary"
-                                />
-                            </div>
-                            <div>
-                                <label className="text-sm text-[#A7B4C8] mb-2 block">Name (Optional)</label>
-                                <input
-                                    type="text"
-                                    value={newViewKeyName}
-                                    onChange={(e) => setNewViewKeyName(e.target.value)}
-                                    placeholder="e.g., Tax Auditor"
-                                    className="w-full bg-[#151A22] border border-[#2B3440] rounded-lg px-4 py-2 text-[#E6EEF3] placeholder-[#A7B4C8] focus:outline-none focus:border-primary"
-                                />
-                            </div>
-                            <div className="flex gap-3 mt-6">
-                                <button
-                                    onClick={() => setShowViewKeyModal(false)}
-                                    className="flex-1 py-2 rounded-lg border border-[#2B3440] text-[#E6EEF3] hover:bg-white/5"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    onClick={handleCreateViewKey}
-                                    className="flex-1 py-2 rounded-lg bg-primary text-primary-text hover:bg-primary/90"
-                                >
-                                    Create
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
-        </>
-    );
-};
 
 const OrganizationRolesSection: React.FC = () => {
     const { address } = useSelfCustodialWallet();
@@ -777,14 +647,12 @@ const Settings: React.FC = () => {
                     <WalletIdentitySection />
                     <SecuritySection />
                     <NetworkSection />
-                    <PrivacySection />
+
                     <OrganizationRolesSection />
                     <RecoverySection />
                     <div className="h-px bg-slate-700/50 my-8" />
 
-                    <LinkedAccountsManager />
 
-                    <div className="h-px bg-slate-700/50 my-8" />
 
                     <WebhookManager />
 

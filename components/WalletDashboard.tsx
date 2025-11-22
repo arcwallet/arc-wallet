@@ -154,7 +154,7 @@ const DashboardHeader: React.FC<DashboardHeaderPropsWithNav> = ({ account, isRef
   const { address: legacyAddress, logout: legacyLogout } = useWallet();
   const address = selfCustodialAddress || legacyAddress;
   const logout = selfCustodialAddress ? lockWallet : legacyLogout;
-  const { isPrivacyMode } = usePrivacy();
+  const { isPrivacyMode, togglePrivacyMode } = usePrivacy();
 
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [hasCopiedAddress, setHasCopiedAddress] = useState(false);
@@ -175,12 +175,20 @@ const DashboardHeader: React.FC<DashboardHeaderPropsWithNav> = ({ account, isRef
           <div className="size-2 rounded-full bg-green-500" />
           <p className="text-sm font-medium text-slate-400">Arc Testnet</p>
         </div>
-        {isPrivacyMode && (
-          <div className="flex items-center gap-2 rounded-lg bg-purple-500/10 border border-purple-500/30 px-3 py-1.5">
-            <LockIcon size={14} className="text-purple-400" />
-            <p className="text-sm font-medium text-purple-400">Privacy Mode</p>
+        <div className="flex items-center gap-3 rounded-lg bg-[#151A22] border border-white/10 px-3 py-1.5">
+          <div className="flex items-center gap-2">
+            <LockIcon size={14} className={isPrivacyMode ? "text-purple-400" : "text-slate-500"} />
+            <p className={`text-sm font-medium ${isPrivacyMode ? "text-purple-400" : "text-slate-400"}`}>Privacy Mode</p>
           </div>
-        )}
+          <button
+            onClick={togglePrivacyMode}
+            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${isPrivacyMode ? 'bg-purple-500' : 'bg-slate-700'}`}
+          >
+            <span
+              className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${isPrivacyMode ? 'translate-x-4' : 'translate-x-1'}`}
+            />
+          </button>
+        </div>
         {address && (
           <button
             onClick={() => {
@@ -326,7 +334,7 @@ const AssetsTable: React.FC<AssetsTableProps> = ({ balanceDisplay, isLoading }) 
   const { sessionKey } = useWallet();
   const walletAddress = selfCustodialAddress || sessionKey?.address;
 
-  const [activeTab, setActiveTab] = useState<'tokens' | 'rwa'>('tokens');
+  const [activeTab, setActiveTab] = useState<'tokens'>('tokens');
   const [tokenBalances, setTokenBalances] = useState<TokenBalance[]>([]);
   const [isLoadingTokens, setIsLoadingTokens] = useState(false);
   const [prices, setPrices] = useState<TokenPrices>({});
@@ -384,29 +392,7 @@ const AssetsTable: React.FC<AssetsTableProps> = ({ balanceDisplay, isLoading }) 
   }, [walletAddress]);
 
   const rows = useMemo(() => {
-    if (activeTab === 'rwa') {
-      // Mock RWA Data
-      return [
-        {
-          name: 'BlackRock USD Inst. Digital Liquidity Fund',
-          ticker: 'BUIDL',
-          price: '$1.00',
-          change: '+0.01%',
-          balance: '0.00',
-          value: '$0.00',
-          icon: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/00/BlackRock_wordmark.svg/2560px-BlackRock_wordmark.svg.png',
-        },
-        {
-          name: 'Ondo US Dollar Yield',
-          ticker: 'USDY',
-          price: '$1.05',
-          change: '+0.02%',
-          balance: '0.00',
-          value: '$0.00',
-          icon: 'https://images.crunchbase.com/image/upload/c_lpad,f_auto,q_auto:eco,dpr_1/v14/organization/logos/8f9b8e8e-8e8e-4e8e-8e8e-8e8e8e8e8e8e.png', // Placeholder
-        }
-      ];
-    }
+
 
     if (tokenBalances.length === 0) {
       // Fallback to supported tokens with zero balances
@@ -452,12 +438,7 @@ const AssetsTable: React.FC<AssetsTableProps> = ({ balanceDisplay, isLoading }) 
           >
             My Assets
           </button>
-          <button
-            onClick={() => setActiveTab('rwa')}
-            className={`text-xl font-bold transition-colors ${activeTab === 'rwa' ? 'text-[#E6EEF3]' : 'text-[#A7B4C8] hover:text-white'}`}
-          >
-            Real World Assets
-          </button>
+
         </div>
       </div>
       <div className="mt-4 flow-root">
@@ -517,15 +498,7 @@ const AssetsTable: React.FC<AssetsTableProps> = ({ balanceDisplay, isLoading }) 
                 ))}
               </tbody>
             </table>
-            {activeTab === 'rwa' && rows.length === 2 && (
-              <div className="mt-8 p-6 bg-white/5 rounded-xl text-center">
-                <p className="text-[#E6EEF3] font-medium mb-2">Start Investing in Real World Assets</p>
-                <p className="text-[#A7B4C8] text-sm mb-4">Access tokenized treasuries, real estate, and private credit directly on Arc.</p>
-                <button className="px-4 py-2 bg-primary text-primary-text rounded-lg font-medium hover:bg-primary/90 transition-colors">
-                  Explore Market
-                </button>
-              </div>
-            )}
+
           </div>
         </div>
       </div>

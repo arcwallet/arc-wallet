@@ -31,7 +31,7 @@ import { TX_EXPLORER_URL } from '../config/app.config';
 const SendAssets: React.FC = () => {
   const { snapshot, isLoading } = useArcAccount();
   // Get private key from self-custodial context first, fall back to legacy
-  const { address: selfCustodialAddress, getPrivateKey } = useSelfCustodialWallet();
+  const { address: selfCustodialAddress, getPrivateKey, isPasskeyEnabled } = useSelfCustodialWallet();
   const { sessionKey, verifyWithPasskey } = useWallet();
   const { addActivity } = useActivity();
   const { isPrivacyMode, fheKeypair } = usePrivacy();
@@ -245,21 +245,24 @@ const SendAssets: React.FC = () => {
     setSubmitError(null);
     setTxHash(null);
     try {
-      try {
-        await verifyWithPasskey();
-      } catch (passkeyError: any) {
-        const passkeyMsg = typeof passkeyError?.message === 'string' ? passkeyError.message : '';
+      // Only verify passkey if enabled
+      if (isPasskeyEnabled) {
+        try {
+          await verifyWithPasskey();
+        } catch (passkeyError: any) {
+          const passkeyMsg = typeof passkeyError?.message === 'string' ? passkeyError.message : '';
 
-        if (passkeyError instanceof DOMException && passkeyError.name === 'NotAllowedError') {
-          throw new Error('Passkey verification was cancelled. Please try again and complete the verification.');
-        } else if (passkeyMsg.toLowerCase().includes('user not found')) {
-          throw new Error('Your passkey is not registered. Please sign out and create a new passkey.');
-        } else if (passkeyMsg.toLowerCase().includes('not found') || passkeyMsg.toLowerCase().includes('passkey not found')) {
-          throw new Error('Passkey not found. Please sign out and register a new passkey.');
-        } else if (passkeyMsg.toLowerCase().includes('challenge')) {
-          throw new Error('Authentication challenge expired. Please try again.');
-        } else {
-          throw new Error(`Passkey verification failed: ${passkeyMsg || 'Unknown error'} `);
+          if (passkeyError instanceof DOMException && passkeyError.name === 'NotAllowedError') {
+            throw new Error('Passkey verification was cancelled. Please try again and complete the verification.');
+          } else if (passkeyMsg.toLowerCase().includes('user not found')) {
+            throw new Error('Your passkey is not registered. Please sign out and create a new passkey.');
+          } else if (passkeyMsg.toLowerCase().includes('not found') || passkeyMsg.toLowerCase().includes('passkey not found')) {
+            throw new Error('Passkey not found. Please sign out and register a new passkey.');
+          } else if (passkeyMsg.toLowerCase().includes('challenge')) {
+            throw new Error('Authentication challenge expired. Please try again.');
+          } else {
+            throw new Error(`Passkey verification failed: ${passkeyMsg || 'Unknown error'} `);
+          }
         }
       }
 
@@ -514,11 +517,11 @@ const SendAssets: React.FC = () => {
                 Sending…
               </span>
             ) : (
-              'Send with Passkey'
+              isPasskeyEnabled ? 'Send with Passkey' : 'Send Transaction'
             )}
           </button>
           <p className="text-xs text-text-secondary text-center mt-3">
-            You'll be prompted to verify with your passkey before sending
+            {isPasskeyEnabled ? "You'll be prompted to verify with your passkey before sending" : "Transaction will be signed with your local wallet"}
           </p>
         </div>
       </div>

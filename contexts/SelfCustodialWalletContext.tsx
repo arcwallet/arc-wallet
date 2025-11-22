@@ -56,6 +56,8 @@ export interface SelfCustodialWalletContextValue {
   // Authentication
   loginWithPasskey: () => Promise<void>;
   registerPasskey: () => Promise<void>;
+  isPasskeyEnabled: boolean;
+  togglePasskey: (enabled: boolean) => void;
 
   // Wallet access
   unlockWallet: (password: string) => Promise<void>;
@@ -283,12 +285,33 @@ export const SelfCustodialWalletProvider: React.FC<{ children: ReactNode }> = ({
     }
   }, [address, currentEmail, loginWithPasskeyInternal]);
 
+  // Passkey settings
+  const [isPasskeyEnabled, setIsPasskeyEnabled] = useState(true);
+
+  // Load passkey setting
+  useEffect(() => {
+    const stored = localStorage.getItem('arcwallet:passkey-enabled');
+    if (stored !== null) {
+      setIsPasskeyEnabled(stored === 'true');
+    }
+  }, []);
+
+  const togglePasskey = useCallback((enabled: boolean) => {
+    setIsPasskeyEnabled(enabled);
+    localStorage.setItem('arcwallet:passkey-enabled', String(enabled));
+  }, []);
+
   // Login with passkey (public)
   const loginWithPasskey = useCallback(async () => {
-    // Allow login even if no local wallet (to restore from backup)
-    // if (!hasWallet) {
-    //   throw new Error('No wallet found. Create or import a wallet first.');
-    // }
+    // If passkey is disabled, we just skip the passkey check and rely on local wallet unlock
+    if (!isPasskeyEnabled) {
+      setIsAuthenticated(true);
+      sessionStorage.setItem(AUTH_STATE_KEY, JSON.stringify({
+        isAuthenticated: true,
+        address,
+      }));
+      return;
+    }
 
     setIsConnecting(true);
 
@@ -303,7 +326,7 @@ export const SelfCustodialWalletProvider: React.FC<{ children: ReactNode }> = ({
     } finally {
       setIsConnecting(false);
     }
-  }, [loginWithPasskeyInternal]);
+  }, [loginWithPasskeyInternal, isPasskeyEnabled, address]);
 
   // Unlock wallet with password
   const unlockWallet = useCallback(async (password: string) => {
@@ -409,6 +432,7 @@ export const SelfCustodialWalletProvider: React.FC<{ children: ReactNode }> = ({
     needsBackup,
     address,
     userId,
+    isPasskeyEnabled,
     createWallet,
     importWallet,
     loginWithPasskey,
@@ -421,6 +445,7 @@ export const SelfCustodialWalletProvider: React.FC<{ children: ReactNode }> = ({
     changePassword,
     markBackedUp,
     getMnemonic,
+    togglePasskey,
   }), [
     isAuthenticated,
     isUnlocked,
@@ -429,6 +454,7 @@ export const SelfCustodialWalletProvider: React.FC<{ children: ReactNode }> = ({
     needsBackup,
     address,
     userId,
+    isPasskeyEnabled,
     createWallet,
     importWallet,
     loginWithPasskey,
@@ -441,6 +467,7 @@ export const SelfCustodialWalletProvider: React.FC<{ children: ReactNode }> = ({
     changePassword,
     markBackedUp,
     getMnemonic,
+    togglePasskey,
   ]);
 
   return (

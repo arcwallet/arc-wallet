@@ -5,7 +5,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import WalletDashboard from './components/WalletDashboard';
 import WalletSetupScreen from './components/WalletSetupScreen';
 import WalletSelectionScreen from './components/WalletSelectionScreen';
-const LoginPage = React.lazy(() => import('./pages/LoginPage'));
+import LoginPage from './pages/LoginPage';
 const RecoveryPage = React.lazy(() => import('./pages/RecoveryPage'));
 import { SessionProvider, useSession } from './contexts/SessionContext';
 import { WalletProvider, useWallet } from './contexts/WalletContext';

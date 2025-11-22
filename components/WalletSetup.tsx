@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useSelfCustodialWallet } from '../contexts/SelfCustodialWalletContext';
-import { SocialLoginButtons } from './SocialLoginButtons';
+
 import { validatePassword, getPasswordStrengthLabel, getPasswordStrengthColor } from '../utils/passwordValidation';
 import { WaveBackground } from './WaveBackground';
 import arcLogo from '../assets/arclogo.png';
@@ -159,16 +159,7 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
         </button>
       </div>
 
-      <div className="relative my-6">
-        <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-slate-500/30"></div>
-        </div>
-        <div className="relative flex justify-center text-sm">
-          <span className="px-3 bg-[#09121D] text-slate-500">Or continue with</span>
-        </div>
-      </div>
 
-      <SocialLoginButtons />
 
       <div className="p-4 rounded-lg bg-amber-900/20 border border-amber-500/50 backdrop-blur-sm">
         <p className="text-sm text-amber-200">

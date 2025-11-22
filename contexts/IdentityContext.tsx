@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { identityService } from '../services/identityService';
 
 export interface Credential {
     id: string;
@@ -27,42 +28,40 @@ export const useIdentity = () => {
 };
 
 export const IdentityProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-    // Mock initial state
-    const [credentials, setCredentials] = useState<Credential[]>([
-        {
-            id: '1',
-            issuer: 'Arc Identity Authority',
-            type: 'KYC Level 1',
-            issueDate: '2024-01-15',
-            status: 'active',
-        },
-        {
-            id: '2',
-            issuer: 'DeFi Credit Score',
-            type: 'Credit Score > 700',
-            issueDate: '2024-02-20',
-            status: 'active',
-        },
-    ]);
+    const [credentials, setCredentials] = useState<Credential[]>([]);
+    const [reputationScore, setReputationScore] = useState(0);
+    const [identityLevel, setIdentityLevel] = useState('Unverified');
 
-    const [reputationScore, setReputationScore] = useState(720);
-    const [identityLevel, setIdentityLevel] = useState('Verified Human');
+    // Load initial data
+    useEffect(() => {
+        const loadData = () => {
+            const data = identityService.getData();
+            setCredentials(data.credentials);
+            setReputationScore(data.reputationScore);
+            setIdentityLevel(data.identityLevel);
+        };
+        loadData();
+
+        // Listen for storage events to sync across tabs
+        window.addEventListener('storage', loadData);
+        return () => window.removeEventListener('storage', loadData);
+    }, []);
+
+    const refreshData = () => {
+        const data = identityService.getData();
+        setCredentials(data.credentials);
+        setReputationScore(data.reputationScore);
+        setIdentityLevel(data.identityLevel);
+    };
 
     const addCredential = (credential: Omit<Credential, 'id' | 'status'>) => {
-        const newCredential: Credential = {
-            ...credential,
-            id: Math.random().toString(36).substr(2, 9),
-            status: 'active',
-        };
-        setCredentials((prev) => [...prev, newCredential]);
-        // Mock score update
-        setReputationScore((prev) => Math.min(prev + 10, 850));
+        identityService.addCredential(credential);
+        refreshData();
     };
 
     const removeCredential = (id: string) => {
-        setCredentials((prev) => prev.filter((c) => c.id !== id));
-        // Mock score update
-        setReputationScore((prev) => Math.max(prev - 10, 0));
+        identityService.removeCredential(id);
+        refreshData();
     };
 
     return (
