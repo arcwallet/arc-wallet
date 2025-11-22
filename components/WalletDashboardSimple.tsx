@@ -6,38 +6,29 @@ const WalletDashboardSimple: React.FC = () => {
   const [activeTab, setActiveTab] = useState('home');
 
   return (
-    <div style={{
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-      minHeight: '100vh',
-      color: 'white',
-      fontFamily: 'system-ui'
-    }}>
+  return (
+    <div className="min-h-screen w-full bg-[#09121D] text-slate-100 font-sans">
       {/* Header */}
-      <div style={{ padding: '20px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-        <h1>🚀 Arc Wallet Dashboard</h1>
-        <p>Welcome to your Arc Wallet!</p>
+      <div className="p-5 border-b border-slate-500/30 bg-slate-900/60 backdrop-blur-sm">
+        <h1 className="text-2xl font-bold">🚀 Arc Wallet Dashboard</h1>
+        <p className="text-slate-400">Welcome to your Arc Wallet!</p>
         {sessionKey && (
-          <p style={{ fontSize: '12px', opacity: 0.8 }}>
+          <p className="text-xs text-slate-500 mt-1">
             Address: {sessionKey.address.slice(0, 6)}...{sessionKey.address.slice(-4)}
           </p>
         )}
       </div>
 
       {/* Navigation */}
-      <div style={{ padding: '20px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+      <div className="p-5 flex gap-3 flex-wrap">
         {['home', 'send', 'receive', 'swap', 'bridge', 'settings'].map(tab => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            style={{
-              padding: '10px 20px',
-              background: activeTab === tab ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.1)',
-              border: '1px solid rgba(255,255,255,0.2)',
-              borderRadius: '20px',
-              color: 'white',
-              cursor: 'pointer',
-              textTransform: 'capitalize'
-            }}
+            className={`px-5 py-2.5 rounded-full border transition-all capitalize ${activeTab === tab
+              ? 'bg-blue-500/20 border-blue-400 text-blue-400 shadow-[0_0_10px_rgba(96,165,250,0.3)]'
+              : 'bg-slate-800/40 border-slate-600/30 text-slate-400 hover:bg-white/5 hover:text-slate-200'
+              }`}
           >
             {tab}
           </button>
@@ -45,19 +36,14 @@ const WalletDashboardSimple: React.FC = () => {
       </div>
 
       {/* Content */}
-      <div style={{ padding: '20px' }}>
+      <div className="p-5">
         {activeTab === 'home' && (
-          <div style={{ textAlign: 'center' }}>
-            <h2>💰 Portfolio</h2>
-            <div style={{
-              background: 'rgba(255,255,255,0.1)',
-              padding: '20px',
-              borderRadius: '10px',
-              margin: '20px 0'
-            }}>
-              <h3>Total Balance</h3>
-              <p style={{ fontSize: '24px' }}>$0.00 USD</p>
-              <p style={{ opacity: 0.8 }}>No tokens detected</p>
+          <div className="text-center">
+            <h2 className="text-xl font-semibold mb-4">💰 Portfolio</h2>
+            <div className="bg-slate-900/60 backdrop-blur-sm p-6 rounded-xl border border-slate-500/30 my-5">
+              <h3 className="text-slate-400 text-sm uppercase tracking-wide">Total Balance</h3>
+              <p className="text-4xl font-light text-white my-2">$0.00 USD</p>
+              <p className="text-slate-500 text-sm">No tokens detected</p>
             </div>
           </div>
         )}
@@ -91,20 +77,15 @@ const WalletDashboardSimple: React.FC = () => {
         )}
 
         {activeTab === 'settings' && (
-          <div style={{ textAlign: 'center' }}>
-            <h2>⚙️ Settings</h2>
-            <div style={{
-              background: 'rgba(255,255,255,0.1)',
-              padding: '20px',
-              borderRadius: '10px',
-              textAlign: 'left'
-            }}>
-              <h3>Wallet Info</h3>
+          <div className="text-center">
+            <h2 className="text-xl font-semibold mb-4">⚙️ Settings</h2>
+            <div className="bg-slate-900/60 backdrop-blur-sm p-6 rounded-xl border border-slate-500/30 text-left space-y-2">
+              <h3 className="text-lg font-medium text-white mb-3">Wallet Info</h3>
               {sessionKey && (
                 <>
-                  <p><strong>Address:</strong> {sessionKey.address}</p>
-                  <p><strong>Network:</strong> Arc Testnet</p>
-                  <p><strong>Status:</strong> ✅ Connected</p>
+                  <p className="text-slate-300"><strong className="text-slate-500">Address:</strong> {sessionKey.address}</p>
+                  <p className="text-slate-300"><strong className="text-slate-500">Network:</strong> Arc Testnet</p>
+                  <p className="text-green-400"><strong className="text-slate-500">Status:</strong> ✅ Connected</p>
                 </>
               )}
             </div>
