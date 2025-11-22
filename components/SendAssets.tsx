@@ -288,13 +288,40 @@ const SendAssets: React.FC = () => {
         hash = result.hash;
         kind = result.kind;
       } else {
-        // Single transfer
+        // Single transfer - need to encode token transfer
+        const tokenInfo = selectedToken;
+        let transferData = '0x';
+        let transferTo = recipient;
+        let transferAmount = '0';
+
+        // Check if we're transferring a token (not native currency)
+        if (tokenInfo.symbol !== 'ETH') {
+          // Get token contract address
+          const { getTokenContractAddress } = await import('../config/tokens');
+          const tokenAddress = getTokenContractAddress(tokenInfo.symbol, 'testnet', 'arcTestnet');
+
+          if (tokenAddress) {
+            // Encode ERC20 transfer(address,uint256) calldata
+            const { Interface, parseUnits } = await import('ethers');
+            const iface = new Interface([
+              'function transfer(address to, uint256 amount) returns (bool)'
+            ]);
+            const amountWei = parseUnits(amount, tokenInfo.decimals);
+            transferData = iface.encodeFunctionData('transfer', [recipient, amountWei]);
+            transferTo = tokenAddress; // Call token contract
+            transferAmount = '0'; // No native ETH value
+          }
+        } else {
+          // Native ETH transfer
+          transferAmount = amount;
+        }
+
         const result = await executeSmartAccountTransferWithFallback({
           smartAccountAddress: walletAddress,
           sessionPrivateKey: walletPrivateKey,
-          to: recipient,
-          amount,
-          data: '0x'
+          to: transferTo,
+          amount: transferAmount,
+          data: transferData
         });
         hash = result.hash;
         kind = result.kind;
