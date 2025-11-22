@@ -1,6 +1,6 @@
 # Privacy Policy
 
-**Last Updated: November 22, 2024**
+**Last Updated: November 22, 2025**
 
 Arc Wallet is committed to protecting your privacy. This privacy policy explains how we handle your data.
 

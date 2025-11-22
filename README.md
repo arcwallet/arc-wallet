@@ -63,7 +63,7 @@ Built with:
 
 ## License
 
-Copyright © 2024 Arc Wallet. All rights reserved.
+Copyright © 2025 Arc Wallet. All rights reserved.
 
 This is proprietary software. Unauthorized copying, distribution, or use is strictly prohibited.
 
@@ -82,4 +82,4 @@ Arc Wallet is not responsible for any loss of funds due to user error, security 
 
 ---
 
-© 2024 Arc Wallet. All rights reserved.
+© 2025 Arc Wallet. All rights reserved.
