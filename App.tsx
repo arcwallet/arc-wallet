@@ -173,13 +173,7 @@ const App: React.FC = () => {
                   <PrivacyProvider>
                     <MultiSigProvider>
                       <div className="auth-wrapper">
-                        <React.Suspense fallback={
-                          <div className="fullpage-login">
-                            <div className="login-content">
-                              <p className="login-message muted">Loading…</p>
-                            </div>
-                          </div>
-                        }>
+                        <React.Suspense fallback={null}>
                           <RootView />
                         </React.Suspense>
                       </div>

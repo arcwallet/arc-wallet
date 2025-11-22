@@ -168,8 +168,8 @@ const DashboardHeader: React.FC<DashboardHeaderPropsWithNav> = ({ account, isRef
       <div className="flex items-center gap-4">
         <div className="hidden lg:flex flex-col text-right">
           <p className="text-xs text-[#A7B4C8] uppercase tracking-wide">{blockLabel}</p>
-          <p className="text-sm font-semibold text-[#E6EEF3]">{isRefreshing ? <ShimmerBar width="70px" /> : account ? `#${account.latestBlock.number.toLocaleString()}` : '—'}</p>
-          <p className="text-xs text-[#A7B4C8]">{isRefreshing ? <ShimmerBar width="60px" /> : lastUpdated}</p>
+          <p className="text-sm font-semibold text-[#E6EEF3]">{account ? `#${account.latestBlock.number.toLocaleString()}` : '—'}</p>
+          <p className="text-xs text-[#A7B4C8]">{lastUpdated}</p>
         </div>
         <div className="flex items-center gap-2 rounded-lg bg-slate-900/60 backdrop-blur-sm border border-slate-600/30 px-3 py-1.5">
           <div className="size-2 rounded-full bg-green-500" />
@@ -264,7 +264,7 @@ const BalanceOverview: React.FC<BalanceOverviewProps> = ({ onNavigate, balanceDi
           <p className="text-base font-medium text-[#A7B4C8]">Total Balance</p>
           <div className="flex items-center gap-4">
             <p className="text-4xl font-bold text-[#E6EEF3] min-h-[44px]">
-              {isLoading ? <ShimmerBar width="180px" /> : isHidden ? '••••••' : displayBalance}
+              {isHidden ? '••••••' : displayBalance}
             </p>
             <div className="flex items-center gap-1.5">
               <p className="text-green-400 text-sm font-medium">Finalized</p>
@@ -272,8 +272,8 @@ const BalanceOverview: React.FC<BalanceOverviewProps> = ({ onNavigate, balanceDi
             </div>
           </div>
           <div className="flex items-center gap-2 text-xs text-[#A7B4C8]">
-            {isLoading ? <ShimmerBar width="110px" /> : `Synced at ${updatedAt}`}
-            {!isLoading && (
+            {`Synced at ${updatedAt}`}
+            {(
               <button
                 onClick={() => void onRefresh()}
                 className="p-1 text-[#A7B4C8] hover:text-white transition-colors"
@@ -472,27 +472,14 @@ const AssetsTable: React.FC<AssetsTableProps> = ({ balanceDisplay, isLoading }) 
                       </div>
                     </td>
                     <td className="whitespace-nowrap px-3 py-4 text-sm">
-                      {isLoading || isLoadingTokens ? (
-                        <div className="flex flex-col gap-1">
-                          <ShimmerBar width="60px" />
-                          <ShimmerBar width="40px" />
-                        </div>
-                      ) : (
-                        <>
-                          <div className="text-slate-100">{asset.price}</div>
-                          <div className="text-green-400">{asset.change}</div>
-                        </>
-                      )}
+                      <>
+                        <div className="text-slate-100">{asset.price}</div>
+                        <div className="text-green-400">{asset.change}</div>
+                      </>
                     </td>
                     <td className="whitespace-nowrap px-3 py-4 text-sm text-slate-300">{asset.balance}</td>
                     <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-0">
-                      {isLoading || isLoadingTokens ? (
-                        <div className="flex justify-end">
-                          <ShimmerBar width="80px" />
-                        </div>
-                      ) : (
-                        <div className="text-slate-100">{asset.value}</div>
-                      )}
+                      <div className="text-slate-100">{asset.value}</div>
                     </td>
                   </tr>
                 ))}
