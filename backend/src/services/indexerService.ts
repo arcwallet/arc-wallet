@@ -14,6 +14,8 @@ class IndexerService {
     private isRunning: boolean = false;
     private pollingInterval: NodeJS.Timeout | null = null;
     private readonly POLLING_DELAY = 2000; // 2 seconds
+    private readonly BLOCK_BATCH_SIZE = 5; // Process max 5 blocks per cycle
+    private readonly BLOCK_DELAY = 200; // 200ms delay between blocks (5 blocks/sec max)
     private tokenMetadataService: TokenMetadataService;
 
     constructor(database: Database) {
@@ -55,9 +57,22 @@ class IndexerService {
             const lastIndexedBlock = this.getLastIndexedBlock();
 
             if (latestBlock > lastIndexedBlock) {
-                // Process blocks sequentially
-                for (let i = lastIndexedBlock + 1; i <= latestBlock; i++) {
+                // Calculate how many blocks to process (max BLOCK_BATCH_SIZE)
+                const blocksToProcess = Math.min(
+                    latestBlock - lastIndexedBlock,
+                    this.BLOCK_BATCH_SIZE
+                );
+
+                console.log(`📦 Processing ${blocksToProcess} blocks (${lastIndexedBlock + 1} to ${lastIndexedBlock + blocksToProcess})`);
+
+                // Process blocks sequentially with delay
+                for (let i = lastIndexedBlock + 1; i <= lastIndexedBlock + blocksToProcess; i++) {
                     await this.processBlock(i);
+
+                    // Add delay between blocks to avoid rate limiting
+                    if (i < lastIndexedBlock + blocksToProcess) {
+                        await new Promise(resolve => setTimeout(resolve, this.BLOCK_DELAY));
+                    }
                 }
             }
         } catch (error) {
@@ -104,10 +119,24 @@ class IndexerService {
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
 
-            // Fetch receipts outside transaction (async)
-            const receiptPromises = block.prefetchedTransactions.map(tx => this.provider.getTransactionReceipt(tx.hash));
-            const receipts = await Promise.all(receiptPromises);
-            const receiptMap = new Map(receipts.map(r => r ? [r.hash, r] : [null, null]));
+            // Fetch receipts in smaller batches to avoid rate limiting
+            const RECEIPT_BATCH_SIZE = 10;
+            const receiptMap = new Map();
+
+            for (let i = 0; i < block.prefetchedTransactions.length; i += RECEIPT_BATCH_SIZE) {
+                const batch = block.prefetchedTransactions.slice(i, i + RECEIPT_BATCH_SIZE);
+                const batchReceipts = await Promise.all(
+                    batch.map(tx => this.provider.getTransactionReceipt(tx.hash))
+                );
+                batchReceipts.forEach((r, idx) => {
+                    if (r) receiptMap.set(r.hash, r);
+                });
+
+                // Small delay between batches
+                if (i + RECEIPT_BATCH_SIZE < block.prefetchedTransactions.length) {
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                }
+            }
 
             db.transaction(() => {
                 // Insert Block
