@@ -402,17 +402,38 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
       </div>
 
       {mnemonic && (
-        <div className="p-6 rounded-lg bg-slate-900/60 border border-slate-500/50 backdrop-blur-sm">
-          <div className="grid grid-cols-3 gap-3">
-            {mnemonic.split(' ').map((word, index) => (
-              <div
-                key={index}
-                className="flex items-center gap-2 p-3 rounded bg-slate-800/60 border border-slate-600/30"
-              >
-                <span className="text-xs text-slate-500 font-mono">{index + 1}.</span>
-                <span className="text-sm text-slate-100 font-mono">{word}</span>
-              </div>
-            ))}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-sm font-medium text-slate-400">Your Seed Phrase</p>
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(mnemonic);
+                const btn = document.getElementById('copy-seed-btn');
+                if (btn) {
+                  btn.textContent = '✓ Copied!';
+                  setTimeout(() => {
+                    btn.textContent = '📋 Copy All';
+                  }, 2000);
+                }
+              }}
+              id="copy-seed-btn"
+              className="text-sm px-4 py-2 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 hover:text-blue-200 border border-blue-400/30 transition-all font-medium"
+            >
+              📋 Copy All
+            </button>
+          </div>
+          <div className="p-6 rounded-lg bg-slate-900/60 border border-slate-500/50 backdrop-blur-sm">
+            <div className="grid grid-cols-3 gap-3">
+              {mnemonic.split(' ').map((word, index) => (
+                <div
+                  key={index}
+                  className="flex items-center gap-2 p-3 rounded bg-slate-800/60 border border-slate-600/30"
+                >
+                  <span className="text-xs text-slate-500 font-mono">{index + 1}.</span>
+                  <span className="text-sm text-slate-100 font-mono">{word}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}
