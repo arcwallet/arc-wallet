@@ -1,0 +1,65 @@
+{
+  "name": "@arc/wallet-sdk",
+  "version": "1.0.0",
+  "description": "Passkey-based Ethereum wallet SDK for Arc Network",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "dev": "vite build --watch --mode development",
+    "build": "tsc && vite build",
+    "build:types": "tsc --emitDeclarationOnly",
+    "prepublishOnly": "npm run build",
+    "test": "vitest",
+    "lint": "eslint src --ext .ts,.tsx"
+  },
+  "keywords": [
+    "ethereum",
+    "wallet",
+    "passkey",
+    "webauthn",
+    "biometrics",
+    "web3",
+    "arc-network",
+    "sdk"
+  ],
+  "author": "Arc Network",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/arcwallet/arc-wallet-sdk"
+  },
+  "dependencies": {
+    "ethers": "^6.15.0",
+    "idb-keyval": "^6.2.1"
+  },
+  "peerDependencies": {
+    "react": "^18.0.0 || ^19.0.0",
+    "react-dom": "^18.0.0 || ^19.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.25",
+    "@types/react": "^18.0.0",
+    "@types/react-dom": "^18.0.0",
+    "typescript": "^5.8.2",
+    "vite": "^6.2.0",
+    "vite-plugin-dts": "^3.7.0",
+    "vitest": "^1.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
