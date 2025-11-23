@@ -1,8 +1,16 @@
 /**
  * WebAuthn Manager - Passkey Creation & Authentication
  * Uses device Secure Enclave for key storage
+ * Now powered by @simplewebauthn library for production reliability
  */
 
+import { startRegistration, startAuthentication } from '@simplewebauthn/browser';
+import type {
+  PublicKeyCredentialCreationOptionsJSON,
+  PublicKeyCredentialRequestOptionsJSON,
+  RegistrationResponseJSON,
+  AuthenticationResponseJSON,
+} from '@simplewebauthn/types';
 import type { PasskeyCredential, AuthenticationResult } from '../types';
 import { logger } from '../utils/logger';
 
@@ -36,10 +44,16 @@ export class WebAuthnManager {
   }
 
   /**
-   * Create new passkey for user
+   * Create new passkey for user using @simplewebauthn/browser
    */
   async createPasskey(userId: string, userName: string): Promise<PasskeyCredential> {
     try {
+      logger.info('Starting passkey registration', {
+        component: 'WebAuthn',
+        action: 'createPasskey',
+        userId,
+      });
+
       // Step 1: Get registration options from backend
       const optionsResponse = await fetch(`${this.backendUrl}/passkey/register/options`, {
         method: 'POST',
@@ -52,29 +66,21 @@ export class WebAuthnManager {
         throw new Error('Failed to get registration options');
       }
 
-      const options = await optionsResponse.json();
+      const options: PublicKeyCredentialCreationOptionsJSON = await optionsResponse.json();
 
-      // Step 2: Create credential using WebAuthn
-      const credential = await navigator.credentials.create({
-        publicKey: {
-          ...options,
-          challenge: this.base64urlToBuffer(options.challenge),
-          user: {
-            ...options.user,
-            id: this.base64urlToBuffer(options.user.id),
-          },
-          excludeCredentials: options.excludeCredentials?.map((cred: any) => ({
-            ...cred,
-            id: this.base64urlToBuffer(cred.id),
-          })),
-        },
-      }) as PublicKeyCredential;
+      logger.debug('Received registration options from backend', {
+        component: 'WebAuthn',
+        challenge: options.challenge.substring(0, 20) + '...',
+      });
 
-      if (!credential) {
-        throw new Error('Failed to create credential');
-      }
+      // Step 2: Create credential using @simplewebauthn/browser
+      // This handles all buffer conversions, Base64URL encoding, and browser quirks
+      const credential: RegistrationResponseJSON = await startRegistration({ optionsJSON: options });
 
-      const attestationResponse = credential.response as AuthenticatorAttestationResponse;
+      logger.debug('Credential created successfully', {
+        component: 'WebAuthn',
+        credentialId: credential.id.substring(0, 20) + '...',
+      });
 
       // Step 3: Verify credential with backend
       const verifyResponse = await fetch(`${this.backendUrl}/passkey/register/verify`, {
@@ -83,44 +89,63 @@ export class WebAuthnManager {
         credentials: 'include',
         body: JSON.stringify({
           userId,
-          credential: {
-            id: credential.id,
-            rawId: this.bufferToBase64url(credential.rawId),
-            response: {
-              clientDataJSON: this.bufferToBase64url(attestationResponse.clientDataJSON),
-              attestationObject: this.bufferToBase64url(attestationResponse.attestationObject),
-            },
-            type: credential.type,
-          },
+          credential,
         }),
       });
 
       if (!verifyResponse.ok) {
-        throw new Error('Failed to verify credential');
+        const errorData = await verifyResponse.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to verify credential');
       }
 
-      await verifyResponse.json();
+      const verifyResult = await verifyResponse.json();
 
-      // Step 4: Extract public key from attestation
-      const publicKeyHex = this.extractPublicKey(attestationResponse);
+      logger.info('Passkey registered successfully', {
+        component: 'WebAuthn',
+        credentialId: credential.id.substring(0, 20) + '...',
+      });
 
+      // Return in our expected format
       return {
         id: credential.id,
-        publicKey: publicKeyHex,
-        userId,
+        publicKey: verifyResult.publicKey || credential.id, // Backend should return the actual public key
+        userId, // Include userId as required by PasskeyCredential interface
         createdAt: new Date(),
       };
     } catch (error: any) {
-      logger.error('Passkey creation failed', error, { component: 'WebAuthn', action: 'createPasskey' });
+      logger.error('Passkey creation failed', error, {
+        component: 'WebAuthn',
+        action: 'createPasskey',
+      });
+
+      // Provide helpful error messages
+      if (error.name === 'NotAllowedError') {
+        throw new Error(
+          'Passkey creation was cancelled. Please try again and allow the passkey when prompted.'
+        );
+      }
+
+      if (error.name === 'InvalidStateError') {
+        throw new Error(
+          'A passkey already exists for this device. Use "Connect Existing Wallet" instead.'
+        );
+      }
+
       throw new Error(`Failed to create passkey: ${error.message}`);
     }
   }
 
   /**
-   * Authenticate with existing passkey
+   * Authenticate with existing passkey using @simplewebauthn/browser
    */
   async authenticate(credentialId?: string): Promise<AuthenticationResult> {
     try {
+      logger.info('Starting passkey authentication', {
+        component: 'WebAuthn',
+        action: 'authenticate',
+        credentialId: credentialId?.substring(0, 20),
+      });
+
       // Step 1: Get authentication options from backend
       const optionsResponse = await fetch(`${this.backendUrl}/passkey/login/options`, {
         method: 'POST',
@@ -133,114 +158,75 @@ export class WebAuthnManager {
         throw new Error('Failed to get authentication options');
       }
 
-      const options = await optionsResponse.json();
+      const options: PublicKeyCredentialRequestOptionsJSON = await optionsResponse.json();
 
-      // Step 2: Get credential from device
-      const assertion = await navigator.credentials.get({
-        publicKey: {
-          ...options,
-          challenge: this.base64urlToBuffer(options.challenge),
-          allowCredentials: options.allowCredentials?.map((cred: any) => ({
-            ...cred,
-            id: this.base64urlToBuffer(cred.id),
-          })),
-        },
-      }) as PublicKeyCredential;
+      logger.debug('Received authentication options from backend', {
+        component: 'WebAuthn',
+        challenge: options.challenge.substring(0, 20) + '...',
+      });
 
-      if (!assertion) {
-        return {
-          success: false,
-          credentialId: '',
-          error: 'Authentication cancelled',
-        };
-      }
+      // Step 2: Authenticate using @simplewebauthn/browser
+      // This handles all browser interactions and buffer conversions
+      const credential: AuthenticationResponseJSON = await startAuthentication({ optionsJSON: options });
 
-      const assertionResponse = assertion.response as AuthenticatorAssertionResponse;
+      logger.debug('Authentication response received', {
+        component: 'WebAuthn',
+        credentialId: credential.id.substring(0, 20) + '...',
+      });
 
-      // Step 3: Verify with backend
+      // Step 3: Verify authentication with backend
       const verifyResponse = await fetch(`${this.backendUrl}/passkey/login/verify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
-          credential: {
-            id: assertion.id,
-            rawId: this.bufferToBase64url(assertion.rawId),
-            response: {
-              clientDataJSON: this.bufferToBase64url(assertionResponse.clientDataJSON),
-              authenticatorData: this.bufferToBase64url(assertionResponse.authenticatorData),
-              signature: this.bufferToBase64url(assertionResponse.signature),
-              userHandle: assertionResponse.userHandle
-                ? this.bufferToBase64url(assertionResponse.userHandle)
-                : undefined,
-            },
-            type: assertion.type,
-          },
+          credential,
         }),
       });
 
       if (!verifyResponse.ok) {
-        throw new Error('Authentication verification failed');
+        const errorData = await verifyResponse.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to verify authentication');
       }
 
-      await verifyResponse.json();
+      const verifyResult = await verifyResponse.json();
+
+      logger.info('Authentication successful', {
+        component: 'WebAuthn',
+        credentialId: credential.id.substring(0, 20) + '...',
+      });
 
       return {
         success: true,
-        credentialId: assertion.id,
-        // Private key is derived securely on client-side
-        // Never sent to backend
+        credentialId: credential.id,
+        userId: verifyResult.userId,
+        // Authenticator data is handled by backend
       };
     } catch (error: any) {
-      logger.error('Authentication failed', error, { component: 'WebAuthn', action: 'authenticate' });
+      logger.error('Authentication failed', error, {
+        component: 'WebAuthn',
+        action: 'authenticate',
+      });
+
+      // Provide helpful error messages
+      if (error.name === 'NotAllowedError') {
+        throw new Error(
+          'Authentication was cancelled. Please try again and verify your identity when prompted.'
+        );
+      }
+
+      if (error.name === 'InvalidStateError') {
+        throw new Error(
+          'No passkey found for this wallet. Please create a new wallet or use a different device.'
+        );
+      }
+
       return {
         success: false,
         credentialId: '',
+        userId: '',
         error: error.message,
       };
     }
-  }
-
-  /**
-   * Extract public key from attestation response
-   */
-  private extractPublicKey(response: AuthenticatorAttestationResponse): string {
-    // Parse CBOR attestation object to extract public key
-    // This is simplified - real implementation needs CBOR parsing
-    const attestationObject = response.attestationObject;
-
-    // For now, return a placeholder
-    // Real implementation would use @simplewebauthn/server to parse
-    return '0x' + Array.from(new Uint8Array(attestationObject.slice(0, 32)))
-      .map(b => b.toString(16).padStart(2, '0'))
-      .join('');
-  }
-
-  /**
-   * Convert base64url to ArrayBuffer
-   */
-  private base64urlToBuffer(base64url: string): ArrayBuffer {
-    const base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
-    const padding = '='.repeat((4 - (base64.length % 4)) % 4);
-    const str = atob(base64 + padding);
-    const buffer = new ArrayBuffer(str.length);
-    const bytes = new Uint8Array(buffer);
-    for (let i = 0; i < str.length; i++) {
-      bytes[i] = str.charCodeAt(i);
-    }
-    return buffer;
-  }
-
-  /**
-   * Convert ArrayBuffer to base64url
-   */
-  private bufferToBase64url(buffer: ArrayBuffer): string {
-    const bytes = new Uint8Array(buffer);
-    let str = '';
-    for (let i = 0; i < bytes.length; i++) {
-      str += String.fromCharCode(bytes[i]);
-    }
-    const base64 = btoa(str);
-    return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
   }
 }

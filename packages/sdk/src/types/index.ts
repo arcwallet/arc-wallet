@@ -121,13 +121,13 @@ export interface AuthenticationResult {
   /** Whether authentication was successful */
   success: boolean;
 
-  /** Credential ID used */
+  /** Credential ID used for authentication */
   credentialId: string;
 
-  /** Derived private key (never exposed to app) */
-  privateKey?: string;
+  /** User ID associated with this credential */
+  userId: string;
 
-  /** Error message if failed */
+  /** Error message if authentication failed */
   error?: string;
 }
 
