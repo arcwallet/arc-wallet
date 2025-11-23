@@ -4,6 +4,7 @@
  */
 
 import type { CCTPConfig } from './cctp';
+import type { SmartAccountConfig, PaymasterConfig } from './account-abstraction';
 
 export interface WalletSDKConfig {
   /** Application name for WebAuthn */
@@ -23,6 +24,15 @@ export interface WalletSDKConfig {
 
   /** Optional CCTP configuration for cross-chain transfers */
   cctp?: Partial<CCTPConfig>;
+
+  /** Account type: EOA (default) or Smart Account */
+  accountType?: 'eoa' | 'smart-account';
+
+  /** Smart Account configuration (required if accountType is 'smart-account') */
+  smartAccount?: Partial<SmartAccountConfig>;
+
+  /** Paymaster configuration for gasless transactions */
+  paymaster?: PaymasterConfig;
 }
 
 export interface PasskeyCredential {

@@ -8,6 +8,7 @@ import { WebAuthnManager } from '../core/webauthn';
 import { SecureStorage } from '../core/secureStorage';
 import { KeyManager } from '../core/keyManager';
 import { CCTPManager } from '../core/cctpManager';
+import { SmartAccountManager } from '../core/smartAccountManager';
 import type {
   WalletSDKConfig,
   WalletAccount,
@@ -17,15 +18,22 @@ import type {
   WalletEventPayload,
 } from '../types';
 import type { CCTPTransferParams, CCTPTransferResult } from '../types/cctp';
+import type {
+  UserOperationRequest,
+  UserOperationResult,
+  BatchTransaction,
+} from '../types/account-abstraction';
 
 export class WalletSDK {
   private webauthn: WebAuthnManager;
   private storage: SecureStorage;
   private keyManager: KeyManager;
   private cctpManager: CCTPManager;
+  private smartAccountManager: SmartAccountManager | null = null;
   private provider: JsonRpcProvider;
   private eventListeners: Map<WalletEvent, Set<(payload: any) => void>>;
   private currentAccount: WalletAccount | null = null;
+  private accountType: 'eoa' | 'smart-account';
 
   constructor(config: WalletSDKConfig) {
 
@@ -40,12 +48,24 @@ export class WalletSDK {
     this.keyManager = new KeyManager(this.webauthn, this.storage);
     this.provider = new JsonRpcProvider(config.rpcUrl);
     this.cctpManager = new CCTPManager(this.provider, config.cctp);
+    this.accountType = config.accountType || 'eoa';
+
+    // Initialize Smart Account Manager if enabled
+    if (this.accountType === 'smart-account') {
+      this.smartAccountManager = new SmartAccountManager(
+        this.provider,
+        config.smartAccount,
+        config.paymaster
+      );
+    }
+
     this.eventListeners = new Map();
 
     console.log('[WalletSDK] Initialized with config:', {
       appName: config.appName,
       rpId: config.rpId,
       rpcUrl: config.rpcUrl,
+      accountType: this.accountType,
     });
   }
 
@@ -303,6 +323,122 @@ export class WalletSDK {
     }
 
     return await this.cctpManager.getUSDCBalance(this.currentAccount.address, chainId);
+  }
+
+  /**
+   * Send UserOperation (Smart Account only)
+   */
+  async sendUserOperation(request: UserOperationRequest): Promise<UserOperationResult> {
+    if (this.accountType !== 'smart-account' || !this.smartAccountManager) {
+      throw new Error('Smart Account mode not enabled. Set accountType to "smart-account"');
+    }
+
+    if (!this.currentAccount) {
+      throw new Error('No wallet connected. Please connect first.');
+    }
+
+    if (!this.keyManager['currentWallet']) {
+      throw new Error('Wallet not unlocked. Please authenticate first.');
+    }
+
+    try {
+      console.log('[WalletSDK] Building UserOperation...');
+
+      const wallet = this.keyManager['currentWallet'];
+      const userOp = await this.smartAccountManager.buildUserOperation(wallet, request);
+
+      console.log('[WalletSDK] Sending UserOperation...');
+      const result = await this.smartAccountManager.sendUserOperation(userOp);
+
+      this.emit('transactionSigned', { hash: result.userOpHash });
+
+      console.log('[WalletSDK] UserOperation sent:', result.userOpHash);
+
+      return result;
+    } catch (error: any) {
+      this.emit('error', {
+        message: error.message,
+        code: 'USER_OPERATION_FAILED',
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Batch transactions (Smart Account only)
+   */
+  async batchTransactions(
+    transactions: BatchTransaction[],
+    sponsored = false
+  ): Promise<UserOperationResult> {
+    if (this.accountType !== 'smart-account' || !this.smartAccountManager) {
+      throw new Error('Smart Account mode not enabled. Set accountType to "smart-account"');
+    }
+
+    if (!this.currentAccount) {
+      throw new Error('No wallet connected. Please connect first.');
+    }
+
+    if (!this.keyManager['currentWallet']) {
+      throw new Error('Wallet not unlocked. Please authenticate first.');
+    }
+
+    try {
+      console.log('[WalletSDK] Building batch UserOperation...');
+
+      const wallet = this.keyManager['currentWallet'];
+      const userOp = await this.smartAccountManager.buildBatchUserOperation(
+        wallet,
+        transactions,
+        sponsored
+      );
+
+      console.log('[WalletSDK] Sending batch UserOperation...');
+      const result = await this.smartAccountManager.sendUserOperation(userOp);
+
+      this.emit('transactionSigned', { hash: result.userOpHash });
+
+      console.log('[WalletSDK] Batch UserOperation sent:', result.userOpHash);
+
+      return result;
+    } catch (error: any) {
+      this.emit('error', {
+        message: error.message,
+        code: 'BATCH_TRANSACTION_FAILED',
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Get Smart Account address (counterfactual)
+   */
+  getSmartAccountAddress(): string | null {
+    if (this.accountType !== 'smart-account' || !this.smartAccountManager) {
+      return null;
+    }
+
+    if (!this.currentAccount) {
+      return null;
+    }
+
+    return this.smartAccountManager.getAccountAddress(this.currentAccount.address);
+  }
+
+  /**
+   * Check if Smart Account is deployed
+   */
+  async isSmartAccountDeployed(): Promise<boolean> {
+    if (this.accountType !== 'smart-account' || !this.smartAccountManager) {
+      return false;
+    }
+
+    const smartAccountAddress = this.getSmartAccountAddress();
+    if (!smartAccountAddress) {
+      return false;
+    }
+
+    return await this.smartAccountManager.isDeployed(smartAccountAddress);
   }
 
   /**
