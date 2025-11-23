@@ -25,30 +25,23 @@ const SelfCustodialWalletExperience: React.FC = () => {
   const {
     hasWallet,
     isUnlocked,
-    isAuthenticated,
-    registerPasskey,
     logout,
-    deleteWallet,
-    needsBackup
   } = useSelfCustodialWallet();
   const { logout: sessionLogout } = useSession();
 
   const handleComplete = async () => {
-    // After wallet creation/import, register passkey for identity
-    try {
-      await registerPasskey();
-    } catch (error) {
-      console.error('Passkey registration failed:', error);
-      // User can still use the wallet without passkey
-    }
+    // Wallet created successfully with SDK
+    console.log('[App] Wallet creation complete');
   };
 
   const handleUnlock = () => {
     // Wallet unlocked, show dashboard
+    console.log('[App] Wallet unlocked');
   };
 
   const handleReset = () => {
     // Wallet reset, go back to setup
+    console.log('[App] Wallet reset');
   };
 
   const handleLogout = async () => {
@@ -56,8 +49,8 @@ const SelfCustodialWalletExperience: React.FC = () => {
     logout();
   };
 
-  // No wallet or needs backup - show setup
-  if (!hasWallet || needsBackup) {
+  // No wallet - show setup
+  if (!hasWallet) {
     return <WalletSetup onComplete={handleComplete} />;
   }
 
@@ -147,15 +140,15 @@ const RootView: React.FC = () => {
     return <TermsAndConditions />;
   }
 
-  // Show login page directly even during loading/verification
-  // The login page will handle its own state
-  if (!email) {
-    return <LoginPage />;
-  }
-
   // Use self-custodial or legacy wallet experience
   if (useSelfCustodial) {
+    // SDK-based wallet doesn't need email login
     return <SelfCustodialWalletExperience />;
+  }
+
+  // Legacy wallet requires email
+  if (!email) {
+    return <LoginPage />;
   }
 
   return <WalletExperience email={email} />;
