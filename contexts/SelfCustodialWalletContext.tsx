@@ -118,9 +118,10 @@ export const SelfCustodialWalletProvider: React.FC<{ children: ReactNode }> = ({
 
     const handleConnect = (payload: { address: string }) => {
       console.log('[Wallet] Connected:', payload.address);
-      setIsUnlocked(true);
+      // Do NOT auto-unlock here. Wait for explicit unlockWallet call.
+      // setIsUnlocked(true); 
       setAddress(payload.address);
-      setIsAuthenticated(true);
+      // setIsAuthenticated(true);
       localStorage.setItem(WALLET_ADDRESS_KEY, payload.address);
     };
 

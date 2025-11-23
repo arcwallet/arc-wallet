@@ -88,7 +88,7 @@ function App() {
   return (
     <div className="app">
       <header>
-        <h1>🔐 Arc Wallet SDK Demo</h1>
+        <h1>Arc Wallet SDK Demo</h1>
         <p>Passkey-based Ethereum Wallet</p>
       </header>
 
@@ -104,7 +104,7 @@ function App() {
                 disabled={loading}
                 className="primary-button"
               >
-                {loading ? 'Creating...' : '➕ Create New Wallet'}
+                {loading ? 'Creating...' : 'Create New Wallet'}
               </button>
 
               <button
@@ -112,7 +112,7 @@ function App() {
                 disabled={loading}
                 className="secondary-button"
               >
-                {loading ? 'Connecting...' : '🔓 Connect Existing Wallet'}
+                {loading ? 'Connecting...' : 'Connect Existing Wallet'}
               </button>
             </div>
 
@@ -125,7 +125,7 @@ function App() {
         ) : (
           <div className="wallet-section">
             <div className="wallet-info">
-              <h2>✅ Wallet Connected</h2>
+              <h2>Wallet Connected</h2>
               <div className="address-box">
                 <span className="label">Address:</span>
                 <code>{account.address}</code>
@@ -144,20 +144,20 @@ function App() {
                 disabled={loading}
                 className="action-button"
               >
-                {loading ? 'Signing...' : '💸 Send Test Transaction'}
+                {loading ? 'Signing...' : 'Send Test Transaction'}
               </button>
 
               <button
                 onClick={handleDisconnect}
                 className="disconnect-button"
               >
-                🔒 Disconnect
+                Disconnect
               </button>
             </div>
 
             {txHash && (
               <div className="success-box">
-                ✅ Transaction Sent!
+                Transaction Sent!
                 <br />
                 <a
                   href={`https://testnet.arcscan.app/tx/${txHash}`}

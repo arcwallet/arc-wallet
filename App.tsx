@@ -2,10 +2,7 @@ import React, { useEffect, useState } from 'react';
 import './styles/magic.css';
 import ErrorBoundary from './components/ErrorBoundary';
 import WalletDashboard from './components/WalletDashboard';
-import WalletSetupScreen from './components/WalletSetupScreen';
-import WalletSelectionScreen from './components/WalletSelectionScreen';
 import LoginPage from './pages/LoginPage';
-const RecoveryPage = React.lazy(() => import('./pages/RecoveryPage'));
 const PrivacyPolicy = React.lazy(() => import('./pages/PrivacyPolicy'));
 const TermsAndConditions = React.lazy(() => import('./pages/TermsAndConditions'));
 import { SessionProvider, useSession } from './contexts/SessionContext';
@@ -49,49 +46,22 @@ const SelfCustodialWalletExperience: React.FC = () => {
     logout();
   };
 
-  // No wallet - show setup
+  // No wallet - show setup (Create Passkey)
   if (!hasWallet) {
     return <WalletSetup onComplete={handleComplete} />;
   }
 
-  // Wallet exists but locked - show unlock
+  // Wallet exists but locked - show unlock (Verify Passkey)
+  // This enforces passkey authentication even after magic link login
   if (!isUnlocked) {
     return <UnlockWallet onUnlock={handleUnlock} onReset={handleReset} />;
   }
 
-  // Wallet unlocked - show dashboard
+  // Only show dashboard if wallet is UNLOCKED (Passkey verified)
   return <WalletDashboard />;
 };
 
-// Legacy wallet experience - existing architecture
-const WalletExperience: React.FC<{ email: string }> = ({ email }) => {
-  const { isAuthenticated, activateWithPrivateKey, loginWithPasskey, isConnecting, logout: walletLogout } = useWallet();
-  const { logout: sessionLogout } = useSession();
-  const [usingRecovery, setUsingRecovery] = useState(false);
 
-  const handleLogout = async () => {
-    await sessionLogout();
-    walletLogout();
-    setUsingRecovery(false);
-  };
-
-  if (!isAuthenticated && !usingRecovery) {
-    return (
-      <WalletSelectionScreen
-        email={email}
-        onConnect={loginWithPasskey}
-        isConnecting={isConnecting}
-        onUseRecovery={() => setUsingRecovery(true)}
-      />
-    );
-  }
-
-  if (!isAuthenticated && usingRecovery) {
-    return <WalletSetupScreen email={email} onComplete={activateWithPrivateKey} onLogout={handleLogout} />;
-  }
-
-  return <WalletDashboard />;
-};
 
 const RootView: React.FC = () => {
   const { email, loading, verifyMagicToken, verifyingToken, message } = useSession();
@@ -108,29 +78,40 @@ const RootView: React.FC = () => {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
+  const verificationStarted = React.useRef(false);
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const token = params.get('token');
-    if (!token || tokenHandled) return;
+
+    if (!token || tokenHandled || verificationStarted.current) return;
 
     // Skip magic link verification if we're on recovery page (recovery has its own token handling)
-    if (currentPath === '/recovery') return;
+    // if (currentPath === '/recovery') return;
+
+    verificationStarted.current = true;
+    console.log('[App] Verifying magic link token...');
 
     verifyMagicToken(token)
+      .then(() => {
+        console.log('[App] Magic link verified successfully');
+      })
+      .catch((error) => {
+        console.error('[App] Magic link verification failed:', error);
+      })
       .finally(() => {
         params.delete('token');
         const next = params.toString();
         const url = `${window.location.pathname}${next ? `?${next}` : ''}`;
         window.history.replaceState({}, '', url);
         setTokenHandled(true);
-      })
-      .catch(() => { });
+      });
   }, [tokenHandled, verifyMagicToken, currentPath]);
 
   // Show recovery page if on /recovery path
-  if (currentPath === '/recovery') {
-    return <RecoveryPage />;
-  }
+  // if (currentPath === '/recovery') {
+  //   return <RecoveryPage />;
+  // }
 
   if (currentPath === '/privacy-policy') {
     return <PrivacyPolicy />;
@@ -141,27 +122,27 @@ const RootView: React.FC = () => {
   }
 
   // Use self-custodial or legacy wallet experience
-  if (useSelfCustodial) {
-    // Hybrid auth: Email + Passkey
-    // Email is required for multi-device support and recovery
-    if (!email) {
-      return <LoginPage />;
-    }
-    return <SelfCustodialWalletExperience />;
-  }
-
-  // Legacy wallet requires email
+  // if (useSelfCustodial) {
+  // Hybrid auth: Email + Passkey
+  // Email is required for multi-device support and recovery
   if (!email) {
     return <LoginPage />;
   }
+  return <SelfCustodialWalletExperience />;
+  // }
 
-  return <WalletExperience email={email} />;
+  // Legacy wallet requires email
+  // if (!email) {
+  //   return <LoginPage />;
+  // }
+
+  // return <WalletExperience email={email} />;
 };
 
 const App: React.FC = () => {
   useEffect(() => {
     const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
-      console.error('🚨 Unhandled Promise Rejection:', event.reason);
+      console.error('Unhandled Promise Rejection:', event.reason);
     };
 
     window.addEventListener('unhandledrejection', handleUnhandledRejection);

@@ -102,19 +102,7 @@ const LoginPage: React.FC = () => {
           </p>
         )}
 
-        {/* Recovery Link */}
-        <div className="mt-8 text-center">
-          <button
-            onClick={() => {
-              window.history.pushState({}, '', '/recovery');
-              window.dispatchEvent(new PopStateEvent('popstate'));
-            }}
-            className="inline-flex items-center gap-1 text-slate-400 hover:text-blue-300 transition-colors text-sm font-medium group bg-transparent border-none cursor-pointer p-0"
-          >
-            Lost your passkey? Recover access
-            <ArrowUpRightIcon className="w-3 h-3 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
-          </button>
-        </div>
+
       </div>
 
       <Footer />

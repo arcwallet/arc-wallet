@@ -6,23 +6,23 @@ A modern, secure wallet SDK with passkey authentication, cross-chain transfers, 
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue.svg)](https://www.typescriptlang.org/)
 
-## 🎯 Features
+## Features
 
-- **🔐 Passkey Authentication** - No seed phrases, biometric authentication only
-- **🔒 WebCrypto Security** - Non-extractable master keys for maximum security
-- **🌉 CCTP Integration** - Native cross-chain USDC transfers via Circle
-- **⚡ Account Abstraction** - ERC-4337 support with gasless transactions
-- **📦 Batch Operations** - Execute multiple transactions in one operation
-- **🎨 Simple API** - Clean, intuitive developer experience
-- **📘 TypeScript** - Full type safety and IntelliSense support
+- **Passkey Authentication** - No seed phrases, biometric authentication only
+- **WebCrypto Security** - Non-extractable master keys for maximum security
+- **CCTP Integration** - Native cross-chain USDC transfers via Circle
+- **Account Abstraction** - ERC-4337 support with gasless transactions
+- **Batch Operations** - Execute multiple transactions in one operation
+- **Simple API** - Clean, intuitive developer experience
+- **TypeScript** - Full type safety and IntelliSense support
 
-## 📦 Installation
+## Installation
 
 ```bash
 npm install @arc/wallet-sdk
 ```
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Basic Wallet
 
@@ -111,7 +111,7 @@ const batchResult = await arc.batchTransactions([
 ], true); // sponsored = true
 ```
 
-## 📚 API Reference
+## API Reference
 
 ### WalletSDK
 
@@ -237,7 +237,7 @@ off(event: WalletEvent, callback: (payload: any) => void): void
 // - 'error'
 ```
 
-## 🔐 Security
+## Security
 
 ### Architecture
 
@@ -264,13 +264,13 @@ User → Biometric Auth → Passkey (Secure Enclave)
 
 ### Key Features
 
-- ✅ **No Seed Phrases** - Eliminates phishing risk
-- ✅ **Non-Extractable Keys** - Master keys cannot be exported
-- ✅ **Hardware-Backed** - Uses device crypto when available
-- ✅ **Self-Custodial** - User always in control
-- ✅ **Biometric Auth** - FaceID, TouchID, or device PIN
+- **No Seed Phrases** - Eliminates phishing risk
+- **Non-Extractable Keys** - Master keys cannot be exported
+- **Hardware-Backed** - Uses device crypto when available
+- **Self-Custodial** - User always in control
+- **Biometric Auth** - FaceID, TouchID, or device PIN
 
-## 🏗️ Architecture
+## Architecture
 
 ### Core Components
 
@@ -291,7 +291,7 @@ WalletSDK
 - **Private Keys**: IndexedDB (encrypted with master keys)
 - **Metadata**: IndexedDB (public info only)
 
-## 🌐 Supported Networks
+## Supported Networks
 
 ### Mainnet
 - Ethereum
@@ -307,7 +307,7 @@ WalletSDK
 - Base Sepolia
 - Arc Testnet
 
-## 📖 Examples
+## Examples
 
 ### React Integration
 
@@ -389,7 +389,7 @@ export function useWallet() {
 }
 ```
 
-## 🛠️ Development
+## Development
 
 ### Build
 
@@ -409,22 +409,22 @@ npm test
 npm run lint
 ```
 
-## 📄 License
+## License
 
 MIT License - see [LICENSE](LICENSE) file for details
 
-## 🤝 Contributing
+## Contributing
 
 Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md) first.
 
-## 📞 Support
+## Support
 
 - **Documentation**: [docs.arc.network](https://docs.arc.network)
 - **Discord**: [discord.gg/arcnetwork](https://discord.gg/arcnetwork)
 - **Twitter**: [@ArcNetwork](https://twitter.com/ArcNetwork)
 - **Email**: support@arc.network
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - [Circle CCTP](https://www.circle.com/en/cross-chain-transfer-protocol) - Cross-chain infrastructure
 - [ERC-4337](https://eips.ethereum.org/EIPS/eip-4337) - Account Abstraction standard
@@ -432,4 +432,4 @@ Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md)
 
 ---
 
-**Built with ❤️ by the Arc Network team**
+**Built by the Arc Network team**

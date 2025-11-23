@@ -162,7 +162,14 @@ export const createMagicLinkRouter = (config: EnvConfig, mailer: MagicLinkMailer
 
     const user = userStore.findOrCreate(payload.email);
     const session = sessionStore.create(user, SESSION_TTL_MS);
-    res.cookie(SESSION_COOKIE_NAME, session.id, COOKIE_BASE_OPTIONS(config.NODE_ENV === 'production'));
+
+    console.log(`[MagicLink] Verified token for ${user.email}, creating session ${session.id}`);
+
+    const cookieOptions = COOKIE_BASE_OPTIONS(config.NODE_ENV === 'production');
+    res.cookie(SESSION_COOKIE_NAME, session.id, cookieOptions);
+
+    console.log(`[MagicLink] Session cookie set with options:`, cookieOptions);
+
     res.json({ success: true });
   });
 

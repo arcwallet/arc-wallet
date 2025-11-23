@@ -30,13 +30,16 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const refresh = useCallback(async () => {
     try {
+      console.log('[SessionContext] Refreshing session...');
       const session = await sessionApi.getSession();
+      console.log('[SessionContext] Session retrieved:', session);
       setState((prev) => ({
         ...prev,
         email: session?.email ?? null,
         loading: false,
       }));
-    } catch {
+    } catch (error) {
+      console.error('[SessionContext] Session refresh failed:', error);
       setState((prev) => ({
         ...prev,
         email: null,
