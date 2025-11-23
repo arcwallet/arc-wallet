@@ -13,6 +13,12 @@ import type {
 } from '@simplewebauthn/types';
 import type { PasskeyCredential, AuthenticationResult } from '../types';
 import { logger } from '../utils/logger';
+import {
+  runPasskeyDiagnostic,
+  getDiagnosticErrorMessage,
+  getPasskeyDiagnosticMode,
+  type PasskeyDiagnosticResult,
+} from '../utils/passkeyDiagnostic';
 
 export interface WebAuthnConfig {
   rpId: string;
@@ -53,6 +59,21 @@ export class WebAuthnManager {
         action: 'createPasskey',
         userId,
       });
+
+      // Run diagnostic check
+      const diagnosticMode = getPasskeyDiagnosticMode();
+      const diagnostic: PasskeyDiagnosticResult = await runPasskeyDiagnostic(diagnosticMode);
+
+      // Log diagnostic result
+      const diagnosticMessage = getDiagnosticErrorMessage(diagnostic);
+      if (diagnosticMessage) {
+        logger.warn('Passkey diagnostic warning', {
+          component: 'WebAuthn',
+          deviceRisk: diagnostic.deviceRisk,
+          platformSupport: diagnostic.platformSupport,
+          message: diagnosticMessage,
+        });
+      }
 
       // Step 1: Get registration options from backend
       const optionsResponse = await fetch(`${this.backendUrl}/passkey/register/options`, {

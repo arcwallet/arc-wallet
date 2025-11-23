@@ -56,6 +56,17 @@ export { logger, createLogger, LogLevel } from './utils/logger';
 export type { LoggerConfig, LogContext } from './utils/logger';
 export { validateCCTPConfig, isArcNetworkConfigured, getCCTPConfigErrorMessage } from './utils/cctpValidator';
 export type { CCTPValidationResult } from './utils/cctpValidator';
+export {
+  runPasskeyDiagnostic,
+  checkPlatformAuthenticatorSupport,
+  isHighRiskDevice,
+  getDeviceRiskLevel,
+  getDiagnosticErrorMessage,
+  getPasskeyDiagnosticMode,
+  PasskeyDiagnosticError,
+  PASSKEY_DIAGNOSTIC_MESSAGES,
+} from './utils/passkeyDiagnostic';
+export type { PasskeyDiagnosticResult, PasskeyDiagnosticMode } from './utils/passkeyDiagnostic';
 
 // Version
 export const VERSION = '1.0.0';
