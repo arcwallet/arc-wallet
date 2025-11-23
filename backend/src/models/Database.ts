@@ -266,6 +266,17 @@ export class Database {
       )
     `);
 
+    // Wallet backups table (for multi-device support)
+    await run(`
+      CREATE TABLE IF NOT EXISTS wallet_backups (
+        email TEXT PRIMARY KEY,
+        encrypted_wallet TEXT NOT NULL,
+        device_id TEXT,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
     // Create indexes
     await run('CREATE INDEX IF NOT EXISTS idx_users_username ON users (username)');
     await run('CREATE INDEX IF NOT EXISTS idx_passkeys_user_id ON passkey_credentials (user_id)');

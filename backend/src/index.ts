@@ -9,6 +9,7 @@ import { SessionKeyManager } from './utils/SessionKeyManager.js';
 import { createPasskeyRoutes } from './routes/passkeys.js';
 import { createMagicLinkRouter } from './routes/magicLink.js';
 import { createWalletRouter } from './routes/wallet.js';
+import { createWalletBackupRouter } from './routes/walletBackup.js';
 import { createBridgeRoutes } from './routes/bridge.js';
 import { createMultiSigRoutes } from './routes/multiSig.js';
 import { createOAuthRouter } from './routes/oauth.js';
@@ -16,6 +17,7 @@ import paymasterRouter from './routes/paymaster.js';
 import { createHistoryRouter } from './routes/history.js';
 import { createWebhookRouter } from './routes/webhooks.js';
 import { createMagicLinkMailer } from './services/magicLinkMailer.js';
+import { WalletBackupService } from './services/walletBackupService.js';
 import { IndexerService } from './services/indexerService.js';
 import { webhookService } from './services/webhookService.js';
 import { initIndexerDB } from './db/indexer.js';
@@ -40,6 +42,7 @@ validateConfig(config);
 // Initialize database
 const db = new Database(config.DB_PATH);
 const sessionKeyManager = new SessionKeyManager(db);
+const walletBackupService = new WalletBackupService(db);
 const magicLinkMailer = createMagicLinkMailer({
   apiKey: process.env.SENDGRID_API_KEY,
   fromAddress: process.env.EMAIL_FROM_ADDRESS,
@@ -103,6 +106,7 @@ app.use(rateLimitMiddleware('general'));
 // Routes
 app.use(createMagicLinkRouter(config, magicLinkMailer, db, magicSessionStore));
 app.use('/api/wallet', createWalletRouter(db, config, magicSessionStore));
+app.use('/api/wallet-backup', createWalletBackupRouter(walletBackupService));
 app.use('/passkeys', createPasskeyRoutes(db, config));
 app.use(createBridgeRoutes(db, {
   NODE_ENV: config.NODE_ENV,

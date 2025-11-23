@@ -142,7 +142,11 @@ const RootView: React.FC = () => {
 
   // Use self-custodial or legacy wallet experience
   if (useSelfCustodial) {
-    // SDK-based wallet doesn't need email login
+    // Hybrid auth: Email + Passkey
+    // Email is required for multi-device support and recovery
+    if (!email) {
+      return <LoginPage />;
+    }
     return <SelfCustodialWalletExperience />;
   }
 

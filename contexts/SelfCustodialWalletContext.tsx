@@ -144,18 +144,19 @@ export const SelfCustodialWalletProvider: React.FC<{ children: ReactNode }> = ({
     };
   }, [sdk]);
 
-  // Create new wallet with passkey (NO PASSWORD!)
+  // Create new wallet with passkey (EMAIL + PASSKEY!)
   const createWallet = useCallback(async (userName: string): Promise<{ address: string }> => {
     if (!sdk) throw new Error('SDK not initialized');
+    if (!currentEmail) throw new Error('Email verification required. Please login first.');
 
     setIsConnecting(true);
 
     try {
-      console.log('[Wallet] Creating new wallet with passkey...');
+      console.log('[Wallet] Creating new wallet with email + passkey...');
 
-      // Generate unique user ID
-      const userId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      const displayName = userName || currentEmail || userId;
+      // Use email as userId for multi-device support
+      const userId = currentEmail;
+      const displayName = userName || currentEmail;
 
       // Create wallet with passkey - This will:
       // 1. Prompt user for biometric authentication
@@ -173,12 +174,15 @@ export const SelfCustodialWalletProvider: React.FC<{ children: ReactNode }> = ({
       setHasWallet(true);
       setIsUnlocked(true);
       setIsAuthenticated(true);
-      setUserId(userId);
+      setUserId(currentEmail);
 
       // Persist wallet existence
       localStorage.setItem(HAS_WALLET_KEY, 'true');
       localStorage.setItem(WALLET_ADDRESS_KEY, account.address);
-      localStorage.setItem(USER_ID_KEY, userId);
+      localStorage.setItem(USER_ID_KEY, currentEmail);
+
+      // TODO: Backup encrypted wallet to backend (Phase 3)
+      // await backupWalletToBackend(currentEmail, account.encryptedData);
 
       return { address: account.address };
     } catch (error: any) {
