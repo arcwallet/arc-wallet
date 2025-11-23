@@ -7,6 +7,7 @@ import { JsonRpcProvider } from 'ethers';
 import { WebAuthnManager } from '../core/webauthn';
 import { SecureStorage } from '../core/secureStorage';
 import { KeyManager } from '../core/keyManager';
+import { CCTPManager } from '../core/cctpManager';
 import type {
   WalletSDKConfig,
   WalletAccount,
@@ -15,11 +16,13 @@ import type {
   WalletEvent,
   WalletEventPayload,
 } from '../types';
+import type { CCTPTransferParams, CCTPTransferResult } from '../types/cctp';
 
 export class WalletSDK {
   private webauthn: WebAuthnManager;
   private storage: SecureStorage;
   private keyManager: KeyManager;
+  private cctpManager: CCTPManager;
   private provider: JsonRpcProvider;
   private eventListeners: Map<WalletEvent, Set<(payload: any) => void>>;
   private currentAccount: WalletAccount | null = null;
@@ -36,6 +39,7 @@ export class WalletSDK {
     this.storage = new SecureStorage();
     this.keyManager = new KeyManager(this.webauthn, this.storage);
     this.provider = new JsonRpcProvider(config.rpcUrl);
+    this.cctpManager = new CCTPManager(this.provider, config.cctp);
     this.eventListeners = new Map();
 
     console.log('[WalletSDK] Initialized with config:', {
@@ -256,6 +260,49 @@ export class WalletSDK {
     if (listeners) {
       listeners.forEach((listener) => listener(payload));
     }
+  }
+
+  /**
+   * Transfer USDC cross-chain using CCTP
+   */
+  async transferUSDC(params: CCTPTransferParams): Promise<CCTPTransferResult> {
+    if (!this.currentAccount) {
+      throw new Error('No wallet connected. Please connect first.');
+    }
+
+    if (!this.keyManager['currentWallet']) {
+      throw new Error('Wallet not unlocked. Please authenticate first.');
+    }
+
+    try {
+      console.log('[WalletSDK] Initiating CCTP transfer...');
+
+      const wallet = this.keyManager['currentWallet'];
+      const result = await this.cctpManager.transferUSDC(wallet, params);
+
+      this.emit('transactionSigned', { hash: result.sourceTxHash });
+
+      console.log('[WalletSDK] CCTP transfer initiated:', result.sourceTxHash);
+
+      return result;
+    } catch (error: any) {
+      this.emit('error', {
+        message: error.message,
+        code: 'CCTP_TRANSFER_FAILED',
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Get USDC balance
+   */
+  async getUSDCBalance(chainId?: number): Promise<string> {
+    if (!this.currentAccount) {
+      throw new Error('No wallet connected');
+    }
+
+    return await this.cctpManager.getUSDCBalance(this.currentAccount.address, chainId);
   }
 
   /**

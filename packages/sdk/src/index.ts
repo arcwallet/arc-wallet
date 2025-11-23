@@ -21,10 +21,21 @@ export type {
   StorageProvider,
 } from './types';
 
+// CCTP Types
+export type {
+  CCTPConfig,
+  CCTPTransferParams,
+  CCTPTransferResult,
+  CCTPAttestation,
+} from './types/cctp';
+
+export { DEFAULT_CCTP_CONFIG } from './types/cctp';
+
 // Core (advanced usage)
 export { WebAuthnManager } from './core/webauthn';
 export { SecureStorage } from './core/secureStorage';
 export { KeyManager } from './core/keyManager';
+export { CCTPManager } from './core/cctpManager';
 
 // Version
 export const VERSION = '1.0.0';

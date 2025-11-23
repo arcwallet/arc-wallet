@@ -3,6 +3,8 @@
  * @module @arc/wallet-sdk
  */
 
+import type { CCTPConfig } from './cctp';
+
 export interface WalletSDKConfig {
   /** Application name for WebAuthn */
   appName: string;
@@ -18,6 +20,9 @@ export interface WalletSDKConfig {
 
   /** Optional backend URL for passkey registration */
   backendUrl?: string;
+
+  /** Optional CCTP configuration for cross-chain transfers */
+  cctp?: Partial<CCTPConfig>;
 }
 
 export interface PasskeyCredential {
