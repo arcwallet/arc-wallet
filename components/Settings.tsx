@@ -104,17 +104,6 @@ const SecuritySection: React.FC = () => {
                     <button onClick={load} disabled={loading} className="flex h-10 items-center justify-center rounded-lg border border-slate-500/50 bg-transparent px-4 text-sm font-medium text-slate-300 hover:bg-white/5 hover:text-white hover:border-slate-400 transition-all disabled:opacity-60">
                         Refresh
                     </button>
-                    <div className="flex items-center justify-between p-4 rounded-lg bg-[#151A22] border border-white/10">
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 rounded-lg bg-blue-500/10 text-blue-400">
-                                <KeyIcon size={20} className="text-blue-400" />
-                            </div>
-                            <div>
-                                <p className="font-medium text-text-primary">Passkey Security</p>
-                                <p className="text-sm text-text-secondary">Your wallet is secured by hardware-backed passkeys.</p>
-                            </div>
-                        </div>
-                    </div>
                 </div>
             </div>
             {error && <div className="rounded-md border border-accent-orange/40 bg-accent-orange/10 p-3 text-sm text-accent-orange">{error}</div>}

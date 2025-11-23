@@ -39,7 +39,7 @@ interface SendAssetsProps {
 const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialRecipient = '', initialToken }) => {
   const { snapshot, isLoading } = useArcAccount();
   // Get private key from self-custodial context first, fall back to legacy
-  const { address: selfCustodialAddress, getPrivateKey, isPasskeyEnabled } = useSelfCustodialWallet();
+  const { address: selfCustodialAddress, getPrivateKey } = useSelfCustodialWallet();
   const { sessionKey, verifyWithPasskey } = useWallet();
   const { addActivity } = useActivity();
   const { isPrivacyMode, fheKeypair } = usePrivacy();
@@ -330,24 +330,22 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
     setSubmitError(null);
     setTxHash(null);
     try {
-      // Only verify passkey if enabled
-      if (isPasskeyEnabled) {
-        try {
-          await verifyWithPasskey();
-        } catch (passkeyError: any) {
-          const passkeyMsg = typeof passkeyError?.message === 'string' ? passkeyError.message : '';
+      // Verify with passkey before sending
+      try {
+        await verifyWithPasskey();
+      } catch (passkeyError: any) {
+        const passkeyMsg = typeof passkeyError?.message === 'string' ? passkeyError.message : '';
 
-          if (passkeyError instanceof DOMException && passkeyError.name === 'NotAllowedError') {
-            throw new Error('Passkey verification was cancelled. Please try again and complete the verification.');
-          } else if (passkeyMsg.toLowerCase().includes('user not found')) {
-            throw new Error('Your passkey is not registered. Please sign out and create a new passkey.');
-          } else if (passkeyMsg.toLowerCase().includes('not found') || passkeyMsg.toLowerCase().includes('passkey not found')) {
-            throw new Error('Passkey not found. Please sign out and register a new passkey.');
-          } else if (passkeyMsg.toLowerCase().includes('challenge')) {
-            throw new Error('Authentication challenge expired. Please try again.');
-          } else {
-            throw new Error(`Passkey verification failed: ${passkeyMsg || 'Unknown error'} `);
-          }
+        if (passkeyError instanceof DOMException && passkeyError.name === 'NotAllowedError') {
+          throw new Error('Passkey verification was cancelled. Please try again and complete the verification.');
+        } else if (passkeyMsg.toLowerCase().includes('user not found')) {
+          throw new Error('Your passkey is not registered. Please sign out and create a new passkey.');
+        } else if (passkeyMsg.toLowerCase().includes('not found') || passkeyMsg.toLowerCase().includes('passkey not found')) {
+          throw new Error('Passkey not found. Please sign out and register a new passkey.');
+        } else if (passkeyMsg.toLowerCase().includes('challenge')) {
+          throw new Error('IMPORTANT: Sign out and sign back in before attempting another transaction.');
+        } else {
+          throw new Error(`Passkey verification failed: ${passkeyMsg || 'Unknown error'} `);
         }
       }
 
@@ -685,7 +683,7 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
           <button
             onClick={handleSubmit}
             disabled={!canSubmit}
-            className="flex w-full cursor-pointer items-center justify-center overflow-hidden rounded-lg h-14 bg-slate-200 hover:bg-white text-slate-900 text-lg font-semibold leading-normal tracking-wide transition-all shadow-[0_0_20px_rgba(255,255,255,0.1)] hover:shadow-[0_0_30px_rgba(255,255,255,0.2)] disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full rounded-md bg-white px-4 py-3 text-lg font-semibold text-black hover:bg-accent-blue focus:outline-none focus:ring-2 focus:ring-accent-blue disabled:bg-slate-400 disabled:text-slate-600 transition-all"
           >
             {isSubmitting ? (
               <span className="flex items-center gap-2">
@@ -696,11 +694,11 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
                 Sending…
               </span>
             ) : (
-              isPasskeyEnabled ? 'Send with Passkey' : 'Send Transaction'
+              'Send with Passkey'
             )}
           </button>
-          <p className="text-xs text-text-secondary text-center mt-3">
-            {isPasskeyEnabled ? "You'll be prompted to verify with your passkey before sending" : "Transaction will be signed with your local wallet"}
+          <p className="mt-2 text-xs text-slate-500 text-center">
+            You'll be prompted to verify with your passkey before sending
           </p>
         </div>
       </div>
