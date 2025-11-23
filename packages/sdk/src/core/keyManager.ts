@@ -1,22 +1,25 @@
 /**
- * Key Manager - Manages private keys using WebAuthn + Secure Storage
- * Keys are encrypted and stored locally, never exposed
+ * Key Manager - Manages private keys using WebAuthn + WebCrypto Secure Storage
+ * Keys are encrypted with non-extractable master keys, never exposed
  */
 
 import { Wallet } from 'ethers';
 import { WebAuthnManager } from './webauthn';
 import { SecureStorage } from './secureStorage';
+import { WebCryptoMasterKeyManager } from './webCryptoMasterKey';
 import type { WalletAccount } from '../types';
 
 export class KeyManager {
   private webauthn: WebAuthnManager;
   private storage: SecureStorage;
+  private webCrypto: WebCryptoMasterKeyManager;
   private currentWallet: Wallet | null = null;
   private currentCredentialId: string | null = null;
 
   constructor(webauthn: WebAuthnManager, storage: SecureStorage) {
     this.webauthn = webauthn;
     this.storage = storage;
+    this.webCrypto = new WebCryptoMasterKeyManager();
   }
 
   /**
@@ -29,32 +32,40 @@ export class KeyManager {
       // Step 1: Create passkey credential
       const credential = await this.webauthn.createPasskey(userId, userName);
 
-      // Step 2: Generate new Ethereum wallet
+      // Step 2: Generate WebCrypto non-extractable master key
+      await this.webCrypto.generateMasterKey(credential.id);
+      console.log('[KeyManager] WebCrypto master key generated (non-extractable)');
+
+      // Step 3: Generate new Ethereum wallet
       const wallet = Wallet.createRandom();
       const privateKey = wallet.privateKey;
       const address = wallet.address;
 
       console.log('[KeyManager] Wallet created:', address);
 
-      // Step 3: Derive encryption key from credential
-      const salt = crypto.getRandomValues(new Uint8Array(16));
-      const encryptionKey = await this.storage.deriveEncryptionKey(credential.id, salt);
+      // Step 4: Encrypt private key with WebCrypto non-extractable master key
+      const { encrypted, iv } = await this.webCrypto.encrypt(privateKey);
 
-      // Step 4: Encrypt and store private key
-      await this.storage.storeKey(credential.id, privateKey, encryptionKey);
+      // Step 5: Store encrypted key (master key stays in WebCrypto, non-extractable)
+      await this.storage.storeWebCryptoData(credential.id, {
+        encrypted: Array.from(encrypted),
+        iv: Array.from(iv),
+        address,
+        keyType: 'webcrypto-master', // Mark as WebCrypto protected
+      });
 
-      // Step 5: Store metadata
+      // Step 6: Store metadata
       await this.storage.storeMetadata(credential.id, {
         address,
         publicKey: credential.publicKey,
         userId,
         createdAt: credential.createdAt.toISOString(),
-        salt: Array.from(salt), // Store salt for key derivation
+        keyType: 'webcrypto-master',
       });
 
-      console.log('[KeyManager] Wallet secured with passkey');
+      console.log('[KeyManager] Wallet secured with WebCrypto non-extractable master key');
 
-      // Set as current wallet (Wallet.createRandom() returns HDNodeWallet, which extends Wallet)
+      // Set as current wallet
       this.currentWallet = wallet as any;
       this.currentCredentialId = credential.id;
 
@@ -91,20 +102,46 @@ export class KeyManager {
         throw new Error('Wallet metadata not found');
       }
 
-      // Step 3: Derive encryption key
-      const salt = new Uint8Array(metadata.salt);
-      const encryptionKey = await this.storage.deriveEncryptionKey(
-        activeCredentialId,
-        salt
-      );
+      // Step 3: Check key type and decrypt accordingly
+      const keyData = await this.storage.getKeyData(activeCredentialId);
+      if (!keyData) {
+        throw new Error('Wallet key data not found');
+      }
 
-      // Step 4: Decrypt private key
-      const privateKey = await this.storage.getKey(activeCredentialId, encryptionKey);
+      let privateKey: string;
+
+      if (keyData.keyType === 'webcrypto-master') {
+        // New WebCrypto approach
+        console.log('[KeyManager] Using WebCrypto master key for decryption');
+
+        // Generate master key
+        await this.webCrypto.generateMasterKey(activeCredentialId);
+
+        // Decrypt with non-extractable master key
+        const encrypted = new Uint8Array(keyData.encrypted);
+        const iv = new Uint8Array(keyData.iv);
+        privateKey = await this.webCrypto.decrypt(encrypted, iv);
+      } else {
+        // Legacy approach (backward compatibility)
+        console.log('[KeyManager] Using legacy decryption method');
+
+        const salt = new Uint8Array(metadata.salt || []);
+        const encryptionKey = await this.storage.deriveEncryptionKey(
+          activeCredentialId,
+          salt
+        );
+        const decrypted = await this.storage.getKey(activeCredentialId, encryptionKey);
+        if (!decrypted) {
+          throw new Error('Failed to decrypt private key');
+        }
+        privateKey = decrypted;
+      }
+
       if (!privateKey) {
         throw new Error('Failed to decrypt private key');
       }
 
-      // Step 5: Create wallet instance
+      // Step 4: Create wallet instance
       const wallet = new Wallet(privateKey);
 
       // Verify address matches

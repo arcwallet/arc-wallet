@@ -72,6 +72,16 @@ export class SecureStorage {
   }
 
   /**
+   * Store WebCrypto encrypted data (new format)
+   */
+  async storeWebCryptoData(
+    credentialId: string,
+    data: { encrypted: number[]; iv: number[]; address: string; keyType: string }
+  ): Promise<void> {
+    await set(`wallet:${credentialId}`, data);
+  }
+
+  /**
    * Retrieve and decrypt private key
    */
   async getKey(credentialId: string, encryptionKey: CryptoKey): Promise<string | null> {
@@ -150,10 +160,17 @@ export class SecureStorage {
   }
 
   /**
-   * Store wallet metadata (not encrypted)
+   * Get key data (supports both legacy and new formats)
+   */
+  async getKeyData(credentialId: string): Promise<any> {
+    return await get(`wallet:${credentialId}`);
+  }
+
+  /**
+   * Store metadata
    */
   async storeMetadata(credentialId: string, metadata: any): Promise<void> {
-    await set(`wallet_meta_${credentialId}`, metadata);
+    await set(`wallet:${credentialId}:metadata`, metadata);
   }
 
   /**
