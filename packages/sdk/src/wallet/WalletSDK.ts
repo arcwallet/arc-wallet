@@ -17,7 +17,6 @@ import type {
 } from '../types';
 
 export class WalletSDK {
-  private config: WalletSDKConfig;
   private webauthn: WebAuthnManager;
   private storage: SecureStorage;
   private keyManager: KeyManager;
@@ -26,7 +25,6 @@ export class WalletSDK {
   private currentAccount: WalletAccount | null = null;
 
   constructor(config: WalletSDKConfig) {
-    this.config = config;
 
     // Initialize core components
     this.webauthn = new WebAuthnManager({
@@ -99,8 +97,6 @@ export class WalletSDK {
    * Disconnect wallet (lock)
    */
   disconnect(): void {
-    const address = this.currentAccount?.address;
-
     this.keyManager.lock();
     this.currentAccount = null;
 

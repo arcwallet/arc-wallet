@@ -54,8 +54,8 @@ export class KeyManager {
 
       console.log('[KeyManager] Wallet secured with passkey');
 
-      // Set as current wallet
-      this.currentWallet = wallet;
+      // Set as current wallet (Wallet.createRandom() returns HDNodeWallet, which extends Wallet)
+      this.currentWallet = wallet as any;
       this.currentCredentialId = credential.id;
 
       return {

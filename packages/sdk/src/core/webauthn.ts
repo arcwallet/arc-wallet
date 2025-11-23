@@ -12,13 +12,9 @@ export interface WebAuthnConfig {
 }
 
 export class WebAuthnManager {
-  private rpId: string;
-  private rpName: string;
   private backendUrl: string;
 
   constructor(config: WebAuthnConfig) {
-    this.rpId = config.rpId;
-    this.rpName = config.rpName;
     this.backendUrl = config.backendUrl || 'http://localhost:4000';
 
     // Check WebAuthn support
@@ -102,11 +98,10 @@ export class WebAuthnManager {
         throw new Error('Failed to verify credential');
       }
 
-      const result = await verifyResponse.json();
+      await verifyResponse.json();
 
-      // Step 4: Derive Ethereum address from public key
+      // Step 4: Extract public key from attestation
       const publicKeyHex = this.extractPublicKey(attestationResponse);
-      const address = await this.deriveAddress(publicKeyHex);
 
       return {
         id: credential.id,
@@ -187,7 +182,7 @@ export class WebAuthnManager {
         throw new Error('Authentication verification failed');
       }
 
-      const result = await verifyResponse.json();
+      await verifyResponse.json();
 
       return {
         success: true,
@@ -218,16 +213,6 @@ export class WebAuthnManager {
     return '0x' + Array.from(new Uint8Array(attestationObject.slice(0, 32)))
       .map(b => b.toString(16).padStart(2, '0'))
       .join('');
-  }
-
-  /**
-   * Derive Ethereum address from public key
-   */
-  private async deriveAddress(publicKeyHex: string): Promise<string> {
-    // Use ethers.js to derive address from public key
-    const { keccak256 } = await import('ethers');
-    const hash = keccak256(publicKeyHex);
-    return '0x' + hash.slice(-40);
   }
 
   /**
