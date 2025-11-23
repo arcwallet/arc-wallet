@@ -1,17 +1,13 @@
 /**
- * CCTP Manager - Handles Circle Cross-Chain Transfer Protocol operations
+ * CCTP Manager - Cross-chain USDC transfer via Circle CCTP
  */
 
-import { Contract, parseUnits, formatUnits, keccak256, getBytes } from 'ethers';
-import type { JsonRpcProvider, Wallet } from 'ethers';
-import { TOKEN_MESSENGER_ABI, USDC_ABI } from './cctp-abis';
-import type {
-    CCTPConfig,
-    CCTPTransferParams,
-    CCTPTransferResult,
-    CCTPAttestation,
-} from '../types/cctp';
+import { Contract, JsonRpcProvider, Wallet, parseUnits, formatUnits, keccak256, getBytes } from 'ethers';
+import type { CCTPConfig, CCTPTransferParams, CCTPTransferResult, CCTPAttestation } from '../types/cctp';
 import { DEFAULT_CCTP_CONFIG } from '../types/cctp';
+import { USDC_ABI, TOKEN_MESSENGER_ABI } from './cctp-abis';
+import { logger } from '../utils/logger';
+import { validateCCTPConfig, getCCTPConfigErrorMessage } from '../utils/cctpValidator';
 
 export class CCTPManager {
     private config: CCTPConfig;
@@ -29,10 +25,35 @@ export class CCTPManager {
         wallet: Wallet,
         params: CCTPTransferParams
     ): Promise<CCTPTransferResult> {
-        try {
-            const sourceChainId = Number((await this.provider.getNetwork()).chainId);
-            const { destinationChainId, destinationAddress, amount } = params;
+        const { amount, destinationAddress, destinationChainId } = params;
 
+        // Validate CCTP configuration for source chain
+        const sourceChainId = await wallet.provider!.getNetwork().then(n => Number(n.chainId));
+        const sourceValidation = validateCCTPConfig(this.config, sourceChainId);
+
+        if (!sourceValidation.isValid) {
+            const errorMsg = getCCTPConfigErrorMessage(sourceChainId);
+            logger.error('CCTP configuration invalid for source chain', undefined, {
+                component: 'CCTPManager',
+                chainId: sourceChainId,
+                errors: sourceValidation.errors,
+            });
+            throw new Error(errorMsg);
+        }
+
+        // Validate CCTP configuration for destination chain
+        const destValidation = validateCCTPConfig(this.config, destinationChainId);
+
+        if (!destValidation.isValid) {
+            const errorMsg = getCCTPConfigErrorMessage(destinationChainId);
+            logger.error('CCTP configuration invalid for destination chain', undefined, {
+                component: 'CCTPManager',
+                chainId: destinationChainId,
+                errors: destValidation.errors,
+            });
+            throw new Error(errorMsg);
+        }
+        try {
             console.log('[CCTP] Starting cross-chain USDC transfer:', {
                 from: sourceChainId,
                 to: destinationChainId,

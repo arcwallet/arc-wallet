@@ -4,6 +4,7 @@
  */
 
 import type { PasskeyCredential, AuthenticationResult } from '../types';
+import { logger } from '../utils/logger';
 
 export interface WebAuthnConfig {
   rpId: string;
@@ -110,7 +111,7 @@ export class WebAuthnManager {
         createdAt: new Date(),
       };
     } catch (error: any) {
-      console.error('Passkey creation failed:', error);
+      logger.error('Passkey creation failed', error, { component: 'WebAuthn', action: 'createPasskey' });
       throw new Error(`Failed to create passkey: ${error.message}`);
     }
   }
@@ -191,7 +192,7 @@ export class WebAuthnManager {
         // Never sent to backend
       };
     } catch (error: any) {
-      console.error('Authentication failed:', error);
+      logger.error('Authentication failed', error, { component: 'WebAuthn', action: 'authenticate' });
       return {
         success: false,
         credentialId: '',

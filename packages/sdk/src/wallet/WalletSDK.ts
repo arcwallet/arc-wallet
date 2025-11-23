@@ -23,6 +23,7 @@ import type {
   UserOperationResult,
   BatchTransaction,
 } from '../types/account-abstraction';
+import { logger } from '../utils/logger';
 
 export class WalletSDK {
   private webauthn: WebAuthnManager;
@@ -61,7 +62,7 @@ export class WalletSDK {
 
     this.eventListeners = new Map();
 
-    console.log('[WalletSDK] Initialized with config:', {
+    logger.debug('Initialized with config', {
       appName: config.appName,
       rpId: config.rpId,
       rpcUrl: config.rpcUrl,
@@ -74,14 +75,14 @@ export class WalletSDK {
    */
   async createWallet(userId: string, userName: string): Promise<WalletAccount> {
     try {
-      console.log('[WalletSDK] Creating new wallet...');
+      logger.info('Creating new wallet', { component: 'WalletSDK', action: 'createWallet' });
 
       const account = await this.keyManager.createWallet(userId, userName);
       this.currentAccount = account;
 
       this.emit('connect', { address: account.address });
 
-      console.log('[WalletSDK] Wallet created:', account.address);
+      logger.info('Wallet created', { component: 'WalletSDK', address: account.address });
 
       return account;
     } catch (error: any) {
@@ -98,14 +99,14 @@ export class WalletSDK {
    */
   async connect(credentialId?: string): Promise<WalletAccount> {
     try {
-      console.log('[WalletSDK] Connecting wallet...');
+      logger.info('Connecting wallet', { component: 'WalletSDK', action: 'connect' });
 
       const account = await this.keyManager.unlockWallet(credentialId);
       this.currentAccount = account;
 
       this.emit('connect', { address: account.address });
 
-      console.log('[WalletSDK] Connected:', account.address);
+      logger.info('Connected', { component: 'WalletSDK', address: account.address });
 
       return account;
     } catch (error: any) {
@@ -126,7 +127,7 @@ export class WalletSDK {
 
     this.emit('disconnect', { reason: 'User disconnected' });
 
-    console.log('[WalletSDK] Disconnected');
+    logger.info('Disconnected', { component: 'WalletSDK' });
   }
 
   /**
@@ -138,7 +139,7 @@ export class WalletSDK {
     }
 
     try {
-      console.log('[WalletSDK] Signing transaction...');
+      logger.info('Signing transaction', { component: 'WalletSDK' });
 
       // Prepare transaction
       const tx = {
@@ -184,7 +185,7 @@ export class WalletSDK {
 
       this.emit('transactionSigned', { hash: receipt!.hash });
 
-      console.log('[WalletSDK] Transaction sent:', receipt!.hash);
+      logger.info('Transaction sent', { component: 'WalletSDK', hash: receipt!.hash });
 
       return result;
     } catch (error: any) {
@@ -205,9 +206,9 @@ export class WalletSDK {
     }
 
     try {
-      console.log('[WalletSDK] Signing message...');
+      logger.info('Signing message', { component: 'WalletSDK' });
       const signature = await this.keyManager.signMessage(message);
-      console.log('[WalletSDK] Message signed');
+      logger.info('Message signed', { component: 'WalletSDK' });
       return signature;
     } catch (error: any) {
       this.emit('error', {
@@ -295,14 +296,14 @@ export class WalletSDK {
     }
 
     try {
-      console.log('[WalletSDK] Initiating CCTP transfer...');
+      logger.info('Initiating CCTP transfer', { component: 'WalletSDK' });
 
       const wallet = this.keyManager['currentWallet'];
       const result = await this.cctpManager.transferUSDC(wallet, params);
 
       this.emit('transactionSigned', { hash: result.sourceTxHash });
 
-      console.log('[WalletSDK] CCTP transfer initiated:', result.sourceTxHash);
+      logger.info('CCTP transfer initiated', { component: 'WalletSDK', sourceTxHash: result.sourceTxHash });
 
       return result;
     } catch (error: any) {
@@ -342,17 +343,17 @@ export class WalletSDK {
     }
 
     try {
-      console.log('[WalletSDK] Building UserOperation...');
+      logger.debug('Building UserOperation', { component: 'WalletSDK' });
 
       const wallet = this.keyManager['currentWallet'];
       const userOp = await this.smartAccountManager.buildUserOperation(wallet, request);
 
-      console.log('[WalletSDK] Sending UserOperation...');
+      logger.info('Sending UserOperation', { component: 'WalletSDK' });
       const result = await this.smartAccountManager.sendUserOperation(userOp);
 
       this.emit('transactionSigned', { hash: result.userOpHash });
 
-      console.log('[WalletSDK] UserOperation sent:', result.userOpHash);
+      logger.info('UserOperation sent', { component: 'WalletSDK', userOpHash: result.userOpHash });
 
       return result;
     } catch (error: any) {
@@ -384,7 +385,7 @@ export class WalletSDK {
     }
 
     try {
-      console.log('[WalletSDK] Building batch UserOperation...');
+      logger.debug('Building batch UserOperation', { component: 'WalletSDK' });
 
       const wallet = this.keyManager['currentWallet'];
       const userOp = await this.smartAccountManager.buildBatchUserOperation(
@@ -393,12 +394,12 @@ export class WalletSDK {
         sponsored
       );
 
-      console.log('[WalletSDK] Sending batch UserOperation...');
+      logger.info('Sending batch UserOperation', { component: 'WalletSDK' });
       const result = await this.smartAccountManager.sendUserOperation(userOp);
 
       this.emit('transactionSigned', { hash: result.userOpHash });
 
-      console.log('[WalletSDK] Batch UserOperation sent:', result.userOpHash);
+      logger.info('Batch UserOperation sent', { component: 'WalletSDK', userOpHash: result.userOpHash });
 
       return result;
     } catch (error: any) {
@@ -454,6 +455,6 @@ export class WalletSDK {
 
     this.disconnect();
 
-    console.log('[WalletSDK] Wallet deleted permanently');
+    logger.info('Wallet deleted permanently', { component: 'WalletSDK' });
   }
 }

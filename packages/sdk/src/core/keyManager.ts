@@ -8,6 +8,7 @@ import { WebAuthnManager } from './webauthn';
 import { SecureStorage } from './secureStorage';
 import { WebCryptoMasterKeyManager } from './webCryptoMasterKey';
 import type { WalletAccount } from '../types';
+import { logger } from '../utils/logger';
 
 export class KeyManager {
   private webauthn: WebAuthnManager;
@@ -27,21 +28,21 @@ export class KeyManager {
    */
   async createWallet(userId: string, userName: string): Promise<WalletAccount> {
     try {
-      console.log('[KeyManager] Creating new wallet with passkey...');
+      logger.info('Creating new wallet with passkey', { component: 'KeyManager', action: 'createWallet' });
 
       // Step 1: Create passkey credential
       const credential = await this.webauthn.createPasskey(userId, userName);
 
       // Step 2: Generate WebCrypto non-extractable master key
       await this.webCrypto.generateMasterKey(credential.id);
-      console.log('[KeyManager] WebCrypto master key generated (non-extractable)');
+      logger.info('WebCrypto master key generated (non-extractable)', { component: 'KeyManager' });
 
       // Step 3: Generate new Ethereum wallet
       const wallet = Wallet.createRandom();
       const privateKey = wallet.privateKey;
       const address = wallet.address;
 
-      console.log('[KeyManager] Wallet created:', address);
+      logger.info('Wallet created', { component: 'KeyManager', address });
 
       // Step 4: Encrypt private key with WebCrypto non-extractable master key
       const { encrypted, iv } = await this.webCrypto.encrypt(privateKey);
@@ -75,7 +76,7 @@ export class KeyManager {
         publicKey: credential.publicKey,
       };
     } catch (error: any) {
-      console.error('[KeyManager] Wallet creation failed:', error);
+      logger.error('Wallet creation failed', error instanceof Error ? error : undefined, { component: 'KeyManager' });
       throw new Error(`Failed to create wallet: ${error.message}`);
     }
   }
@@ -85,7 +86,7 @@ export class KeyManager {
    */
   async unlockWallet(credentialId?: string): Promise<WalletAccount> {
     try {
-      console.log('[KeyManager] Unlocking wallet with passkey...');
+      logger.info('Unlocking wallet with passkey', { component: 'KeyManager', action: 'unlockWallet' });
 
       // Step 1: Authenticate with passkey
       const authResult = await this.webauthn.authenticate(credentialId);
@@ -149,7 +150,7 @@ export class KeyManager {
         throw new Error('Address mismatch - wallet may be corrupted');
       }
 
-      console.log('[KeyManager] Wallet unlocked:', wallet.address);
+      logger.info('Wallet unlocked', { component: 'KeyManager', address: wallet.address });
 
       // Set as current wallet
       this.currentWallet = wallet;
@@ -161,7 +162,7 @@ export class KeyManager {
         publicKey: metadata.publicKey,
       };
     } catch (error: any) {
-      console.error('[KeyManager] Wallet unlock failed:', error);
+      logger.error('Wallet unlock failed', error instanceof Error ? error : undefined, { component: 'KeyManager' });
       throw new Error(`Failed to unlock wallet: ${error.message}`);
     }
   }
@@ -199,7 +200,7 @@ export class KeyManager {
       console.log('[KeyManager] Message signed');
       return signature;
     } catch (error: any) {
-      console.error('[KeyManager] Message signing failed:', error);
+      logger.error('Message signing failed', error instanceof Error ? error : undefined, { component: 'KeyManager' });
       throw new Error(`Failed to sign message: ${error.message}`);
     }
   }
@@ -224,7 +225,7 @@ export class KeyManager {
   lock(): void {
     this.currentWallet = null;
     this.currentCredentialId = null;
-    console.log('[KeyManager] Wallet locked');
+    logger.info('Wallet locked', { component: 'KeyManager' });
   }
 
   /**

@@ -40,17 +40,30 @@ export interface CCTPAttestation {
 
 // Default CCTP configuration for Arc Network
 export const DEFAULT_CCTP_CONFIG: CCTPConfig = {
+    // Token Messenger contract addresses by chain ID
     tokenMessengerAddresses: {
-        // Arc Testnet
-        412346: '0x...', // TODO: Add actual TokenMessenger address
-        // Ethereum Sepolia
-        11155111: '0x9f3B8679c73C2Fef8b59B4f3444d4e156fb70AA5',
+        11155111: '0x9f3B8679c73C2Fef8b59B4f3444d4e156fb70AA5', // Sepolia
+        421614: '0x9f3B8679c73C2Fef8b59B4f3444d4e156fb70AA5',   // Arbitrum Sepolia
+        11155420: '0x9f3B8679c73C2Fef8b59B4f3444d4e156fb70AA5', // Optimism Sepolia
+        84532: '0x9f3B8679c73C2Fef8b59B4f3444d4e156fb70AA5',    // Base Sepolia
+
+        // ⚠️ CONFIGURATION REQUIRED
+        // Arc Network TokenMessenger address must be obtained from Arc Network team
+        // Current value is a placeholder and will cause transactions to fail
+        412346: '0x0000000000000000000000000000000000000000', // Arc Testnet - PLACEHOLDER
     },
+
+    // USDC contract addresses by chain ID
     usdcAddresses: {
-        // Arc Testnet
-        412346: '0x...', // TODO: Add actual USDC address
-        // Ethereum Sepolia
-        11155111: '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238',
+        11155111: '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238', // Sepolia
+        421614: '0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d',   // Arbitrum Sepolia
+        11155420: '0x5fd84259d66Cd46123540766Be93DFE6D43130D7', // Optimism Sepolia
+        84532: '0x036CbD53842c5426634e7929541eC2318f3dCF7e',    // Base Sepolia
+
+        // ⚠️ CONFIGURATION REQUIRED
+        // Arc Network USDC address must be obtained from Arc Network team
+        // Current value is a placeholder and will cause transactions to fail
+        412346: '0x0000000000000000000000000000000000000000', // Arc Testnet - PLACEHOLDER
     },
     domainIds: {
         // Arc Testnet

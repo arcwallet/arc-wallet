@@ -12,18 +12,18 @@ export default defineConfig({
   ],
   build: {
     lib: {
-      entry: resolve(__dirname, 'src/index.ts'),
+      entry: 'src/index.ts',
       name: 'ArcWalletSDK',
-      formats: ['es', 'cjs'],
+      formats: ['es', 'umd'],
       fileName: (format) => `index.${format === 'es' ? 'mjs' : 'js'}`,
     },
     rollupOptions: {
-      external: ['react', 'react-dom', 'ethers'],
+      external: ['ethers', 'idb-keyval', '@sentry/browser'],
       output: {
         globals: {
-          react: 'React',
-          'react-dom': 'ReactDOM',
-          ethers: 'ethers',
+          'ethers': 'ethers',
+          'idb-keyval': 'idbKeyval',
+          '@sentry/browser': 'Sentry',
         },
       },
     },

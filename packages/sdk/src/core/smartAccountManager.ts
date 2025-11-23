@@ -13,6 +13,7 @@ import type {
     PaymasterConfig,
     PaymasterData,
 } from '../types/account-abstraction';
+import { logger } from '../utils/logger';
 import { DEFAULT_AA_CONFIG } from '../types/account-abstraction';
 
 const abiCoder = new AbiCoder();
@@ -212,7 +213,7 @@ export class SmartAccountManager {
      */
     async sendUserOperation(userOp: UserOperation): Promise<UserOperationResult> {
         try {
-            console.log('[SmartAccount] Sending UserOperation to bundler...');
+            logger.info('Sending UserOperation to bundler', { component: 'SmartAccount' });
 
             const response = await fetch(this.config.bundlerUrl, {
                 method: 'POST',
@@ -232,7 +233,7 @@ export class SmartAccountManager {
             }
 
             const userOpHash = data.result;
-            console.log('[SmartAccount] UserOperation sent:', userOpHash);
+            logger.info('UserOperation sent', { component: 'SmartAccount', userOpHash });
 
             return {
                 userOpHash,

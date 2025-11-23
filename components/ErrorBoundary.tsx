@@ -1,4 +1,5 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
+import { logger } from '@arc/wallet-sdk';
 
 interface Props {
   children: ReactNode;
@@ -33,10 +34,11 @@ class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    // Log error to console in development
-    if (process.env.NODE_ENV === 'development') {
-      console.error('ErrorBoundary caught an error:', error, errorInfo);
-    }
+    // Log to structured logger (which can send to Sentry if configured)
+    logger.error('React Error Boundary caught an error', error, {
+      component: 'ErrorBoundary',
+      componentStack: errorInfo.componentStack,
+    });
 
     // Update state with error details
     this.setState({

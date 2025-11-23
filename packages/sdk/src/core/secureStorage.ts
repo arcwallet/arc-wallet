@@ -4,6 +4,7 @@
  */
 
 import { get, set, del, clear } from 'idb-keyval';
+import { logger } from '../utils/logger';
 
 export interface EncryptedData {
   /** Encrypted data */
@@ -64,9 +65,9 @@ export class SecureStorage {
     try {
       const encrypted = await this.encrypt(privateKey, encryptionKey);
       await set(`wallet_key_${credentialId}`, encrypted);
-      console.log('[SecureStorage] Private key encrypted and stored');
+      logger.info('Private key encrypted and stored', { component: 'SecureStorage' });
     } catch (error) {
-      console.error('[SecureStorage] Failed to store key:', error);
+      logger.error('Failed to store key', error instanceof Error ? error : undefined, { component: 'SecureStorage' });
       throw new Error('Failed to store private key securely');
     }
   }
@@ -93,7 +94,7 @@ export class SecureStorage {
 
       return await this.decrypt(encrypted, encryptionKey);
     } catch (error) {
-      console.error('[SecureStorage] Failed to retrieve key:', error);
+      logger.error('Failed to retrieve key', error instanceof Error ? error : undefined, { component: 'SecureStorage' });
       return null;
     }
   }

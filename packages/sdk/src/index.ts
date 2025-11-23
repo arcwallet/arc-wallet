@@ -51,5 +51,11 @@ export { KeyManager } from './core/keyManager';
 export { CCTPManager } from './core/cctpManager';
 export { SmartAccountManager } from './core/smartAccountManager';
 
+// Utils
+export { logger, createLogger, LogLevel } from './utils/logger';
+export type { LoggerConfig, LogContext } from './utils/logger';
+export { validateCCTPConfig, isArcNetworkConfigured, getCCTPConfigErrorMessage } from './utils/cctpValidator';
+export type { CCTPValidationResult } from './utils/cctpValidator';
+
 // Version
 export const VERSION = '1.0.0';
