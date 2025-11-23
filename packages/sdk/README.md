@@ -1,25 +1,20 @@
-# 🔐 Arc Wallet SDK
+# Arc Wallet SDK
 
-**Passkey-based Ethereum Wallet SDK for Web3 Applications**
+A modern, secure wallet SDK with passkey authentication, cross-chain transfers, and gasless transactions.
 
-Build secure, user-friendly wallets using WebAuthn (Passkeys) instead of seed phrases. Users sign transactions with biometrics (FaceID/TouchID) or device passcodes.
+[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/arcwallet/arc-wallet)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue.svg)](https://www.typescriptlang.org/)
 
-[![npm version](https://img.shields.io/npm/v/@arc/wallet-sdk.svg)](https://www.npmjs.com/package/@arc/wallet-sdk)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+## 🎯 Features
 
----
-
-## ✨ Features
-
-- **🔒 No Seed Phrases** - Uses WebAuthn (Passkeys) for authentication
-- **📱 Biometric Authentication** - FaceID, TouchID, or device passcode
-- **🔐 Secure Enclave** - Private keys stored in device's Secure Enclave
-- **🎨 Embedded UI** - Modal/overlay components for seamless integration
-- **⚡ Simple API** - Easy to integrate with just a few lines of code
-- **🌐 Arc Network** - Optimized for Arc testnet and mainnet
-- **📦 NPM Package** - Install and use like any other library
-
----
+- **🔐 Passkey Authentication** - No seed phrases, biometric authentication only
+- **🔒 WebCrypto Security** - Non-extractable master keys for maximum security
+- **🌉 CCTP Integration** - Native cross-chain USDC transfers via Circle
+- **⚡ Account Abstraction** - ERC-4337 support with gasless transactions
+- **📦 Batch Operations** - Execute multiple transactions in one operation
+- **🎨 Simple API** - Clean, intuitive developer experience
+- **📘 TypeScript** - Full type safety and IntelliSense support
 
 ## 📦 Installation
 
@@ -27,81 +22,98 @@ Build secure, user-friendly wallets using WebAuthn (Passkeys) instead of seed ph
 npm install @arc/wallet-sdk
 ```
 
-or
-
-```bash
-yarn add @arc/wallet-sdk
-```
-
----
-
 ## 🚀 Quick Start
 
-### 1. Initialize SDK
+### Basic Wallet
 
 ```typescript
 import { WalletSDK } from '@arc/wallet-sdk';
 
-const sdk = new WalletSDK({
-  appName: 'My DApp',
-  rpId: 'myapp.com', // Your domain
-  rpcUrl: 'https://rpc.testnet.arc.network',
-  backendUrl: 'https://api.myapp.com', // Optional
-  theme: 'dark', // or 'light'
+const arc = new WalletSDK({
+  appName: 'My dApp',
+  rpId: 'mydapp.com',
+  rpcUrl: 'https://rpc.arc.network'
+});
+
+// Create wallet with passkey
+await arc.createWallet('user@example.com', 'John Doe');
+
+// Connect (unlock with biometric)
+await arc.connect();
+
+// Sign message
+const signature = await arc.signMessage('Hello World');
+
+// Send transaction
+const tx = await arc.signTransaction({
+  to: '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb',
+  value: '1000000000000000000' // 1 ETH in wei
 });
 ```
 
-### 2. Create New Wallet
+### Cross-Chain USDC Transfer (CCTP)
 
 ```typescript
-// User creates wallet with passkey
-const account = await sdk.createWallet(
-  'user_123', // User ID
-  'john@example.com' // User name/email
-);
-
-console.log('Wallet created:', account.address);
-// Output: 0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb
-```
-
-### 3. Connect Existing Wallet
-
-```typescript
-// User unlocks wallet with passkey (biometric)
-const account = await sdk.connect();
-
-console.log('Connected:', account.address);
-```
-
-### 4. Sign Transaction
-
-```typescript
-// Sign and send transaction
-const result = await sdk.signTransaction({
-  to: '0x...',
-  value: '1000000', // Amount in wei
-  data: '0x', // Contract call data
+const arc = new WalletSDK({
+  appName: 'My dApp',
+  rpcUrl: 'https://rpc.arc.network',
+  cctp: {
+    attestationServiceUrl: 'https://iris-api.circle.com'
+  }
 });
 
-console.log('Transaction hash:', result.hash);
+// Transfer USDC from Arc to Ethereum Sepolia
+const result = await arc.transferUSDC({
+  amount: '100', // 100 USDC
+  destinationAddress: '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb',
+  destinationChainId: 11155111 // Sepolia
+});
+
+console.log('Transfer initiated:', result.sourceTxHash);
+console.log('Message hash:', result.messageHash);
+
+// Check USDC balance
+const balance = await arc.getUSDCBalance();
+console.log('Balance:', balance, 'USDC');
 ```
 
-### 5. Sign Message
+### Gasless Transactions (Account Abstraction)
 
 ```typescript
-// Sign arbitrary message
-const signature = await sdk.signMessage('Hello, World!');
+const arc = new WalletSDK({
+  appName: 'My dApp',
+  rpcUrl: 'https://rpc.arc.network',
+  accountType: 'smart-account',
+  smartAccount: {
+    entryPoint: '0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789',
+    bundlerUrl: 'https://bundler.arc.network',
+    factoryAddress: '0x...',
+    accountImplementation: '0x...'
+  },
+  paymaster: {
+    url: 'https://paymaster.arc.network',
+    enabled: true
+  }
+});
 
-console.log('Signature:', signature);
+// Gasless transaction (sponsored by paymaster)
+const result = await arc.sendUserOperation({
+  to: '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb',
+  value: '1000000',
+  sponsored: true // Paymaster pays gas!
+});
+
+// Batch transactions
+const batchResult = await arc.batchTransactions([
+  { to: '0xAddr1', value: '100000' },
+  { to: '0xAddr2', value: '200000' },
+  { to: '0xAddr3', value: '300000' }
+], true); // sponsored = true
 ```
-
----
 
 ## 📚 API Reference
 
-### `WalletSDK`
-
-Main SDK class for wallet operations.
+### WalletSDK
 
 #### Constructor
 
@@ -111,368 +123,313 @@ new WalletSDK(config: WalletSDKConfig)
 
 **Config Options:**
 
-| Option | Type | Required | Description |
-|--------|------|----------|-------------|
-| `appName` | string | ✅ | Your application name (for WebAuthn) |
-| `rpId` | string | ✅ | Relying Party ID (usually your domain) |
-| `rpcUrl` | string | ✅ | Blockchain RPC URL |
-| `backendUrl` | string | ❌ | Backend URL for passkey registration |
-| `theme` | 'light' \| 'dark' | ❌ | UI theme (default: 'dark') |
+```typescript
+interface WalletSDKConfig {
+  appName: string;              // Your app name
+  rpId: string;                 // Your domain (for WebAuthn)
+  rpcUrl: string;               // Blockchain RPC URL
+  theme?: 'light' | 'dark';     // UI theme
+  backendUrl?: string;          // Backend URL for passkey registration
+  
+  // CCTP Configuration
+  cctp?: {
+    tokenMessengerAddresses?: Record<number, string>;
+    usdcAddresses?: Record<number, string>;
+    domainIds?: Record<number, number>;
+    attestationServiceUrl?: string;
+  };
+  
+  // Account Abstraction Configuration
+  accountType?: 'eoa' | 'smart-account';
+  smartAccount?: {
+    entryPoint?: string;
+    bundlerUrl?: string;
+    factoryAddress?: string;
+    accountImplementation?: string;
+  };
+  paymaster?: {
+    url: string;
+    enabled: boolean;
+  };
+}
+```
 
 #### Methods
 
-##### `createWallet(userId: string, userName: string): Promise<WalletAccount>`
-
-Create new wallet with passkey.
+##### Wallet Management
 
 ```typescript
-const account = await sdk.createWallet('user_123', 'John Doe');
+// Create new wallet
+createWallet(userId: string, userName: string): Promise<WalletAccount>
+
+// Connect (unlock) wallet
+connect(): Promise<WalletAccount>
+
+// Disconnect wallet
+disconnect(): void
+
+// Delete wallet permanently
+deleteWallet(): Promise<void>
+
+// Get current address
+getAddress(): string | null
+
+// Check if connected
+isConnected(): boolean
 ```
 
-**Returns:**
-```typescript
-{
-  address: string; // Ethereum address
-  credentialId: string; // Passkey credential ID
-  publicKey: string; // Public key hex
-}
-```
-
----
-
-##### `connect(credentialId?: string): Promise<WalletAccount>`
-
-Connect to existing wallet (unlock with passkey).
-
-```typescript
-const account = await sdk.connect();
-```
-
----
-
-##### `disconnect(): void`
-
-Disconnect wallet (lock).
+##### Transactions
 
 ```typescript
-sdk.disconnect();
+// Sign message
+signMessage(message: string): Promise<string>
+
+// Sign transaction
+signTransaction(tx: TransactionRequest): Promise<SignedTransaction>
+
+// Send transaction
+sendTransaction(tx: TransactionRequest): Promise<string>
 ```
 
----
-
-##### `signTransaction(tx: TransactionRequest): Promise<SignedTransaction>`
-
-Sign and send transaction.
+##### CCTP (Cross-Chain)
 
 ```typescript
-const result = await sdk.signTransaction({
-  to: '0x...',
-  value: '1000000',
-  data: '0x',
-  // Optional:
-  gasLimit: 21000n,
-  maxFeePerGas: 1000000000n,
-  maxPriorityFeePerGas: 1000000000n,
-});
+// Transfer USDC cross-chain
+transferUSDC(params: CCTPTransferParams): Promise<CCTPTransferResult>
+
+// Get USDC balance
+getUSDCBalance(chainId?: number): Promise<string>
 ```
 
-**Returns:**
-```typescript
-{
-  hash: string; // Transaction hash
-  signedTx: string; // Signed transaction data
-  from: string; // Sender address
-  to: string; // Recipient address
-  value: string; // Amount
-}
-```
-
----
-
-##### `signMessage(message: string): Promise<string>`
-
-Sign arbitrary message.
+##### Account Abstraction
 
 ```typescript
-const signature = await sdk.signMessage('Hello!');
+// Send UserOperation (Smart Account only)
+sendUserOperation(request: UserOperationRequest): Promise<UserOperationResult>
+
+// Batch transactions (Smart Account only)
+batchTransactions(
+  transactions: BatchTransaction[],
+  sponsored?: boolean
+): Promise<UserOperationResult>
+
+// Get Smart Account address
+getSmartAccountAddress(): string | null
+
+// Check if Smart Account is deployed
+isSmartAccountDeployed(): Promise<boolean>
 ```
 
----
-
-##### `getAccount(): WalletAccount | null`
-
-Get current connected account.
+##### Events
 
 ```typescript
-const account = sdk.getAccount();
-if (account) {
-  console.log('Connected:', account.address);
-}
+// Listen to events
+on(event: WalletEvent, callback: (payload: any) => void): void
+
+// Remove event listener
+off(event: WalletEvent, callback: (payload: any) => void): void
+
+// Available events:
+// - 'connected'
+// - 'disconnected'
+// - 'accountChanged'
+// - 'transactionSigned'
+// - 'error'
 ```
-
----
-
-##### `getAddress(): string | null`
-
-Get current wallet address.
-
-```typescript
-const address = sdk.getAddress();
-```
-
----
-
-##### `isConnected(): boolean`
-
-Check if wallet is connected.
-
-```typescript
-if (sdk.isConnected()) {
-  console.log('Wallet is connected');
-}
-```
-
----
-
-##### `getProvider(): JsonRpcProvider`
-
-Get ethers.js provider for advanced usage.
-
-```typescript
-const provider = sdk.getProvider();
-const balance = await provider.getBalance(address);
-```
-
----
-
-### Events
-
-Subscribe to wallet events:
-
-```typescript
-sdk.on('connect', (payload) => {
-  console.log('Wallet connected:', payload.address);
-});
-
-sdk.on('disconnect', (payload) => {
-  console.log('Wallet disconnected:', payload.reason);
-});
-
-sdk.on('transactionSigned', (payload) => {
-  console.log('Transaction signed:', payload.hash);
-});
-
-sdk.on('error', (payload) => {
-  console.error('Error:', payload.message);
-});
-```
-
-**Available Events:**
-
-- `connect` - Wallet connected
-- `disconnect` - Wallet disconnected
-- `accountsChanged` - Account changed
-- `chainChanged` - Network changed
-- `transactionSigned` - Transaction signed
-- `error` - Error occurred
-
----
 
 ## 🔐 Security
 
-### How It Works
+### Architecture
 
-1. **Passkey Creation** - User creates passkey using device biometrics
-2. **Key Generation** - Ethereum wallet generated and private key encrypted
-3. **Secure Storage** - Encrypted key stored in IndexedDB
-4. **Encryption Key** - Derived from passkey credential (never leaves device)
-5. **Authentication** - User authenticates with biometrics to unlock wallet
-6. **Signing** - Private key decrypted in-memory for signing only
+Arc Wallet SDK uses a multi-layered security approach:
 
-### Security Features
+1. **Passkey Layer** - WebAuthn credentials stored in device Secure Enclave
+2. **WebCrypto Layer** - Non-extractable AES-GCM master keys
+3. **Encryption Layer** - Private keys encrypted with master keys
+4. **Sandbox Layer** - All crypto operations in browser sandbox
+
+### Security Flow
+
+```
+User → Biometric Auth → Passkey (Secure Enclave)
+                            ↓
+                    WebCrypto Master Key (Non-Extractable)
+                            ↓
+                    Decrypt Private Key (In Memory)
+                            ↓
+                    Sign Transaction
+                            ↓
+                    Clear from Memory
+```
+
+### Key Features
 
 - ✅ **No Seed Phrases** - Eliminates phishing risk
-- ✅ **Secure Enclave** - Keys stored in device's Secure Enclave via WebAuthn
-- ✅ **AES-GCM Encryption** - Private keys encrypted with AES-256-GCM
-- ✅ **PBKDF2 Key Derivation** - Encryption key derived with 100,000 iterations
-- ✅ **No Backend Storage** - Private keys never sent to backend
-- ✅ **Client-Side Signing** - All signing happens on client
+- ✅ **Non-Extractable Keys** - Master keys cannot be exported
+- ✅ **Hardware-Backed** - Uses device crypto when available
+- ✅ **Self-Custodial** - User always in control
+- ✅ **Biometric Auth** - FaceID, TouchID, or device PIN
 
----
+## 🏗️ Architecture
 
-## 🎨 React Integration
+### Core Components
 
-### Example: Connect Button
+```
+WalletSDK
+├── WebAuthnManager      # Passkey authentication
+├── KeyManager           # Private key management
+├── SecureStorage        # Encrypted storage
+├── WebCryptoMasterKey   # Non-extractable master keys
+├── CCTPManager          # Cross-chain transfers
+└── SmartAccountManager  # Account Abstraction
+```
+
+### Storage
+
+- **Passkeys**: Device Secure Enclave (iOS Keychain, Android Keystore)
+- **Master Keys**: WebCrypto (non-extractable)
+- **Private Keys**: IndexedDB (encrypted with master keys)
+- **Metadata**: IndexedDB (public info only)
+
+## 🌐 Supported Networks
+
+### Mainnet
+- Ethereum
+- Arbitrum
+- Optimism
+- Base
+- Arc Network
+
+### Testnet
+- Sepolia
+- Arbitrum Sepolia
+- Optimism Sepolia
+- Base Sepolia
+- Arc Testnet
+
+## 📖 Examples
+
+### React Integration
 
 ```typescript
 import { WalletSDK } from '@arc/wallet-sdk';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
-const sdk = new WalletSDK({
-  appName: 'My DApp',
-  rpId: 'localhost',
-  rpcUrl: 'https://rpc.testnet.arc.network',
-});
-
-function ConnectButton() {
+function App() {
+  const [arc] = useState(() => new WalletSDK({
+    appName: 'My dApp',
+    rpId: window.location.hostname,
+    rpcUrl: 'https://rpc.arc.network'
+  }));
+  
   const [address, setAddress] = useState<string | null>(null);
-
+  
+  useEffect(() => {
+    arc.on('connected', ({ address }) => {
+      setAddress(address);
+    });
+    
+    arc.on('disconnected', () => {
+      setAddress(null);
+    });
+  }, [arc]);
+  
   const handleConnect = async () => {
     try {
-      const account = await sdk.connect();
-      setAddress(account.address);
+      const account = await arc.connect();
+      console.log('Connected:', account.address);
     } catch (error) {
-      console.error('Connect failed:', error);
+      console.error('Connection failed:', error);
     }
   };
-
+  
   return (
-    <button onClick={handleConnect}>
-      {address ? `Connected: ${address.slice(0, 6)}...` : 'Connect Wallet'}
-    </button>
+    <div>
+      {address ? (
+        <p>Connected: {address}</p>
+      ) : (
+        <button onClick={handleConnect}>Connect Wallet</button>
+      )}
+    </div>
   );
 }
 ```
 
----
-
-## 🌐 Backend Setup (Optional)
-
-If you want to track passkey registrations on your backend:
+### Next.js Integration
 
 ```typescript
-// Backend endpoint example (Express.js)
-app.post('/passkey/register/options', async (req, res) => {
-  const { userId, userName } = req.body;
+// app/providers.tsx
+'use client';
 
-  const options = {
-    challenge: generateRandomChallenge(),
-    rp: {
-      name: 'My DApp',
-      id: 'myapp.com',
-    },
-    user: {
-      id: userId,
-      name: userName,
-      displayName: userName,
-    },
-    pubKeyCredParams: [
-      { alg: -7, type: 'public-key' }, // ES256
-      { alg: -257, type: 'public-key' }, // RS256
-    ],
-    authenticatorSelection: {
-      authenticatorAttachment: 'platform',
-      requireResidentKey: false,
-      userVerification: 'required',
-    },
-  };
+import { WalletSDK } from '@arc/wallet-sdk';
+import { createContext, useContext, ReactNode } from 'react';
 
-  res.json(options);
-});
-```
+const WalletContext = createContext<WalletSDK | null>(null);
 
----
-
-## 📖 Examples
-
-### Send USDC
-
-```typescript
-import { parseUnits } from 'ethers';
-
-// USDC has 6 decimals
-const amount = parseUnits('10', 6); // 10 USDC
-
-const result = await sdk.signTransaction({
-  to: '0xRecipientAddress',
-  value: amount.toString(),
-  data: '0x',
-});
-
-console.log('USDC sent:', result.hash);
-```
-
-### Call Smart Contract
-
-```typescript
-import { Interface } from 'ethers';
-
-// ERC20 transfer
-const iface = new Interface([
-  'function transfer(address to, uint256 amount) returns (bool)',
-]);
-
-const data = iface.encodeFunctionData('transfer', [
-  '0xRecipient',
-  parseUnits('10', 6),
-]);
-
-const result = await sdk.signTransaction({
-  to: '0xUSDCContractAddress',
-  value: '0',
-  data,
-});
-```
-
----
-
-## 🛠️ Advanced Usage
-
-### Custom Storage Provider
-
-```typescript
-import { WalletSDK, StorageProvider } from '@arc/wallet-sdk';
-
-class CustomStorage implements StorageProvider {
-  async set(key: string, value: any): Promise<void> {
-    // Your custom storage logic
-  }
-
-  async get<T>(key: string): Promise<T | null> {
-    // Your custom retrieval logic
-  }
-
-  async delete(key: string): Promise<void> {
-    // Your custom deletion logic
-  }
-
-  async clear(): Promise<void> {
-    // Your custom clear logic
-  }
+export function WalletProvider({ children }: { children: ReactNode }) {
+  const arc = new WalletSDK({
+    appName: 'My dApp',
+    rpId: process.env.NEXT_PUBLIC_RP_ID!,
+    rpcUrl: process.env.NEXT_PUBLIC_RPC_URL!
+  });
+  
+  return (
+    <WalletContext.Provider value={arc}>
+      {children}
+    </WalletContext.Provider>
+  );
 }
 
-// Use custom storage
-const sdk = new WalletSDK({
-  // ... config
-  storage: new CustomStorage(),
-});
+export function useWallet() {
+  const context = useContext(WalletContext);
+  if (!context) {
+    throw new Error('useWallet must be used within WalletProvider');
+  }
+  return context;
+}
 ```
 
----
+## 🛠️ Development
 
-## 🤝 Contributing
+### Build
 
-Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md).
+```bash
+npm run build
+```
 
----
+### Test
+
+```bash
+npm test
+```
+
+### Lint
+
+```bash
+npm run lint
+```
 
 ## 📄 License
 
-MIT © Arc Network
+MIT License - see [LICENSE](LICENSE) file for details
+
+## 🤝 Contributing
+
+Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md) first.
+
+## 📞 Support
+
+- **Documentation**: [docs.arc.network](https://docs.arc.network)
+- **Discord**: [discord.gg/arcnetwork](https://discord.gg/arcnetwork)
+- **Twitter**: [@ArcNetwork](https://twitter.com/ArcNetwork)
+- **Email**: support@arc.network
+
+## 🙏 Acknowledgments
+
+- [Circle CCTP](https://www.circle.com/en/cross-chain-transfer-protocol) - Cross-chain infrastructure
+- [ERC-4337](https://eips.ethereum.org/EIPS/eip-4337) - Account Abstraction standard
+- [WebAuthn](https://webauthn.io/) - Passkey authentication
 
 ---
 
-## 🔗 Links
-
-- [Documentation](https://docs.arc.network)
-- [GitHub](https://github.com/arcwallet/arc-wallet-sdk)
-- [NPM Package](https://www.npmjs.com/package/@arc/wallet-sdk)
-- [Arc Network](https://arc.network)
-
----
-
-## 💬 Support
-
-- Discord: [Join our community](https://discord.gg/arc)
-- Twitter: [@ArcNetwork](https://twitter.com/arcnetwork)
-- Email: support@arc.network
+**Built with ❤️ by the Arc Network team**

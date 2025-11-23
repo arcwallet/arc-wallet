@@ -1,106 +1,212 @@
 # Privacy Policy
 
-**Last Updated: November 22, 2025**
+**Last Updated: November 23, 2025**
 
-Arc Wallet is committed to protecting your privacy. This privacy policy explains how we handle your data.
+## Introduction
 
-## Overview
+Arc Wallet ("we," "our," or "us") is committed to protecting your privacy. This Privacy Policy explains how we handle information when you use the Arc Wallet SDK and related services.
 
-Arc Wallet is a **self-custodial wallet**, meaning:
-- You control your private keys
-- We do not have access to your funds
-- We cannot recover your wallet if you lose your seed phrase
+## Our Privacy-First Approach
 
-## Data We Collect
+Arc Wallet is designed with privacy as a core principle:
 
-### Information You Provide
-- **Email Address**: Used for magic link authentication (optional)
-- **Wallet Preferences**: Settings and configurations stored locally
+- **Self-Custodial**: You maintain complete control of your wallet and private keys
+- **No Seed Phrases**: We never generate, store, or have access to seed phrases
+- **Local Storage**: All sensitive data is stored locally on your device
+- **No Account Required**: No email, phone number, or personal information needed
+- **Minimal Data Collection**: We collect only what's necessary for the service to function
 
-### Automatically Collected Information
-- **Transaction Data**: Blockchain transactions are public and recorded on-chain
-- **Usage Analytics**: Anonymous usage statistics (if enabled)
-- **Error Reports**: Crash logs and error messages for debugging
+## Information We Do NOT Collect
 
-## How We Use Your Data
+We explicitly **DO NOT** collect:
 
-We use collected information to:
-- Provide wallet functionality and services
-- Authenticate users via magic links
-- Improve user experience and fix bugs
-- Comply with legal obligations
+- ❌ Seed phrases or mnemonic phrases
+- ❌ Private keys
+- ❌ Wallet passwords or PINs
+- ❌ Transaction history
+- ❌ Wallet balances
+- ❌ Personal identification information (unless voluntarily provided)
+- ❌ Browsing history
+- ❌ Location data
+- ❌ Device identifiers (beyond what's necessary for WebAuthn)
 
-## Data Storage
+## Information Stored Locally on Your Device
 
-### Local Storage
-- **Private Keys**: Encrypted and stored in your browser's localStorage
-- **Wallet Data**: Preferences and settings stored locally
-- **Session Data**: Temporary authentication tokens
+The following information is stored **locally** on your device and never transmitted to our servers:
 
-### Server Storage
-- **Email Addresses**: Stored for magic link authentication
-- **Session Keys**: Temporary authentication data (expires after use)
-- **Transaction History**: Retrieved from public blockchain, not stored by us
+### 1. Passkey Credentials
+- **What**: WebAuthn passkey credentials
+- **Where**: Device Secure Enclave (iOS Keychain, Android Keystore, or browser credential manager)
+- **Purpose**: Authenticate you to unlock your wallet
+- **Access**: Only you can access via biometric authentication
 
-## Data Sharing
+### 2. Encrypted Private Keys
+- **What**: Your Ethereum private keys, encrypted with non-extractable master keys
+- **Where**: Browser IndexedDB
+- **Purpose**: Sign transactions
+- **Encryption**: Protected by WebCrypto non-extractable AES-GCM keys
+- **Access**: Only accessible after passkey authentication
 
-We **do not sell or share** your personal information with third parties, except:
-- **Blockchain Networks**: Transaction data is public on blockchain
-- **Service Providers**: Email delivery (SendGrid), RPC providers
-- **Legal Requirements**: When required by law or legal process
+### 3. Wallet Metadata
+- **What**: Wallet address, creation date, public key
+- **Where**: Browser IndexedDB
+- **Purpose**: Display wallet information
+- **Sensitivity**: Public information only
 
-## Your Rights (GDPR/CCPA)
+## Information We May Collect
 
-You have the right to:
-- **Access**: Request a copy of your data
-- **Deletion**: Request deletion of your account and data
-- **Portability**: Export your data in a standard format
-- **Opt-Out**: Disable analytics and tracking
+### Optional Backend Services
 
-To exercise these rights, contact us at **privacy@example.com**.
+If you choose to use our optional backend services (e.g., passkey registration backup), we may collect:
 
-## Security
+1. **Passkey Registration Data**
+   - Passkey public key (not the private credential)
+   - User identifier (email or username, if provided)
+   - Registration timestamp
+   - **Purpose**: Enable passkey recovery across devices
+   - **Retention**: Until you delete your account
 
-We implement industry-standard security measures:
-- **Encryption**: AES-256-GCM for wallet encryption
-- **HTTPS**: All communications are encrypted
-- **Passkeys**: WebAuthn support for enhanced security
-- **No Server-Side Keys**: We never store your private keys
+2. **Usage Analytics** (Optional, Opt-In Only)
+   - SDK version
+   - Network interactions (RPC calls)
+   - Error logs (anonymized)
+   - **Purpose**: Improve SDK performance and reliability
+   - **Opt-Out**: Available in SDK configuration
+
+### Blockchain Transactions
+
+When you send transactions:
+
+- **Public Information**: All blockchain transactions are public and permanently recorded on the blockchain
+- **What's Public**: Wallet addresses, transaction amounts, timestamps, smart contract interactions
+- **What's Private**: Your identity is not linked to your wallet address unless you choose to reveal it
 
 ## Third-Party Services
 
-Arc Wallet integrates with:
-- **RPC Providers**: For blockchain data (Arc Network, Ethereum)
-- **SendGrid**: For email delivery
-- **Circle**: For bridging functionality (optional)
+### Circle CCTP (Cross-Chain Transfer Protocol)
 
-Each service has its own privacy policy.
+When using CCTP for cross-chain transfers:
+
+- **Service**: Circle's attestation service
+- **Data Shared**: Transaction hash, message hash
+- **Purpose**: Verify cross-chain transfers
+- **Privacy**: No personal information shared
+- **Policy**: [Circle Privacy Policy](https://www.circle.com/en/legal/privacy-policy)
+
+### RPC Providers
+
+When interacting with blockchains:
+
+- **Service**: RPC node providers (configurable)
+- **Data Shared**: Transaction data, wallet addresses (public blockchain data)
+- **Purpose**: Submit transactions to blockchain
+- **Privacy**: Use your own RPC node for maximum privacy
+
+### Paymaster Services (Optional)
+
+When using gasless transactions:
+
+- **Service**: Paymaster service (if enabled)
+- **Data Shared**: UserOperation data, wallet address
+- **Purpose**: Sponsor transaction gas fees
+- **Privacy**: Only transaction-related data, no personal information
+
+## Data Security
+
+### Security Measures
+
+1. **Non-Extractable Keys**
+   - Master encryption keys cannot be exported from WebCrypto
+   - Keys never leave the browser's cryptographic module
+
+2. **Hardware-Backed Security**
+   - Passkeys stored in device Secure Enclave when available
+   - Biometric authentication required for access
+
+3. **Encryption**
+   - All private keys encrypted with AES-GCM 256-bit encryption
+   - Unique encryption keys per wallet
+
+4. **Browser Sandbox**
+   - All cryptographic operations isolated in browser sandbox
+   - Protection against memory extraction attacks
+
+5. **No Server-Side Keys**
+   - We never have access to your private keys
+   - Self-custodial architecture ensures you're always in control
+
+## Your Rights
+
+You have the right to:
+
+1. **Access**: View all data stored locally in your browser
+2. **Delete**: Permanently delete your wallet and all associated data
+3. **Export**: Export your wallet (public information only)
+4. **Opt-Out**: Disable optional analytics and backend services
+5. **Control**: Full control over your private keys and transactions
+
+## Data Retention
+
+### Local Data
+- **Retention**: Indefinitely, until you delete your wallet
+- **Deletion**: Permanent and immediate when you delete your wallet
+
+### Backend Data (if using optional services)
+- **Retention**: Until you request deletion
+- **Deletion**: Within 30 days of deletion request
 
 ## Children's Privacy
 
-Arc Wallet is not intended for users under 18 years of age. We do not knowingly collect data from children.
+Arc Wallet is not intended for users under 18 years of age. We do not knowingly collect information from children.
 
 ## International Users
 
-Arc Wallet is available globally. By using our service, you consent to data transfer to the United States and other countries where our servers are located.
+Arc Wallet is designed to work globally. Your data is stored locally on your device, regardless of your location.
+
+If you use our optional backend services:
+- Data may be processed in the United States
+- We comply with applicable data protection laws
+- GDPR rights apply to EU users
 
 ## Changes to This Policy
 
-We may update this privacy policy from time to time. We will notify users of significant changes via email or in-app notification.
+We may update this Privacy Policy from time to time. We will notify you of any material changes by:
+
+- Updating the "Last Updated" date
+- Displaying a notice in the SDK
+- Sending an email (if you've provided one)
+
+Continued use of Arc Wallet after changes constitutes acceptance of the updated policy.
+
+## Open Source
+
+Arc Wallet SDK is open source. You can:
+
+- Review our code on [GitHub](https://github.com/arcwallet/arc-wallet)
+- Verify our privacy claims
+- Contribute to improvements
+- Self-host if desired
 
 ## Contact Us
 
-For privacy-related questions or concerns:
-- **Email**: privacy@example.com
-- **GitHub**: Open an issue in our repository
+If you have questions about this Privacy Policy:
 
-## Compliance
+- **Email**: privacy@arc.network
+- **GitHub**: [github.com/arcwallet/arc-wallet/issues](https://github.com/arcwallet/arc-wallet/issues)
+- **Discord**: [discord.gg/arcnetwork](https://discord.gg/arcnetwork)
 
-Arc Wallet complies with:
-- **GDPR** (General Data Protection Regulation - EU)
-- **CCPA** (California Consumer Privacy Act - US)
-- **SOC 2** (Security and privacy controls)
+## Transparency
+
+We believe in radical transparency:
+
+- ✅ Open source code
+- ✅ No hidden data collection
+- ✅ Clear documentation
+- ✅ Self-custodial design
+- ✅ Privacy by default
+
+**Your privacy is not a feature—it's a fundamental right.**
 
 ---
 
-**Note**: This is a template privacy policy. Please consult with legal counsel to ensure compliance with all applicable laws and regulations in your jurisdiction.
+**Arc Wallet - Privacy-First, Self-Custodial, Open Source**
