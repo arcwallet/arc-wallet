@@ -1,14 +1,15 @@
 /**
- * Self-Custodial Wallet Context
+ * Self-Custodial Wallet Context - WebAuthn/Passkey Edition
  *
  * SECURITY: Private keys are generated and stored ONLY on client-side
  * Backend NEVER sees or stores private keys
  *
  * Flow:
- * 1. User creates wallet → Key generated locally → Encrypted with password
- * 2. User authenticates with passkey → Backend verifies identity
- * 3. User unlocks wallet → Decrypts local key with password
- * 4. Transactions signed locally → Only signed tx sent to backend
+ * 1. User creates wallet → Passkey created → Key generated locally → Encrypted with passkey
+ * 2. User unlocks wallet → Authenticates with biometrics → Key decrypted in-memory
+ * 3. Transactions signed locally → Only signed tx sent to network
+ *
+ * NO SEED PHRASES - Uses WebAuthn (FaceID/TouchID/Device Passcode)
  */
 
 import React, {
@@ -20,23 +21,9 @@ import React, {
   useState,
   ReactNode,
 } from 'react';
-import { passkeyClient, PasskeyClientError } from '../services/passkeyClient';
-import { createRegistrationCredential, createAuthenticationCredential } from '../utils/webauthn';
+import { WalletSDK } from '@arc/wallet-sdk';
+import type { WalletAccount } from '@arc/wallet-sdk';
 import { useSession } from './SessionContext';
-import {
-  generateWallet,
-  encryptWallet,
-  decryptWallet,
-  saveEncryptedWallet,
-  loadEncryptedWallet,
-  hasStoredWallet,
-  deleteStoredWallet,
-  importFromMnemonic,
-  importFromPrivateKey,
-  isValidMnemonic,
-  isValidPrivateKey,
-  WalletData,
-} from '../services/cryptoService';
 
 // Types
 export interface SelfCustodialWalletContextValue {
@@ -45,383 +32,289 @@ export interface SelfCustodialWalletContextValue {
   isUnlocked: boolean;
   isConnecting: boolean;
   hasWallet: boolean;
-  needsBackup: boolean;
+  needsBackup: boolean; // Always false now (no seed phrases)
   address: string | null;
   userId: string | null;
 
-  // Wallet creation/import
-  createWallet: (password: string) => Promise<{ address: string; mnemonic: string }>;
-  importWallet: (input: string, password: string) => Promise<string>;
+  // Wallet creation (no password needed!)
+  createWallet: (userName: string) => Promise<{ address: string }>;
 
-  // Authentication
-  loginWithPasskey: () => Promise<void>;
-  registerPasskey: () => Promise<void>;
-  isPasskeyEnabled: boolean;
-  togglePasskey: (enabled: boolean) => void;
-
-  // Wallet access
-  unlockWallet: (password: string) => Promise<void>;
+  // Authentication with biometrics
+  unlockWallet: () => Promise<void>;
   lockWallet: () => void;
+
+  // Signing
   getPrivateKey: () => string | null;
+  signTransaction: (tx: any) => Promise<string>;
+  signMessage: (message: string) => Promise<string>;
 
   // Management
   logout: () => void;
-  deleteWallet: () => void;
-  changePassword: (oldPassword: string, newPassword: string) => Promise<void>;
-  markBackedUp: () => void;
-  getMnemonic: () => string | null;
+  deleteWallet: () => Promise<void>;
+
+  // SDK instance for advanced usage
+  sdk: WalletSDK | null;
 }
 
 const SelfCustodialWalletContext = createContext<SelfCustodialWalletContextValue | undefined>(undefined);
 
 // Storage keys
 const USER_ID_KEY = 'arcwallet:user-id';
-const AUTH_STATE_KEY = 'arcwallet:auth-state';
-const BACKUP_FLAG_KEY = 'arcwallet:needs-backup';
+const HAS_WALLET_KEY = 'arcwallet:has-wallet';
+const WALLET_ADDRESS_KEY = 'arcwallet:wallet-address';
+
+// Initialize SDK
+const initializeSDK = (): WalletSDK => {
+  return new WalletSDK({
+    appName: 'Arc Wallet',
+    rpId: typeof window !== 'undefined' ? window.location.hostname : 'localhost',
+    rpcUrl: 'https://rpc.testnet.arc.network',
+    backendUrl: 'http://localhost:4000',
+    theme: 'dark',
+  });
+};
 
 export const SelfCustodialWalletProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   // Core state
+  const [sdk] = useState<WalletSDK>(() => {
+    if (typeof window === 'undefined') return null as any;
+    return initializeSDK();
+  });
+
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [hasWallet, setHasWallet] = useState(false);
-  const [needsBackup, setNeedsBackup] = useState(false);
   const [address, setAddress] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
-
-  // In-memory only (cleared on lock/logout)
-  const [privateKey, setPrivateKey] = useState<string | null>(null);
-  const [mnemonic, setMnemonic] = useState<string | null>(null);
+  const [currentAccount, setCurrentAccount] = useState<WalletAccount | null>(null);
 
   const { currentEmail } = useSession();
 
-  // Initialize on mount
+  // Initialize on mount - check for existing wallet
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined' || !sdk) return;
 
-    // Check for existing wallet
-    setHasWallet(hasStoredWallet());
+    // Check if wallet exists in storage
+    const hasWalletStored = localStorage.getItem(HAS_WALLET_KEY) === 'true';
+    setHasWallet(hasWalletStored);
 
-    // Check backup flag
-    const backupFlag = localStorage.getItem(BACKUP_FLAG_KEY);
-    setNeedsBackup(backupFlag === 'true');
+    // Restore address if available
+    const storedAddress = localStorage.getItem(WALLET_ADDRESS_KEY);
+    if (storedAddress) {
+      setAddress(storedAddress);
+    }
 
     // Restore user ID
     const storedUserId = localStorage.getItem(USER_ID_KEY);
     if (storedUserId) {
       setUserId(storedUserId);
     }
+  }, [sdk]);
 
-    // Check auth state
-    const authState = sessionStorage.getItem(AUTH_STATE_KEY);
-    if (authState) {
-      try {
-        const parsed = JSON.parse(authState);
-        setIsAuthenticated(parsed.isAuthenticated);
-        setAddress(parsed.address);
-      } catch { }
-    }
-  }, []);
-
-
-
-  // Create new wallet (generates key locally)
-  const createWallet = useCallback(async (password: string): Promise<{ address: string; mnemonic: string }> => {
-    setIsConnecting(true);
-
-    try {
-      // Generate wallet locally - NEVER sent to backend
-      const walletData = generateWallet();
-
-      if (!walletData.mnemonic) {
-        throw new Error('Failed to generate mnemonic');
-      }
-
-      // Encrypt and save locally
-      const encrypted = await encryptWallet(walletData, password);
-      saveEncryptedWallet(encrypted);
-
-      // Update state
-      setAddress(walletData.address);
-      setPrivateKey(walletData.privateKey);
-      setMnemonic(walletData.mnemonic);
-      setHasWallet(true);
-      setIsUnlocked(true);
-      setNeedsBackup(true);
-
-      // Save backup flag
-      localStorage.setItem(BACKUP_FLAG_KEY, 'true');
-
-      return {
-        address: walletData.address,
-        mnemonic: walletData.mnemonic,
-      };
-    } finally {
-      setIsConnecting(false);
-    }
-  }, []);
-
-  // Import wallet from mnemonic or private key
-  const importWallet = useCallback(async (input: string, password: string): Promise<string> => {
-    setIsConnecting(true);
-
-    try {
-      let walletData: WalletData;
-      const trimmed = input.trim();
-
-      if (isValidMnemonic(trimmed)) {
-        walletData = importFromMnemonic(trimmed);
-      } else if (isValidPrivateKey(trimmed)) {
-        walletData = importFromPrivateKey(trimmed);
-      } else {
-        throw new Error('Invalid private key or mnemonic');
-      }
-
-      // Encrypt and save locally
-      const encrypted = await encryptWallet(walletData, password);
-      saveEncryptedWallet(encrypted);
-
-      // Update state
-      setAddress(walletData.address);
-      setPrivateKey(walletData.privateKey);
-      setMnemonic(walletData.mnemonic || null);
-      setHasWallet(true);
-      setIsUnlocked(true);
-      setNeedsBackup(false);
-
-      localStorage.removeItem(BACKUP_FLAG_KEY);
-
-      return walletData.address;
-    } finally {
-      setIsConnecting(false);
-    }
-  }, []);
-
-  // Login with passkey (internal)
-  const loginWithPasskeyInternal = useCallback(async () => {
-    const startResp = await passkeyClient.beginAuthentication(currentEmail || undefined);
-    const options = startResp.data?.options;
-    const credential = await createAuthenticationCredential(options);
-    const finishResp = await passkeyClient.finishAuthentication(credential);
-
-    const responseData = finishResp.data as { user?: { id: string; username: string; displayName: string } } | undefined;
-    const user = responseData?.user;
-    if (user?.id) {
-      localStorage.setItem(USER_ID_KEY, user.id);
-      setUserId(user.id);
-    }
-
-    setIsAuthenticated(true);
-
-    // Check if we need to restore wallet from backend
-    if (!hasStoredWallet()) {
-      try {
-        const backupResp = await fetch('/api/wallet/backup');
-        if (backupResp.ok) {
-          const { encryptedWallet } = await backupResp.json();
-          if (encryptedWallet) {
-            // Restore to local storage
-            const parsed = JSON.parse(encryptedWallet);
-            saveEncryptedWallet(parsed);
-            setHasWallet(true);
-            // Note: Wallet is still locked, user needs to enter password
-          }
-        }
-      } catch (error) {
-        console.error('Failed to restore wallet backup:', error);
-      }
-    }
-
-    // Save auth state
-    sessionStorage.setItem(AUTH_STATE_KEY, JSON.stringify({
-      isAuthenticated: true,
-      address, // Might be null if just restored
-    }));
-  }, [address, currentEmail]);
-
-  // Register passkey (for identity, not wallet)
-  const registerPasskey = useCallback(async () => {
-    if (!address) {
-      throw new Error('Create or import a wallet first');
-    }
-
-    setIsConnecting(true);
-
-    try {
-      const username = currentEmail || `user-${address.slice(0, 8)}`;
-      const displayName = currentEmail || username;
-
-      // Register passkey with backend
-      const startResp = await passkeyClient.beginRegistration(username, displayName);
-      const options = startResp.data?.options;
-      const credential = await createRegistrationCredential(options);
-      const finishResp = await passkeyClient.finishRegistration(username, credential);
-
-      // Get user ID from backend
-      const responseData = finishResp.data as { user?: { id: string; username: string; displayName: string } } | undefined;
-      const user = responseData?.user;
-      if (user?.id) {
-        localStorage.setItem(USER_ID_KEY, user.id);
-        setUserId(user.id);
-      }
-
-      setIsAuthenticated(true);
-
-      // Save auth state
-      sessionStorage.setItem(AUTH_STATE_KEY, JSON.stringify({
-        isAuthenticated: true,
-        address,
-      }));
-
-    } catch (error) {
-      if (error instanceof PasskeyClientError && error.status === 400) {
-        // Already registered, try to authenticate
-        await loginWithPasskeyInternal();
-        return;
-      }
-      throw error;
-    } finally {
-      setIsConnecting(false);
-    }
-  }, [address, currentEmail, loginWithPasskeyInternal]);
-
-  // Passkey settings
-  const [isPasskeyEnabled, setIsPasskeyEnabled] = useState(true);
-
-  // Load passkey setting
+  // Setup SDK event listeners
   useEffect(() => {
-    const stored = localStorage.getItem('arcwallet:passkey-enabled');
-    if (stored !== null) {
-      setIsPasskeyEnabled(stored === 'true');
-    }
-  }, []);
+    if (!sdk) return;
 
-  const togglePasskey = useCallback((enabled: boolean) => {
-    setIsPasskeyEnabled(enabled);
-    localStorage.setItem('arcwallet:passkey-enabled', String(enabled));
-  }, []);
-
-  // Login with passkey (public)
-  const loginWithPasskey = useCallback(async () => {
-    // If passkey is disabled, we just skip the passkey check and rely on local wallet unlock
-    if (!isPasskeyEnabled) {
-      setIsAuthenticated(true);
-      sessionStorage.setItem(AUTH_STATE_KEY, JSON.stringify({
-        isAuthenticated: true,
-        address,
-      }));
-      return;
-    }
-
-    setIsConnecting(true);
-
-    try {
-      await loginWithPasskeyInternal();
-    } catch (error) {
-      if (error instanceof PasskeyClientError && error.status === 404) {
-        // No passkey registered, need to register first
-        throw new Error('No passkey found. Please register a passkey first.');
-      }
-      throw error;
-    } finally {
-      setIsConnecting(false);
-    }
-  }, [loginWithPasskeyInternal, isPasskeyEnabled, address]);
-
-  // Unlock wallet with password
-  const unlockWallet = useCallback(async (password: string) => {
-    setIsConnecting(true);
-
-    try {
-      const encrypted = loadEncryptedWallet();
-      if (!encrypted) {
-        throw new Error('No wallet found');
-      }
-
-      const walletData = await decryptWallet(encrypted, password);
-
-      setAddress(walletData.address);
-      setPrivateKey(walletData.privateKey);
-      setMnemonic(walletData.mnemonic || null);
+    const handleConnect = (payload: { address: string }) => {
+      console.log('[Wallet] Connected:', payload.address);
       setIsUnlocked(true);
+      setAddress(payload.address);
+      setIsAuthenticated(true);
+      localStorage.setItem(WALLET_ADDRESS_KEY, payload.address);
+    };
 
-      // Update auth state with address
-      if (isAuthenticated) {
-        sessionStorage.setItem(AUTH_STATE_KEY, JSON.stringify({
-          isAuthenticated: true,
-          address: walletData.address,
-        }));
-      }
+    const handleDisconnect = () => {
+      console.log('[Wallet] Disconnected');
+      setIsUnlocked(false);
+    };
+
+    const handleError = (payload: { message: string; code: string }) => {
+      console.error('[Wallet] Error:', payload);
+    };
+
+    sdk.on('connect', handleConnect);
+    sdk.on('disconnect', handleDisconnect);
+    sdk.on('error', handleError);
+
+    return () => {
+      sdk.off('connect', handleConnect);
+      sdk.off('disconnect', handleDisconnect);
+      sdk.off('error', handleError);
+    };
+  }, [sdk]);
+
+  // Create new wallet with passkey (NO PASSWORD!)
+  const createWallet = useCallback(async (userName: string): Promise<{ address: string }> => {
+    if (!sdk) throw new Error('SDK not initialized');
+
+    setIsConnecting(true);
+
+    try {
+      console.log('[Wallet] Creating new wallet with passkey...');
+
+      // Generate unique user ID
+      const userId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const displayName = userName || currentEmail || userId;
+
+      // Create wallet with passkey - This will:
+      // 1. Prompt user for biometric authentication
+      // 2. Create passkey in device's Secure Enclave
+      // 3. Generate Ethereum wallet
+      // 4. Encrypt private key with passkey-derived key
+      // 5. Store encrypted key in IndexedDB
+      const account = await sdk.createWallet(userId, displayName);
+
+      console.log('[Wallet] Wallet created successfully:', account.address);
+
+      // Update state
+      setCurrentAccount(account);
+      setAddress(account.address);
+      setHasWallet(true);
+      setIsUnlocked(true);
+      setIsAuthenticated(true);
+      setUserId(userId);
+
+      // Persist wallet existence
+      localStorage.setItem(HAS_WALLET_KEY, 'true');
+      localStorage.setItem(WALLET_ADDRESS_KEY, account.address);
+      localStorage.setItem(USER_ID_KEY, userId);
+
+      return { address: account.address };
     } catch (error: any) {
-      if (error.name === 'OperationError') {
-        throw new Error('Incorrect password');
-      }
-      throw error;
+      console.error('[Wallet] Creation failed:', error);
+      throw new Error(error.message || 'Failed to create wallet');
     } finally {
       setIsConnecting(false);
     }
-  }, [isAuthenticated]);
+  }, [sdk, currentEmail]);
 
-  // Lock wallet (clear sensitive data)
+  // Unlock wallet with passkey (biometric authentication)
+  const unlockWallet = useCallback(async () => {
+    if (!sdk) throw new Error('SDK not initialized');
+
+    setIsConnecting(true);
+
+    try {
+      console.log('[Wallet] Unlocking wallet with passkey...');
+
+      // Connect with passkey - This will:
+      // 1. Prompt user for biometric authentication
+      // 2. Verify passkey with device
+      // 3. Derive encryption key from passkey
+      // 4. Decrypt private key from IndexedDB
+      // 5. Load wallet into memory
+      const account = await sdk.connect();
+
+      console.log('[Wallet] Wallet unlocked:', account.address);
+
+      // Update state
+      setCurrentAccount(account);
+      setAddress(account.address);
+      setIsUnlocked(true);
+      setIsAuthenticated(true);
+
+      // Update stored address in case it changed
+      localStorage.setItem(WALLET_ADDRESS_KEY, account.address);
+    } catch (error: any) {
+      console.error('[Wallet] Unlock failed:', error);
+      throw new Error(error.message || 'Failed to unlock wallet. Please try again.');
+    } finally {
+      setIsConnecting(false);
+    }
+  }, [sdk]);
+
+  // Lock wallet (clear from memory)
   const lockWallet = useCallback(() => {
-    setPrivateKey(null);
-    setMnemonic(null);
-    setIsUnlocked(false);
-  }, []);
+    if (!sdk) return;
 
-  // Get private key (only when unlocked)
+    console.log('[Wallet] Locking wallet...');
+    sdk.disconnect();
+    setIsUnlocked(false);
+    setCurrentAccount(null);
+  }, [sdk]);
+
+  // Get private key (only when unlocked) - for signing transactions
   const getPrivateKey = useCallback((): string | null => {
-    if (!isUnlocked) return null;
-    return privateKey;
-  }, [isUnlocked, privateKey]);
+    // Note: SDK keeps private key in memory only when unlocked
+    // We don't expose it directly for security reasons
+    // Use signTransaction or signMessage instead
+    if (!isUnlocked || !currentAccount) return null;
 
-  // Get mnemonic (only when unlocked)
-  const getMnemonic = useCallback((): string | null => {
-    if (!isUnlocked) return null;
-    return mnemonic;
-  }, [isUnlocked, mnemonic]);
+    // For backwards compatibility, return a placeholder
+    // Components should use signTransaction/signMessage instead
+    return 'PRIVATE_KEY_MANAGED_BY_SDK';
+  }, [isUnlocked, currentAccount]);
 
-  // Logout (clear auth but keep wallet)
+  // Sign transaction with SDK
+  const signTransaction = useCallback(async (tx: any): Promise<string> => {
+    if (!sdk) throw new Error('SDK not initialized');
+    if (!isUnlocked) throw new Error('Wallet is locked. Please unlock first.');
+
+    try {
+      console.log('[Wallet] Signing transaction...');
+      const result = await sdk.signTransaction(tx);
+      console.log('[Wallet] Transaction signed:', result.hash);
+      return result.hash;
+    } catch (error: any) {
+      console.error('[Wallet] Transaction signing failed:', error);
+      throw error;
+    }
+  }, [sdk, isUnlocked]);
+
+  // Sign message with SDK
+  const signMessage = useCallback(async (message: string): Promise<string> => {
+    if (!sdk) throw new Error('SDK not initialized');
+    if (!isUnlocked) throw new Error('Wallet is locked. Please unlock first.');
+
+    try {
+      console.log('[Wallet] Signing message...');
+      const signature = await sdk.signMessage(message);
+      console.log('[Wallet] Message signed');
+      return signature;
+    } catch (error: any) {
+      console.error('[Wallet] Message signing failed:', error);
+      throw error;
+    }
+  }, [sdk, isUnlocked]);
+
+  // Logout (lock wallet and clear auth state)
   const logout = useCallback(() => {
+    console.log('[Wallet] Logging out...');
+    lockWallet();
     setIsAuthenticated(false);
-    setIsUnlocked(false);
-    setPrivateKey(null);
-    setMnemonic(null);
-    sessionStorage.removeItem(AUTH_STATE_KEY);
-  }, []);
+  }, [lockWallet]);
 
   // Delete wallet completely
-  const deleteWallet = useCallback(() => {
-    deleteStoredWallet();
-    localStorage.removeItem(BACKUP_FLAG_KEY);
-    setAddress(null);
-    setPrivateKey(null);
-    setMnemonic(null);
-    setIsUnlocked(false);
-    setHasWallet(false);
-    setNeedsBackup(false);
-  }, []);
+  const deleteWallet = useCallback(async () => {
+    if (!sdk) throw new Error('SDK not initialized');
 
-  // Change password
-  const changePassword = useCallback(async (oldPassword: string, newPassword: string) => {
-    const encrypted = loadEncryptedWallet();
-    if (!encrypted) {
-      throw new Error('No wallet found');
+    try {
+      console.log('[Wallet] Deleting wallet...');
+
+      if (isUnlocked) {
+        await sdk.deleteWallet();
+      }
+
+      // Clear all storage
+      localStorage.removeItem(HAS_WALLET_KEY);
+      localStorage.removeItem(WALLET_ADDRESS_KEY);
+      localStorage.removeItem(USER_ID_KEY);
+
+      // Reset state
+      setAddress(null);
+      setCurrentAccount(null);
+      setIsUnlocked(false);
+      setHasWallet(false);
+      setIsAuthenticated(false);
+      setUserId(null);
+
+      console.log('[Wallet] Wallet deleted successfully');
+    } catch (error: any) {
+      console.error('[Wallet] Delete failed:', error);
+      throw error;
     }
-
-    // Decrypt with old password
-    const walletData = await decryptWallet(encrypted, oldPassword);
-
-    // Re-encrypt with new password
-    const newEncrypted = await encryptWallet(walletData, newPassword);
-    saveEncryptedWallet(newEncrypted);
-  }, []);
-
-  // Mark as backed up
-  const markBackedUp = useCallback(() => {
-    setNeedsBackup(false);
-    localStorage.removeItem(BACKUP_FLAG_KEY);
-  }, []);
+  }, [sdk, isUnlocked]);
 
   // Context value
   const value = useMemo<SelfCustodialWalletContextValue>(() => ({
@@ -429,45 +322,34 @@ export const SelfCustodialWalletProvider: React.FC<{ children: ReactNode }> = ({
     isUnlocked,
     isConnecting,
     hasWallet,
-    needsBackup,
+    needsBackup: false, // No seed phrases, so no backup needed
     address,
     userId,
-    isPasskeyEnabled,
     createWallet,
-    importWallet,
-    loginWithPasskey,
-    registerPasskey,
     unlockWallet,
     lockWallet,
     getPrivateKey,
+    signTransaction,
+    signMessage,
     logout,
     deleteWallet,
-    changePassword,
-    markBackedUp,
-    getMnemonic,
-    togglePasskey,
+    sdk,
   }), [
     isAuthenticated,
     isUnlocked,
     isConnecting,
     hasWallet,
-    needsBackup,
     address,
     userId,
-    isPasskeyEnabled,
     createWallet,
-    importWallet,
-    loginWithPasskey,
-    registerPasskey,
     unlockWallet,
     lockWallet,
     getPrivateKey,
+    signTransaction,
+    signMessage,
     logout,
     deleteWallet,
-    changePassword,
-    markBackedUp,
-    getMnemonic,
-    togglePasskey,
+    sdk,
   ]);
 
   return (

@@ -1,6 +1,7 @@
 /**
- * Unlock Wallet Component
- * Password entry to decrypt local wallet
+ * Unlock Wallet Component - Passkey Edition
+ * Biometric authentication to unlock wallet
+ * NO PASSWORDS
  */
 
 import React, { useState } from 'react';
@@ -17,40 +18,46 @@ interface UnlockWalletProps {
 const UnlockWallet: React.FC<UnlockWalletProps> = ({ onUnlock, onReset }) => {
   const { unlockWallet, address, deleteWallet } = useSelfCustodialWallet();
 
-  const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [showReset, setShowReset] = useState(false);
 
   const handleUnlock = async () => {
-    if (!password) {
-      setError('Please enter your password');
-      return;
-    }
-
     setIsLoading(true);
     setError(null);
 
     try {
-      await unlockWallet(password);
+      console.log('[UnlockWallet] Unlocking with biometric...');
+      await unlockWallet();
+      console.log('[UnlockWallet] Unlock successful');
       onUnlock();
     } catch (err: any) {
-      setError(err.message || 'Failed to unlock wallet');
+      console.error('[UnlockWallet] Unlock failed:', err);
+
+      // Handle specific errors
+      if (err.message?.includes('User cancelled') || err.message?.includes('cancelled')) {
+        setError('Biometric authentication was cancelled. Please try again.');
+      } else if (err.message?.includes('not supported')) {
+        setError('Your device does not support biometric authentication.');
+      } else if (err.message?.includes('not available')) {
+        setError('Biometric authentication is not available. Please enable it in your device settings.');
+      } else {
+        setError(err.message || 'Failed to unlock wallet. Please try again.');
+      }
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleUnlock();
-    }
-  };
-
-  const handleReset = () => {
-    if (window.confirm('Are you sure you want to reset your wallet? This will delete your encrypted wallet. You will need your seed phrase to recover.')) {
-      deleteWallet();
-      onReset?.();
+  const handleReset = async () => {
+    if (window.confirm('Are you sure you want to reset your wallet? This will delete your encrypted wallet permanently. This action cannot be undone.')) {
+      try {
+        await deleteWallet();
+        onReset?.();
+      } catch (error) {
+        console.error('[UnlockWallet] Reset failed:', error);
+        setError('Failed to reset wallet. Please try again.');
+      }
     }
   };
 
@@ -85,24 +92,26 @@ const UnlockWallet: React.FC<UnlockWalletProps> = ({ onUnlock, onReset }) => {
               Unlock Wallet
             </h2>
             <p className="text-slate-400 text-lg">
-              Enter your password to access <span className="font-mono text-blue-400">{shortAddress}</span>
+              Use biometric authentication to access <span className="font-mono text-blue-400">{shortAddress}</span>
             </p>
           </div>
 
-          {/* Password Input */}
+          {/* Unlock Section */}
           <div className="space-y-6">
-            <div className="group">
-              <div className="relative">
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  placeholder="Enter password"
-                  autoFocus
-                  className="w-full bg-slate-900/60 border border-slate-500/50 rounded-lg px-4 py-4 text-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 transition-all backdrop-blur-sm"
-                />
-                <div className="absolute inset-0 rounded-lg bg-blue-500/5 opacity-0 group-focus-within:opacity-100 pointer-events-none transition-opacity duration-500" />
+            {/* Biometric Info */}
+            <div className="p-6 rounded-lg bg-blue-900/20 border border-blue-500/50 backdrop-blur-sm">
+              <div className="flex items-start gap-3">
+                <svg className="w-6 h-6 text-blue-300 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4" />
+                </svg>
+                <div>
+                  <p className="text-sm text-blue-200 font-medium mb-1">
+                    Secure Authentication
+                  </p>
+                  <p className="text-sm text-blue-200/80">
+                    Your wallet is protected by your device's biometric authentication (FaceID, TouchID, or device passcode).
+                  </p>
+                </div>
               </div>
             </div>
 
@@ -115,9 +124,24 @@ const UnlockWallet: React.FC<UnlockWalletProps> = ({ onUnlock, onReset }) => {
             <button
               onClick={handleUnlock}
               disabled={isLoading}
-              className="w-full bg-slate-200 hover:bg-white text-slate-900 font-medium text-lg py-3.5 rounded-lg transition-all duration-200 shadow-[0_0_20px_rgba(255,255,255,0.1)] hover:shadow-[0_0_30px_rgba(255,255,255,0.2)] disabled:opacity-70 disabled:cursor-not-allowed"
+              className="w-full bg-slate-200 hover:bg-white text-slate-900 font-medium text-lg py-4 rounded-lg transition-all duration-200 shadow-[0_0_20px_rgba(255,255,255,0.1)] hover:shadow-[0_0_30px_rgba(255,255,255,0.2)] disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
-              {isLoading ? 'Unlocking...' : 'Unlock'}
+              {isLoading ? (
+                <>
+                  <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  <span>Authenticating...</span>
+                </>
+              ) : (
+                <>
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
+                  </svg>
+                  <span>Unlock with Biometric</span>
+                </>
+              )}
             </button>
 
             {/* Forgot Password Link */}
@@ -126,7 +150,7 @@ const UnlockWallet: React.FC<UnlockWalletProps> = ({ onUnlock, onReset }) => {
                 onClick={() => setShowReset(!showReset)}
                 className="text-sm text-slate-400 hover:text-blue-400 transition-colors"
               >
-                Forgot password?
+                Can't unlock your wallet?
               </button>
             </div>
 
@@ -134,7 +158,7 @@ const UnlockWallet: React.FC<UnlockWalletProps> = ({ onUnlock, onReset }) => {
             {showReset && (
               <div className="p-5 rounded-lg bg-red-900/20 border border-red-500/50 backdrop-blur-sm space-y-4">
                 <p className="text-sm text-red-200">
-                  If you forgot your password, you'll need to reset your wallet and import using your seed phrase.
+                  If you can't unlock your wallet, you'll need to reset it. This will permanently delete your encrypted wallet from this device.
                 </p>
                 <button
                   onClick={handleReset}
@@ -149,7 +173,7 @@ const UnlockWallet: React.FC<UnlockWalletProps> = ({ onUnlock, onReset }) => {
           {/* Security Note */}
           <div className="p-4 rounded-lg bg-slate-900/40 border border-slate-600/30 backdrop-blur-sm">
             <p className="text-xs text-slate-400 text-center leading-relaxed">
-              Your wallet is encrypted locally. We never have access to your password or private keys.
+              Your wallet is encrypted locally. We never have access to your private keys or biometric data.
             </p>
           </div>
         </div>

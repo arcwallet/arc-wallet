@@ -1,473 +1,58 @@
 /**
- * Wallet Setup Component
- * Self-custodial wallet creation and import
+ * Wallet Setup Component - Passkey Edition
+ * Self-custodial wallet creation with WebAuthn/Passkey
+ * NO PASSWORDS - NO SEED PHRASES
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useSelfCustodialWallet } from '../contexts/SelfCustodialWalletContext';
-
-import { validatePassword, getPasswordStrengthLabel, getPasswordStrengthColor } from '../utils/passwordValidation';
 import { WaveBackground } from './WaveBackground';
 import arcLogo from '../assets/arclogo.png';
 import { Footer } from './Footer';
-
-type SetupStep = 'choice' | 'create' | 'import' | 'backup';
 
 interface WalletSetupProps {
   onComplete: () => void;
 }
 
 const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
-  const {
-    createWallet,
-    importWallet,
-    needsBackup,
-    getMnemonic,
-    markBackedUp,
-    isConnecting
-  } = useSelfCustodialWallet();
+  const { createWallet, isConnecting } = useSelfCustodialWallet();
 
-  const [step, setStep] = useState<SetupStep>('choice');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [importInput, setImportInput] = useState('');
-  const [mnemonic, setMnemonic] = useState<string | null>(null);
+  const [userName, setUserName] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [showPassword, setShowPassword] = useState(false);
-  const [backupConfirmed, setBackupConfirmed] = useState(false);
-  const [passwordStrength, setPasswordStrength] = useState({ isValid: false, score: 0, feedback: [] as string[] });
+  const [isCreating, setIsCreating] = useState(false);
 
-  // Update password strength on password change
-  useEffect(() => {
-    if (password) {
-      setPasswordStrength(validatePassword(password));
-    } else {
-      setPasswordStrength({ isValid: false, score: 0, feedback: [] });
-    }
-  }, [password]);
-
-  // Check for existing mnemonic needing backup and URL errors
-  useEffect(() => {
-    if (needsBackup) {
-      const existingMnemonic = getMnemonic();
-      if (existingMnemonic) {
-        setMnemonic(existingMnemonic);
-        setStep('backup');
-      }
-    }
-
-    // Check for error in URL (e.g. from OAuth failure)
-    const params = new URLSearchParams(window.location.search);
-    const errorParam = params.get('error');
-    if (errorParam) {
-      setError(decodeURIComponent(errorParam));
-    }
-  }, [needsBackup, getMnemonic]);
-
-  // Handle wallet creation
+  // Handle wallet creation with passkey
   const handleCreate = async () => {
     setError(null);
 
-    if (!passwordStrength.isValid) {
-      setError('Password does not meet security requirements');
+    if (!userName.trim()) {
+      setError('Please enter your name');
       return;
     }
 
-    if (password !== confirmPassword) {
-      setError('Passwords do not match');
-      return;
-    }
+    setIsCreating(true);
 
     try {
-      const result = await createWallet(password);
-      if (result.mnemonic) {
-        setMnemonic(result.mnemonic);
-        setStep('backup');
-      }
-    } catch (err: any) {
-      setError(err.message || 'Failed to create wallet');
-    }
-  };
-
-  // Handle wallet import
-  const handleImport = async () => {
-    setError(null);
-
-    if (!importInput.trim()) {
-      setError('Please enter a seed phrase or private key');
-      return;
-    }
-
-    if (!passwordStrength.isValid) {
-      setError('Password does not meet security requirements');
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      setError('Passwords do not match');
-      return;
-    }
-
-    try {
-      await importWallet(importInput.trim(), password);
+      console.log('[WalletSetup] Creating wallet with passkey...');
+      await createWallet(userName.trim());
+      console.log('[WalletSetup] Wallet created successfully');
       onComplete();
     } catch (err: any) {
-      setError(err.message || 'Failed to import wallet');
+      console.error('[WalletSetup] Creation failed:', err);
+
+      // Handle specific WebAuthn errors
+      if (err.message?.includes('User cancelled') || err.message?.includes('cancelled')) {
+        setError('Biometric authentication was cancelled. Please try again.');
+      } else if (err.message?.includes('not supported')) {
+        setError('Your device does not support biometric authentication. Please use a compatible device.');
+      } else if (err.message?.includes('not available')) {
+        setError('Biometric authentication is not available. Please enable it in your device settings.');
+      } else {
+        setError(err.message || 'Failed to create wallet. Please try again.');
+      }
+      setIsCreating(false);
     }
   };
-
-  // Handle backup confirmation
-  const handleBackupConfirm = () => {
-    if (!backupConfirmed) {
-      setError('Please confirm you have saved your backup');
-      return;
-    }
-    markBackedUp();
-    onComplete();
-  };
-
-  // Render choice step
-  const renderChoice = () => (
-    <div className="space-y-8">
-      <div className="text-center space-y-4">
-        <h2 className="text-4xl font-light text-slate-100 tracking-tight drop-shadow-lg">
-          Setup Your Wallet
-        </h2>
-        <p className="text-slate-400 text-lg">
-          Your keys, your crypto. Create a new wallet or import an existing one.
-        </p>
-      </div>
-
-      <div className="space-y-4">
-        <button
-          onClick={() => setStep('create')}
-          className="w-full p-6 rounded-lg border border-slate-500/50 bg-slate-900/60 hover:border-blue-400 hover:bg-slate-900/80 transition-all backdrop-blur-sm text-left group"
-        >
-          <p className="font-semibold text-slate-100 text-lg mb-2">Create New Wallet</p>
-          <p className="text-sm text-slate-400 group-hover:text-slate-300 transition-colors">
-            Generate a new wallet with a secure seed phrase
-          </p>
-        </button>
-
-        <button
-          onClick={() => setStep('import')}
-          className="w-full p-6 rounded-lg border border-slate-500/50 bg-slate-900/60 hover:border-blue-400 hover:bg-slate-900/80 transition-all backdrop-blur-sm text-left group"
-        >
-          <p className="font-semibold text-slate-100 text-lg mb-2">Import Existing Wallet</p>
-          <p className="text-sm text-slate-400 group-hover:text-slate-300 transition-colors">
-            Restore using seed phrase or private key
-          </p>
-        </button>
-      </div>
-
-
-
-      <div className="p-4 rounded-lg bg-amber-900/20 border border-amber-500/50 backdrop-blur-sm">
-        <p className="text-sm text-amber-200">
-          <strong>Self-Custodial:</strong> Your private keys are encrypted and stored only on this device.
-          We never have access to your keys.
-        </p>
-      </div>
-    </div>
-  );
-
-  // Render create step
-  const renderCreate = () => (
-    <div className="space-y-8">
-      <div className="text-center space-y-4">
-        <h2 className="text-4xl font-light text-slate-100 tracking-tight drop-shadow-lg">
-          Create New Wallet
-        </h2>
-        <p className="text-slate-400 text-lg">
-          Set a strong password to encrypt your wallet
-        </p>
-      </div>
-
-      <div className="space-y-6">
-        <div className="group">
-          <label className="block text-sm font-medium text-slate-400 mb-2">
-            Password
-          </label>
-          <div className="relative">
-            <input
-              type={showPassword ? "text" : "password"}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Minimum 8 characters"
-              className="w-full bg-slate-900/60 border border-slate-500/50 rounded-lg px-4 py-4 text-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 transition-all backdrop-blur-sm"
-            />
-            <div className="absolute inset-0 rounded-lg bg-blue-500/5 opacity-0 group-focus-within:opacity-100 pointer-events-none transition-opacity duration-500" />
-          </div>
-          {password && (
-            <div className="mt-3 space-y-2">
-              <div className="flex items-center gap-3">
-                <div className="flex-1 h-2 bg-slate-700/50 rounded-full overflow-hidden">
-                  <div
-                    className="h-full transition-all duration-300"
-                    style={{
-                      width: `${(passwordStrength.score / 4) * 100}%`,
-                      backgroundColor: getPasswordStrengthColor(passwordStrength.score)
-                    }}
-                  />
-                </div>
-                <span
-                  className="text-xs font-medium"
-                  style={{ color: getPasswordStrengthColor(passwordStrength.score) }}
-                >
-                  {getPasswordStrengthLabel(passwordStrength.score)}
-                </span>
-              </div>
-              {passwordStrength.feedback.length > 0 && (
-                <ul className="text-xs text-slate-400 space-y-1">
-                  {passwordStrength.feedback.map((msg, i) => (
-                    <li key={i}>• {msg}</li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          )}
-        </div>
-
-        <div className="group">
-          <label className="block text-sm font-medium text-slate-400 mb-2">
-            Confirm Password
-          </label>
-          <div className="relative">
-            <input
-              type={showPassword ? "text" : "password"}
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="Re-enter password"
-              className="w-full bg-slate-900/60 border border-slate-500/50 rounded-lg px-4 py-4 text-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 transition-all backdrop-blur-sm"
-            />
-            <div className="absolute inset-0 rounded-lg bg-blue-500/5 opacity-0 group-focus-within:opacity-100 pointer-events-none transition-opacity duration-500" />
-          </div>
-        </div>
-
-        <button
-          type="button"
-          onClick={() => setShowPassword(!showPassword)}
-          className="text-sm text-slate-400 hover:text-blue-400 transition-colors"
-        >
-          {showPassword ? 'Hide' : 'Show'} passwords
-        </button>
-
-        {error && (
-          <div className="p-3 rounded-lg backdrop-blur-sm border bg-red-900/20 border-red-500/50 text-red-200 text-center text-sm">
-            {error}
-          </div>
-        )}
-
-        <div className="flex gap-3 pt-2">
-          <button
-            onClick={() => setStep('choice')}
-            className="flex-1 bg-transparent border border-slate-500/50 text-slate-300 hover:text-white hover:border-slate-400 font-medium text-lg py-3.5 rounded-lg transition-all duration-200"
-          >
-            Back
-          </button>
-          <button
-            onClick={handleCreate}
-            disabled={isConnecting}
-            className="flex-1 bg-slate-200 hover:bg-white text-slate-900 font-medium text-lg py-3.5 rounded-lg transition-all duration-200 shadow-[0_0_20px_rgba(255,255,255,0.1)] hover:shadow-[0_0_30px_rgba(255,255,255,0.2)] disabled:opacity-70 disabled:cursor-not-allowed"
-          >
-            {isConnecting ? 'Creating...' : 'Create Wallet'}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-
-  // Render import step
-  const renderImport = () => (
-    <div className="space-y-8">
-      <div className="text-center space-y-4">
-        <h2 className="text-4xl font-light text-slate-100 tracking-tight drop-shadow-lg">
-          Import Wallet
-        </h2>
-        <p className="text-slate-400 text-lg">
-          Enter your seed phrase or private key
-        </p>
-      </div>
-
-      <div className="space-y-6">
-        <div className="group">
-          <label className="block text-sm font-medium text-slate-400 mb-2">
-            Seed Phrase or Private Key
-          </label>
-          <div className="relative">
-            <textarea
-              value={importInput}
-              onChange={(e) => setImportInput(e.target.value)}
-              placeholder="Enter 12 or 24 word seed phrase, or private key (0x...)"
-              rows={4}
-              className="w-full bg-slate-900/60 border border-slate-500/50 rounded-lg px-4 py-4 text-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 transition-all backdrop-blur-sm font-mono resize-none"
-            />
-            <div className="absolute inset-0 rounded-lg bg-blue-500/5 opacity-0 group-focus-within:opacity-100 pointer-events-none transition-opacity duration-500" />
-          </div>
-        </div>
-
-        <div className="group">
-          <label className="block text-sm font-medium text-slate-400 mb-2">
-            Encryption Password
-          </label>
-          <div className="relative">
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Set a password for this device"
-              className="w-full bg-slate-900/60 border border-slate-500/50 rounded-lg px-4 py-4 text-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 transition-all backdrop-blur-sm"
-            />
-            <div className="absolute inset-0 rounded-lg bg-blue-500/5 opacity-0 group-focus-within:opacity-100 pointer-events-none transition-opacity duration-500" />
-          </div>
-          {password && (
-            <div className="mt-3 space-y-2">
-              <div className="flex items-center gap-3">
-                <div className="flex-1 h-2 bg-slate-700/50 rounded-full overflow-hidden">
-                  <div
-                    className="h-full transition-all duration-300"
-                    style={{
-                      width: `${(passwordStrength.score / 4) * 100}%`,
-                      backgroundColor: getPasswordStrengthColor(passwordStrength.score)
-                    }}
-                  />
-                </div>
-                <span
-                  className="text-xs font-medium"
-                  style={{ color: getPasswordStrengthColor(passwordStrength.score) }}
-                >
-                  {getPasswordStrengthLabel(passwordStrength.score)}
-                </span>
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="group">
-          <label className="block text-sm font-medium text-slate-400 mb-2">
-            Confirm Password
-          </label>
-          <div className="relative">
-            <input
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="Re-enter password"
-              className="w-full bg-slate-900/60 border border-slate-500/50 rounded-lg px-4 py-4 text-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 transition-all backdrop-blur-sm"
-            />
-            <div className="absolute inset-0 rounded-lg bg-blue-500/5 opacity-0 group-focus-within:opacity-100 pointer-events-none transition-opacity duration-500" />
-          </div>
-        </div>
-
-        {error && (
-          <div className="p-3 rounded-lg backdrop-blur-sm border bg-red-900/20 border-red-500/50 text-red-200 text-center text-sm">
-            {error}
-          </div>
-        )}
-
-        <div className="flex gap-3 pt-2">
-          <button
-            onClick={() => setStep('choice')}
-            className="flex-1 bg-transparent border border-slate-500/50 text-slate-300 hover:text-white hover:border-slate-400 font-medium text-lg py-3.5 rounded-lg transition-all duration-200"
-          >
-            Back
-          </button>
-          <button
-            onClick={handleImport}
-            disabled={isConnecting}
-            className="flex-1 bg-slate-200 hover:bg-white text-slate-900 font-medium text-lg py-3.5 rounded-lg transition-all duration-200 shadow-[0_0_20px_rgba(255,255,255,0.1)] hover:shadow-[0_0_30px_rgba(255,255,255,0.2)] disabled:opacity-70 disabled:cursor-not-allowed"
-          >
-            {isConnecting ? 'Importing...' : 'Import Wallet'}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-
-  // Render backup step
-  const renderBackup = () => (
-    <div className="space-y-8">
-      <div className="text-center space-y-4">
-        <h2 className="text-4xl font-light text-slate-100 tracking-tight drop-shadow-lg">
-          Backup Your Wallet
-        </h2>
-        <p className="text-slate-400 text-lg">
-          Write down your seed phrase and store it safely
-        </p>
-      </div>
-
-      <div className="p-6 rounded-lg bg-amber-900/20 border border-amber-500/50 backdrop-blur-sm">
-        <p className="text-sm text-amber-200 mb-4">
-          <strong>Important:</strong> This is the ONLY way to recover your wallet. Never share it with anyone.
-        </p>
-      </div>
-
-      {mnemonic && (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-sm font-medium text-slate-400">Your Seed Phrase</p>
-            <button
-              onClick={() => {
-                navigator.clipboard.writeText(mnemonic);
-                const btn = document.getElementById('copy-seed-btn');
-                if (btn) {
-                  btn.textContent = 'Copied!';
-                  setTimeout(() => {
-                    btn.textContent = 'Copy All';
-                  }, 2000);
-                }
-              }}
-              id="copy-seed-btn"
-              className="text-sm px-4 py-2 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 hover:text-blue-200 border border-blue-400/30 transition-all font-medium"
-            >
-              Copy All
-            </button>
-          </div>
-          <div className="p-6 rounded-lg bg-slate-900/60 border border-slate-500/50 backdrop-blur-sm">
-            <div className="grid grid-cols-3 gap-3">
-              {mnemonic.split(' ').map((word, index) => (
-                <div
-                  key={index}
-                  className="flex items-center gap-2 p-3 rounded bg-slate-800/60 border border-slate-600/30"
-                >
-                  <span className="text-xs text-slate-500 font-mono">{index + 1}.</span>
-                  <span className="text-sm text-slate-100 font-mono">{word}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div className="space-y-4">
-        <label className="flex items-start gap-3 p-4 rounded-lg border border-slate-500/50 bg-slate-900/40 hover:bg-slate-900/60 cursor-pointer transition-all group">
-          <input
-            type="checkbox"
-            checked={backupConfirmed}
-            onChange={(e) => setBackupConfirmed(e.target.checked)}
-            className="mt-1 w-5 h-5 rounded border-slate-500 bg-slate-800 checked:bg-blue-500 focus:ring-2 focus:ring-blue-400 focus:ring-offset-0"
-          />
-          <span className="text-sm text-slate-300 group-hover:text-slate-100 transition-colors">
-            I have safely stored my seed phrase. I understand that if I lose it, I will not be able to recover my wallet.
-          </span>
-        </label>
-
-        {error && (
-          <div className="p-3 rounded-lg backdrop-blur-sm border bg-red-900/20 border-red-500/50 text-red-200 text-center text-sm">
-            {error}
-          </div>
-        )}
-
-        <button
-          onClick={handleBackupConfirm}
-          disabled={!backupConfirmed}
-          className="w-full bg-slate-200 hover:bg-white text-slate-900 font-medium text-lg py-3.5 rounded-lg transition-all duration-200 shadow-[0_0_20px_rgba(255,255,255,0.1)] hover:shadow-[0_0_30px_rgba(255,255,255,0.2)] disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          Continue
-        </button>
-      </div>
-    </div>
-  );
 
   return (
     <div className="fixed inset-0 w-full h-full flex flex-col items-center justify-center overflow-hidden bg-transparent">
@@ -478,15 +63,127 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
 
       {/* Top Left Logo */}
       <div className="absolute top-8 left-8 z-20 opacity-90 hover:opacity-100 transition-opacity cursor-pointer">
-        <img src={arcLogo} alt="Arc Wallet" className="w-20 h-20 object-contain drop-shadow-[0_0_20px_rgba(255,255,255,0.6)]" />
+        <img
+          src={arcLogo}
+          alt="Arc Wallet"
+          className="w-20 h-20 object-contain drop-shadow-[0_0_20px_rgba(255,255,255,0.6)]"
+        />
       </div>
 
       {/* Setup Container */}
       <div className="relative z-20 w-full max-w-lg px-4 animate-in fade-in zoom-in duration-700">
-        {step === 'choice' && renderChoice()}
-        {step === 'create' && renderCreate()}
-        {step === 'import' && renderImport()}
-        {step === 'backup' && renderBackup()}
+        <div className="space-y-8">
+          {/* Header */}
+          <div className="text-center space-y-4">
+            <h2 className="text-4xl font-light text-slate-100 tracking-tight drop-shadow-lg">
+              Create Your Wallet
+            </h2>
+            <p className="text-slate-400 text-lg">
+              Secure your wallet with biometric authentication
+            </p>
+          </div>
+
+          {/* Security Notice */}
+          <div className="p-6 rounded-lg bg-blue-900/20 border border-blue-500/50 backdrop-blur-sm space-y-3">
+            <div className="flex items-start gap-3">
+              <svg className="w-6 h-6 text-blue-300 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              </svg>
+              <div className="space-y-2">
+                <p className="text-sm text-blue-200 font-medium">
+                  No passwords. No seed phrases.
+                </p>
+                <ul className="text-sm text-blue-200/80 space-y-1">
+                  <li>• Use FaceID, TouchID, or device passcode</li>
+                  <li>• Private key stored in device's Secure Enclave</li>
+                  <li>• Your keys never leave your device</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          {/* Form */}
+          <div className="space-y-6">
+            <div className="group">
+              <label className="block text-sm font-medium text-slate-400 mb-2">
+                Your Name
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={userName}
+                  onChange={(e) => setUserName(e.target.value)}
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter' && userName.trim() && !isCreating) {
+                      handleCreate();
+                    }
+                  }}
+                  placeholder="Enter your name"
+                  disabled={isCreating}
+                  className="w-full bg-slate-900/60 border border-slate-500/50 rounded-lg px-4 py-4 text-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 transition-all backdrop-blur-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                  autoFocus
+                />
+                <div className="absolute inset-0 rounded-lg bg-blue-500/5 opacity-0 group-focus-within:opacity-100 pointer-events-none transition-opacity duration-500" />
+              </div>
+              <p className="mt-2 text-xs text-slate-500">
+                This will be used to identify your wallet
+              </p>
+            </div>
+
+            {error && (
+              <div className="p-3 rounded-lg backdrop-blur-sm border bg-red-900/20 border-red-500/50 text-red-200 text-center text-sm">
+                {error}
+              </div>
+            )}
+
+            <button
+              onClick={handleCreate}
+              disabled={isConnecting || isCreating || !userName.trim()}
+              className="w-full bg-slate-200 hover:bg-white text-slate-900 font-medium text-lg py-4 rounded-lg transition-all duration-200 shadow-[0_0_20px_rgba(255,255,255,0.1)] hover:shadow-[0_0_30px_rgba(255,255,255,0.2)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {isCreating ? (
+                <>
+                  <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  <span>Waiting for biometric...</span>
+                </>
+              ) : (
+                <>
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4" />
+                  </svg>
+                  <span>Create Wallet with Biometric</span>
+                </>
+              )}
+            </button>
+
+            {/* Info Cards */}
+            <div className="grid grid-cols-3 gap-3 pt-4">
+              <div className="p-4 rounded-lg bg-slate-900/40 border border-slate-500/30 text-center">
+                <div className="text-2xl mb-1">🔐</div>
+                <p className="text-xs text-slate-400">Secure Enclave</p>
+              </div>
+              <div className="p-4 rounded-lg bg-slate-900/40 border border-slate-500/30 text-center">
+                <div className="text-2xl mb-1">👆</div>
+                <p className="text-xs text-slate-400">Biometric Auth</p>
+              </div>
+              <div className="p-4 rounded-lg bg-slate-900/40 border border-slate-500/30 text-center">
+                <div className="text-2xl mb-1">✨</div>
+                <p className="text-xs text-slate-400">Self-Custodial</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Self-Custodial Notice */}
+          <div className="p-4 rounded-lg bg-amber-900/20 border border-amber-500/50 backdrop-blur-sm">
+            <p className="text-sm text-amber-200">
+              <strong>Self-Custodial:</strong> Your private keys are encrypted and stored only on this device.
+              We never have access to your keys. Only you can access your wallet through biometric authentication.
+            </p>
+          </div>
+        </div>
       </div>
 
       <Footer />
