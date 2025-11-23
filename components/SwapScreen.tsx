@@ -2,6 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { SwapIcon, SpinnerIcon } from './Icons';
 import { getAllSupportedTokens, TokenInfo } from '../config/tokens';
 import { swapService, Quote } from '../services/swapService';
+import { useWallet } from '../contexts/WalletContext';
+import { useSelfCustodialWallet } from '../contexts/SelfCustodialWalletContext';
+import { useActivity } from '../contexts/ActivityContext';
+import { TransactionStatus, TransactionType } from '../types';
+import { TX_EXPLORER_URL } from '../config/app.config';
 
 interface SwapScreenProps {
     initialFromToken?: string;
@@ -11,6 +16,14 @@ interface SwapScreenProps {
 
 const SwapScreen: React.FC<SwapScreenProps> = ({ initialFromToken, initialToToken, initialAmount = '' }) => {
     const tokens = getAllSupportedTokens();
+    const { sessionKey } = useWallet();
+    const { address: selfCustodialAddress, getPrivateKey } = useSelfCustodialWallet();
+    const { addActivity } = useActivity();
+
+    // Get wallet address and private key
+    const walletAddress = selfCustodialAddress || sessionKey?.address;
+    const walletPrivateKey = selfCustodialAddress ? getPrivateKey() : sessionKey?.privateKey;
+
     const [fromToken, setFromToken] = useState<TokenInfo>(() => {
         if (initialFromToken) {
             const found = tokens.find(t => t.symbol.toUpperCase() === initialFromToken.toUpperCase());
@@ -30,6 +43,7 @@ const SwapScreen: React.FC<SwapScreenProps> = ({ initialFromToken, initialToToke
     const [loading, setLoading] = useState(false);
     const [swapping, setSwapping] = useState(false);
     const [txHash, setTxHash] = useState<string | null>(null);
+    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         const fetchQuote = async () => {
@@ -53,15 +67,60 @@ const SwapScreen: React.FC<SwapScreenProps> = ({ initialFromToken, initialToToke
     }, [amount, fromToken, toToken]);
 
     const handleSwap = async () => {
-        if (!quote) return;
+        if (!quote || !walletPrivateKey || !walletAddress) {
+            setError('Wallet not available. Please unlock your wallet.');
+            return;
+        }
+
         setSwapping(true);
+        setError(null);
+
         try {
-            const hash = await swapService.executeSwap(quote);
+            console.log('[SWAP UI] Starting swap:', {
+                from: quote.fromToken.symbol,
+                to: quote.toToken.symbol,
+                amount: quote.fromAmount
+            });
+
+            const hash = await swapService.executeSwap(quote, walletPrivateKey);
+
+            console.log('[SWAP UI] Swap successful! Hash:', hash);
             setTxHash(hash);
+
+            // Add to activity feed
+            const swapAmount = parseFloat(quote.fromAmount);
+            addActivity({
+                id: hash,
+                type: TransactionType.Swap,
+                description: `Swapped ${quote.fromAmount} ${quote.fromToken.symbol} to ${quote.toToken.symbol}`,
+                timestamp: 'Just now',
+                date: new Date(),
+                amount: swapAmount,
+                currency: quote.fromToken.symbol,
+                usdValue: swapAmount * (quote.fromToken.currentPrice || 1),
+                status: TransactionStatus.Pending,
+                hash,
+                from: walletAddress,
+                to: walletAddress, // Swap is to self
+                networkFee: parseFloat(quote.estimatedGas),
+                approvals: {
+                    required: 0,
+                    list: [],
+                },
+            });
+
+            // Reset form
             setAmount('');
             setQuote(null);
-        } catch (error) {
-            console.error('Swap failed:', error);
+        } catch (error: any) {
+            console.error('[SWAP UI] Swap failed:', error);
+            const errorMessage = error?.message || 'Swap failed. Please try again.';
+            setError(errorMessage);
+
+            // Show error notification
+            if (typeof window !== 'undefined') {
+                alert(errorMessage);
+            }
         } finally {
             setSwapping(false);
         }
@@ -134,10 +193,42 @@ const SwapScreen: React.FC<SwapScreenProps> = ({ initialFromToken, initialToToke
                             <span>Rate</span>
                             <span>1 {fromToken.symbol} = {quote.rate} {toToken.symbol}</span>
                         </div>
-                        <div className="flex justify-between text-slate-400">
+                        <div className="flex justify-between text-slate-400 mb-1">
                             <span>Fee</span>
-                            <span>{quote.fee} {fromToken.symbol}</span>
+                            <span>{quote.fee}</span>
                         </div>
+                        <div className="flex justify-between text-slate-400 mb-1">
+                            <span>Price Impact</span>
+                            <span className="text-green-400">{quote.priceImpact}</span>
+                        </div>
+                        <div className="flex justify-between text-slate-400">
+                            <span>Minimum Received</span>
+                            <span>{quote.minimumReceived} {toToken.symbol}</span>
+                        </div>
+                    </div>
+                )}
+
+                {/* Error Message */}
+                {error && (
+                    <div className="mt-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
+                        <p className="text-sm text-red-400">{error}</p>
+                    </div>
+                )}
+
+                {/* Success Message */}
+                {txHash && (
+                    <div className="mt-4 p-3 bg-green-500/10 border border-green-500/30 rounded-lg">
+                        <p className="text-sm text-green-400">
+                            Swap successful!{' '}
+                            <a
+                                href={`${TX_EXPLORER_URL}${txHash}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="underline hover:text-green-300"
+                            >
+                                View on Explorer
+                            </a>
+                        </p>
                     </div>
                 )}
 
