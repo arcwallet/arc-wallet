@@ -100,44 +100,15 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
             <h2 className="text-4xl font-light text-slate-100 tracking-tight drop-shadow-lg">
               Create Your Wallet
             </h2>
-            <p className="text-slate-400 text-lg">
-              Secure your wallet with biometric authentication
-            </p>
-          </div>
-
-          {/* Security Notice */}
-          <div className="p-6 rounded-lg bg-blue-900/20 border border-blue-500/50 backdrop-blur-sm space-y-3">
-            <div className="flex items-start gap-3">
-              <svg className="w-6 h-6 text-blue-300 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-              </svg>
-              <div className="space-y-2">
-                <p className="text-sm text-blue-200 font-medium">
-                  No passwords. No seed phrases.
-                </p>
-                <ul className="text-sm text-blue-200/80 space-y-1">
-                  <li>• Use FaceID, TouchID, or device passcode</li>
-                  <li>• Private key stored in device's Secure Enclave</li>
-                  <li>• Your keys never leave your device</li>
-                </ul>
-              </div>
-            </div>
           </div>
 
           {/* Form */}
           <div className="space-y-6">
             <div className="rounded-lg bg-slate-900/60 border border-slate-600/40 px-4 py-4">
-              <p className="text-xs uppercase tracking-widest text-slate-500 mb-1">Linked Email</p>
+              <p className="text-xs uppercase tracking-widest text-slate-500 mb-1">E-posta</p>
               <p className="text-base font-mono text-slate-100">
-                {currentEmail ?? 'Waiting for verification...'}
+                {currentEmail ?? 'Doğrulanıyor...'}
               </p>
-              <p className="text-xs text-slate-500 mt-2">
-                Your passkey is tied to this email. Switch accounts to use a different identity.
-              </p>
-            </div>
-
-            <div className="rounded-lg border border-slate-600/30 bg-slate-900/50 px-4 py-3 text-sm text-slate-200">
-              {statusMessage}
             </div>
 
             {error && (
@@ -157,47 +128,17 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                   </svg>
-                  <span>Waiting for biometric...</span>
+                  <span>Passkey oluşturuluyor...</span>
                 </>
               ) : (
                 <>
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                   </svg>
-                  <span>{currentEmail ? 'Retry Biometric Prompt' : 'Waiting for email...'}</span>
+                  <span>{currentEmail ? 'Passkey ile Cüzdan Oluştur' : 'E-posta doğrulanıyor...'}</span>
                 </>
               )}
             </button>
-
-            {/* Info Cards */}
-            <div className="grid grid-cols-3 gap-3 pt-4">
-              <div className="p-4 rounded-lg bg-slate-900/40 border border-slate-500/30 text-center flex flex-col items-center gap-2">
-                <svg className="w-6 h-6 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                </svg>
-                <p className="text-xs text-slate-400 font-medium">Secure Enclave</p>
-              </div>
-              <div className="p-4 rounded-lg bg-slate-900/40 border border-slate-500/30 text-center flex flex-col items-center gap-2">
-                <svg className="w-6 h-6 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4" />
-                </svg>
-                <p className="text-xs text-slate-400 font-medium">Biometric Auth</p>
-              </div>
-              <div className="p-4 rounded-lg bg-slate-900/40 border border-slate-500/30 text-center flex flex-col items-center gap-2">
-                <svg className="w-6 h-6 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                </svg>
-                <p className="text-xs text-slate-400 font-medium">Self-Custodial</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Self-Custodial Notice */}
-          <div className="p-4 rounded-lg bg-amber-900/20 border border-amber-500/50 backdrop-blur-sm">
-            <p className="text-sm text-amber-200">
-              <strong>Self-Custodial:</strong> Your private keys are encrypted and stored only on this device.
-              We never have access to your keys. Only you can access your wallet through biometric authentication.
-            </p>
           </div>
         </div>
       </div>
