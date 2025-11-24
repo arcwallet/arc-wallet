@@ -16,7 +16,7 @@ function O(r) {
     i[c] = a.charCodeAt(c);
   return s;
 }
-function W() {
+function F() {
   return ie.stubThis((globalThis == null ? void 0 : globalThis.PublicKeyCredential) !== void 0 && typeof globalThis.PublicKeyCredential == "function");
 }
 const ie = {
@@ -171,7 +171,7 @@ async function de(r) {
   var w;
   !r.optionsJSON && r.challenge && (console.warn("startRegistration() was not called correctly. It will try to continue with the provided options, but this call should be refactored to use the expected call structure instead. See https://simplewebauthn.dev/docs/packages/browser#typeerror-cannot-read-properties-of-undefined-reading-challenge for more information."), r = { optionsJSON: r });
   const { optionsJSON: e, useAutoRegister: t = !1 } = r;
-  if (!W())
+  if (!F())
     throw new Error("WebAuthn is not supported in this browser");
   const n = {
     ...e,
@@ -237,7 +237,7 @@ function _(r, e) {
 `, e);
 }
 function ue() {
-  if (!W())
+  if (!F())
     return N.stubThis(new Promise((e) => e(!1)));
   const r = globalThis.PublicKeyCredential;
   return (r == null ? void 0 : r.isConditionalMediationAvailable) === void 0 ? N.stubThis(new Promise((e) => e(!1))) : N.stubThis(r.isConditionalMediationAvailable());
@@ -290,7 +290,7 @@ async function pe(r) {
   var p, w;
   !r.optionsJSON && r.challenge && (console.warn("startAuthentication() was not called correctly. It will try to continue with the provided options, but this call should be refactored to use the expected call structure instead. See https://simplewebauthn.dev/docs/packages/browser#typeerror-cannot-read-properties-of-undefined-reading-challenge for more information."), r = { optionsJSON: r });
   const { optionsJSON: e, useBrowserAutofill: t = !1, verifyBrowserAutofillInput: n = !0 } = r;
-  if (!W())
+  if (!F())
     throw new Error("WebAuthn is not supported in this browser");
   let a;
   ((p = e.allowCredentials) == null ? void 0 : p.length) !== 0 && (a = (w = e.allowCredentials) == null ? void 0 : w.map(j));
@@ -429,10 +429,10 @@ const o = new X({
   sentryDsn: process.env.SENTRY_DSN,
   environment: process.env.NODE_ENV || "development"
 });
-function Fe(r) {
+function We(r) {
   return new X(r);
 }
-class We extends Error {
+class Fe extends Error {
   constructor(t, n) {
     super(t);
     u(this, "cause");
@@ -1094,6 +1094,14 @@ class Te {
    * Sign transaction with current wallet
    */
   async signTransaction(e) {
+    if (!this.currentWallet) {
+      console.log("[KeyManager] Wallet not unlocked, prompting for passkey authentication...");
+      try {
+        await this.unlockWallet(this.currentCredentialId || void 0);
+      } catch {
+        throw new Error("Please authenticate with your passkey to sign this transaction.");
+      }
+    }
     if (!this.currentWallet)
       throw new Error("No wallet unlocked. Please authenticate first.");
     try {
@@ -1108,6 +1116,14 @@ class Te {
    * Sign message with current wallet
    */
   async signMessage(e) {
+    if (!this.currentWallet) {
+      console.log("[KeyManager] Wallet not unlocked, prompting for passkey authentication...");
+      try {
+        await this.unlockWallet(this.currentCredentialId || void 0);
+      } catch {
+        throw new Error("Please authenticate with your passkey to sign this message.");
+      }
+    }
     if (!this.currentWallet)
       throw new Error("No wallet unlocked. Please authenticate first.");
     try {
@@ -1508,7 +1524,7 @@ const ve = {
 function Ie(r) {
   return G[r];
 }
-function Re(r) {
+function ke(r) {
   var e;
   return ((e = G[r]) == null ? void 0 : e.cctpSupported) ?? !1;
 }
@@ -1517,14 +1533,14 @@ function Ge(r) {
   return ((e = G[r]) == null ? void 0 : e.nativeUSDC) ?? !1;
 }
 const $ = "0x0000000000000000000000000000000000000000", V = /^0x\.\.\.$/;
-function F(r, e) {
+function W(r, e) {
   var i, c, d;
   const t = {
     isValid: !0,
     errors: [],
     warnings: []
   };
-  if (!Re(e)) {
+  if (!ke(e)) {
     const l = Ie(e), h = l ? l.name : `Chain ID ${e}`;
     return t.errors.push(`${h} does not support Circle CCTP`), t.isValid = !1, t;
   }
@@ -1550,7 +1566,7 @@ function F(r, e) {
   }), t;
 }
 function Le(r) {
-  const e = F(r, 412346);
+  const e = W(r, 412346);
   return e.isValid && e.warnings.length === 0;
 }
 function z(r) {
@@ -1573,7 +1589,7 @@ const sdk = new WalletSDK({
 });
 \`\`\`` : `CCTP configuration missing for chain ID ${r}`;
 }
-class ke {
+class Re {
   constructor(e, t) {
     u(this, "config");
     u(this, "provider");
@@ -1583,7 +1599,7 @@ class ke {
    * Transfer USDC cross-chain using CCTP
    */
   async transferUSDC(e, t) {
-    const { amount: n, destinationAddress: a, destinationChainId: s } = t, i = await e.provider.getNetwork().then((l) => Number(l.chainId)), c = F(this.config, i);
+    const { amount: n, destinationAddress: a, destinationChainId: s } = t, i = await e.provider.getNetwork().then((l) => Number(l.chainId)), c = W(this.config, i);
     if (!c.isValid) {
       const l = z(i);
       throw o.error("CCTP configuration invalid for source chain", void 0, {
@@ -1592,7 +1608,7 @@ class ke {
         errors: c.errors
       }), new Error(l);
     }
-    const d = F(this.config, s);
+    const d = W(this.config, s);
     if (!d.isValid) {
       const l = z(s);
       throw o.error("CCTP configuration invalid for destination chain", void 0, {
@@ -1746,7 +1762,7 @@ class Me {
     }
   }
 }
-const R = new ne(), k = [
+const k = new ne(), R = [
   "function execute(address dest, uint256 value, bytes calldata func)",
   "function executeBatch(address[] calldata dest, uint256[] calldata value, bytes[] calldata func)",
   "function getNonce() view returns (uint256)"
@@ -1769,13 +1785,13 @@ class Ke {
    */
   getAccountAddress(e) {
     const t = b(D(e)), n = b(
-      R.encode(
+      k.encode(
         ["address", "address"],
         [this.config.accountImplementation, e]
       )
     );
     return "0x" + b(
-      R.encode(
+      k.encode(
         ["bytes1", "address", "bytes32", "bytes32"],
         ["0xff", this.config.factoryAddress, t, n]
       )
@@ -1794,13 +1810,13 @@ class Ke {
     var f;
     const n = this.accountAddress || this.getAccountAddress(e.address);
     this.accountAddress = n;
-    const a = await this.isDeployed(n), i = new U(k).encodeFunctionData("execute", [
+    const a = await this.isDeployed(n), i = new U(R).encodeFunctionData("execute", [
       t.to,
       BigInt(t.value || "0"),
       t.data || "0x"
     ]);
     let c = 0n;
-    a && (c = await new E(n, k, this.provider).getNonce());
+    a && (c = await new E(n, R, this.provider).getNonce());
     const d = a ? "0x" : this.buildInitCode(e.address), l = await this.provider.getFeeData(), h = {
       sender: n,
       nonce: c,
@@ -1829,13 +1845,13 @@ class Ke {
     var M;
     const a = this.accountAddress || this.getAccountAddress(e.address);
     this.accountAddress = a;
-    const s = await this.isDeployed(a), i = new U(k), c = t.map((A) => A.to), d = t.map((A) => BigInt(A.value || "0")), l = t.map((A) => A.data || "0x"), h = i.encodeFunctionData("executeBatch", [
+    const s = await this.isDeployed(a), i = new U(R), c = t.map((A) => A.to), d = t.map((A) => BigInt(A.value || "0")), l = t.map((A) => A.data || "0x"), h = i.encodeFunctionData("executeBatch", [
       c,
       d,
       l
     ]);
     let y = 0n;
-    s && (y = await new E(a, k, this.provider).getNonce());
+    s && (y = await new E(a, R, this.provider).getNonce());
     const f = s ? "0x" : this.buildInitCode(e.address), p = await this.provider.getFeeData(), w = {
       sender: a,
       nonce: y,
@@ -1910,7 +1926,7 @@ class Ke {
     var s;
     const t = this.packUserOp(e), n = b(t), a = ((s = this.provider._network) == null ? void 0 : s.chainId) || 1n;
     return b(
-      R.encode(
+      k.encode(
         ["bytes32", "address", "uint256"],
         [n, this.config.entryPoint, a]
       )
@@ -1920,7 +1936,7 @@ class Ke {
    * Pack UserOperation for hashing
    */
   packUserOp(e) {
-    return R.encode(
+    return k.encode(
       [
         "address",
         "uint256",
@@ -2040,7 +2056,7 @@ class Be {
       rpId: e.rpId,
       rpName: e.appName,
       backendUrl: e.backendUrl
-    }), this.storage = new Se(), this.keyManager = new Te(this.webauthn, this.storage), this.provider = new re(e.rpcUrl), this.cctpManager = new ke(this.provider, e.cctp), this.accountType = e.accountType || "eoa", this.accountType === "smart-account" && (this.smartAccountManager = new Ke(
+    }), this.storage = new Se(), this.keyManager = new Te(this.webauthn, this.storage), this.provider = new re(e.rpcUrl), this.cctpManager = new Re(this.provider, e.cctp), this.accountType = e.accountType || "eoa", this.accountType === "smart-account" && (this.smartAccountManager = new Ke(
       this.provider,
       e.smartAccount,
       e.paymaster
@@ -2363,7 +2379,7 @@ async function $e(r, e) {
 }
 const Ve = "1.0.0";
 export {
-  ke as CCTPManager,
+  Re as CCTPManager,
   G as CIRCLE_NETWORKS,
   He as CircleApiClient,
   Me as CirclePaymasterClient,
@@ -2372,26 +2388,26 @@ export {
   Te as KeyManager,
   ye as LogLevel,
   T as PASSKEY_DIAGNOSTIC_MESSAGES,
-  We as PasskeyDiagnosticError,
+  Fe as PasskeyDiagnosticError,
   Se as SecureStorage,
   Ke as SmartAccountManager,
   Ve as VERSION,
   Be as WalletSDK,
   Ee as WebAuthnManager,
   Ae as checkPlatformAuthenticatorSupport,
-  Fe as createLogger,
+  We as createLogger,
   z as getCCTPConfigErrorMessage,
   Ie as getCircleNetwork,
   we as getDeviceRiskLevel,
   Ce as getDiagnosticErrorMessage,
   ge as getPasskeyDiagnosticMode,
   Le as isArcNetworkConfigured,
-  Re as isCCTPSupported,
+  ke as isCCTPSupported,
   $e as isCircleMSCA,
   me as isHighRiskDevice,
   Ge as isNativeUSDC,
   o as logger,
   be as runPasskeyDiagnostic,
-  F as validateCCTPConfig
+  W as validateCCTPConfig
 };
 //# sourceMappingURL=index.mjs.map

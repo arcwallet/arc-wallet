@@ -171,6 +171,16 @@ export class KeyManager {
    * Sign transaction with current wallet
    */
   async signTransaction(tx: any): Promise<string> {
+    // Auto-unlock wallet if not already unlocked
+    if (!this.currentWallet) {
+      console.log('[KeyManager] Wallet not unlocked, prompting for passkey authentication...');
+      try {
+        await this.unlockWallet(this.currentCredentialId || undefined);
+      } catch (error: any) {
+        throw new Error('Please authenticate with your passkey to sign this transaction.');
+      }
+    }
+
     if (!this.currentWallet) {
       throw new Error('No wallet unlocked. Please authenticate first.');
     }
@@ -190,6 +200,16 @@ export class KeyManager {
    * Sign message with current wallet
    */
   async signMessage(message: string): Promise<string> {
+    // Auto-unlock wallet if not already unlocked
+    if (!this.currentWallet) {
+      console.log('[KeyManager] Wallet not unlocked, prompting for passkey authentication...');
+      try {
+        await this.unlockWallet(this.currentCredentialId || undefined);
+      } catch (error: any) {
+        throw new Error('Please authenticate with your passkey to sign this message.');
+      }
+    }
+
     if (!this.currentWallet) {
       throw new Error('No wallet unlocked. Please authenticate first.');
     }
