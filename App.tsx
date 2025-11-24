@@ -15,7 +15,7 @@ import { PrivacyProvider } from './contexts/PrivacyContext';
 // Self-custodial wallet imports
 import { SelfCustodialWalletProvider, useSelfCustodialWallet } from './contexts/SelfCustodialWalletContext';
 import WalletSetup from './components/WalletSetup';
-import UnlockWallet from './components/UnlockWallet';
+import UnlockWalletPasskey from './components/UnlockWalletPasskey';
 
 // Self-custodial wallet experience - new architecture
 const SelfCustodialWalletExperience: React.FC = () => {
@@ -54,7 +54,7 @@ const SelfCustodialWalletExperience: React.FC = () => {
   // Wallet exists but locked - show unlock (Verify Passkey)
   // This enforces passkey authentication even after magic link login
   if (!isUnlocked) {
-    return <UnlockWallet onUnlock={handleUnlock} onReset={handleReset} />;
+    return <UnlockWalletPasskey onUnlock={handleUnlock} onReset={handleReset} />;
   }
 
   // Only show dashboard if wallet is UNLOCKED (Passkey verified)
