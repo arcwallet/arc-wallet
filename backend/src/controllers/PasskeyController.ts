@@ -223,10 +223,21 @@ export class PasskeyController {
         // Use credential.id directly - it's already base64url encoded
         const credentialIdB64Url = credential.id;
 
-        console.log('[PasskeyReg] Storing credential with ID:', {
+        // Derive Ethereum address from passkey public key
+        // This address will be the owner of the Smart Account
+        const { deriveAddressFromCOSE } = await import('../utils/passkeyUtils.js');
+        const ownerAddress = deriveAddressFromCOSE(verification.registrationInfo.credentialPublicKey);
+
+        console.log('[PasskeyReg] Derived owner address from passkey:', {
+          ownerAddress,
           credentialId: credentialIdB64Url,
           credentialIdLength: credentialIdB64Url.length,
           userId: user.id
+        });
+
+        // Update user with wallet address (owner address)
+        await this.db.updateUser(user.id, {
+          walletAddress: ownerAddress
         });
 
         await this.db.createPasskeyCredential({
@@ -240,7 +251,7 @@ export class PasskeyController {
           transports: credential.response.transports
         });
 
-        console.log('[PasskeyReg] Credential stored successfully');
+        console.log('[PasskeyReg] Credential stored successfully with owner address');
       }
 
       // Clean up challenge
