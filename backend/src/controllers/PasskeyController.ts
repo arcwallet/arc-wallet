@@ -320,13 +320,38 @@ export class PasskeyController {
         throw new ApiError('Credential is required', 400, 'MISSING_CREDENTIAL');
       }
 
+      // Debug logging for credential ID
+      console.log('[PasskeyAuth] Credential received:', {
+        id: credential.id?.substring(0, 20),
+        rawId: credential.rawId?.substring(0, 20),
+        hasResponse: !!credential.response
+      });
+
       // Get passkey credential from database
       // Use rawId (base64url) instead of id (base64) to match database format
       const credentialId = credential.rawId || credential.id;
+      console.log('[PasskeyAuth] Looking up credential with ID:', credentialId?.substring(0, 30) + '...');
+
       const passkeyCredential = await this.db.getPasskeyByCredentialId(credentialId);
       if (!passkeyCredential) {
+        console.error('[PasskeyAuth] Passkey not found in database for ID:', credentialId?.substring(0, 30));
+        // List all credentials for debugging
+        const user = await this.db.getUserByUsername(credential.id); // Try to find user another way
+        if (user) {
+          const userPasskeys = await this.db.getPasskeysByUserId(user.id);
+          console.log('[PasskeyAuth] User has passkeys:', userPasskeys.map(p => ({
+            id: p.credentialID.substring(0, 30),
+            counter: p.counter
+          })));
+        }
         throw new ApiError('Passkey not found', 404, 'PASSKEY_NOT_FOUND');
       }
+
+      console.log('[PasskeyAuth] Passkey found:', {
+        credentialID: passkeyCredential.credentialID?.substring(0, 30),
+        counter: passkeyCredential.counter,
+        userId: passkeyCredential.userId
+      });
 
       // Get user
       const user = await this.db.getUserById(passkeyCredential.userId);
@@ -343,6 +368,7 @@ export class PasskeyController {
         throw new ApiError('Invalid or expired challenge', 400, 'INVALID_CHALLENGE');
       }
 
+      console.log('[PasskeyAuth] Verifying authentication...');
       // Verify authentication response
       const verification = await verifyAuthenticationResponse({
         response: credential,
@@ -357,6 +383,8 @@ export class PasskeyController {
         },
         requireUserVerification: true
       });
+
+      console.log('[PasskeyAuth] Verification result:', verification.verified);
 
       if (!verification.verified) {
         throw new ApiError('Authentication verification failed', 400, 'VERIFICATION_FAILED');
