@@ -178,7 +178,7 @@ export class WebAuthnManager {
 
       if (error.name === 'InvalidStateError') {
         throw new Error(
-          'A passkey already exists for this device. Use "Connect Existing Wallet" instead.'
+          'This device is already registered. Please sign in with your existing passkey.'
         );
       }
 
