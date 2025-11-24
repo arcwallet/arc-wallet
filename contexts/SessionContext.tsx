@@ -3,6 +3,9 @@ import { sessionApi } from '../services/sessionApi';
 
 interface SessionState {
   email: string | null;
+  hasWallet: boolean;
+  walletAddress: string | null;
+  userId: string | null;
   loading: boolean;
   requestStatus: 'idle' | 'success' | 'error';
   message: string | null;
@@ -22,6 +25,9 @@ const SessionContext = createContext<SessionContextValue | undefined>(undefined)
 export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [state, setState] = useState<SessionState>({
     email: null,
+    hasWallet: false,
+    walletAddress: null,
+    userId: null,
     loading: false,
     requestStatus: 'idle',
     message: null,
@@ -36,6 +42,9 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
       setState((prev) => ({
         ...prev,
         email: session?.email ?? null,
+        hasWallet: session?.hasWallet ?? false,
+        walletAddress: session?.walletAddress ?? null,
+        userId: session?.userId ?? null,
         loading: false,
       }));
     } catch (error) {
@@ -43,6 +52,9 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
       setState((prev) => ({
         ...prev,
         email: null,
+        hasWallet: false,
+        walletAddress: null,
+        userId: null,
         loading: false,
       }));
     }

@@ -109,7 +109,7 @@ export const sessionApi = {
     }
   },
 
-  async getSession(timeoutMs = 3000): Promise<{ email: string } | null> {
+  async getSession(timeoutMs = 3000): Promise<{ email: string; hasWallet?: boolean; walletAddress?: string; userId?: string } | null> {
     // getSession is used for refreshing token, so no retry logic here to avoid loops
     const controller = new AbortController();
     const timer = window.setTimeout(() => controller.abort(), timeoutMs);
@@ -121,7 +121,7 @@ export const sessionApi = {
       if (response.status === 401) {
         return null;
       }
-      const body = await handleResponse<ApiResponse<{ email: string }>>(response);
+      const body = await handleResponse<ApiResponse<{ email: string; hasWallet?: boolean; walletAddress?: string; userId?: string }>>(response);
       return body?.data ?? null;
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') {

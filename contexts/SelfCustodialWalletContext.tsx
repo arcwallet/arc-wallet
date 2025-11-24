@@ -114,7 +114,7 @@ export const SelfCustodialWalletProvider: React.FC<{ children: ReactNode }> = ({
   const [userId, setUserId] = useState<string | null>(null);
   const [currentAccount, setCurrentAccount] = useState<WalletAccount | null>(null);
 
-  const { currentEmail } = useSession();
+  const { currentEmail, hasWallet: sessionHasWallet, walletAddress: sessionWalletAddress } = useSession();
   const normalizedEmail = normalizeEmail(currentEmail);
 
   // Initialize on mount and when email changes
@@ -155,17 +155,35 @@ export const SelfCustodialWalletProvider: React.FC<{ children: ReactNode }> = ({
     }
 
     // Load user-specific wallet
-    const userHasWalletKey = getStorageKey(normalizedEmail, 'has-wallet');
-    const userAddressKey = getStorageKey(normalizedEmail, 'wallet-address');
+    // PRIORITY:
+    // 1. Session info from backend (truth)
+    // 2. Local storage (fallback/offline)
 
-    const hasWalletStored = localStorage.getItem(userHasWalletKey) === 'true';
-    setHasWallet(hasWalletStored);
+    if (sessionHasWallet) {
+      console.log('[Wallet] Wallet found in session for user:', normalizedEmail);
+      setHasWallet(true);
+      if (sessionWalletAddress) {
+        setAddress(sessionWalletAddress);
+        // Sync to local storage for offline support
+        const userAddressKey = getStorageKey(normalizedEmail, 'wallet-address');
+        const userHasWalletKey = getStorageKey(normalizedEmail, 'has-wallet');
+        localStorage.setItem(userAddressKey, sessionWalletAddress);
+        localStorage.setItem(userHasWalletKey, 'true');
+      }
+    } else {
+      // Fallback to local storage if session doesn't know (e.g. offline or sync issue)
+      const userHasWalletKey = getStorageKey(normalizedEmail, 'has-wallet');
+      const userAddressKey = getStorageKey(normalizedEmail, 'wallet-address');
 
-    const storedAddress = localStorage.getItem(userAddressKey);
-    if (storedAddress) {
-      setAddress(storedAddress);
+      const hasWalletStored = localStorage.getItem(userHasWalletKey) === 'true';
+      setHasWallet(hasWalletStored);
+
+      const storedAddress = localStorage.getItem(userAddressKey);
+      if (storedAddress) {
+        setAddress(storedAddress);
+      }
     }
-  }, [sdk, normalizedEmail]);
+  }, [sdk, normalizedEmail, sessionHasWallet, sessionWalletAddress]);
 
   // Setup SDK event listeners
   useEffect(() => {

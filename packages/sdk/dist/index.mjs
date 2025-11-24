@@ -598,7 +598,7 @@ class Ee {
         platformSupport: i.platformSupport,
         message: c
       });
-      const d = await fetch(`${this.backendUrl}/passkeys/register/options`, {
+      const d = await fetch(`${this.backendUrl}/passkeys/register/start`, {
         method: "POST",
         headers: this.getHeaders(),
         credentials: "include",
@@ -621,7 +621,7 @@ class Ee {
         component: "WebAuthn",
         credentialId: y.id.substring(0, 20) + "..."
       });
-      const f = await fetch(`${this.backendUrl}/passkeys/register/verify`, {
+      const f = await fetch(`${this.backendUrl}/passkeys/register/finish`, {
         method: "POST",
         headers: this.getHeaders(),
         credentials: "include",
@@ -669,7 +669,7 @@ class Ee {
         action: "authenticate",
         credentialId: e == null ? void 0 : e.substring(0, 20)
       });
-      const a = await fetch(`${this.backendUrl}/passkeys/login/options`, {
+      const a = await fetch(`${this.backendUrl}/passkeys/auth/start`, {
         method: "POST",
         headers: this.getHeaders(),
         credentials: "include",
@@ -687,7 +687,7 @@ class Ee {
         component: "WebAuthn",
         credentialId: c.id.substring(0, 20) + "..."
       });
-      const d = await fetch(`${this.backendUrl}/passkeys/login/verify`, {
+      const d = await fetch(`${this.backendUrl}/passkeys/auth/finish`, {
         method: "POST",
         headers: this.getHeaders(),
         credentials: "include",

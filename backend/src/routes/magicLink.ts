@@ -173,15 +173,33 @@ export const createMagicLinkRouter = (config: EnvConfig, mailer: MagicLinkMailer
     res.json({ success: true });
   });
 
-  router.get('/api/session', (req, res) => {
+  router.get('/api/session', async (req, res) => {
     const session = requireSession(req);
     if (!session) {
       return res.status(401).json({ success: false, error: 'Session not found.' });
     }
-    res.json({
-      success: true,
-      data: { email: session.email },
-    });
+
+    try {
+      // Get user details from main database to check for wallet
+      const user = await db.getUserByUsername(session.email);
+
+      res.json({
+        success: true,
+        data: {
+          email: session.email,
+          hasWallet: !!user?.walletAddress,
+          walletAddress: user?.walletAddress || null,
+          userId: user?.id || null
+        },
+      });
+    } catch (error) {
+      console.error('Session fetch error:', error);
+      // Fallback to just email if DB fails
+      res.json({
+        success: true,
+        data: { email: session.email },
+      });
+    }
   });
 
   router.get('/dashboard', (req, res) => {

@@ -1,0 +1,1 @@
+{"version":3,"file":"UserStore.d.ts","sourceRoot":"","sources":["../../src/magicLink/UserStore.ts"],"names":[],"mappings":"AAGA,OAAO,EAAE,SAAS,EAAE,MAAM,YAAY,CAAC;AAEvC,qBAAa,cAAc;IACzB,OAAO,CAAC,KAAK,CAAqC;IAClD,OAAO,CAAC,QAAQ,CAAC,QAAQ,CAAS;gBAEtB,OAAO,EAAE,MAAM;IAM3B,YAAY,CAAC,QAAQ,EAAE,MAAM,GAAG,SAAS;IAsBzC,OAAO,CAAC,eAAe;IAOvB,OAAO,CAAC,IAAI;YAgBE,OAAO;CAQtB"}

@@ -446,7 +446,7 @@ export class Database {
     const all: any = promisify(this.db.all.bind(this.db));
 
     const credentials = await all('SELECT * FROM passkey_credentials WHERE user_id = ?', [userId]);
-    return credentials.map(this.mapPasskeyCredential);
+    return credentials.map((c: any) => this.mapPasskeyCredential(c));
   }
 
   async getPasskeyByCredentialId(credentialId: string): Promise<PasskeyCredential | null> {
@@ -506,7 +506,7 @@ export class Database {
       'SELECT * FROM session_keys WHERE user_id = ? AND expires_at > ? ORDER BY created_at DESC',
       [userId, new Date().toISOString()]
     );
-    return sessionKeys.map(this.mapSessionKey);
+    return sessionKeys.map((k: any) => this.mapSessionKey(k));
   }
 
   async getActiveSessionKeyByAddress(address: string): Promise<SessionKey | null> {
