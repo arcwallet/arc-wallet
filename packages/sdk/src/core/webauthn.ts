@@ -101,7 +101,7 @@ export class WebAuthnManager {
       }
 
       // Step 1: Get registration options from backend
-      const optionsResponse = await fetch(`${this.backendUrl}/passkeys/register/options`, {
+      const optionsResponse = await fetch(`${this.backendUrl}/passkeys/register/start`, {
         method: 'POST',
         headers: this.getHeaders(),
         credentials: 'include',
@@ -134,7 +134,7 @@ export class WebAuthnManager {
       });
 
       // Step 3: Verify credential with backend
-      const verifyResponse = await fetch(`${this.backendUrl}/passkeys/register/verify`, {
+      const verifyResponse = await fetch(`${this.backendUrl}/passkeys/register/finish`, {
         method: 'POST',
         headers: this.getHeaders(),
         credentials: 'include',
@@ -198,7 +198,7 @@ export class WebAuthnManager {
       });
 
       // Step 1: Get authentication options from backend
-      const optionsResponse = await fetch(`${this.backendUrl}/passkeys/login/options`, {
+      const optionsResponse = await fetch(`${this.backendUrl}/passkeys/auth/start`, {
         method: 'POST',
         headers: this.getHeaders(),
         credentials: 'include',
@@ -228,7 +228,7 @@ export class WebAuthnManager {
       });
 
       // Step 3: Verify authentication with backend
-      const verifyResponse = await fetch(`${this.backendUrl}/passkeys/login/verify`, {
+      const verifyResponse = await fetch(`${this.backendUrl}/passkeys/auth/finish`, {
         method: 'POST',
         headers: this.getHeaders(),
         credentials: 'include',
