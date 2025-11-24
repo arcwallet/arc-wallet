@@ -167,7 +167,7 @@ const DashboardHeader: React.FC<DashboardHeaderPropsWithNav> = ({ account, isRef
   const lastUpdated = account ? formatBlockTime(account.latestBlock.timestamp) : '—';
 
   return (
-    <header className="flex h-20 items-center justify-between gap-4 border-b border-slate-500/30 px-8 py-3 backdrop-blur-sm bg-slate-900/40">
+    <header className="relative z-50 flex h-20 items-center justify-between gap-4 border-b border-slate-500/30 px-8 py-3 backdrop-blur-sm bg-slate-900/40">
       <div />
       <div className="flex items-center gap-4">
         <div className="hidden lg:flex flex-col text-right">
