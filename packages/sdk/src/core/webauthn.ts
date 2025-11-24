@@ -50,6 +50,31 @@ export class WebAuthnManager {
   }
 
   /**
+   * Get CSRF token from cookie
+   */
+  private getCsrfToken(): string | null {
+    if (typeof document === 'undefined') return null;
+    const match = document.cookie.match(/(?:^|; )_csrf=([^;]*)/);
+    return match ? decodeURIComponent(match[1]) : null;
+  }
+
+  /**
+   * Get headers with CSRF token for API requests
+   */
+  private getHeaders(): HeadersInit {
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+
+    const csrfToken = this.getCsrfToken();
+    if (csrfToken) {
+      headers['X-CSRF-Token'] = csrfToken;
+    }
+
+    return headers;
+  }
+
+  /**
    * Create new passkey for user using @simplewebauthn/browser
    */
   async createPasskey(userId: string, userName: string): Promise<PasskeyCredential> {
@@ -78,7 +103,7 @@ export class WebAuthnManager {
       // Step 1: Get registration options from backend
       const optionsResponse = await fetch(`${this.backendUrl}/passkey/register/options`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: this.getHeaders(),
         credentials: 'include',
         body: JSON.stringify({ userId, userName }),
       });
@@ -106,7 +131,7 @@ export class WebAuthnManager {
       // Step 3: Verify credential with backend
       const verifyResponse = await fetch(`${this.backendUrl}/passkey/register/verify`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: this.getHeaders(),
         credentials: 'include',
         body: JSON.stringify({
           userId,
@@ -170,7 +195,7 @@ export class WebAuthnManager {
       // Step 1: Get authentication options from backend
       const optionsResponse = await fetch(`${this.backendUrl}/passkey/login/options`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: this.getHeaders(),
         credentials: 'include',
         body: JSON.stringify({ credentialId }),
       });
@@ -198,7 +223,7 @@ export class WebAuthnManager {
       // Step 3: Verify authentication with backend
       const verifyResponse = await fetch(`${this.backendUrl}/passkey/login/verify`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: this.getHeaders(),
         credentials: 'include',
         body: JSON.stringify({
           credential,
