@@ -177,8 +177,17 @@ export class PasskeyController {
       // Verify the challenge exists and is valid
       const challengeRecord = await this.db.getChallengeByValue(clientChallenge, 'registration');
       if (!challengeRecord) {
+        console.error('[PasskeyReg] Challenge not found or expired:', clientChallenge);
         throw new ApiError('Invalid or expired challenge', 400, 'INVALID_CHALLENGE');
       }
+
+      console.log('[PasskeyReg] Verifying registration response...', {
+        expectedChallenge: challengeRecord.challenge,
+        expectedOrigin: this.config.ORIGIN,
+        expectedRPID: this.config.RP_ID,
+        clientDataJSON: credential.response.clientDataJSON,
+        decodedClientData: decodeClientDataJSON(credential.response.clientDataJSON)
+      });
 
       // Verify registration response
       const verification = await verifyRegistrationResponse({
@@ -189,7 +198,10 @@ export class PasskeyController {
         requireUserVerification: true
       });
 
+      console.log('[PasskeyReg] Verification result:', verification.verified, verification.registrationInfo);
+
       if (!verification.verified) {
+        console.error('[PasskeyReg] Verification failed details:', verification);
         throw new ApiError('Registration verification failed', 400, 'VERIFICATION_FAILED');
       }
 
