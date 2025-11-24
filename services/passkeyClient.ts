@@ -66,6 +66,11 @@ interface RegistrationStartData {
   options: any;
 }
 
+interface RegistrationFinishData {
+  sessionKey?: SessionKey;
+  user: { id: string; username: string; displayName: string };
+}
+
 interface AuthenticationStartData {
   options: any;
 }
@@ -97,7 +102,7 @@ export const passkeyClient = {
     postJSON<RegistrationStartData>('/passkeys/register/start', { username, displayName: displayName ?? username }),
 
   finishRegistration: (username: string, credential: unknown) =>
-    postJSON<unknown>('/passkeys/register/finish', { username, credential }),
+    postJSON<RegistrationFinishData>('/passkeys/register/finish', { username, credential }),
 
   beginAuthentication: async (username?: string) => {
     const result = await postJSON<AuthenticationStartData>('/passkeys/auth/start', username ? { username } : {});

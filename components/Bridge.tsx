@@ -41,11 +41,6 @@ const Bridge: React.FC = () => {
   const [progressItem, setProgressItem] = useState<string>('');
   const [currentTransactionId, setCurrentTransactionId] = useState<number | null>(null);
 
-  const canSubmit = useMemo(() => {
-    const normalized = Number(amount);
-    return Boolean(address) && Boolean(userId) && normalized > 0 && !Number.isNaN(normalized) && !isSubmitting;
-  }, [address, userId, amount, isSubmitting]);
-
   const normalizeAmount = (raw: string): string | null => {
     if (raw == null) return null;
     // remove thousand separators and spaces; unify comma to dot
@@ -61,6 +56,16 @@ const Bridge: React.FC = () => {
     // return with 2 decimals to be safe for BridgeKit
     return Number(clamped).toFixed(2);
   };
+
+  const canSubmit = useMemo(() => {
+    if (!address || !userId || isSubmitting) {
+      return false;
+    }
+    const normalized = normalizeAmount(amount);
+    if (!normalized) return false;
+    const numeric = Number(normalized);
+    return Number.isFinite(numeric) && numeric > 0;
+  }, [address, userId, amount, isSubmitting]);
 
   const handleBridge = async () => {
     if (!address || !userId) {

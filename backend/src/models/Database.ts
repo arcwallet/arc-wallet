@@ -578,6 +578,22 @@ export class Database {
     return row ? this.mapChallenge(row) : null;
   }
 
+  async getChallengeByValue(challengeValue: string, type?: 'registration' | 'authentication'): Promise<WebAuthnChallenge | null> {
+    await this.waitForReady();
+    const get: any = promisify(this.db.get.bind(this.db));
+
+    const params: any[] = [challengeValue, new Date().toISOString()];
+    let query = 'SELECT * FROM webauthn_challenges WHERE challenge = ? AND expires_at > ?';
+    if (type) {
+      query += ' AND type = ?';
+      params.push(type);
+    }
+    query += ' ORDER BY created_at DESC LIMIT 1';
+
+    const row = await get(query, params);
+    return row ? this.mapChallenge(row) : null;
+  }
+
   async deleteChallenge(id: string): Promise<void> {
     await this.waitForReady();
     const run: any = promisify(this.db.run.bind(this.db));

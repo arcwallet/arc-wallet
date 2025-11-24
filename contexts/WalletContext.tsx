@@ -30,7 +30,8 @@ const WalletContext = createContext<WalletContextValue | undefined>(undefined);
 const USER_ID_STORAGE_KEY = 'arcwallet:user-id';
 const SESSION_KEY_STORAGE_KEY = 'arcwallet:session-key';
 const WALLET_STORAGE_KEY = 'arcwallet:wallets';
-const ENCRYPTION_SECRET = import.meta.env.VITE_WALLET_ENCRYPTION_SECRET ?? '';
+const ENCRYPTION_SECRET =
+  ((import.meta as any).env?.VITE_WALLET_ENCRYPTION_SECRET as string | undefined) ?? '';
 
 const textEncoder = typeof TextEncoder !== 'undefined' ? new TextEncoder() : null;
 const textDecoder = typeof TextDecoder !== 'undefined' ? new TextDecoder() : null;
@@ -53,18 +54,6 @@ const ensureEncryptionConfigured = () => {
     window.alert(message);
   }
   return ready;
-};
-
-const getOrCreateUserId = () => {
-  if (typeof window === 'undefined') {
-    return null;
-  }
-  let userId = window.localStorage.getItem(USER_ID_STORAGE_KEY);
-  if (!userId) {
-    userId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `user-${Date.now()}`;
-    window.localStorage.setItem(USER_ID_STORAGE_KEY, userId);
-  }
-  return userId;
 };
 
 const toBase64 = (buffer: ArrayBuffer) => {
@@ -257,6 +246,9 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     const finishResp = await passkeyClient.finishAuthentication(credential);
     const newSession = finishResp.data?.sessionKey ?? (finishResp as any).data?.sessionKey;
     const user = finishResp.data?.user ?? (finishResp as any).data?.user;
+    if (!newSession) {
+      throw new Error('Authentication succeeded but no session key was issued by the server.');
+    }
     if (user?.id && typeof window !== 'undefined') {
       try {
         window.localStorage.setItem(USER_ID_STORAGE_KEY, user.id);
@@ -271,20 +263,21 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     return sessionWithUsername;
   }, []);
 
-const registerPasskey = useCallback(async (userId: string, email?: string | null): Promise<SessionKey | null> => {
-  const username = email ?? `Arc User ${userId.slice(0, 6)}`;
-  const displayName = email ?? username;
-  try {
-    const startResp = await passkeyClient.beginRegistration(username, displayName);
+  const registerPasskey = useCallback(async (email: string): Promise<SessionKey | null> => {
+    const trimmedEmail = email.trim();
+    const normalizedEmail = trimmedEmail.toLowerCase();
+    if (!normalizedEmail) {
+      throw new Error('Email is required for passkey registration');
+    }
+    try {
+      const startResp = await passkeyClient.beginRegistration(normalizedEmail, trimmedEmail);
       const options = startResp.data?.options ?? (startResp as any).data?.options;
       const credential = await createRegistrationCredential(options);
-      const finishResp = await passkeyClient.finishRegistration(username, credential);
+      const finishResp = await passkeyClient.finishRegistration(normalizedEmail, credential);
 
-      // Registration now returns a session key
       const sessionKey = finishResp.data?.sessionKey ?? (finishResp as any).data?.sessionKey;
       const user = finishResp.data?.user ?? (finishResp as any).data?.user;
 
-      // Update user ID from registration response
       if (user?.id && typeof window !== 'undefined') {
         try {
           window.localStorage.setItem(USER_ID_STORAGE_KEY, user.id);
@@ -292,26 +285,24 @@ const registerPasskey = useCallback(async (userId: string, email?: string | null
         } catch {}
       }
 
-      // Include username in session key for future authentications
-      const sessionWithUsername: SessionKey = {
-        ...sessionKey,
-        username: user?.username || username
-      };
-      return sessionWithUsername;
+      if (sessionKey) {
+        const sessionWithUsername: SessionKey = {
+          ...sessionKey,
+          username: user?.username || normalizedEmail
+        };
+        return sessionWithUsername;
+      }
+
+      // Backend must always issue a session key; fallback to explicit auth just in case
+      return await authenticateWithPasskey(normalizedEmail);
     } catch (error) {
       if (error instanceof PasskeyClientError && error.status === 400) {
         console.info('Passkey already registered, trying to authenticate instead');
-        // If already registered, try to authenticate
-        const username = email ?? `Arc User ${userId.slice(0, 6)}`;
-        const session = await authenticateWithPasskey(username);
-        return session;
+        return authenticateWithPasskey(normalizedEmail);
       }
       if (error instanceof DOMException && error.name === 'InvalidStateError') {
         console.info('Credential already exists on this authenticator, trying to authenticate');
-        // If credential exists, try to authenticate
-        const username = email ?? `Arc User ${userId.slice(0, 6)}`;
-        const session = await authenticateWithPasskey(username);
-        return session;
+        return authenticateWithPasskey(normalizedEmail);
       }
       throw error;
     }
@@ -319,6 +310,10 @@ const registerPasskey = useCallback(async (userId: string, email?: string | null
 
   const loginWithPasskey = useCallback(async () => {
     if (typeof window === 'undefined') {
+      return;
+    }
+    if (!currentEmail) {
+      window.alert('Please verify your email first and try again.');
       return;
     }
     if (!('credentials' in navigator)) {
@@ -336,14 +331,8 @@ const registerPasskey = useCallback(async (userId: string, email?: string | null
     } catch (firstError) {
       if (firstError instanceof PasskeyClientError && firstError.status === 404) {
         console.info('No existing passkey. Attempting registration.');
-        const uid = userId || getOrCreateUserId();
-        if (!uid) {
-          window.alert('Unable to generate identity for passkey registration.');
-          return;
-        }
-        setUserId(uid);
         try {
-          const newSession = await registerPasskey(uid, currentEmail);
+          const newSession = await registerPasskey(currentEmail);
           if (newSession) {
             finalizeSession(newSession);
           }
@@ -409,10 +398,10 @@ const registerPasskey = useCallback(async (userId: string, email?: string | null
       loginWithPasskey,
       logout,
       registerPasskeyForCurrentUser: async () => {
-        const uid = userId || getOrCreateUserId();
-        if (!uid) throw new Error('No user identity');
-        setUserId(uid);
-        const session = await registerPasskey(uid, currentEmail);
+        if (!currentEmail) {
+          throw new Error('Cannot add a new passkey before the email is verified.');
+        }
+        const session = await registerPasskey(currentEmail);
         const stored = await loadStoredWalletForCurrentEmail();
         const sessionToUse = stored ?? session;
         if (sessionToUse) {

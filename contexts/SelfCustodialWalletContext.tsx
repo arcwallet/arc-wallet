@@ -58,6 +58,11 @@ export interface SelfCustodialWalletContextValue {
 
 const SelfCustodialWalletContext = createContext<SelfCustodialWalletContextValue | undefined>(undefined);
 
+const normalizeEmail = (email?: string | null) => {
+  if (!email) return null;
+  return email.trim().toLowerCase();
+};
+
 // Storage keys helpers
 const getStorageKey = (userId: string | null, key: string) => {
   if (!userId) return key; // Fallback for legacy or unauthenticated
@@ -96,6 +101,7 @@ export const SelfCustodialWalletProvider: React.FC<{ children: ReactNode }> = ({
   const [currentAccount, setCurrentAccount] = useState<WalletAccount | null>(null);
 
   const { currentEmail } = useSession();
+  const normalizedEmail = normalizeEmail(currentEmail);
 
   // Initialize on mount and when email changes
   useEffect(() => {
@@ -107,9 +113,9 @@ export const SelfCustodialWalletProvider: React.FC<{ children: ReactNode }> = ({
     setCurrentAccount(null);
     setAddress(null);
     setHasWallet(false);
-    setUserId(currentEmail || null);
+    setUserId(normalizedEmail);
 
-    if (!currentEmail) {
+    if (!normalizedEmail) {
       // If no email, we can't load a specific wallet
       return;
     }
@@ -122,8 +128,8 @@ export const SelfCustodialWalletProvider: React.FC<{ children: ReactNode }> = ({
       console.log('[Wallet] Found legacy wallet, migrating to user:', currentEmail);
 
       // Migrate to namespaced keys
-      const hasWalletKey = getStorageKey(currentEmail, 'has-wallet');
-      const addressKey = getStorageKey(currentEmail, 'wallet-address');
+      const hasWalletKey = getStorageKey(normalizedEmail, 'has-wallet');
+      const addressKey = getStorageKey(normalizedEmail, 'wallet-address');
 
       localStorage.setItem(hasWalletKey, 'true');
       localStorage.setItem(addressKey, legacyAddress);
@@ -135,8 +141,8 @@ export const SelfCustodialWalletProvider: React.FC<{ children: ReactNode }> = ({
     }
 
     // Load user-specific wallet
-    const userHasWalletKey = getStorageKey(currentEmail, 'has-wallet');
-    const userAddressKey = getStorageKey(currentEmail, 'wallet-address');
+    const userHasWalletKey = getStorageKey(normalizedEmail, 'has-wallet');
+    const userAddressKey = getStorageKey(normalizedEmail, 'wallet-address');
 
     const hasWalletStored = localStorage.getItem(userHasWalletKey) === 'true';
     setHasWallet(hasWalletStored);
@@ -145,7 +151,7 @@ export const SelfCustodialWalletProvider: React.FC<{ children: ReactNode }> = ({
     if (storedAddress) {
       setAddress(storedAddress);
     }
-  }, [sdk, currentEmail]);
+  }, [sdk, normalizedEmail]);
 
   // Setup SDK event listeners
   useEffect(() => {
@@ -155,8 +161,8 @@ export const SelfCustodialWalletProvider: React.FC<{ children: ReactNode }> = ({
       console.log('[Wallet] Connected:', payload.address);
       setAddress(payload.address);
 
-      if (currentEmail) {
-        const addressKey = getStorageKey(currentEmail, 'wallet-address');
+      if (normalizedEmail) {
+        const addressKey = getStorageKey(normalizedEmail, 'wallet-address');
         localStorage.setItem(addressKey, payload.address);
       }
     };
@@ -179,12 +185,12 @@ export const SelfCustodialWalletProvider: React.FC<{ children: ReactNode }> = ({
       sdk.off('disconnect', handleDisconnect);
       sdk.off('error', handleError);
     };
-  }, [sdk, currentEmail]);
+  }, [sdk, normalizedEmail]);
 
   // Create new wallet with passkey (EMAIL + PASSKEY!)
   const createWallet = useCallback(async (userName: string): Promise<{ address: string }> => {
     if (!sdk) throw new Error('SDK not initialized');
-    if (!currentEmail) throw new Error('Email verification required. Please login first.');
+    if (!normalizedEmail) throw new Error('Email verification required. Please login first.');
 
     setIsConnecting(true);
 
@@ -192,8 +198,8 @@ export const SelfCustodialWalletProvider: React.FC<{ children: ReactNode }> = ({
       console.log('[Wallet] Creating new wallet with email + passkey...');
 
       // Use email as userId for multi-device support
-      const userId = currentEmail;
-      const displayName = userName || currentEmail;
+      const userId = normalizedEmail;
+      const displayName = (userName || currentEmail || normalizedEmail).slice(0, 64);
 
       // Create wallet with passkey - This will:
       // 1. Prompt user for biometric authentication
@@ -211,16 +217,16 @@ export const SelfCustodialWalletProvider: React.FC<{ children: ReactNode }> = ({
       setHasWallet(true);
       setIsUnlocked(true);
       setIsAuthenticated(true);
-      setUserId(currentEmail);
+      setUserId(normalizedEmail);
 
       // Persist wallet existence
-      const hasWalletKey = getStorageKey(currentEmail, 'has-wallet');
-      const addressKey = getStorageKey(currentEmail, 'wallet-address');
-      const userIdKey = getStorageKey(currentEmail, 'user-id');
+      const hasWalletKey = getStorageKey(normalizedEmail, 'has-wallet');
+      const addressKey = getStorageKey(normalizedEmail, 'wallet-address');
+      const userIdKey = getStorageKey(normalizedEmail, 'user-id');
 
       localStorage.setItem(hasWalletKey, 'true');
       localStorage.setItem(addressKey, account.address);
-      localStorage.setItem(userIdKey, currentEmail);
+      localStorage.setItem(userIdKey, normalizedEmail);
 
       // TODO: Backup encrypted wallet to backend (Phase 3)
       // await backupWalletToBackend(currentEmail, account.encryptedData);
@@ -232,7 +238,7 @@ export const SelfCustodialWalletProvider: React.FC<{ children: ReactNode }> = ({
     } finally {
       setIsConnecting(false);
     }
-  }, [sdk, currentEmail]);
+  }, [sdk, normalizedEmail, currentEmail]);
 
   // Unlock wallet with passkey (biometric authentication)
   const unlockWallet = useCallback(async () => {
@@ -260,8 +266,8 @@ export const SelfCustodialWalletProvider: React.FC<{ children: ReactNode }> = ({
       setIsAuthenticated(true);
 
       // Update stored address in case it changed
-      if (currentEmail) {
-        const addressKey = getStorageKey(currentEmail, 'wallet-address');
+      if (normalizedEmail) {
+        const addressKey = getStorageKey(normalizedEmail, 'wallet-address');
         localStorage.setItem(addressKey, account.address);
       }
     } catch (error: any) {
@@ -270,7 +276,7 @@ export const SelfCustodialWalletProvider: React.FC<{ children: ReactNode }> = ({
     } finally {
       setIsConnecting(false);
     }
-  }, [sdk, currentEmail]);
+  }, [sdk, normalizedEmail]);
 
   // Lock wallet (clear from memory)
   const lockWallet = useCallback(() => {
@@ -345,10 +351,10 @@ export const SelfCustodialWalletProvider: React.FC<{ children: ReactNode }> = ({
       }
 
       // Clear all storage
-      if (currentEmail) {
-        const hasWalletKey = getStorageKey(currentEmail, 'has-wallet');
-        const addressKey = getStorageKey(currentEmail, 'wallet-address');
-        const userIdKey = getStorageKey(currentEmail, 'user-id');
+      if (normalizedEmail) {
+        const hasWalletKey = getStorageKey(normalizedEmail, 'has-wallet');
+        const addressKey = getStorageKey(normalizedEmail, 'wallet-address');
+        const userIdKey = getStorageKey(normalizedEmail, 'user-id');
 
         localStorage.removeItem(hasWalletKey);
         localStorage.removeItem(addressKey);
@@ -368,7 +374,7 @@ export const SelfCustodialWalletProvider: React.FC<{ children: ReactNode }> = ({
       console.error('[Wallet] Delete failed:', error);
       throw error;
     }
-  }, [sdk, isUnlocked, currentEmail]);
+  }, [sdk, isUnlocked, normalizedEmail]);
 
   // Context value
   const value = useMemo<SelfCustodialWalletContextValue>(() => ({

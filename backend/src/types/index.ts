@@ -147,6 +147,11 @@ export interface RegistrationFinishRequest {
 
 export interface RegistrationFinishResponse {
   success: boolean;
+  sessionKey: {
+    privateKey: string;
+    address: string;
+    expiresAt: string;
+  };
   user: {
     id: string;
     username: string;

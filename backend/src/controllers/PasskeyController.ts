@@ -18,8 +18,40 @@ import {
   RegistrationFinishRequest,
   AuthenticationStartRequest,
   AuthenticationFinishRequest,
-  EnvConfig
+  EnvConfig,
+  SessionKey
 } from '../types/index.js';
+
+const normalizeUsername = (value: string) => value.trim().toLowerCase();
+
+const serializeSessionKey = (sessionKey: SessionKey) => ({
+  privateKey: sessionKey.privateKey,
+  address: sessionKey.address,
+  expiresAt: sessionKey.expiresAt instanceof Date
+    ? sessionKey.expiresAt.toISOString()
+    : new Date(sessionKey.expiresAt).toISOString()
+});
+
+const decodeClientDataJSON = (clientData: string): Record<string, any> => {
+  const base64 = clientData.replace(/-/g, '+').replace(/_/g, '/');
+  const pad = base64.length % 4;
+  const padded = pad ? base64 + '='.repeat(4 - pad) : base64;
+  const buffer = Buffer.from(padded, 'base64');
+  try {
+    return JSON.parse(buffer.toString('utf-8'));
+  } catch (error) {
+    throw new ApiError('Invalid client data JSON', 400, 'INVALID_CHALLENGE');
+  }
+};
+
+const extractChallengeFromCredential = (clientDataJSON: string): string => {
+  const clientData = decodeClientDataJSON(clientDataJSON);
+  const challenge = clientData?.challenge;
+  if (typeof challenge !== 'string' || challenge.length === 0) {
+    throw new ApiError('Challenge not found in credential', 400, 'INVALID_CHALLENGE');
+  }
+  return challenge;
+};
 
 export class PasskeyController {
   private db: Database;
@@ -38,13 +70,17 @@ export class PasskeyController {
   registrationStart = async (req: Request, res: Response) => {
     try {
       const { username, displayName }: RegistrationStartRequest = req.body;
+      const rawUsername = username?.trim();
 
-      if (!username || !displayName) {
-        throw new ApiError('Username and display name are required', 400, 'MISSING_FIELDS');
+      if (!rawUsername) {
+        throw new ApiError('Username (email) is required', 400, 'MISSING_FIELDS');
       }
 
+      const normalizedUsername = normalizeUsername(rawUsername);
+      const friendlyDisplayName = (displayName?.trim() || rawUsername).slice(0, 64);
+
       // Check if user already exists
-      const existingUser = await this.db.getUserByUsername(username);
+      const existingUser = await this.db.getUserByUsername(normalizedUsername);
 
       let options;
       if (existingUser) {
@@ -88,8 +124,8 @@ export class PasskeyController {
           rpName: this.config.RP_NAME,
           rpID: this.config.RP_ID,
           userID: new Uint8Array(Buffer.from(randomUUID())),
-          userName: username,
-          userDisplayName: displayName,
+          userName: normalizedUsername,
+          userDisplayName: friendlyDisplayName,
           attestationType: 'none',
           authenticatorSelection: {
             residentKey: 'preferred',
@@ -131,13 +167,17 @@ export class PasskeyController {
         throw new ApiError('Username and credential are required', 400, 'MISSING_FIELDS');
       }
 
-      // Verify the challenge exists and is valid (latest unexpired registration challenge)
-      const challengeRecord = await this.db.getLatestChallengeByType('registration');
+      const rawUsername = username.trim();
+      const normalizedUsername = normalizeUsername(rawUsername);
+      const friendlyDisplayName = rawUsername || normalizedUsername;
+
+      const clientChallenge = extractChallengeFromCredential(credential.response.clientDataJSON);
+
+      // Verify the challenge exists and is valid
+      const challengeRecord = await this.db.getChallengeByValue(clientChallenge, 'registration');
       if (!challengeRecord) {
         throw new ApiError('Invalid or expired challenge', 400, 'INVALID_CHALLENGE');
       }
-
-      // Credential received for registration (sensitive data redacted)
 
       // Verify registration response
       const verification = await verifyRegistrationResponse({
@@ -153,13 +193,13 @@ export class PasskeyController {
       }
 
       // Create user if not exists; otherwise use existing
-      let user = await this.db.getUserByUsername(username);
+      let user = await this.db.getUserByUsername(normalizedUsername);
       if (!user) {
         const userId = randomUUID();
         user = await this.db.createUser({
           id: userId,
-          username,
-          displayName: username
+          username: normalizedUsername,
+          displayName: friendlyDisplayName
         });
       }
 
@@ -197,7 +237,8 @@ export class PasskeyController {
             id: user.id,
             username: user.username,
             displayName: user.displayName
-          }
+          },
+          sessionKey: serializeSessionKey(sessionKey)
         }
       });
 
@@ -218,10 +259,11 @@ export class PasskeyController {
       const { username }: AuthenticationStartRequest = req.body;
 
       let allowCredentials = undefined;
+      const normalizedUsername = username?.trim() ? normalizeUsername(username) : undefined;
 
       // If username is provided, get user's credentials
-      if (username) {
-        const user = await this.db.getUserByUsername(username);
+      if (normalizedUsername) {
+        const user = await this.db.getUserByUsername(normalizedUsername);
         if (!user) {
           throw new ApiError('User not found', 404, 'USER_NOT_FOUND');
         }
@@ -291,8 +333,10 @@ export class PasskeyController {
         throw new ApiError('User not found', 404, 'USER_NOT_FOUND');
       }
 
-      // Find latest active authentication challenge
-      const challenge = await this.db.getLatestChallengeByType('authentication');
+      const clientChallenge = extractChallengeFromCredential(credential.response.clientDataJSON);
+
+      // Find specific authentication challenge
+      const challenge = await this.db.getChallengeByValue(clientChallenge, 'authentication');
 
       if (!challenge) {
         throw new ApiError('Invalid or expired challenge', 400, 'INVALID_CHALLENGE');
@@ -343,7 +387,8 @@ export class PasskeyController {
             id: user.id,
             username: user.username,
             displayName: user.displayName
-          }
+          },
+          sessionKey: serializeSessionKey(sessionKey)
         }
       });
 
