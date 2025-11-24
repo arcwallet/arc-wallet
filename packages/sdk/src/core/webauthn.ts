@@ -115,11 +115,13 @@ export class WebAuthnManager {
         throw new Error('Failed to get registration options');
       }
 
-      const options: PublicKeyCredentialCreationOptionsJSON = await optionsResponse.json();
+      const responseData = await optionsResponse.json();
+      // Backend returns: { success: true, data: { options: {...} } }
+      const options: PublicKeyCredentialCreationOptionsJSON = responseData.data?.options || responseData;
 
       logger.debug('Received registration options from backend', {
         component: 'WebAuthn',
-        challenge: options.challenge.substring(0, 20) + '...',
+        challenge: options.challenge?.substring(0, 20) + '...',
       });
 
       // Step 2: Create credential using @simplewebauthn/browser
@@ -207,11 +209,13 @@ export class WebAuthnManager {
         throw new Error('Failed to get authentication options');
       }
 
-      const options: PublicKeyCredentialRequestOptionsJSON = await optionsResponse.json();
+      const responseData = await optionsResponse.json();
+      // Backend returns: { success: true, data: { options: {...} } }
+      const options: PublicKeyCredentialRequestOptionsJSON = responseData.data?.options || responseData;
 
       logger.debug('Received authentication options from backend', {
         component: 'WebAuthn',
-        challenge: options.challenge.substring(0, 20) + '...',
+        challenge: options.challenge?.substring(0, 20) + '...',
       });
 
       // Step 2: Authenticate using @simplewebauthn/browser
