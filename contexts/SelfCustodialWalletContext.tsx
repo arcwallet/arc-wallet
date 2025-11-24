@@ -77,11 +77,13 @@ const LEGACY_USER_ID_KEY = 'arcwallet:user-id';
 // Initialize SDK
 const initializeSDK = (): WalletSDK => {
   // Use environment variable with smart fallback:
-  // 1. VITE_PASSKEY_API_URL if set
-  // 2. In production build, use same-origin /api to avoid CORS
-  // 3. In development, fallback to localhost:4000
+  // 1. VITE_PASSKEY_API_URL if set (local development)
+  // 2. PASSKEY_API_URL if set (Render/Vercel without VITE_ prefix)
+  // 3. In production build, use same-origin /api to avoid CORS
+  // 4. In development, fallback to localhost:4000
   const backendUrl = typeof window !== 'undefined'
     ? ((import.meta as any).env.VITE_PASSKEY_API_URL ??
+      (import.meta as any).env.PASSKEY_API_URL ??
       ((import.meta as any).env.PROD
         ? `${window.location.origin}/api`
         : 'http://localhost:4000'))
