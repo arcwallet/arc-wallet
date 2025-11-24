@@ -104,6 +104,13 @@ export class Database {
       )
     `);
 
+    // Migration: Add private_key_iv column if it doesn't exist
+    try {
+      await run('ALTER TABLE session_keys ADD COLUMN private_key_iv TEXT');
+    } catch (error) {
+      // Ignore error if column already exists
+    }
+
     // WebAuthn challenges table
     await run(`
       CREATE TABLE IF NOT EXISTS webauthn_challenges (
