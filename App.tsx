@@ -14,8 +14,9 @@ import { IdentityProvider } from './contexts/IdentityContext';
 import { PrivacyProvider } from './contexts/PrivacyContext';
 // Self-custodial wallet imports
 import { SelfCustodialWalletProvider, useSelfCustodialWallet } from './contexts/SelfCustodialWalletContext';
-import WalletAutoSetup from './components/WalletAutoSetup';
+import WalletSetup from './components/WalletSetup';
 import UnlockWalletPasskey from './components/UnlockWalletPasskey';
+import PasskeySelectionScreen from './components/PasskeySelectionScreen';
 
 // Self-custodial wallet experience - new architecture
 const SelfCustodialWalletExperience: React.FC = () => {
@@ -25,10 +26,12 @@ const SelfCustodialWalletExperience: React.FC = () => {
     logout,
   } = useSelfCustodialWallet();
   const { logout: sessionLogout } = useSession();
+  const [authFlow, setAuthFlow] = React.useState<'select' | 'create' | 'unlock'>('select');
 
   const handleComplete = async () => {
     // Wallet created successfully with SDK
     console.log('[App] Wallet creation complete');
+    setAuthFlow('select'); // Return to selection after creation
   };
 
   const handleUnlock = () => {
@@ -37,23 +40,35 @@ const SelfCustodialWalletExperience: React.FC = () => {
   };
 
   const handleReset = () => {
-    // Wallet reset, go back to setup
+    // Wallet reset, go back to selection
     console.log('[App] Wallet reset');
+    setAuthFlow('select');
   };
 
   const handleLogout = async () => {
     await sessionLogout();
     logout();
+    setAuthFlow('select'); // Reset flow on logout
   };
 
-  // No wallet - show setup (Create Passkey)
-  if (!hasWallet) {
-    return <WalletAutoSetup onComplete={handleComplete} />;
+  // Show selection screen first (after magic link)
+  if (authFlow === 'select') {
+    return (
+      <PasskeySelectionScreen
+        hasExistingWallet={hasWallet}
+        onSelectCreate={() => setAuthFlow('create')}
+        onSelectUnlock={() => setAuthFlow('unlock')}
+      />
+    );
   }
 
-  // Wallet exists but locked - show unlock (Verify Passkey)
-  // This enforces passkey authentication even after magic link login
-  if (!isUnlocked) {
+  // Create flow - setup new passkey
+  if (authFlow === 'create' || (!hasWallet && authFlow !== 'unlock')) {
+    return <WalletSetup onComplete={handleComplete} />;
+  }
+
+  // Unlock flow - use existing passkey
+  if ((!isUnlocked && hasWallet) || authFlow === 'unlock') {
     return <UnlockWalletPasskey onUnlock={handleUnlock} onReset={handleReset} />;
   }
 
