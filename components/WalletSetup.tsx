@@ -4,7 +4,7 @@
  * NO PASSWORDS - NO SEED PHRASES
  */
 
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useSelfCustodialWallet } from '../contexts/SelfCustodialWalletContext';
 import { WaveBackground } from './WaveBackground';
 import arcLogo from '../assets/arclogo.png';
@@ -15,17 +15,19 @@ interface WalletSetupProps {
 }
 
 const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
-  const { createWallet, isConnecting } = useSelfCustodialWallet();
+  const { createWallet, isConnecting, hasWallet } = useSelfCustodialWallet();
 
   const [userName, setUserName] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
+  const [autoStarted, setAutoStarted] = useState(false);
 
   // Handle wallet creation with passkey
-  const handleCreate = async () => {
+  const handleCreate = useCallback(async (auto = false) => {
     setError(null);
 
-    if (!userName.trim()) {
+    const nameToUse = userName.trim() || 'Arc Wallet User';
+    if (!userName.trim() && !auto) {
       setError('Please enter your name');
       return;
     }
@@ -34,7 +36,7 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
 
     try {
       console.log('[WalletSetup] Creating wallet with passkey...');
-      await createWallet(userName.trim());
+      await createWallet(nameToUse);
       console.log('[WalletSetup] Wallet created successfully');
       onComplete();
     } catch (err: any) {
@@ -52,7 +54,14 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
       }
       setIsCreating(false);
     }
-  };
+  }, [createWallet, onComplete, userName]);
+
+  useEffect(() => {
+    if (!hasWallet && !autoStarted && !isCreating) {
+      setAutoStarted(true);
+      void handleCreate(true);
+    }
+  }, [hasWallet, autoStarted, isCreating, handleCreate]);
 
   return (
     <div className="fixed inset-0 w-full h-full flex flex-col items-center justify-center overflow-hidden bg-transparent">
@@ -104,31 +113,33 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
 
           {/* Form */}
           <div className="space-y-6">
-            <div className="group">
-              <label className="block text-sm font-medium text-slate-400 mb-2">
-                Your Name
-              </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  value={userName}
-                  onChange={(e) => setUserName(e.target.value)}
-                  onKeyPress={(e) => {
-                    if (e.key === 'Enter' && userName.trim() && !isCreating) {
-                      handleCreate();
-                    }
-                  }}
-                  placeholder="Enter your name"
-                  disabled={isCreating}
-                  className="w-full bg-slate-900/60 border border-slate-500/50 rounded-lg px-4 py-4 text-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 transition-all backdrop-blur-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                  autoFocus
-                />
-                <div className="absolute inset-0 rounded-lg bg-blue-500/5 opacity-0 group-focus-within:opacity-100 pointer-events-none transition-opacity duration-500" />
+            {!isCreating && (
+              <div className="group">
+                <label className="block text-sm font-medium text-slate-400 mb-2">
+                  Your Name
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={userName}
+                    onChange={(e) => setUserName(e.target.value)}
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter' && !isCreating) {
+                        handleCreate();
+                      }
+                    }}
+                    placeholder="Enter your name"
+                    disabled={isCreating}
+                    className="w-full bg-slate-900/60 border border-slate-500/50 rounded-lg px-4 py-4 text-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 transition-all backdrop-blur-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                    autoFocus
+                  />
+                  <div className="absolute inset-0 rounded-lg bg-blue-500/5 opacity-0 group-focus-within:opacity-100 pointer-events-none transition-opacity duration-500" />
+                </div>
+                <p className="mt-2 text-xs text-slate-500">
+                  This will be used to identify your wallet
+                </p>
               </div>
-              <p className="mt-2 text-xs text-slate-500">
-                This will be used to identify your wallet
-              </p>
-            </div>
+            )}
 
             {error && (
               <div className="p-3 rounded-lg backdrop-blur-sm border bg-red-900/20 border-red-500/50 text-red-200 text-center text-sm">
@@ -137,8 +148,8 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
             )}
 
             <button
-              onClick={handleCreate}
-              disabled={isConnecting || isCreating || !userName.trim()}
+              onClick={() => handleCreate()}
+              disabled={isConnecting || isCreating}
               className="w-full bg-slate-200 hover:bg-white text-slate-900 font-medium text-lg py-4 rounded-lg transition-all duration-200 shadow-[0_0_20px_rgba(255,255,255,0.1)] hover:shadow-[0_0_30px_rgba(255,255,255,0.2)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {isCreating ? (
