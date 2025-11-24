@@ -17,11 +17,11 @@ export function createPasskeyRoutes(db: Database, config: EnvConfig): Router {
   router.use(sanitizeInput);
 
   /**
-   * POST /passkeys/register/options
-   * Start passkey registration process (get options)
+   * POST /passkeys/register/start
+   * Start passkey registration process
    */
   router.post(
-    '/register/options',
+    '/register/start',
     rateLimitMiddleware('registration'),
     validateRequestBody(['username', 'displayName']),
     async (req: Request, res: Response, next: NextFunction) => {
@@ -34,11 +34,11 @@ export function createPasskeyRoutes(db: Database, config: EnvConfig): Router {
   );
 
   /**
-   * POST /passkeys/register/verify
-   * Complete passkey registration (verify credential)
+   * POST /passkeys/register/finish
+   * Complete passkey registration
    */
   router.post(
-    '/register/verify',
+    '/register/finish',
     rateLimitMiddleware('registration'),
     validateRequestBody(['username', 'credential']),
     async (req: Request, res: Response, next: NextFunction) => {
@@ -51,11 +51,11 @@ export function createPasskeyRoutes(db: Database, config: EnvConfig): Router {
   );
 
   /**
-   * POST /passkeys/login/options
-   * Start passkey authentication process (get options)
+   * POST /passkeys/auth/start
+   * Start passkey authentication process
    */
   router.post(
-    '/login/options',
+    '/auth/start',
     rateLimitMiddleware('auth'),
     async (req: Request, res: Response, next: NextFunction) => {
       try {
@@ -67,11 +67,11 @@ export function createPasskeyRoutes(db: Database, config: EnvConfig): Router {
   );
 
   /**
-   * POST /passkeys/login/verify
-   * Complete passkey authentication (verify credential)
+   * POST /passkeys/auth/finish
+   * Complete passkey authentication
    */
   router.post(
-    '/login/verify',
+    '/auth/finish',
     rateLimitMiddleware('auth'),
     validateRequestBody(['credential']),
     async (req: Request, res: Response, next: NextFunction) => {
@@ -94,7 +94,7 @@ export function createPasskeyRoutes(db: Database, config: EnvConfig): Router {
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         const { userId } = req.params;
-
+    
         // Verify user owns this data
         if (req.user?.id !== userId) {
           return res.status(403).json({
@@ -137,7 +137,7 @@ export function createPasskeyRoutes(db: Database, config: EnvConfig): Router {
     async (req, res, next) => {
       try {
         const { userId } = req.params;
-
+    
         // Verify user owns this data
         if (req.user?.id !== userId) {
           return res.status(403).json({
