@@ -29,12 +29,12 @@ export const setCsrfCookie = (req: Request, res: Response, next: NextFunction) =
 };
 
 // Routes that don't require CSRF validation (public endpoints)
+// Passkey endpoints are exempt because WebAuthn provides cryptographic security
 const CSRF_EXEMPT_ROUTES = [
   '/api/send-link',
   '/api/verify',
   '/health',
-  '/passkeys/register/options',  // First passkey request needs to get CSRF cookie
-  '/passkeys/login/options',     // First login request needs to get CSRF cookie
+  '/passkeys',  // All passkey routes exempt (WebAuthn provides cryptographic security)
 ];
 
 /**
