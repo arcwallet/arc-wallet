@@ -17,6 +17,14 @@ export declare class WebAuthnManager {
      */
     isSupported(): boolean;
     /**
+     * Get CSRF token from cookie
+     */
+    private getCsrfToken;
+    /**
+     * Get headers with CSRF token for API requests
+     */
+    private getHeaders;
+    /**
      * Create new passkey for user using @simplewebauthn/browser
      */
     createPasskey(userId: string, userName: string): Promise<PasskeyCredential>;

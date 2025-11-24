@@ -105,7 +105,10 @@ export class WebAuthnManager {
         method: 'POST',
         headers: this.getHeaders(),
         credentials: 'include',
-        body: JSON.stringify({ userId, userName }),
+        body: JSON.stringify({
+          username: userId,      // Backend expects 'username' (email)
+          displayName: userName  // Backend expects 'displayName' (friendly name)
+        }),
       });
 
       if (!optionsResponse.ok) {
@@ -134,7 +137,7 @@ export class WebAuthnManager {
         headers: this.getHeaders(),
         credentials: 'include',
         body: JSON.stringify({
-          userId,
+          username: userId,  // Backend expects 'username' not 'userId'
           credential,
         }),
       });

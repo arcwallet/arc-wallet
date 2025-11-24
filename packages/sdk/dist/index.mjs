@@ -1,5 +1,5 @@
-var X = Object.defineProperty;
-var Z = (r, e, t) => e in r ? X(r, e, { enumerable: !0, configurable: !0, writable: !0, value: t }) : r[e] = t;
+var Q = Object.defineProperty;
+var Z = (r, e, t) => e in r ? Q(r, e, { enumerable: !0, configurable: !0, writable: !0, value: t }) : r[e] = t;
 var d = (r, e, t) => Z(r, typeof e != "symbol" ? e + "" : e, t);
 import { Wallet as B, parseUnits as ee, Contract as E, keccak256 as b, getBytes as D, formatUnits as te, AbiCoder as ne, Interface as U, toBeHex as S, JsonRpcProvider as re } from "ethers";
 import { set as x, get as I, del as ae, clear as se } from "idb-keyval";
@@ -10,7 +10,7 @@ function C(r) {
     t += String.fromCharCode(a);
   return btoa(t).replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
 }
-function k(r) {
+function O(r) {
   const e = r.replace(/-/g, "+").replace(/_/g, "/"), t = (4 - e.length % 4) % 4, n = e.padEnd(e.length + t, "="), a = atob(n), s = new ArrayBuffer(a.length), i = new Uint8Array(s);
   for (let c = 0; c < a.length; c++)
     i[c] = a.charCodeAt(c);
@@ -26,7 +26,7 @@ function j(r) {
   const { id: e } = r;
   return {
     ...r,
-    id: k(e),
+    id: O(e),
     /**
      * `descriptor.transports` is an array of our `AuthenticatorTransportFuture` that includes newer
      * transports that TypeScript's DOM lib is ignorant of. Convince TS that our list of transports
@@ -175,10 +175,10 @@ async function de(r) {
     throw new Error("WebAuthn is not supported in this browser");
   const n = {
     ...e,
-    challenge: k(e.challenge),
+    challenge: O(e.challenge),
     user: {
       ...e.user,
-      id: k(e.user.id)
+      id: O(e.user.id)
     },
     excludeCredentials: (w = e.excludeCredentials) == null ? void 0 : w.map(j)
   }, a = {};
@@ -296,7 +296,7 @@ async function pe(r) {
   ((p = e.allowCredentials) == null ? void 0 : p.length) !== 0 && (a = (w = e.allowCredentials) == null ? void 0 : w.map(j));
   const s = {
     ...e,
-    challenge: k(e.challenge),
+    challenge: O(e.challenge),
     allowCredentials: a
   }, i = {};
   if (t) {
@@ -332,7 +332,7 @@ async function pe(r) {
   };
 }
 var ye = /* @__PURE__ */ ((r) => (r[r.DEBUG = 0] = "DEBUG", r[r.INFO = 1] = "INFO", r[r.WARN = 2] = "WARN", r[r.ERROR = 3] = "ERROR", r[r.SILENT = 4] = "SILENT", r))(ye || {});
-class Q {
+class X {
   constructor(e) {
     d(this, "config");
     d(this, "sentryInitialized", !1);
@@ -422,7 +422,7 @@ class Q {
   setContext(e) {
   }
 }
-const o = new Q({
+const o = new X({
   level: process.env.NODE_ENV === "production" ? 2 : 0,
   enableConsole: !0,
   enableSentry: process.env.NODE_ENV === "production",
@@ -430,7 +430,7 @@ const o = new Q({
   environment: process.env.NODE_ENV || "development"
 });
 function Fe(r) {
-  return new Q(r);
+  return new X(r);
 }
 class We extends Error {
   constructor(t, n) {
@@ -564,6 +564,23 @@ class Ee {
     return typeof window < "u" && window.PublicKeyCredential !== void 0 && typeof window.PublicKeyCredential == "function";
   }
   /**
+   * Get CSRF token from cookie
+   */
+  getCsrfToken() {
+    if (typeof document > "u") return null;
+    const e = document.cookie.match(/(?:^|; )_csrf=([^;]*)/);
+    return e ? decodeURIComponent(e[1]) : null;
+  }
+  /**
+   * Get headers with CSRF token for API requests
+   */
+  getHeaders() {
+    const e = {
+      "Content-Type": "application/json"
+    }, t = this.getCsrfToken();
+    return t && (e["X-CSRF-Token"] = t), e;
+  }
+  /**
    * Create new passkey for user using @simplewebauthn/browser
    */
   async createPasskey(e, t) {
@@ -580,11 +597,16 @@ class Ee {
         platformSupport: a.platformSupport,
         message: s
       });
-      const i = await fetch(`${this.backendUrl}/passkey/register/options`, {
+      const i = await fetch(`${this.backendUrl}/passkeys/register/options`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: this.getHeaders(),
         credentials: "include",
-        body: JSON.stringify({ userId: e, userName: t })
+        body: JSON.stringify({
+          username: e,
+          // Backend expects 'username' (email)
+          displayName: t
+          // Backend expects 'displayName' (friendly name)
+        })
       });
       if (!i.ok)
         throw new Error("Failed to get registration options");
@@ -598,12 +620,13 @@ class Ee {
         component: "WebAuthn",
         credentialId: u.id.substring(0, 20) + "..."
       });
-      const l = await fetch(`${this.backendUrl}/passkey/register/verify`, {
+      const l = await fetch(`${this.backendUrl}/passkeys/register/verify`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: this.getHeaders(),
         credentials: "include",
         body: JSON.stringify({
-          userId: e,
+          username: e,
+          // Backend expects 'username' not 'userId'
           credential: u
         })
       });
@@ -644,9 +667,9 @@ class Ee {
         action: "authenticate",
         credentialId: e == null ? void 0 : e.substring(0, 20)
       });
-      const t = await fetch(`${this.backendUrl}/passkey/login/options`, {
+      const t = await fetch(`${this.backendUrl}/passkeys/login/options`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: this.getHeaders(),
         credentials: "include",
         body: JSON.stringify({ credentialId: e })
       });
@@ -662,9 +685,9 @@ class Ee {
         component: "WebAuthn",
         credentialId: a.id.substring(0, 20) + "..."
       });
-      const s = await fetch(`${this.backendUrl}/passkey/login/verify`, {
+      const s = await fetch(`${this.backendUrl}/passkeys/login/verify`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: this.getHeaders(),
         credentials: "include",
         body: JSON.stringify({
           credential: a
@@ -1548,7 +1571,7 @@ const sdk = new WalletSDK({
 });
 \`\`\`` : `CCTP configuration missing for chain ID ${r}`;
 }
-class Oe {
+class ke {
   constructor(e, t) {
     d(this, "config");
     d(this, "provider");
@@ -1679,7 +1702,7 @@ class Oe {
     return te(i, 6);
   }
 }
-const ke = {
+const Oe = {
   entryPoint: "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789",
   // v0.6
   bundlerUrl: "",
@@ -1721,7 +1744,7 @@ class Me {
     }
   }
 }
-const R = new ne(), O = [
+const R = new ne(), k = [
   "function execute(address dest, uint256 value, bytes calldata func)",
   "function executeBatch(address[] calldata dest, uint256[] calldata value, bytes[] calldata func)",
   "function getNonce() view returns (uint256)"
@@ -1733,7 +1756,7 @@ class Ke {
     d(this, "paymasterConfig");
     d(this, "circlePaymaster");
     d(this, "accountAddress", null);
-    this.provider = e, this.config = { ...ke, ...t }, this.paymasterConfig = n, (n == null ? void 0 : n.type) === "circle" && n.chainId && (this.circlePaymaster = new Me({
+    this.provider = e, this.config = { ...Oe, ...t }, this.paymasterConfig = n, (n == null ? void 0 : n.type) === "circle" && n.chainId && (this.circlePaymaster = new Me({
       paymasterUrl: n.url,
       chainId: n.chainId,
       bundlerUrl: t == null ? void 0 : t.bundlerUrl
@@ -1769,13 +1792,13 @@ class Ke {
     var m;
     const n = this.accountAddress || this.getAccountAddress(e.address);
     this.accountAddress = n;
-    const a = await this.isDeployed(n), i = new U(O).encodeFunctionData("execute", [
+    const a = await this.isDeployed(n), i = new U(k).encodeFunctionData("execute", [
       t.to,
       BigInt(t.value || "0"),
       t.data || "0x"
     ]);
     let c = 0n;
-    a && (c = await new E(n, O, this.provider).getNonce());
+    a && (c = await new E(n, k, this.provider).getNonce());
     const u = a ? "0x" : this.buildInitCode(e.address), l = await this.provider.getFeeData(), h = {
       sender: n,
       nonce: c,
@@ -1804,13 +1827,13 @@ class Ke {
     var M;
     const a = this.accountAddress || this.getAccountAddress(e.address);
     this.accountAddress = a;
-    const s = await this.isDeployed(a), i = new U(O), c = t.map((A) => A.to), u = t.map((A) => BigInt(A.value || "0")), l = t.map((A) => A.data || "0x"), h = i.encodeFunctionData("executeBatch", [
+    const s = await this.isDeployed(a), i = new U(k), c = t.map((A) => A.to), u = t.map((A) => BigInt(A.value || "0")), l = t.map((A) => A.data || "0x"), h = i.encodeFunctionData("executeBatch", [
       c,
       u,
       l
     ]);
     let g = 0n;
-    s && (g = await new E(a, O, this.provider).getNonce());
+    s && (g = await new E(a, k, this.provider).getNonce());
     const m = s ? "0x" : this.buildInitCode(e.address), p = await this.provider.getFeeData(), w = {
       sender: a,
       nonce: g,
@@ -2015,7 +2038,7 @@ class Be {
       rpId: e.rpId,
       rpName: e.appName,
       backendUrl: e.backendUrl
-    }), this.storage = new Se(), this.keyManager = new Te(this.webauthn, this.storage), this.provider = new re(e.rpcUrl), this.cctpManager = new Oe(this.provider, e.cctp), this.accountType = e.accountType || "eoa", this.accountType === "smart-account" && (this.smartAccountManager = new Ke(
+    }), this.storage = new Se(), this.keyManager = new Te(this.webauthn, this.storage), this.provider = new re(e.rpcUrl), this.cctpManager = new ke(this.provider, e.cctp), this.accountType = e.accountType || "eoa", this.accountType === "smart-account" && (this.smartAccountManager = new Ke(
       this.provider,
       e.smartAccount,
       e.paymaster
@@ -2338,11 +2361,11 @@ async function $e(r, e) {
 }
 const Ve = "1.0.0";
 export {
-  Oe as CCTPManager,
+  ke as CCTPManager,
   G as CIRCLE_NETWORKS,
   He as CircleApiClient,
   Me as CirclePaymasterClient,
-  ke as DEFAULT_AA_CONFIG,
+  Oe as DEFAULT_AA_CONFIG,
   ve as DEFAULT_CCTP_CONFIG,
   Te as KeyManager,
   ye as LogLevel,
