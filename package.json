@@ -50,6 +50,7 @@
     "glob": "^9.3.5",
     "idb-keyval": "^6.2.1",
     "lru-cache": "^11.2.2",
+    "ox": "^0.8.9",
     "permissionless": "^0.3.2",
     "qrcode": "^1.5.4",
     "react": "^19.2.0",
