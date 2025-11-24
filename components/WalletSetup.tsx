@@ -16,39 +16,47 @@ interface WalletSetupProps {
 }
 
 const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
-  const { createWallet, isConnecting, hasWallet } = useSelfCustodialWallet();
+  const { createWallet, unlockWallet, isConnecting, hasWallet } = useSelfCustodialWallet();
   const { currentEmail } = useSession();
   const [error, setError] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string>('Waiting for verified email...');
   const [isCreating, setIsCreating] = useState(false);
   const [autoStarted, setAutoStarted] = useState(false);
 
-  // Handle wallet creation with passkey
-  const handleCreate = useCallback(async (auto = false) => {
+  // Handle wallet creation or unlock with passkey
+  const handleWalletAccess = useCallback(async (auto = false) => {
     setError(null);
 
     if (!currentEmail) {
       if (!auto) {
-        setError('Please verify your email before creating a wallet.');
+        setError('Please verify your email before accessing wallet.');
       }
       return;
     }
 
     setIsCreating(true);
-    if (currentEmail) {
-      setStatusMessage(`Requesting biometric approval for ${currentEmail}...`);
-    }
 
     try {
-      console.log('[WalletSetup] Creating wallet with passkey...');
-      // Extract username from email (before @) for display
-      const userName = currentEmail.split('@')[0];
-      await createWallet(currentEmail, userName);
-      console.log('[WalletSetup] Wallet created successfully');
-      setStatusMessage('Wallet created successfully. Loading dashboard...');
+      if (hasWallet) {
+        // Existing wallet - unlock with passkey
+        console.log('[WalletSetup] Unlocking existing wallet with passkey...');
+        setStatusMessage(`Authenticating ${currentEmail} with passkey...`);
+        await unlockWallet();
+        console.log('[WalletSetup] Wallet unlocked successfully');
+        setStatusMessage('Wallet unlocked successfully. Loading dashboard...');
+      } else {
+        // New wallet - create with passkey
+        console.log('[WalletSetup] Creating wallet with passkey...');
+        setStatusMessage(`Requesting biometric approval for ${currentEmail}...`);
+        const userName = currentEmail.split('@')[0];
+        await createWallet(currentEmail, userName);
+        console.log('[WalletSetup] Wallet created successfully');
+        setStatusMessage('Wallet created successfully. Loading dashboard...');
+      }
+
       onComplete();
     } catch (err: any) {
-      console.error('[WalletSetup] Creation failed:', err);
+      console.error('[WalletSetup] Wallet access failed:', err);
 
       // Handle specific WebAuthn errors
       if (err.message?.includes('User cancelled') || err.message?.includes('cancelled')) {
@@ -58,9 +66,11 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
       } else if (err.message?.includes('not available')) {
         setError('Biometric authentication is not available. Please enable it in your device settings.');
       } else if (err.message?.includes('Failed to fetch')) {
-        setError('Could not reach the passkey API. Please make sure the backend (http://localhost:4000) is running and reachable.');
+        setError('Could not reach the passkey API. Please make sure the backend is running and reachable.');
+      } else if (err.message?.includes('passkey already exists')) {
+        setError('A wallet already exists for this email. Please use "Connect Existing Wallet" instead.');
       } else {
-        setError(err.message || 'Failed to create wallet. Please try again.');
+        setError(err.message || `Failed to ${hasWallet ? 'unlock' : 'create'} wallet. Please try again.`);
       }
     } finally {
       setIsCreating(false);
@@ -68,15 +78,15 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
         setStatusMessage('Biometric prompt dismissed. Use Retry to try again.');
       }
     }
-  }, [createWallet, onComplete, currentEmail]);
+  }, [createWallet, unlockWallet, onComplete, currentEmail, hasWallet]);
 
   useEffect(() => {
-    if (!hasWallet && !autoStarted && !isCreating && currentEmail) {
+    if (!autoStarted && !isCreating && currentEmail) {
       setAutoStarted(true);
-      setStatusMessage(`Preparing biometric prompt for ${currentEmail}...`);
-      void handleCreate(true);
+      setStatusMessage(`Preparing ${hasWallet ? 'authentication' : 'wallet creation'} for ${currentEmail}...`);
+      void handleWalletAccess(true);
     }
-  }, [hasWallet, autoStarted, isCreating, handleCreate, currentEmail]);
+  }, [autoStarted, isCreating, handleWalletAccess, currentEmail, hasWallet]);
 
   return (
     <div className="fixed inset-0 w-full h-full flex flex-col items-center justify-center overflow-hidden bg-transparent">
@@ -120,7 +130,7 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
             )}
 
             <button
-              onClick={() => handleCreate()}
+              onClick={() => handleWalletAccess()}
               disabled={isConnecting || isCreating || !currentEmail}
               className="w-full bg-slate-200 hover:bg-white text-slate-900 font-medium text-lg py-4 rounded-lg transition-all duration-200 shadow-[0_0_20px_rgba(255,255,255,0.1)] hover:shadow-[0_0_30px_rgba(255,255,255,0.2)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
@@ -130,14 +140,16 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                   </svg>
-                  <span>Creating wallet...</span>
+                  <span>{hasWallet ? 'Unlocking wallet...' : 'Creating wallet...'}</span>
                 </>
               ) : (
                 <>
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                   </svg>
-                  <span>{currentEmail ? 'Create Wallet with Passkey' : 'Waiting for email...'}</span>
+                  <span>
+                    {!currentEmail ? 'Waiting for email...' : hasWallet ? 'Unlock Wallet with Passkey' : 'Create Wallet with Passkey'}
+                  </span>
                 </>
               )}
             </button>
