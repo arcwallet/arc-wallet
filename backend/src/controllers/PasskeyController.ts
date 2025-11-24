@@ -369,6 +369,11 @@ export class PasskeyController {
       }
 
       console.log('[PasskeyAuth] Verifying authentication...');
+
+      // Convert credentialID from base64url string to Uint8Array for verification
+      // The database stores it as base64url string, but @simplewebauthn expects Uint8Array
+      const credentialIdBuffer = Buffer.from(passkeyCredential.credentialID, 'base64url');
+
       // Verify authentication response
       const verification = await verifyAuthenticationResponse({
         response: credential,
@@ -376,7 +381,7 @@ export class PasskeyController {
         expectedOrigin: this.config.ORIGIN,
         expectedRPID: this.config.RP_ID,
         authenticator: {
-          credentialID: passkeyCredential.credentialID,
+          credentialID: new Uint8Array(credentialIdBuffer), // Convert to Uint8Array
           credentialPublicKey: passkeyCredential.credentialPublicKey,
           counter: passkeyCredential.counter,
           transports: passkeyCredential.transports
