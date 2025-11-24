@@ -14,7 +14,7 @@ import { IdentityProvider } from './contexts/IdentityContext';
 import { PrivacyProvider } from './contexts/PrivacyContext';
 // Self-custodial wallet imports
 import { SelfCustodialWalletProvider, useSelfCustodialWallet } from './contexts/SelfCustodialWalletContext';
-import WalletSetup from './components/WalletSetup';
+import WalletAutoSetup from './components/WalletAutoSetup';
 import UnlockWalletPasskey from './components/UnlockWalletPasskey';
 
 // Self-custodial wallet experience - new architecture
@@ -48,7 +48,7 @@ const SelfCustodialWalletExperience: React.FC = () => {
 
   // No wallet - show setup (Create Passkey)
   if (!hasWallet) {
-    return <WalletSetup onComplete={handleComplete} />;
+    return <WalletAutoSetup onComplete={handleComplete} />;
   }
 
   // Wallet exists but locked - show unlock (Verify Passkey)

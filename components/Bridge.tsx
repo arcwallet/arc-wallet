@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useSelfCustodialWallet } from '../contexts/SelfCustodialWalletContext';
+import { useWallet } from '../contexts/WalletContext';
 import { useActivity } from '../contexts/ActivityContext';
 import { TransactionStatus, TransactionType } from '../types';
 import { SpinnerIcon } from './Icons';
@@ -26,7 +27,8 @@ const DIRECTIONS: { id: BridgeDirection; label: string; description: string }[] 
 const PRIMARY_TOKEN_DECIMALS = 6;
 
 const Bridge: React.FC = () => {
-  const { address, userId, loginWithPasskey, logout } = useSelfCustodialWallet();
+  const { address, userId } = useSelfCustodialWallet();
+  const { loginWithPasskey } = useWallet();
   const { addActivity } = useActivity();
   const [needsReauth, setNeedsReauth] = useState(false);
 
@@ -43,8 +45,15 @@ const Bridge: React.FC = () => {
 
   const normalizeAmount = (raw: string): string | null => {
     if (raw == null) return null;
-    // remove thousand separators and spaces; unify comma to dot
-    let s = String(raw).trim().replace(/[,_\s]/g, '').replace(',', '.');
+    let s = String(raw).trim();
+    // remove whitespace/underscore thousand separators
+    s = s.replace(/[\s_]/g, '');
+    // if there's no dot, treat comma as decimal separator; otherwise commas are thousands
+    if (s.includes(',') && !s.includes('.')) {
+      s = s.replace(/,/g, '.');
+    } else {
+      s = s.replace(/,/g, '');
+    }
     if (s === '') return null;
     if (s.startsWith('.')) s = '0' + s;
     if (s.endsWith('.')) s = s + '0';

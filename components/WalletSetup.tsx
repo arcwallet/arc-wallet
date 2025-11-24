@@ -19,6 +19,7 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
   const { createWallet, isConnecting, hasWallet } = useSelfCustodialWallet();
   const { currentEmail } = useSession();
   const [error, setError] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState<string>('Waiting for verified email...');
   const [isCreating, setIsCreating] = useState(false);
   const [autoStarted, setAutoStarted] = useState(false);
 
@@ -34,11 +35,15 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
     }
 
     setIsCreating(true);
+    if (currentEmail) {
+      setStatusMessage(`Requesting biometric approval for ${currentEmail}...`);
+    }
 
     try {
       console.log('[WalletSetup] Creating wallet with passkey...');
       await createWallet(currentEmail);
       console.log('[WalletSetup] Wallet created successfully');
+      setStatusMessage('Wallet created successfully. Loading dashboard...');
       onComplete();
     } catch (err: any) {
       console.error('[WalletSetup] Creation failed:', err);
@@ -50,17 +55,23 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
         setError('Your device does not support biometric authentication. Please use a compatible device.');
       } else if (err.message?.includes('not available')) {
         setError('Biometric authentication is not available. Please enable it in your device settings.');
+      } else if (err.message?.includes('Failed to fetch')) {
+        setError('Could not reach the passkey API. Please make sure the backend (http://localhost:4000) is running and reachable.');
       } else {
         setError(err.message || 'Failed to create wallet. Please try again.');
       }
     } finally {
       setIsCreating(false);
+      if (currentEmail) {
+        setStatusMessage('Biometric prompt dismissed. Use Retry to try again.');
+      }
     }
   }, [createWallet, onComplete, currentEmail]);
 
   useEffect(() => {
     if (!hasWallet && !autoStarted && !isCreating && currentEmail) {
       setAutoStarted(true);
+      setStatusMessage(`Preparing biometric prompt for ${currentEmail}...`);
       void handleCreate(true);
     }
   }, [hasWallet, autoStarted, isCreating, handleCreate, currentEmail]);
@@ -125,6 +136,10 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
               </p>
             </div>
 
+            <div className="rounded-lg border border-slate-600/30 bg-slate-900/50 px-4 py-3 text-sm text-slate-200">
+              {statusMessage}
+            </div>
+
             {error && (
               <div className="p-3 rounded-lg backdrop-blur-sm border bg-red-900/20 border-red-500/50 text-red-200 text-center text-sm">
                 {error}
@@ -149,7 +164,7 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4" />
                   </svg>
-                  <span>Create Wallet with Biometric</span>
+                  <span>{currentEmail ? 'Retry Biometric Prompt' : 'Waiting for email...'}</span>
                 </>
               )}
             </button>
