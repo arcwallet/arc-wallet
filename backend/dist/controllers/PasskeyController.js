@@ -173,11 +173,16 @@ export class PasskeyController {
                 });
             }
             // Store passkey credential
-            // IMPORTANT: Use credential.rawId directly (already base64url encoded)
-            // DO NOT encode again - verification.registrationInfo.credentialID is Uint8Array
+            // IMPORTANT: credential.id is already base64url encoded by @simplewebauthn/browser
+            // DO NOT encode again - use it directly
             if (verification.registrationInfo) {
-                // Use frontend's rawId directly - it's already base64url encoded
-                const credentialIdB64Url = credential.rawId || credential.id;
+                // Use credential.id directly - it's already base64url encoded
+                const credentialIdB64Url = credential.id;
+                console.log('[PasskeyReg] Storing credential with ID:', {
+                    credentialId: credentialIdB64Url,
+                    credentialIdLength: credentialIdB64Url.length,
+                    userId: user.id
+                });
                 await this.db.createPasskeyCredential({
                     id: randomUUID(),
                     userId: user.id,
@@ -188,6 +193,7 @@ export class PasskeyController {
                     credentialBackedUp: verification.registrationInfo.credentialBackedUp,
                     transports: credential.response.transports
                 });
+                console.log('[PasskeyReg] Credential stored successfully');
             }
             // Clean up challenge
             await this.db.deleteChallenge(challengeRecord.id);
