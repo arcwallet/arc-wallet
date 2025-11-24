@@ -33,8 +33,8 @@ const CSRF_EXEMPT_ROUTES = [
   '/api/send-link',
   '/api/verify',
   '/health',
-  '/passkey/register/options',  // First passkey request needs to get CSRF cookie
-  '/passkey/login/options',     // First login request needs to get CSRF cookie
+  '/passkeys/register/options',  // First passkey request needs to get CSRF cookie
+  '/passkeys/login/options',     // First login request needs to get CSRF cookie
 ];
 
 /**
