@@ -17,13 +17,13 @@ export function createPasskeyRoutes(db: Database, config: EnvConfig): Router {
   router.use(sanitizeInput);
 
   /**
-   * POST /passkeys/register/start
-   * Start passkey registration process
+   * POST /passkeys/register/options
+   * Start passkey registration process (get options)
    */
   router.post(
-    '/register/start',
+    '/register/options',
     rateLimitMiddleware('registration'),
-    validateRequestBody(['username', 'displayName']),
+    validateRequestBody(['userId', 'userName']),
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         await passkeyController.registrationStart(req, res);
@@ -34,13 +34,13 @@ export function createPasskeyRoutes(db: Database, config: EnvConfig): Router {
   );
 
   /**
-   * POST /passkeys/register/finish
-   * Complete passkey registration
+   * POST /passkeys/register/verify
+   * Complete passkey registration (verify credential)
    */
   router.post(
-    '/register/finish',
+    '/register/verify',
     rateLimitMiddleware('registration'),
-    validateRequestBody(['username', 'credential']),
+    validateRequestBody(['userId', 'userName', 'credential']),
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         await passkeyController.registrationFinish(req, res);
@@ -51,11 +51,11 @@ export function createPasskeyRoutes(db: Database, config: EnvConfig): Router {
   );
 
   /**
-   * POST /passkeys/auth/start
-   * Start passkey authentication process
+   * POST /passkeys/login/options
+   * Start passkey authentication process (get options)
    */
   router.post(
-    '/auth/start',
+    '/login/options',
     rateLimitMiddleware('auth'),
     async (req: Request, res: Response, next: NextFunction) => {
       try {
@@ -67,11 +67,11 @@ export function createPasskeyRoutes(db: Database, config: EnvConfig): Router {
   );
 
   /**
-   * POST /passkeys/auth/finish
-   * Complete passkey authentication
+   * POST /passkeys/login/verify
+   * Complete passkey authentication (verify credential)
    */
   router.post(
-    '/auth/finish',
+    '/login/verify',
     rateLimitMiddleware('auth'),
     validateRequestBody(['credential']),
     async (req: Request, res: Response, next: NextFunction) => {
@@ -94,7 +94,7 @@ export function createPasskeyRoutes(db: Database, config: EnvConfig): Router {
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         const { userId } = req.params;
-    
+
         // Verify user owns this data
         if (req.user?.id !== userId) {
           return res.status(403).json({
@@ -137,7 +137,7 @@ export function createPasskeyRoutes(db: Database, config: EnvConfig): Router {
     async (req, res, next) => {
       try {
         const { userId } = req.params;
-    
+
         // Verify user owns this data
         if (req.user?.id !== userId) {
           return res.status(403).json({
