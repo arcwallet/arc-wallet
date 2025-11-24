@@ -84,13 +84,10 @@ export class PasskeyController {
 
       let options;
       if (existingUser) {
-        // Check if user already has a passkey - only allow one per email
+        // Existing user: allow registration (multiple devices or recovery)
+        // Note: We allow multiple passkeys per user for multi-device support
         const userPasskeys = await this.db.getPasskeysByUserId(existingUser.id);
-        if (userPasskeys.length > 0) {
-          throw new ApiError('A passkey already exists for this email. Please use authentication instead.', 400, 'PASSKEY_EXISTS');
-        }
 
-        // Existing user without passkey: allow registration
         options = await generateRegistrationOptions({
           rpName: this.config.RP_NAME,
           rpID: this.config.RP_ID,
@@ -98,12 +95,16 @@ export class PasskeyController {
           userName: existingUser.username,
           userDisplayName: existingUser.displayName,
           attestationType: 'none',
-        authenticatorSelection: {
-          residentKey: 'required',
-          userVerification: 'required',
-          authenticatorAttachment: 'platform'
-        },
-          excludeCredentials: [],
+          authenticatorSelection: {
+            residentKey: 'required',
+            userVerification: 'required',
+            authenticatorAttachment: 'platform'
+          },
+          // Exclude existing credentials to prevent duplicate device registration
+          excludeCredentials: userPasskeys.map(passkey => ({
+            id: passkey.credentialID,
+            type: 'public-key' as const,
+          })),
           supportedAlgorithmIDs: [-7, -257]
         });
 
@@ -550,7 +551,7 @@ export class PasskeyController {
       await dbAny.waitForReady();
       const run = promisify(dbAny.db.run.bind(dbAny.db));
       await run('DELETE FROM passkey_credentials WHERE id = ?', [passkey.id]);
-      
+
       res.json({ success: true, message: 'Device removed' });
     } catch (error) {
       console.error('Delete device error:', error);
