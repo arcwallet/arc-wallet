@@ -23,7 +23,7 @@ export function createPasskeyRoutes(db: Database, config: EnvConfig): Router {
   router.post(
     '/register/options',
     rateLimitMiddleware('registration'),
-    validateRequestBody(['userId', 'userName']),
+    validateRequestBody(['username', 'displayName']),
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         await passkeyController.registrationStart(req, res);
@@ -40,7 +40,7 @@ export function createPasskeyRoutes(db: Database, config: EnvConfig): Router {
   router.post(
     '/register/verify',
     rateLimitMiddleware('registration'),
-    validateRequestBody(['userId', 'userName', 'credential']),
+    validateRequestBody(['username', 'credential']),
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         await passkeyController.registrationFinish(req, res);
