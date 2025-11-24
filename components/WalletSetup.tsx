@@ -41,7 +41,9 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
 
     try {
       console.log('[WalletSetup] Creating wallet with passkey...');
-      await createWallet(currentEmail);
+      // Extract username from email (before @) for display
+      const userName = currentEmail.split('@')[0];
+      await createWallet(currentEmail, userName);
       console.log('[WalletSetup] Wallet created successfully');
       setStatusMessage('Wallet created successfully. Loading dashboard...');
       onComplete();
@@ -105,9 +107,9 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
           {/* Form */}
           <div className="space-y-6">
             <div className="rounded-lg bg-slate-900/60 border border-slate-600/40 px-4 py-4">
-              <p className="text-xs uppercase tracking-widest text-slate-500 mb-1">E-posta</p>
+              <p className="text-xs uppercase tracking-widest text-slate-500 mb-1">Email</p>
               <p className="text-base font-mono text-slate-100">
-                {currentEmail ?? 'Doğrulanıyor...'}
+                {currentEmail ?? 'Verifying...'}
               </p>
             </div>
 
@@ -128,14 +130,14 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                   </svg>
-                  <span>Passkey oluşturuluyor...</span>
+                  <span>Creating wallet...</span>
                 </>
               ) : (
                 <>
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                   </svg>
-                  <span>{currentEmail ? 'Passkey ile Cüzdan Oluştur' : 'E-posta doğrulanıyor...'}</span>
+                  <span>{currentEmail ? 'Create Wallet with Passkey' : 'Waiting for email...'}</span>
                 </>
               )}
             </button>
