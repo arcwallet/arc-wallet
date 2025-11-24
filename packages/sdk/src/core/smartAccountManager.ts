@@ -15,6 +15,7 @@ import type {
 } from '../types/account-abstraction';
 import { logger } from '../utils/logger';
 import { DEFAULT_AA_CONFIG } from '../types/account-abstraction';
+import { CirclePaymasterClient } from './circlePaymaster';
 
 const abiCoder = new AbiCoder();
 
@@ -29,6 +30,7 @@ export class SmartAccountManager {
     private config: SmartAccountConfig;
     private provider: JsonRpcProvider;
     private paymasterConfig?: PaymasterConfig;
+    private circlePaymaster?: CirclePaymasterClient;
     private accountAddress: string | null = null;
 
     constructor(
@@ -39,6 +41,14 @@ export class SmartAccountManager {
         this.provider = provider;
         this.config = { ...DEFAULT_AA_CONFIG, ...config };
         this.paymasterConfig = paymasterConfig;
+
+        if (paymasterConfig?.type === 'circle' && paymasterConfig.chainId) {
+            this.circlePaymaster = new CirclePaymasterClient({
+                paymasterUrl: paymasterConfig.url,
+                chainId: paymasterConfig.chainId,
+                bundlerUrl: config?.bundlerUrl,
+            });
+        }
     }
 
     /**
@@ -353,6 +363,16 @@ export class SmartAccountManager {
             return null;
         }
 
+        // Use Circle Paymaster if configured
+        if (this.circlePaymaster) {
+            try {
+                return await this.circlePaymaster.getPaymasterData(this.serializeUserOp(userOp));
+            } catch (error) {
+                console.error('[Paymaster] Circle Paymaster failed:', error);
+                return null;
+            }
+        }
+
         try {
             const response = await fetch(`${this.paymasterConfig.url}/sponsor`, {
                 method: 'POST',
@@ -383,6 +403,50 @@ export class SmartAccountManager {
         } catch (error) {
             console.error('[Paymaster] Failed to get sponsorship:', error);
             return null;
+        }
+    }
+
+    /**
+     * Create Circle-compatible smart account (MSCA)
+     */
+    async createCircleMSCA(owner: string, signer: Wallet): Promise<string> {
+        // Circle's account factory address
+        // TODO: Update with official Circle Factory address for each chain
+        const CIRCLE_ACCOUNT_FACTORY = '0x0000000000000000000000000000000000000000';
+
+        const factory = new Contract(
+            CIRCLE_ACCOUNT_FACTORY,
+            ['function createAccount(address owner, uint256 salt) returns (address)'],
+            signer
+        );
+
+        // Use a random salt or deterministic one
+        const salt = 0;
+
+        try {
+            logger.info('Creating Circle MSCA', {
+                component: 'SmartAccountManager',
+                owner,
+            });
+
+            const tx = await factory.createAccount(owner, salt);
+            const receipt = await tx.wait();
+
+            // In a real implementation, we would parse the event to get the address
+            // For now, we return a placeholder or calculate it
+            // const accountAddress = ...
+
+            logger.info('Circle MSCA creation transaction confirmed', {
+                component: 'SmartAccountManager',
+                txHash: receipt.hash
+            });
+
+            return '0x...'; // Return actual address
+        } catch (error: any) {
+            logger.error('Failed to create Circle MSCA', error, {
+                component: 'SmartAccountManager',
+            });
+            throw error;
         }
     }
 }

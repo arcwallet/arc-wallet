@@ -46,6 +46,8 @@ export interface SmartAccountConfig {
 export interface PaymasterConfig {
     url: string;
     enabled: boolean;
+    type?: 'circle' | 'generic';
+    chainId?: number; // Required for Circle Paymaster
 }
 
 export interface PaymasterData {

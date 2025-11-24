@@ -50,12 +50,17 @@ export { SecureStorage } from './core/secureStorage';
 export { KeyManager } from './core/keyManager';
 export { CCTPManager } from './core/cctpManager';
 export { SmartAccountManager } from './core/smartAccountManager';
+export { CirclePaymasterClient } from './core/circlePaymaster';
+export { CircleApiClient } from './services/circleApi';
 
 // Utils
 export { logger, createLogger, LogLevel } from './utils/logger';
 export type { LoggerConfig, LogContext } from './utils/logger';
 export { validateCCTPConfig, isArcNetworkConfigured, getCCTPConfigErrorMessage } from './utils/cctpValidator';
 export type { CCTPValidationResult } from './utils/cctpValidator';
+export { isCircleMSCA } from './utils/mscaDetector';
+export { getCircleNetwork, isCCTPSupported, isNativeUSDC, CIRCLE_NETWORKS } from './utils/circleNetworks';
+export type { CircleNetwork } from './utils/circleNetworks';
 export {
   runPasskeyDiagnostic,
   checkPlatformAuthenticatorSupport,

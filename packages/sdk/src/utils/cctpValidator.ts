@@ -5,6 +5,7 @@
 
 import { CCTPConfig } from '../types/cctp';
 import { logger } from './logger';
+import { isCCTPSupported, getCircleNetwork } from './circleNetworks';
 
 const PLACEHOLDER_ADDRESS = '0x0000000000000000000000000000000000000000';
 const PLACEHOLDER_PATTERN = /^0x\.\.\.$/;
@@ -28,7 +29,16 @@ export function validateCCTPConfig(
         warnings: [],
     };
 
-    // Check if chain is supported
+    // Check if chain is known to support CCTP
+    if (!isCCTPSupported(chainId)) {
+        const network = getCircleNetwork(chainId);
+        const name = network ? network.name : `Chain ID ${chainId}`;
+        result.errors.push(`${name} does not support Circle CCTP`);
+        result.isValid = false;
+        return result;
+    }
+
+    // Check if chain is supported in config
     const tokenMessenger = config.tokenMessengerAddresses?.[chainId];
     const usdcAddress = config.usdcAddresses?.[chainId];
     const domainId = config.domainIds?.[chainId];
