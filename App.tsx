@@ -10,7 +10,6 @@ import { WalletProvider, useWallet } from './contexts/WalletContext';
 import { ArcAccountProvider } from './contexts/ArcAccountContext';
 import { ActivityProvider } from './contexts/ActivityContext';
 import { MultiSigProvider } from './contexts/MultiSigContext';
-import { IdentityProvider } from './contexts/IdentityContext';
 import { PrivacyProvider } from './contexts/PrivacyContext';
 // Self-custodial wallet imports
 import { SelfCustodialWalletProvider, useSelfCustodialWallet } from './contexts/SelfCustodialWalletContext';
@@ -156,17 +155,15 @@ const App: React.FC = () => {
           <WalletProvider>
             <ArcAccountProvider>
               <ActivityProvider>
-                <IdentityProvider>
-                  <PrivacyProvider>
-                    <MultiSigProvider>
-                      <div className="auth-wrapper">
-                        <React.Suspense fallback={null}>
-                          <RootView />
-                        </React.Suspense>
-                      </div>
-                    </MultiSigProvider>
-                  </PrivacyProvider>
-                </IdentityProvider>
+                <PrivacyProvider>
+                  <MultiSigProvider>
+                    <div className="auth-wrapper">
+                      <React.Suspense fallback={null}>
+                        <RootView />
+                      </React.Suspense>
+                    </div>
+                  </MultiSigProvider>
+                </PrivacyProvider>
               </ActivityProvider>
             </ArcAccountProvider>
           </WalletProvider>

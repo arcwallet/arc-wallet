@@ -9,42 +9,6 @@ import { WalletIcon, CopyIcon, AddIcon, LaptopIcon, PhoneIcon, ChevronDownIcon, 
 import WebhookManager from './WebhookManager';
 import NotificationManager from './NotificationManager';
 
-const WalletIdentitySection: React.FC = () => {
-    const { address } = useSelfCustodialWallet();
-    const walletAddress = address || "0x0000000000000000000000000000000000000000";
-
-    const handleCopy = () => {
-        if (address) {
-            navigator.clipboard.writeText(address);
-        }
-    };
-
-    return (
-        <div className="flex flex-col gap-3 rounded-xl bg-slate-900/60 backdrop-blur-sm border border-slate-500/50 p-5 sm:p-6">
-            <h3 className="text-lg font-semibold text-slate-100">Wallet Identity</h3>
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex min-w-0 items-center gap-3 rounded-lg border border-slate-500/50 bg-slate-900/40 px-3 py-2">
-                    <WalletIcon size={20} className="text-slate-400" />
-                    <p className="flex-1 truncate font-mono text-sm text-slate-100">{address ? walletAddress : 'No Wallet Connected'}</p>
-                    <button
-                        onClick={handleCopy}
-                        disabled={!address}
-                        className="flex shrink-0 items-center justify-center rounded-md p-1.5 text-slate-400 hover:bg-white/10 hover:text-slate-100 disabled:opacity-50"
-                    >
-                        <CopyIcon size={18} />
-                    </button>
-                </div>
-                <button
-                    disabled={!address}
-                    className="flex h-10 w-full shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-lg border border-slate-500/50 bg-transparent px-4 text-sm font-medium text-slate-300 hover:bg-white/5 hover:text-white hover:border-slate-400 transition-all sm:w-auto disabled:opacity-50"
-                >
-                    <span className="truncate">View on Explorer</span>
-                </button>
-            </div>
-        </div>
-    );
-};
-
 const SecuritySection: React.FC = () => {
     const { userId, address } = useSelfCustodialWallet();
     const [loading, setLoading] = useState(false);
@@ -290,7 +254,6 @@ const Settings: React.FC = () => {
                 </div>
                 {/* Settings Sections */}
                 <div className="flex flex-col gap-8">
-                    <WalletIdentitySection />
                     <SecuritySection />
                     <NetworkSection />
 

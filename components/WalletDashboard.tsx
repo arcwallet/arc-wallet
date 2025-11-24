@@ -9,7 +9,6 @@ import MultiSigDashboard from './MultiSigDashboard';
 import Faucet from './Faucet';
 import SwapScreen from './SwapScreen';
 import Bridge from './Bridge';
-import IdentityScreen from './IdentityScreen';
 import AgentScreen from './AgentScreen';
 // import Bridge from './Bridge';
 import { Transaction } from '../types';
@@ -649,8 +648,6 @@ const WalletDashboard: React.FC = () => {
         return <MultiSigDashboard />;
       case 'Faucet':
         return <Faucet />;
-      case 'Identity':
-        return <IdentityScreen />;
       case 'Agent':
         return <AgentScreen onExecuteIntent={handleAgentIntent} />;
       case 'Settings':
