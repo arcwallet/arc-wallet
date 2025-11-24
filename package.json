@@ -29,6 +29,7 @@
   "scripts": {
     "dev": "vite",
     "build:sdk": "cd packages/sdk && npm install && npm run build",
+    "postinstall": "npm run build:sdk",
     "build": "npm run build:sdk && vite build",
     "preview": "vite preview",
     "test": "vitest",

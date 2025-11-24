@@ -4,6 +4,7 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, '.', '');
+  const isProd = mode === 'production';
   return {
     server: {
       port: 3000,
@@ -24,10 +25,18 @@ export default defineConfig(({ mode }) => {
       },
     },
     plugins: [react()],
+    optimizeDeps: {
+      // Prevent Vite from trying to prebundle the local SDK as a package
+      exclude: ['@arc/wallet-sdk'],
+    },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),
-        '@arc/wallet-sdk': path.resolve(__dirname, './packages/sdk/src/index.ts'),
+        // Use source during local dev; use built dist during production builds
+        '@arc/wallet-sdk': path.resolve(
+          __dirname,
+          isProd ? './packages/sdk/dist/index.mjs' : './packages/sdk/src/index.ts'
+        ),
       }
     }
   };
