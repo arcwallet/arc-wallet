@@ -60,7 +60,7 @@ function formatRelativeTime(timestampMs: number): string {
  * Fetches transaction history from the indexer backend
  */
 
-const fetchActivityHistory = async (address: string, limit: number = 20): Promise<any[]> => {
+const fetchActivityHistory = async (address: string, limit: number = 50): Promise<any[]> => {
   try {
     const normalizedAddress = address.toLowerCase();
     const response = await fetch(API_ENDPOINTS.history(normalizedAddress, limit));
@@ -70,16 +70,77 @@ const fetchActivityHistory = async (address: string, limit: number = 20): Promis
     }
 
     if (!response.ok) {
-      throw new Error('Failed to fetch history');
+      console.warn('Indexer history not available, falling back to RPC');
+      return await fetchFromRPC(normalizedAddress, limit);
     }
 
     const json = await response.json();
     if (!json.success) {
-      throw new Error(json.error || 'Failed to fetch history');
+      console.warn('Indexer returned error, falling back to RPC');
+      return await fetchFromRPC(normalizedAddress, limit);
     }
+
+    // If indexer returns empty, try RPC fallback
+    if (!json.data || json.data.length === 0) {
+      console.log('[Activity] No data from indexer, trying RPC fallback');
+      return await fetchFromRPC(normalizedAddress, limit);
+    }
+
     return json.data;
   } catch (error) {
     console.error('Error fetching activity history from indexer:', error);
+    // Fallback to direct RPC query
+    return await fetchFromRPC(address.toLowerCase(), limit);
+  }
+};
+
+/**
+ * Fallback: Fetch recent transactions directly from RPC
+ * This is used when the indexer is not available or has no data
+ */
+const fetchFromRPC = async (address: string, limit: number = 20): Promise<any[]> => {
+  try {
+    const latestBlock = await provider.getBlockNumber();
+    const startBlock = Math.max(0, latestBlock - 1000); // Last 1000 blocks
+
+    const transactions: any[] = [];
+
+    // Scan recent blocks for transactions involving this address
+    for (let i = latestBlock; i >= startBlock && transactions.length < limit; i--) {
+      try {
+        const block = await provider.getBlock(i, true);
+        if (!block || !block.prefetchedTransactions) continue;
+
+        for (const tx of block.prefetchedTransactions) {
+          const fromMatch = tx.from?.toLowerCase() === address;
+          const toMatch = tx.to?.toLowerCase() === address;
+
+          if (fromMatch || toMatch) {
+            const receipt = await provider.getTransactionReceipt(tx.hash);
+            transactions.push({
+              hash: tx.hash,
+              block_number: block.number,
+              from_address: tx.from,
+              to_address: tx.to,
+              value: tx.value.toString(),
+              timestamp: block.timestamp,
+              status: receipt?.status ?? 1,
+              token_address: null
+            });
+
+            if (transactions.length >= limit) break;
+          }
+        }
+      } catch (blockError) {
+        // Skip problematic blocks
+        continue;
+      }
+    }
+
+    console.log(`[Activity] Fetched ${transactions.length} transactions from RPC`);
+    return transactions;
+  } catch (error) {
+    console.error('Error fetching from RPC:', error);
     return [];
   }
 };
