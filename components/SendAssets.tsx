@@ -19,6 +19,10 @@ import {
   executeNativeTransfer,
   executeSmartAccountTransferWithFallback,
   executeERC20Transfer,
+  executeViaSmartAccount,
+  executeBatchViaSmartAccount,
+  isERC4337Available,
+  getSmartAccountAddress,
 } from '../services/executionRouter';
 import { TransactionStatus, TransactionType } from '../types';
 import { ExpandIcon, ContactIcon, LockIcon } from './Icons';
@@ -87,6 +91,11 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
   // Batch Mode State
   const [isBatchMode, setIsBatchMode] = useState(false);
   const [batchTransactions, setBatchTransactions] = useState<{ to: string; amount: string; data?: string }[]>([]);
+
+  // Smart Account Mode (ERC-4337)
+  const [useSmartAccount, setUseSmartAccount] = useState(false);
+  const [smartAccountAvailable, setSmartAccountAvailable] = useState(false);
+  const [smartAccountAddress, setSmartAccountAddress] = useState<string | null>(null);
 
   const balance = useMemo(() => {
     return parseFloat(tokenBalance) || 0;
@@ -175,6 +184,33 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
     checkGasEligibility();
   }, [walletAddress]);
 
+  // Check ERC-4337 Smart Account availability
+  useEffect(() => {
+    const checkSmartAccount = async () => {
+      if (!walletAddress) {
+        setSmartAccountAvailable(false);
+        setSmartAccountAddress(null);
+        return;
+      }
+
+      try {
+        const available = await isERC4337Available();
+        setSmartAccountAvailable(available);
+
+        if (available) {
+          const saAddress = await getSmartAccountAddress(walletAddress);
+          setSmartAccountAddress(saAddress);
+          console.log('[ERC-4337] Smart Account address:', saAddress);
+        }
+      } catch (error) {
+        console.error('Error checking ERC-4337 availability:', error);
+        setSmartAccountAvailable(false);
+      }
+    };
+
+    checkSmartAccount();
+  }, [walletAddress]);
+
   // On mount or address change: auto-select the token that has non-zero balance on Arc Testnet
   useEffect(() => {
     const chooseTokenWithBalance = async () => {
@@ -204,7 +240,8 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
   const feeNumber = feeEstimate ? Number(feeEstimate) / 1e18 : 0;
   const total = amountNumber > 0 ? amountNumber + feeNumber : 0;
 
-  const usingSmartAccount = false;
+  // Use Smart Account if available and enabled
+  const usingSmartAccount = useSmartAccount && smartAccountAvailable;
 
   // Estimate fees
   useEffect(() => {
@@ -436,20 +473,38 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
         // Prepare batch transactions
         const transactions = batchTransactions.map(tx => ({
           to: tx.to,
-          value: parseUnits(tx.amount, selectedToken.decimals),
+          value: tx.amount,
           data: tx.data || '0x'
         }));
 
-        // Execute batch via Smart Account
-        const result = await executeSmartAccountTransferWithFallback({
-          smartAccountAddress: walletAddress,
-          sessionPrivateKey: walletPrivateKey,
-          to: '0x0000000000000000000000000000000000000000',
-          amount: '0',
-          transactions // Pass transactions array
-        });
-        hash = result.hash;
-        kind = result.kind;
+        if (usingSmartAccount) {
+          // ERC-4337 Smart Account batch execution
+          console.log('[SEND] Executing batch via ERC-4337 Smart Account');
+          const result = await executeBatchViaSmartAccount({
+            privateKey: walletPrivateKey,
+            transactions,
+            sponsored: true // Use Pimlico paymaster for gasless
+          });
+          hash = result.hash;
+          kind = result.kind;
+        } else {
+          // Legacy Smart Account batch execution
+          const legacyTransactions = batchTransactions.map(tx => ({
+            to: tx.to,
+            value: parseUnits(tx.amount, selectedToken.decimals),
+            data: tx.data || '0x'
+          }));
+
+          const result = await executeSmartAccountTransferWithFallback({
+            smartAccountAddress: walletAddress,
+            sessionPrivateKey: walletPrivateKey,
+            to: '0x0000000000000000000000000000000000000000',
+            amount: '0',
+            transactions: legacyTransactions
+          });
+          hash = result.hash;
+          kind = result.kind;
+        }
       } else {
         // Single transfer
         const tokenInfo = selectedToken;
@@ -466,10 +521,10 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
 
           console.log(`[SEND] Transferring ${amount} ${tokenInfo.symbol} to ${recipient}`);
           console.log(`[SEND] Token contract: ${tokenAddress}`);
-          console.log(`[SEND] Using Smart Account: ${usingSmartAccount}`);
+          console.log(`[SEND] Using Smart Account (ERC-4337): ${usingSmartAccount}`);
 
           if (usingSmartAccount) {
-            // Smart Account: Encode ERC20 transfer as calldata
+            // ERC-4337 Smart Account: Encode ERC20 transfer as calldata
             const { Interface, parseUnits } = await import('ethers');
             const iface = new Interface([
               'function transfer(address to, uint256 amount) returns (bool)'
@@ -478,13 +533,14 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
             const transferData = iface.encodeFunctionData('transfer', [recipient, amountWei]);
 
             console.log(`[SEND] Amount (wei): ${amountWei.toString()}`);
+            console.log(`[SEND] Executing via ERC-4337 with Pimlico bundler`);
 
-            const result = await executeSmartAccountTransferWithFallback({
-              smartAccountAddress: walletAddress,
-              sessionPrivateKey: walletPrivateKey,
+            const result = await executeViaSmartAccount({
+              privateKey: walletPrivateKey,
               to: tokenAddress, // Call token contract
-              amount: '0', // No native ETH value
-              data: transferData
+              amount: '0', // No native value for ERC20
+              data: transferData,
+              sponsored: true // Pimlico paymaster
             });
             hash = result.hash;
             kind = result.kind;
@@ -501,14 +557,18 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
             kind = result.kind;
           }
         } else {
-          // Native ETH transfer
+          // Native ETH/USDC transfer
           if (usingSmartAccount) {
-            const result = await executeSmartAccountTransferWithFallback({
-              smartAccountAddress: walletAddress,
-              sessionPrivateKey: walletPrivateKey,
+            // ERC-4337 Smart Account native transfer
+            console.log(`[SEND] Native transfer via ERC-4337 Smart Account`);
+            const { parseUnits } = await import('ethers');
+            const amountWei = parseUnits(amount, 6).toString(); // Arc uses USDC (6 decimals)
+
+            const result = await executeViaSmartAccount({
+              privateKey: walletPrivateKey,
               to: recipient,
-              amount: amount,
-              data: '0x'
+              amount: amountWei,
+              sponsored: true // Pimlico paymaster
             });
             hash = result.hash;
             kind = result.kind;
@@ -591,6 +651,37 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
         <p className="text-text-secondary text-base font-normal leading-normal mt-3">Initiate a secure transfer of your digital assets.</p>
       </div>
       <div className="flex flex-col gap-6">
+        {/* Smart Account Mode Toggle */}
+        {smartAccountAvailable && (
+          <div className="rounded-lg border border-blue-500/30 bg-blue-500/10 p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-semibold text-blue-400">ERC-4337 Smart Account</span>
+                  <span className="text-xs bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded">Gasless</span>
+                </div>
+                <p className="text-xs text-blue-300/70 mt-1">
+                  {smartAccountAddress ? `${smartAccountAddress.slice(0, 8)}...${smartAccountAddress.slice(-6)}` : 'Loading...'}
+                </p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="sr-only peer"
+                  checked={useSmartAccount}
+                  onChange={(e) => setUseSmartAccount(e.target.checked)}
+                />
+                <div className="w-11 h-6 bg-slate-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+              </label>
+            </div>
+            {useSmartAccount && (
+              <p className="text-xs text-green-400 mt-2">
+                ✓ Transactions will be sponsored by Pimlico Paymaster
+              </p>
+            )}
+          </div>
+        )}
+
         <div className="flex flex-col w-full">
           <p className="text-sm font-medium leading-normal pb-2 text-text-secondary">Asset</p>
           <div className="relative w-full">
