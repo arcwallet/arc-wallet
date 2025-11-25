@@ -322,15 +322,11 @@ export const SelfCustodialWalletProvider: React.FC<{ children: ReactNode }> = ({
 
   // Get private key (only when unlocked) - for signing transactions
   const getPrivateKey = useCallback((): string | null => {
-    // Note: SDK keeps private key in memory only when unlocked
-    // We don't expose it directly for security reasons
-    // Use signTransaction or signMessage instead
-    if (!isUnlocked || !currentAccount) return null;
+    if (!sdk || !isUnlocked || !currentAccount) return null;
 
-    // For backwards compatibility, return a placeholder
-    // Components should use signTransaction/signMessage instead
-    return 'PRIVATE_KEY_MANAGED_BY_SDK';
-  }, [isUnlocked, currentAccount]);
+    // Get actual private key from SDK
+    return sdk.getPrivateKey();
+  }, [sdk, isUnlocked, currentAccount]);
 
   // Sign transaction with SDK
   const signTransaction = useCallback(async (tx: any): Promise<string> => {

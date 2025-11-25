@@ -33,6 +33,11 @@ export declare class KeyManager {
      */
     getCurrentAddress(): string | null;
     /**
+     * Get current wallet's private key (only when unlocked)
+     * WARNING: Handle with care - never log or expose this value
+     */
+    getPrivateKey(): string | null;
+    /**
      * Get current credential ID
      */
     getCurrentCredentialId(): string | null;

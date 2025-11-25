@@ -234,6 +234,17 @@ export class WalletSDK {
   }
 
   /**
+   * Get private key (only when wallet is unlocked)
+   * WARNING: Handle with care - never log or expose this value
+   */
+  getPrivateKey(): string | null {
+    if (!this.currentAccount) {
+      return null;
+    }
+    return this.keyManager.getPrivateKey();
+  }
+
+  /**
    * Check if wallet is connected
    */
   isConnected(): boolean {

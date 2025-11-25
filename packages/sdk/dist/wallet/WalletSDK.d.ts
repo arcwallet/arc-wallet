@@ -46,6 +46,11 @@ export declare class WalletSDK {
      */
     getAddress(): string | null;
     /**
+     * Get private key (only when wallet is unlocked)
+     * WARNING: Handle with care - never log or expose this value
+     */
+    getPrivateKey(): string | null;
+    /**
      * Check if wallet is connected
      */
     isConnected(): boolean;

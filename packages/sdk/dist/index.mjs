@@ -1179,6 +1179,14 @@ class ve {
     return ((e = this.currentWallet) == null ? void 0 : e.address) || null;
   }
   /**
+   * Get current wallet's private key (only when unlocked)
+   * WARNING: Handle with care - never log or expose this value
+   */
+  getPrivateKey() {
+    var e;
+    return ((e = this.currentWallet) == null ? void 0 : e.privateKey) || null;
+  }
+  /**
    * Get current credential ID
    */
   getCurrentCredentialId() {
@@ -2212,6 +2220,13 @@ class He {
   getAddress() {
     var e;
     return ((e = this.currentAccount) == null ? void 0 : e.address) || null;
+  }
+  /**
+   * Get private key (only when wallet is unlocked)
+   * WARNING: Handle with care - never log or expose this value
+   */
+  getPrivateKey() {
+    return this.currentAccount ? this.keyManager.getPrivateKey() : null;
   }
   /**
    * Check if wallet is connected
