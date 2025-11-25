@@ -7,9 +7,12 @@ declare class IndexerService {
     private provider;
     private isRunning;
     private pollingInterval;
-    private readonly POLLING_DELAY;
+    private currentPollingDelay;
+    private readonly BASE_POLLING_DELAY;
+    private readonly MAX_POLLING_DELAY;
     private readonly BLOCK_BATCH_SIZE;
     private readonly BLOCK_DELAY;
+    private rateLimitHits;
     private tokenMetadataService;
     constructor(database: Database);
     /**

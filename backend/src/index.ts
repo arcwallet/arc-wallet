@@ -130,10 +130,15 @@ initIndexerDB();
 console.log('🔧 Initializing agent database...');
 initializeAgentDatabase();
 
-// Initialize and start indexer service
-console.log('🚀 Starting indexer service...');
-const indexerService = new IndexerService(db);
-indexerService.start();
+// Initialize and start indexer service (optional - can be disabled via env)
+const INDEXER_ENABLED = process.env.INDEXER_ENABLED !== 'false';
+if (INDEXER_ENABLED) {
+  console.log('🚀 Starting indexer service...');
+  const indexerService = new IndexerService(db);
+  indexerService.start();
+} else {
+  console.log('⏸️ Indexer service disabled (INDEXER_ENABLED=false)');
+}
 webhookService.start();
 
 // Root endpoint

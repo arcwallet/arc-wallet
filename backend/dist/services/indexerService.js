@@ -11,14 +11,18 @@ class IndexerService {
     provider;
     isRunning = false;
     pollingInterval = null;
-    POLLING_DELAY = 2000; // 2 seconds
-    BLOCK_BATCH_SIZE = 5; // Process max 5 blocks per cycle
-    BLOCK_DELAY = 200; // 200ms delay between blocks (5 blocks/sec max)
+    currentPollingDelay;
+    BASE_POLLING_DELAY = 30000; // 30 seconds (was 2s - too aggressive)
+    MAX_POLLING_DELAY = 300000; // 5 minutes max backoff
+    BLOCK_BATCH_SIZE = 2; // Process max 2 blocks per cycle (was 5)
+    BLOCK_DELAY = 1000; // 1s delay between blocks (was 200ms)
+    rateLimitHits = 0;
     tokenMetadataService;
     constructor(database) {
         const rpcUrl = process.env.ARC_RPC_URL || 'http://localhost:8545';
         this.provider = new ethers.JsonRpcProvider(rpcUrl);
         this.tokenMetadataService = new TokenMetadataService(this.provider, database);
+        this.currentPollingDelay = this.BASE_POLLING_DELAY;
     }
     /**
      * Start the indexer
@@ -62,13 +66,29 @@ class IndexerService {
                         await new Promise(resolve => setTimeout(resolve, this.BLOCK_DELAY));
                     }
                 }
+                // Successful processing - reset backoff
+                this.rateLimitHits = 0;
+                this.currentPollingDelay = this.BASE_POLLING_DELAY;
             }
         }
         catch (error) {
-            console.error('Error in indexer poll loop:', error);
+            const errorMessage = error?.message || error?.toString() || '';
+            // Check for rate limit errors
+            if (errorMessage.includes('rate limit') ||
+                errorMessage.includes('daily request limit') ||
+                errorMessage.includes('429') ||
+                errorMessage.includes('Too Many Requests')) {
+                this.rateLimitHits++;
+                // Exponential backoff: double the delay each time, up to max
+                this.currentPollingDelay = Math.min(this.BASE_POLLING_DELAY * Math.pow(2, this.rateLimitHits), this.MAX_POLLING_DELAY);
+                console.warn(`⚠️ Rate limit hit (${this.rateLimitHits}x). Backing off to ${this.currentPollingDelay / 1000}s`);
+            }
+            else {
+                console.error('Error in indexer poll loop:', error);
+            }
         }
-        // Schedule next poll
-        this.pollingInterval = setTimeout(() => this.poll(), this.POLLING_DELAY);
+        // Schedule next poll with current delay
+        this.pollingInterval = setTimeout(() => this.poll(), this.currentPollingDelay);
     }
     /**
      * Get the last indexed block number from DB
