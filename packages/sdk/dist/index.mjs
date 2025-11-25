@@ -163,7 +163,7 @@ class ce {
   }
 }
 const Y = new ce(), le = ["cross-platform", "platform"];
-function q(r) {
+function X(r) {
   if (r && !(le.indexOf(r) < 0))
     return r;
 }
@@ -229,7 +229,7 @@ async function de(r) {
     },
     type: l,
     clientExtensionResults: s.getClientExtensionResults(),
-    authenticatorAttachment: q(s.authenticatorAttachment)
+    authenticatorAttachment: X(s.authenticatorAttachment)
   };
 }
 function _(r, e) {
@@ -328,11 +328,11 @@ async function pe(r) {
     },
     type: f,
     clientExtensionResults: c.getClientExtensionResults(),
-    authenticatorAttachment: q(c.authenticatorAttachment)
+    authenticatorAttachment: X(c.authenticatorAttachment)
   };
 }
 var ye = /* @__PURE__ */ ((r) => (r[r.DEBUG = 0] = "DEBUG", r[r.INFO = 1] = "INFO", r[r.WARN = 2] = "WARN", r[r.ERROR = 3] = "ERROR", r[r.SILENT = 4] = "SILENT", r))(ye || {});
-class X {
+class q {
   constructor(e) {
     u(this, "config");
     u(this, "sentryInitialized", !1);
@@ -422,17 +422,17 @@ class X {
   setContext(e) {
   }
 }
-const o = new X({
+const o = new q({
   level: process.env.NODE_ENV === "production" ? 2 : 0,
   enableConsole: !0,
   enableSentry: process.env.NODE_ENV === "production",
   sentryDsn: process.env.SENTRY_DSN,
   environment: process.env.NODE_ENV || "development"
 });
-function Fe(r) {
-  return new X(r);
+function We(r) {
+  return new q(r);
 }
-class We extends Error {
+class Ge extends Error {
   constructor(t, n) {
     super(t);
     u(this, "cause");
@@ -862,17 +862,53 @@ class Se {
     return await v(`wallet_key_${e}`) !== void 0;
   }
 }
-class De {
+const De = new Uint8Array([
+  65,
+  82,
+  67,
+  87,
+  65,
+  76,
+  76,
+  69,
+  // "ARCWALLE"
+  84,
+  95,
+  83,
+  65,
+  76,
+  84,
+  95,
+  86
+  // "T_SALT_V"
+]);
+class Te {
   constructor() {
     u(this, "masterKey", null);
     u(this, "keyId", null);
   }
   /**
-   * Generate non-extractable master key
+   * Generate/derive non-extractable master key from credentialId
+   * Uses PBKDF2 to ensure deterministic key derivation
    */
   async generateMasterKey(e) {
     try {
-      console.log("[WebCrypto] Generating non-extractable master key..."), this.masterKey = await crypto.subtle.generateKey(
+      console.log("[WebCrypto] Deriving non-extractable master key from credential...");
+      const t = await crypto.subtle.importKey(
+        "raw",
+        new TextEncoder().encode(e),
+        "PBKDF2",
+        !1,
+        ["deriveBits", "deriveKey"]
+      );
+      this.masterKey = await crypto.subtle.deriveKey(
+        {
+          name: "PBKDF2",
+          salt: De,
+          iterations: 1e5,
+          hash: "SHA-256"
+        },
+        t,
         {
           name: "AES-GCM",
           length: 256
@@ -880,9 +916,9 @@ class De {
         !1,
         // NON-EXTRACTABLE - Key cannot be exported!
         ["encrypt", "decrypt"]
-      ), this.keyId = e, console.log("[WebCrypto] Master key generated (non-extractable)");
+      ), this.keyId = e, console.log("[WebCrypto] Master key derived (non-extractable, deterministic)");
     } catch (t) {
-      throw console.error("[WebCrypto] Master key generation failed:", t), new Error(`Failed to generate master key: ${t.message}`);
+      throw console.error("[WebCrypto] Master key derivation failed:", t), new Error(`Failed to derive master key: ${t.message}`);
     }
   }
   /**
@@ -1006,14 +1042,14 @@ class De {
     return new TextDecoder().decode(i);
   }
 }
-class Te {
+class ve {
   constructor(e, t) {
     u(this, "webauthn");
     u(this, "storage");
     u(this, "webCrypto");
     u(this, "currentWallet", null);
     u(this, "currentCredentialId", null);
-    this.webauthn = e, this.storage = t, this.webCrypto = new De();
+    this.webauthn = e, this.storage = t, this.webCrypto = new Te();
   }
   /**
    * Create new wallet with passkey
@@ -1022,7 +1058,7 @@ class Te {
     try {
       o.info("Creating new wallet with passkey", { component: "KeyManager", action: "createWallet" });
       const n = await this.webauthn.createPasskey(e, t);
-      await this.webCrypto.generateMasterKey(n.id), o.info("WebCrypto master key generated (non-extractable)", { component: "KeyManager" });
+      await this.webCrypto.generateMasterKey(n.id), o.info("WebCrypto master key derived (non-extractable, deterministic)", { component: "KeyManager" });
       const a = B.createRandom(), s = a.privateKey, i = a.address;
       o.info("Wallet created", { component: "KeyManager", address: i });
       const { encrypted: c, iv: d } = await this.webCrypto.encrypt(s);
@@ -1038,7 +1074,7 @@ class Te {
         userId: e,
         createdAt: n.createdAt.toISOString(),
         keyType: "webcrypto-master"
-      }), console.log("[KeyManager] Wallet secured with WebCrypto non-extractable master key"), this.currentWallet = a, this.currentCredentialId = n.id, {
+      }), console.log("[KeyManager] Wallet secured with WebCrypto deterministic master key"), this.currentWallet = a, this.currentCredentialId = n.id, {
         address: i,
         credentialId: n.id,
         publicKey: n.publicKey
@@ -1064,7 +1100,7 @@ class Te {
         throw new Error("Wallet key data not found");
       let i;
       if (s.keyType === "webcrypto-master") {
-        console.log("[KeyManager] Using WebCrypto master key for decryption"), await this.webCrypto.generateMasterKey(n);
+        console.log("[KeyManager] Deriving WebCrypto master key for decryption"), await this.webCrypto.generateMasterKey(n);
         const d = new Uint8Array(s.encrypted), l = new Uint8Array(s.iv);
         i = await this.webCrypto.decrypt(d, l);
       } else {
@@ -1177,7 +1213,7 @@ class Te {
     return [];
   }
 }
-const ve = {
+const Pe = {
   // Token Messenger contract addresses by chain ID
   tokenMessengerAddresses: {
     // TESTNETS
@@ -1262,7 +1298,7 @@ const ve = {
     // Polygon
   },
   attestationServiceUrl: "https://iris-api.circle.com"
-}, Pe = [
+}, Ie = [
   {
     inputs: [
       {
@@ -1522,14 +1558,14 @@ const ve = {
     // Planned support
   }
 };
-function Ie(r) {
+function ke(r) {
   return G[r];
 }
-function ke(r) {
+function Re(r) {
   var e;
   return ((e = G[r]) == null ? void 0 : e.cctpSupported) ?? !1;
 }
-function Ge(r) {
+function Le(r) {
   var e;
   return ((e = G[r]) == null ? void 0 : e.nativeUSDC) ?? !1;
 }
@@ -1541,8 +1577,8 @@ function F(r, e) {
     errors: [],
     warnings: []
   };
-  if (!ke(e)) {
-    const l = Ie(e), h = l ? l.name : `Chain ID ${e}`;
+  if (!Re(e)) {
+    const l = ke(e), h = l ? l.name : `Chain ID ${e}`;
     return t.errors.push(`${h} does not support Circle CCTP`), t.isValid = !1, t;
   }
   const n = (i = r.tokenMessengerAddresses) == null ? void 0 : i[e], a = (c = r.usdcAddresses) == null ? void 0 : c[e], s = (d = r.domainIds) == null ? void 0 : d[e];
@@ -1566,7 +1602,7 @@ function F(r, e) {
     });
   }), t;
 }
-function Le(r) {
+function Be(r) {
   const e = F(r, 412346);
   return e.isValid && e.warnings.length === 0;
 }
@@ -1590,11 +1626,11 @@ const sdk = new WalletSDK({
 });
 \`\`\`` : `CCTP configuration missing for chain ID ${r}`;
 }
-class Re {
+class Oe {
   constructor(e, t) {
     u(this, "config");
     u(this, "provider");
-    this.provider = e, this.config = { ...ve, ...t };
+    this.provider = e, this.config = { ...Pe, ...t };
   }
   /**
    * Transfer USDC cross-chain using CCTP
@@ -1636,7 +1672,7 @@ class Re {
       console.log("[CCTP] Calling depositForBurn...");
       const K = await (await new E(
         l,
-        Pe,
+        Ie,
         e
       ).depositForBurn(
         g,
@@ -1721,7 +1757,7 @@ class Re {
     return te(i, 6);
   }
 }
-const Oe = {
+const Me = {
   entryPoint: "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789",
   // v0.6
   bundlerUrl: "",
@@ -1731,7 +1767,7 @@ const Oe = {
   accountImplementation: ""
   // Must be provided
 };
-class Me {
+class Ke {
   constructor(e) {
     u(this, "config");
     this.config = e;
@@ -1768,14 +1804,14 @@ const k = new ne(), R = [
   "function executeBatch(address[] calldata dest, uint256[] calldata value, bytes[] calldata func)",
   "function getNonce() view returns (uint256)"
 ];
-class Ke {
+class Ue {
   constructor(e, t, n) {
     u(this, "config");
     u(this, "provider");
     u(this, "paymasterConfig");
     u(this, "circlePaymaster");
     u(this, "accountAddress", null);
-    this.provider = e, this.config = { ...Oe, ...t }, this.paymasterConfig = n, (n == null ? void 0 : n.type) === "circle" && n.chainId && (this.circlePaymaster = new Me({
+    this.provider = e, this.config = { ...Me, ...t }, this.paymasterConfig = n, (n == null ? void 0 : n.type) === "circle" && n.chainId && (this.circlePaymaster = new Ke({
       paymasterUrl: n.url,
       chainId: n.chainId,
       bundlerUrl: t == null ? void 0 : t.bundlerUrl
@@ -2042,7 +2078,7 @@ class Ke {
     }
   }
 }
-class Be {
+class He {
   constructor(e) {
     u(this, "webauthn");
     u(this, "storage");
@@ -2057,7 +2093,7 @@ class Be {
       rpId: e.rpId,
       rpName: e.appName,
       backendUrl: e.backendUrl
-    }), this.storage = new Se(), this.keyManager = new Te(this.webauthn, this.storage), this.provider = new re(e.rpcUrl), this.cctpManager = new Re(this.provider, e.cctp), this.accountType = e.accountType || "eoa", this.accountType === "smart-account" && (this.smartAccountManager = new Ke(
+    }), this.storage = new Se(), this.keyManager = new ve(this.webauthn, this.storage), this.provider = new re(e.rpcUrl), this.cctpManager = new Oe(this.provider, e.cctp), this.accountType = e.accountType || "eoa", this.accountType === "smart-account" && (this.smartAccountManager = new Ue(
       this.provider,
       e.smartAccount,
       e.paymaster
@@ -2311,7 +2347,7 @@ class Be {
     await this.keyManager.deleteWallet(e), this.disconnect(), o.info("Wallet deleted permanently", { component: "WalletSDK" });
   }
 }
-class He {
+class $e {
   constructor(e) {
     u(this, "config");
     u(this, "baseUrl");
@@ -2368,45 +2404,45 @@ class He {
     }
   }
 }
-const Ue = "0x00000000";
-async function $e(r, e) {
+const xe = "0x00000000";
+async function Ve(r, e) {
   try {
     return await e.getCode(r) === "0x" ? !1 : await new E(r, [
       "function supportsInterface(bytes4) view returns (bool)"
-    ], e).supportsInterface(Ue);
+    ], e).supportsInterface(xe);
   } catch {
     return !1;
   }
 }
-const Ve = "1.0.0";
+const ze = "1.0.0";
 export {
-  Re as CCTPManager,
+  Oe as CCTPManager,
   G as CIRCLE_NETWORKS,
-  He as CircleApiClient,
-  Me as CirclePaymasterClient,
-  Oe as DEFAULT_AA_CONFIG,
-  ve as DEFAULT_CCTP_CONFIG,
-  Te as KeyManager,
+  $e as CircleApiClient,
+  Ke as CirclePaymasterClient,
+  Me as DEFAULT_AA_CONFIG,
+  Pe as DEFAULT_CCTP_CONFIG,
+  ve as KeyManager,
   ye as LogLevel,
   T as PASSKEY_DIAGNOSTIC_MESSAGES,
-  We as PasskeyDiagnosticError,
+  Ge as PasskeyDiagnosticError,
   Se as SecureStorage,
-  Ke as SmartAccountManager,
-  Ve as VERSION,
-  Be as WalletSDK,
+  Ue as SmartAccountManager,
+  ze as VERSION,
+  He as WalletSDK,
   Ee as WebAuthnManager,
   Ae as checkPlatformAuthenticatorSupport,
-  Fe as createLogger,
+  We as createLogger,
   z as getCCTPConfigErrorMessage,
-  Ie as getCircleNetwork,
+  ke as getCircleNetwork,
   we as getDeviceRiskLevel,
   Ce as getDiagnosticErrorMessage,
   ge as getPasskeyDiagnosticMode,
-  Le as isArcNetworkConfigured,
-  ke as isCCTPSupported,
-  $e as isCircleMSCA,
+  Be as isArcNetworkConfigured,
+  Re as isCCTPSupported,
+  Ve as isCircleMSCA,
   me as isHighRiskDevice,
-  Ge as isNativeUSDC,
+  Le as isNativeUSDC,
   o as logger,
   be as runPasskeyDiagnostic,
   F as validateCCTPConfig

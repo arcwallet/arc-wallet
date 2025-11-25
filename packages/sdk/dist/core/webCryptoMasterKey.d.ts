@@ -1,12 +1,16 @@
 /**
  * WebCrypto Master Key Manager
  * Manages non-extractable master keys for enhanced security
+ *
+ * IMPORTANT: Uses PBKDF2 to derive deterministic keys from credentialId
+ * This ensures the same key is generated for the same credentialId across sessions
  */
 export declare class WebCryptoMasterKeyManager {
     private masterKey;
     private keyId;
     /**
-     * Generate non-extractable master key
+     * Generate/derive non-extractable master key from credentialId
+     * Uses PBKDF2 to ensure deterministic key derivation
      */
     generateMasterKey(credentialId: string): Promise<void>;
     /**

@@ -33,9 +33,9 @@ export class KeyManager {
       // Step 1: Create passkey credential
       const credential = await this.webauthn.createPasskey(userId, userName);
 
-      // Step 2: Generate WebCrypto non-extractable master key
+      // Step 2: Derive WebCrypto non-extractable master key from credential
       await this.webCrypto.generateMasterKey(credential.id);
-      logger.info('WebCrypto master key generated (non-extractable)', { component: 'KeyManager' });
+      logger.info('WebCrypto master key derived (non-extractable, deterministic)', { component: 'KeyManager' });
 
       // Step 3: Generate new Ethereum wallet
       const wallet = Wallet.createRandom();
@@ -64,7 +64,7 @@ export class KeyManager {
         keyType: 'webcrypto-master',
       });
 
-      console.log('[KeyManager] Wallet secured with WebCrypto non-extractable master key');
+      console.log('[KeyManager] Wallet secured with WebCrypto deterministic master key');
 
       // Set as current wallet
       this.currentWallet = wallet as any;
@@ -112,10 +112,10 @@ export class KeyManager {
       let privateKey: string;
 
       if (keyData.keyType === 'webcrypto-master') {
-        // New WebCrypto approach
-        console.log('[KeyManager] Using WebCrypto master key for decryption');
+        // New WebCrypto approach - derive the same deterministic key
+        console.log('[KeyManager] Deriving WebCrypto master key for decryption');
 
-        // Generate master key
+        // Derive master key (deterministic - same credentialId = same key)
         await this.webCrypto.generateMasterKey(activeCredentialId);
 
         // Decrypt with non-extractable master key

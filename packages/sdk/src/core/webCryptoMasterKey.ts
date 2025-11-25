@@ -1,21 +1,47 @@
 /**
  * WebCrypto Master Key Manager
  * Manages non-extractable master keys for enhanced security
+ *
+ * IMPORTANT: Uses PBKDF2 to derive deterministic keys from credentialId
+ * This ensures the same key is generated for the same credentialId across sessions
  */
+
+// Fixed salt for deterministic key derivation (app-specific)
+const FIXED_SALT = new Uint8Array([
+    0x41, 0x52, 0x43, 0x57, 0x41, 0x4c, 0x4c, 0x45,  // "ARCWALLE"
+    0x54, 0x5f, 0x53, 0x41, 0x4c, 0x54, 0x5f, 0x56   // "T_SALT_V"
+]);
 
 export class WebCryptoMasterKeyManager {
     private masterKey: CryptoKey | null = null;
     private keyId: string | null = null;
 
     /**
-     * Generate non-extractable master key
+     * Generate/derive non-extractable master key from credentialId
+     * Uses PBKDF2 to ensure deterministic key derivation
      */
     async generateMasterKey(credentialId: string): Promise<void> {
         try {
-            console.log('[WebCrypto] Generating non-extractable master key...');
+            console.log('[WebCrypto] Deriving non-extractable master key from credential...');
 
-            // Generate AES-GCM key (non-extractable)
-            this.masterKey = await crypto.subtle.generateKey(
+            // Import credential ID as key material for PBKDF2
+            const keyMaterial = await crypto.subtle.importKey(
+                'raw',
+                new TextEncoder().encode(credentialId),
+                'PBKDF2',
+                false,
+                ['deriveBits', 'deriveKey']
+            );
+
+            // Derive AES-GCM key using PBKDF2 (deterministic - same credentialId = same key)
+            this.masterKey = await crypto.subtle.deriveKey(
+                {
+                    name: 'PBKDF2',
+                    salt: FIXED_SALT,
+                    iterations: 100000,
+                    hash: 'SHA-256',
+                },
+                keyMaterial,
                 {
                     name: 'AES-GCM',
                     length: 256,
@@ -26,10 +52,10 @@ export class WebCryptoMasterKeyManager {
 
             this.keyId = credentialId;
 
-            console.log('[WebCrypto] Master key generated (non-extractable)');
+            console.log('[WebCrypto] Master key derived (non-extractable, deterministic)');
         } catch (error: any) {
-            console.error('[WebCrypto] Master key generation failed:', error);
-            throw new Error(`Failed to generate master key: ${error.message}`);
+            console.error('[WebCrypto] Master key derivation failed:', error);
+            throw new Error(`Failed to derive master key: ${error.message}`);
         }
     }
 
