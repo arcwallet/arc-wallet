@@ -3,7 +3,7 @@
  * Handles COSE public key extraction and Ethereum address derivation
  */
 import { keccak256 } from 'ethers';
-import * as cbor from 'cbor';
+import cbor from 'cbor';
 /**
  * DER-encoded public key prefix for P-256 (secp256r1) EC public keys
  * ASN.1 SubjectPublicKeyInfo structure
