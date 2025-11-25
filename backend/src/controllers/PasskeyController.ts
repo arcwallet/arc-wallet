@@ -181,13 +181,15 @@ export class PasskeyController {
         throw new ApiError('Invalid or expired challenge', 400, 'INVALID_CHALLENGE');
       }
 
-      console.log('[PasskeyReg] Verifying registration response...', {
-        expectedChallenge: challengeRecord.challenge,
-        expectedOrigin: this.config.ORIGIN,
-        expectedRPID: this.config.RP_ID,
-        clientDataJSON: credential.response.clientDataJSON,
-        decodedClientData: decodeClientDataJSON(credential.response.clientDataJSON)
-      });
+      const decodedClientData = decodeClientDataJSON(credential.response.clientDataJSON);
+      console.log('[PasskeyReg] Verifying registration response...');
+      console.log('[PasskeyReg] Expected challenge:', challengeRecord.challenge);
+      console.log('[PasskeyReg] Expected origin:', this.config.ORIGIN);
+      console.log('[PasskeyReg] Expected RP_ID:', this.config.RP_ID);
+      console.log('[PasskeyReg] Client origin:', decodedClientData.origin);
+      console.log('[PasskeyReg] Client challenge:', decodedClientData.challenge);
+      console.log('[PasskeyReg] Origin match:', this.config.ORIGIN === decodedClientData.origin);
+      console.log('[PasskeyReg] Challenge match:', challengeRecord.challenge === decodedClientData.challenge);
 
       // Verify registration response
       let verification;

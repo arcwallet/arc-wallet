@@ -142,21 +142,31 @@ export class PasskeyController {
                 console.error('[PasskeyReg] Challenge not found or expired:', clientChallenge);
                 throw new ApiError('Invalid or expired challenge', 400, 'INVALID_CHALLENGE');
             }
-            console.log('[PasskeyReg] Verifying registration response...', {
-                expectedChallenge: challengeRecord.challenge,
-                expectedOrigin: this.config.ORIGIN,
-                expectedRPID: this.config.RP_ID,
-                clientDataJSON: credential.response.clientDataJSON,
-                decodedClientData: decodeClientDataJSON(credential.response.clientDataJSON)
-            });
+            const decodedClientData = decodeClientDataJSON(credential.response.clientDataJSON);
+            console.log('[PasskeyReg] Verifying registration response...');
+            console.log('[PasskeyReg] Expected challenge:', challengeRecord.challenge);
+            console.log('[PasskeyReg] Expected origin:', this.config.ORIGIN);
+            console.log('[PasskeyReg] Expected RP_ID:', this.config.RP_ID);
+            console.log('[PasskeyReg] Client origin:', decodedClientData.origin);
+            console.log('[PasskeyReg] Client challenge:', decodedClientData.challenge);
+            console.log('[PasskeyReg] Origin match:', this.config.ORIGIN === decodedClientData.origin);
+            console.log('[PasskeyReg] Challenge match:', challengeRecord.challenge === decodedClientData.challenge);
             // Verify registration response
-            const verification = await verifyRegistrationResponse({
-                response: credential,
-                expectedChallenge: challengeRecord.challenge,
-                expectedOrigin: this.config.ORIGIN,
-                expectedRPID: this.config.RP_ID,
-                requireUserVerification: true
-            });
+            let verification;
+            try {
+                verification = await verifyRegistrationResponse({
+                    response: credential,
+                    expectedChallenge: challengeRecord.challenge,
+                    expectedOrigin: this.config.ORIGIN,
+                    expectedRPID: this.config.RP_ID,
+                    requireUserVerification: true
+                });
+            }
+            catch (verifyError) {
+                console.error('[PasskeyReg] verifyRegistrationResponse threw error:', verifyError.message);
+                console.error('[PasskeyReg] Full error:', verifyError);
+                throw new ApiError(`Credential verification failed: ${verifyError.message}`, 400, 'VERIFICATION_FAILED');
+            }
             console.log('[PasskeyReg] Verification result:', verification.verified, verification.registrationInfo);
             if (!verification.verified) {
                 console.error('[PasskeyReg] Verification failed details:', verification);
