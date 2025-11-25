@@ -141,3 +141,98 @@ export async function executeERC20Transfer(params: {
   const hash = await module.sendERC20Transfer(params);
   return { kind: 'transaction', hash };
 }
+
+// ============================================================================
+// ERC-4337 Smart Account Execution (Phase 2)
+// ============================================================================
+
+/**
+ * Execute transfer via ERC-4337 Smart Account with Pimlico bundler
+ * This is the Phase 2 implementation using proper account abstraction
+ */
+export async function executeViaSmartAccount(params: {
+  privateKey: string;
+  to: string;
+  amount: string;
+  data?: string;
+  sponsored?: boolean;
+}): Promise<ExecutionResult> {
+  const { Wallet } = await import('ethers');
+  const { erc4337Service } = await import('./erc4337Service');
+  const { RPC_URL } = await import('../config/app.config');
+  const { JsonRpcProvider } = await import('ethers');
+
+  const provider = new JsonRpcProvider(RPC_URL);
+  const signer = new Wallet(params.privateKey, provider);
+
+  const result = await erc4337Service.executeTransaction(
+    signer,
+    params.to,
+    params.amount,
+    params.data || '0x',
+    params.sponsored ?? true
+  );
+
+  return {
+    kind: 'userOp',
+    hash: result.txHash || result.userOpHash,
+  };
+}
+
+/**
+ * Execute batch transactions via ERC-4337 Smart Account
+ */
+export async function executeBatchViaSmartAccount(params: {
+  privateKey: string;
+  transactions: { to: string; value?: string; data?: string }[];
+  sponsored?: boolean;
+}): Promise<ExecutionResult> {
+  const { Wallet } = await import('ethers');
+  const { erc4337Service } = await import('./erc4337Service');
+  const { RPC_URL } = await import('../config/app.config');
+  const { JsonRpcProvider } = await import('ethers');
+
+  const provider = new JsonRpcProvider(RPC_URL);
+  const signer = new Wallet(params.privateKey, provider);
+
+  const result = await erc4337Service.executeBatch(
+    signer,
+    params.transactions,
+    params.sponsored ?? true
+  );
+
+  return {
+    kind: 'userOp',
+    hash: result.txHash || result.userOpHash,
+  };
+}
+
+/**
+ * Check if ERC-4337 (Pimlico) is available
+ */
+export async function isERC4337Available(): Promise<boolean> {
+  const { erc4337Service } = await import('./erc4337Service');
+  return erc4337Service.isAvailable();
+}
+
+/**
+ * Get Smart Account address for an EOA owner
+ */
+export async function getSmartAccountAddress(ownerAddress: string): Promise<string> {
+  const { erc4337Service } = await import('./erc4337Service');
+  return erc4337Service.getSmartAccountAddress(ownerAddress);
+}
+
+/**
+ * Get Smart Account info
+ */
+export async function getSmartAccountInfo(ownerAddress: string): Promise<{
+  address: string;
+  owner: string;
+  isDeployed: boolean;
+  balance: string;
+  balanceFormatted: string;
+}> {
+  const { erc4337Service } = await import('./erc4337Service');
+  return erc4337Service.getAccountInfo(ownerAddress);
+}
