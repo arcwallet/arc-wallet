@@ -2,7 +2,7 @@ var Q = Object.defineProperty;
 var Z = (r, e, t) => e in r ? Q(r, e, { enumerable: !0, configurable: !0, writable: !0, value: t }) : r[e] = t;
 var u = (r, e, t) => Z(r, typeof e != "symbol" ? e + "" : e, t);
 import { Wallet as B, parseUnits as ee, Contract as E, keccak256 as b, getBytes as D, formatUnits as te, AbiCoder as ne, Interface as U, toBeHex as S, JsonRpcProvider as re } from "ethers";
-import { set as x, get as I, del as ae, clear as se } from "idb-keyval";
+import { set as x, get as v, del as ae, clear as se } from "idb-keyval";
 function C(r) {
   const e = new Uint8Array(r);
   let t = "";
@@ -16,7 +16,7 @@ function O(r) {
     i[c] = a.charCodeAt(c);
   return s;
 }
-function F() {
+function W() {
   return ie.stubThis((globalThis == null ? void 0 : globalThis.PublicKeyCredential) !== void 0 && typeof globalThis.PublicKeyCredential == "function");
 }
 const ie = {
@@ -171,7 +171,7 @@ async function de(r) {
   var w;
   !r.optionsJSON && r.challenge && (console.warn("startRegistration() was not called correctly. It will try to continue with the provided options, but this call should be refactored to use the expected call structure instead. See https://simplewebauthn.dev/docs/packages/browser#typeerror-cannot-read-properties-of-undefined-reading-challenge for more information."), r = { optionsJSON: r });
   const { optionsJSON: e, useAutoRegister: t = !1 } = r;
-  if (!F())
+  if (!W())
     throw new Error("WebAuthn is not supported in this browser");
   const n = {
     ...e,
@@ -237,7 +237,7 @@ function _(r, e) {
 `, e);
 }
 function ue() {
-  if (!F())
+  if (!W())
     return N.stubThis(new Promise((e) => e(!1)));
   const r = globalThis.PublicKeyCredential;
   return (r == null ? void 0 : r.isConditionalMediationAvailable) === void 0 ? N.stubThis(new Promise((e) => e(!1))) : N.stubThis(r.isConditionalMediationAvailable());
@@ -290,7 +290,7 @@ async function pe(r) {
   var p, w;
   !r.optionsJSON && r.challenge && (console.warn("startAuthentication() was not called correctly. It will try to continue with the provided options, but this call should be refactored to use the expected call structure instead. See https://simplewebauthn.dev/docs/packages/browser#typeerror-cannot-read-properties-of-undefined-reading-challenge for more information."), r = { optionsJSON: r });
   const { optionsJSON: e, useBrowserAutofill: t = !1, verifyBrowserAutofillInput: n = !0 } = r;
-  if (!F())
+  if (!W())
     throw new Error("WebAuthn is not supported in this browser");
   let a;
   ((p = e.allowCredentials) == null ? void 0 : p.length) !== 0 && (a = (w = e.allowCredentials) == null ? void 0 : w.map(j));
@@ -429,10 +429,10 @@ const o = new X({
   sentryDsn: process.env.SENTRY_DSN,
   environment: process.env.NODE_ENV || "development"
 });
-function We(r) {
+function Fe(r) {
   return new X(r);
 }
-class Fe extends Error {
+class We extends Error {
   constructor(t, n) {
     super(t);
     u(this, "cause");
@@ -786,7 +786,7 @@ class Se {
    */
   async getKey(e, t) {
     try {
-      const n = await I(`wallet_key_${e}`);
+      const n = await v(`wallet_key_${e}`);
       return n ? await this.decrypt(n, t) : null;
     } catch (n) {
       return o.error("Failed to retrieve key", n instanceof Error ? n : void 0, { component: "SecureStorage" }), null;
@@ -840,7 +840,7 @@ class Se {
    * Get key data (supports both legacy and new formats)
    */
   async getKeyData(e) {
-    return await I(`wallet:${e}`);
+    return await v(`wallet:${e}`);
   }
   /**
    * Store metadata
@@ -852,13 +852,14 @@ class Se {
    * Get wallet metadata
    */
   async getMetadata(e) {
-    return await I(`wallet_meta_${e}`);
+    const t = await v(`wallet:${e}:metadata`);
+    return t || await v(`wallet_meta_${e}`);
   }
   /**
    * Check if key exists
    */
   async hasKey(e) {
-    return await I(`wallet_key_${e}`) !== void 0;
+    return await v(`wallet_key_${e}`) !== void 0;
   }
 }
 class De {
@@ -1533,7 +1534,7 @@ function Ge(r) {
   return ((e = G[r]) == null ? void 0 : e.nativeUSDC) ?? !1;
 }
 const $ = "0x0000000000000000000000000000000000000000", V = /^0x\.\.\.$/;
-function W(r, e) {
+function F(r, e) {
   var i, c, d;
   const t = {
     isValid: !0,
@@ -1566,7 +1567,7 @@ function W(r, e) {
   }), t;
 }
 function Le(r) {
-  const e = W(r, 412346);
+  const e = F(r, 412346);
   return e.isValid && e.warnings.length === 0;
 }
 function z(r) {
@@ -1599,7 +1600,7 @@ class Re {
    * Transfer USDC cross-chain using CCTP
    */
   async transferUSDC(e, t) {
-    const { amount: n, destinationAddress: a, destinationChainId: s } = t, i = await e.provider.getNetwork().then((l) => Number(l.chainId)), c = W(this.config, i);
+    const { amount: n, destinationAddress: a, destinationChainId: s } = t, i = await e.provider.getNetwork().then((l) => Number(l.chainId)), c = F(this.config, i);
     if (!c.isValid) {
       const l = z(i);
       throw o.error("CCTP configuration invalid for source chain", void 0, {
@@ -1608,7 +1609,7 @@ class Re {
         errors: c.errors
       }), new Error(l);
     }
-    const d = W(this.config, s);
+    const d = F(this.config, s);
     if (!d.isValid) {
       const l = z(s);
       throw o.error("CCTP configuration invalid for destination chain", void 0, {
@@ -1644,16 +1645,16 @@ class Re {
         h
       )).wait();
       console.log("[CCTP] Burn transaction confirmed:", K.hash);
-      const L = this.extractMessageHash(K), v = {
+      const L = this.extractMessageHash(K), P = {
         sourceTxHash: K.hash,
         messageHash: L,
         status: "pending"
       };
-      return this.pollForAttestation(L).then((P) => {
-        v.attestation = P, v.status = "attested", console.log("[CCTP] Attestation received");
-      }).catch((P) => {
-        console.error("[CCTP] Attestation failed:", P), v.status = "failed";
-      }), v;
+      return this.pollForAttestation(L).then((I) => {
+        P.attestation = I, P.status = "attested", console.log("[CCTP] Attestation received");
+      }).catch((I) => {
+        console.error("[CCTP] Attestation failed:", I), P.status = "failed";
+      }), P;
     } catch (l) {
       throw console.error("[CCTP] Transfer failed:", l), new Error(`CCTP transfer failed: ${l.message}`);
     }
@@ -2388,14 +2389,14 @@ export {
   Te as KeyManager,
   ye as LogLevel,
   T as PASSKEY_DIAGNOSTIC_MESSAGES,
-  Fe as PasskeyDiagnosticError,
+  We as PasskeyDiagnosticError,
   Se as SecureStorage,
   Ke as SmartAccountManager,
   Ve as VERSION,
   Be as WalletSDK,
   Ee as WebAuthnManager,
   Ae as checkPlatformAuthenticatorSupport,
-  We as createLogger,
+  Fe as createLogger,
   z as getCCTPConfigErrorMessage,
   Ie as getCircleNetwork,
   we as getDeviceRiskLevel,
@@ -2408,6 +2409,6 @@ export {
   Ge as isNativeUSDC,
   o as logger,
   be as runPasskeyDiagnostic,
-  W as validateCCTPConfig
+  F as validateCCTPConfig
 };
 //# sourceMappingURL=index.mjs.map

@@ -178,6 +178,11 @@ export class SecureStorage {
    * Get wallet metadata
    */
   async getMetadata(credentialId: string): Promise<any | null> {
+    // Try new format first, then legacy format
+    const newFormat = await get(`wallet:${credentialId}:metadata`);
+    if (newFormat) return newFormat;
+
+    // Legacy format fallback
     return await get(`wallet_meta_${credentialId}`);
   }
 

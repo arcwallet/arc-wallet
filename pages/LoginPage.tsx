@@ -4,12 +4,16 @@ import { ArrowUpRightIcon } from '../components/Icons';
 import { WaveBackground } from '../components/WaveBackground';
 import arcLogo from '../assets/arclogo.png';
 import { Footer } from '../components/Footer';
+import { passkeyClient } from '../services/passkeyClient';
+import { createAuthenticationCredential } from '../utils/webauthn';
 
 const LoginPage: React.FC = () => {
-  const { sendMagicLink, requestStatus, message } = useSession();
+  const { sendMagicLink, requestStatus, message, refresh } = useSession();
   const [email, setEmail] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [cooldown, setCooldown] = useState(0);
+  const [localMessage, setLocalMessage] = useState<string | null>(null);
+  const [localStatus, setLocalStatus] = useState<'idle' | 'success' | 'error'>('idle');
 
   React.useEffect(() => {
     if (cooldown <= 0) return;
@@ -19,11 +23,72 @@ const LoginPage: React.FC = () => {
     return () => window.clearInterval(timer);
   }, [cooldown]);
 
+  const handlePasskeyAuth = async (userEmail: string): Promise<boolean> => {
+    try {
+      // Start authentication
+      const startResult = await passkeyClient.beginAuthentication(userEmail);
+      if (!startResult.success || !startResult.data?.options) {
+        throw new Error('Failed to start passkey authentication');
+      }
+
+      // Create credential with browser
+      const credential = await createAuthenticationCredential(startResult.data.options);
+
+      // Finish authentication
+      const finishResult = await passkeyClient.finishAuthentication(credential);
+      if (!finishResult.success) {
+        throw new Error('Failed to verify passkey');
+      }
+
+      // Store session key if returned
+      if (finishResult.data?.sessionKey) {
+        localStorage.setItem('arc_session_key', JSON.stringify(finishResult.data.sessionKey));
+      }
+
+      // Refresh session to update state
+      await refresh();
+      return true;
+    } catch (error) {
+      console.error('[LoginPage] Passkey auth failed:', error);
+      return false;
+    }
+  };
+
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!email || submitting || cooldown > 0) return;
     setSubmitting(true);
+    setLocalMessage(null);
+    setLocalStatus('idle');
+
     try {
+      // First check if user has passkeys
+      const checkResult = await passkeyClient.checkUserPasskeys(email);
+
+      if (checkResult.success && checkResult.data?.hasPasskey) {
+        // User has passkeys, try direct passkey authentication
+        setLocalMessage('Passkey found! Please authenticate with your passkey...');
+        setLocalStatus('success');
+
+        const authSuccess = await handlePasskeyAuth(email);
+        if (authSuccess) {
+          // Auth successful, session will be refreshed and user redirected
+          return;
+        } else {
+          // Passkey auth failed, fall back to magic link
+          setLocalMessage('Passkey authentication failed. Sending magic link...');
+          setLocalStatus('error');
+          await sendMagicLink(email);
+          setCooldown(30);
+        }
+      } else {
+        // No passkeys, send magic link
+        await sendMagicLink(email);
+        setCooldown(30);
+      }
+    } catch (error) {
+      // If checkUserPasskeys fails, fall back to magic link
+      console.error('[LoginPage] Check passkeys failed:', error);
       await sendMagicLink(email);
       setCooldown(30);
     } finally {
@@ -87,12 +152,12 @@ const LoginPage: React.FC = () => {
         </form>
 
         {/* Status Messages */}
-        {message && (
-          <div className={`mt-4 p-3 rounded-lg backdrop-blur-sm border text-center ${requestStatus === 'error'
+        {(localMessage || message) && (
+          <div className={`mt-4 p-3 rounded-lg backdrop-blur-sm border text-center ${(localStatus === 'error' || requestStatus === 'error')
             ? 'bg-red-900/20 border-red-500/50 text-red-200'
             : 'bg-blue-900/20 border-blue-500/50 text-blue-200'
             }`}>
-            {message}
+            {localMessage || message}
           </div>
         )}
 

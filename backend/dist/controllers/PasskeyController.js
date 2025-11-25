@@ -693,5 +693,44 @@ export class PasskeyController {
             throw new ApiError('Failed to complete recovery', 500, 'RECOVERY_COMPLETE_FAILED');
         }
     };
+    /**
+     * Check if user has registered passkeys
+     * Used to skip magic link when user already has passkeys for this email
+     */
+    checkUserPasskeys = async (req, res) => {
+        try {
+            const { email } = req.body;
+            if (!email) {
+                throw new ApiError('Email is required', 400, 'MISSING_EMAIL');
+            }
+            const normalizedEmail = email.trim().toLowerCase();
+            const user = await this.db.getUserByUsername(normalizedEmail);
+            if (!user) {
+                return res.json({
+                    success: true,
+                    data: {
+                        hasPasskey: false,
+                        passkeyCount: 0
+                    }
+                });
+            }
+            const passkeys = await this.db.getPasskeysByUserId(user.id);
+            return res.json({
+                success: true,
+                data: {
+                    hasPasskey: passkeys.length > 0,
+                    passkeyCount: passkeys.length,
+                    userId: user.id
+                }
+            });
+        }
+        catch (error) {
+            console.error('Check user passkeys error:', error);
+            if (error instanceof ApiError) {
+                throw error;
+            }
+            throw new ApiError('Failed to check user passkeys', 500, 'CHECK_USER_FAILED');
+        }
+    };
 }
 //# sourceMappingURL=PasskeyController.js.map

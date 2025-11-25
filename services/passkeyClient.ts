@@ -141,6 +141,10 @@ export const passkeyClient = {
   completeRecovery: (token: string, privateKey?: string) =>
     postJSON<{ email: string; deletedPasskeys: number; deletedSessionKeys: number; message: string }>('/passkeys/recovery/complete', { token, privateKey }),
 
+  // Check if user has registered passkeys
+  checkUserPasskeys: (email: string) =>
+    postJSON<{ hasPasskey: boolean; passkeyCount: number; userId?: string }>('/passkeys/check-user', { email }),
+
   PasskeyClientError,
 };
 

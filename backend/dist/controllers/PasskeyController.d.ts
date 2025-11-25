@@ -55,5 +55,10 @@ export declare class PasskeyController {
      * Complete recovery - delete old passkeys and allow new registration
      */
     recoveryComplete: (req: Request, res: Response) => Promise<void>;
+    /**
+     * Check if user has registered passkeys
+     * Used to skip magic link when user already has passkeys for this email
+     */
+    checkUserPasskeys: (req: Request, res: Response) => Promise<Response<any, Record<string, any>>>;
 }
 //# sourceMappingURL=PasskeyController.d.ts.map

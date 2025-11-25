@@ -152,6 +152,18 @@ export function createPasskeyRoutes(db, config) {
         }
     });
     /**
+     * POST /passkeys/check-user
+     * Check if user has registered passkeys
+     */
+    router.post('/check-user', rateLimitMiddleware('general'), validateRequestBody(['email']), async (req, res, next) => {
+        try {
+            await passkeyController.checkUserPasskeys(req, res);
+        }
+        catch (error) {
+            next(error);
+        }
+    });
+    /**
      * GET /passkeys/health
      * Health check for passkey service
      */
