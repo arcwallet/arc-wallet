@@ -190,13 +190,20 @@ export class PasskeyController {
       });
 
       // Verify registration response
-      const verification = await verifyRegistrationResponse({
-        response: credential,
-        expectedChallenge: challengeRecord.challenge,
-        expectedOrigin: this.config.ORIGIN,
-        expectedRPID: this.config.RP_ID,
-        requireUserVerification: true
-      });
+      let verification;
+      try {
+        verification = await verifyRegistrationResponse({
+          response: credential,
+          expectedChallenge: challengeRecord.challenge,
+          expectedOrigin: this.config.ORIGIN,
+          expectedRPID: this.config.RP_ID,
+          requireUserVerification: true
+        });
+      } catch (verifyError: any) {
+        console.error('[PasskeyReg] verifyRegistrationResponse threw error:', verifyError.message);
+        console.error('[PasskeyReg] Full error:', verifyError);
+        throw new ApiError(`Credential verification failed: ${verifyError.message}`, 400, 'VERIFICATION_FAILED');
+      }
 
       console.log('[PasskeyReg] Verification result:', verification.verified, verification.registrationInfo);
 

@@ -16,7 +16,7 @@ function O(r) {
     i[c] = a.charCodeAt(c);
   return s;
 }
-function W() {
+function F() {
   return ie.stubThis((globalThis == null ? void 0 : globalThis.PublicKeyCredential) !== void 0 && typeof globalThis.PublicKeyCredential == "function");
 }
 const ie = {
@@ -171,7 +171,7 @@ async function de(r) {
   var w;
   !r.optionsJSON && r.challenge && (console.warn("startRegistration() was not called correctly. It will try to continue with the provided options, but this call should be refactored to use the expected call structure instead. See https://simplewebauthn.dev/docs/packages/browser#typeerror-cannot-read-properties-of-undefined-reading-challenge for more information."), r = { optionsJSON: r });
   const { optionsJSON: e, useAutoRegister: t = !1 } = r;
-  if (!W())
+  if (!F())
     throw new Error("WebAuthn is not supported in this browser");
   const n = {
     ...e,
@@ -186,35 +186,35 @@ async function de(r) {
   let s;
   try {
     s = await navigator.credentials.create(a);
-  } catch (g) {
-    throw oe({ error: g, options: a });
+  } catch (y) {
+    throw oe({ error: y, options: a });
   }
   if (!s)
     throw new Error("Registration was not completed");
   const { id: i, rawId: c, response: d, type: l } = s;
   let h;
   typeof d.getTransports == "function" && (h = d.getTransports());
-  let y;
+  let f;
   if (typeof d.getPublicKeyAlgorithm == "function")
     try {
-      y = d.getPublicKeyAlgorithm();
-    } catch (g) {
-      _("getPublicKeyAlgorithm()", g);
+      f = d.getPublicKeyAlgorithm();
+    } catch (y) {
+      _("getPublicKeyAlgorithm()", y);
     }
-  let f;
+  let g;
   if (typeof d.getPublicKey == "function")
     try {
-      const g = d.getPublicKey();
-      g !== null && (f = C(g));
-    } catch (g) {
-      _("getPublicKey()", g);
+      const y = d.getPublicKey();
+      y !== null && (g = C(y));
+    } catch (y) {
+      _("getPublicKey()", y);
     }
   let p;
   if (typeof d.getAuthenticatorData == "function")
     try {
       p = C(d.getAuthenticatorData());
-    } catch (g) {
-      _("getAuthenticatorData()", g);
+    } catch (y) {
+      _("getAuthenticatorData()", y);
     }
   return {
     id: i,
@@ -223,8 +223,8 @@ async function de(r) {
       attestationObject: C(d.attestationObject),
       clientDataJSON: C(d.clientDataJSON),
       transports: h,
-      publicKeyAlgorithm: y,
-      publicKey: f,
+      publicKeyAlgorithm: f,
+      publicKey: g,
       authenticatorData: p
     },
     type: l,
@@ -237,7 +237,7 @@ function _(r, e) {
 `, e);
 }
 function ue() {
-  if (!W())
+  if (!F())
     return N.stubThis(new Promise((e) => e(!1)));
   const r = globalThis.PublicKeyCredential;
   return (r == null ? void 0 : r.isConditionalMediationAvailable) === void 0 ? N.stubThis(new Promise((e) => e(!1))) : N.stubThis(r.isConditionalMediationAvailable());
@@ -290,7 +290,7 @@ async function pe(r) {
   var p, w;
   !r.optionsJSON && r.challenge && (console.warn("startAuthentication() was not called correctly. It will try to continue with the provided options, but this call should be refactored to use the expected call structure instead. See https://simplewebauthn.dev/docs/packages/browser#typeerror-cannot-read-properties-of-undefined-reading-challenge for more information."), r = { optionsJSON: r });
   const { optionsJSON: e, useBrowserAutofill: t = !1, verifyBrowserAutofillInput: n = !0 } = r;
-  if (!W())
+  if (!F())
     throw new Error("WebAuthn is not supported in this browser");
   let a;
   ((p = e.allowCredentials) == null ? void 0 : p.length) !== 0 && (a = (w = e.allowCredentials) == null ? void 0 : w.map(j));
@@ -310,23 +310,23 @@ async function pe(r) {
   let c;
   try {
     c = await navigator.credentials.get(i);
-  } catch (g) {
-    throw he({ error: g, options: i });
+  } catch (y) {
+    throw he({ error: y, options: i });
   }
   if (!c)
     throw new Error("Authentication was not completed");
-  const { id: d, rawId: l, response: h, type: y } = c;
-  let f;
-  return h.userHandle && (f = C(h.userHandle)), {
+  const { id: d, rawId: l, response: h, type: f } = c;
+  let g;
+  return h.userHandle && (g = C(h.userHandle)), {
     id: d,
     rawId: C(l),
     response: {
       authenticatorData: C(h.authenticatorData),
       clientDataJSON: C(h.clientDataJSON),
       signature: C(h.signature),
-      userHandle: f
+      userHandle: g
     },
-    type: y,
+    type: f,
     clientExtensionResults: c.getClientExtensionResults(),
     authenticatorAttachment: q(c.authenticatorAttachment)
   };
@@ -429,10 +429,10 @@ const o = new X({
   sentryDsn: process.env.SENTRY_DSN,
   environment: process.env.NODE_ENV || "development"
 });
-function Fe(r) {
+function We(r) {
   return new X(r);
 }
-class We extends Error {
+class Fe extends Error {
   constructor(t, n) {
     super(t);
     u(this, "cause");
@@ -616,32 +616,32 @@ class Ee {
         component: "WebAuthn",
         challenge: ((a = h.challenge) == null ? void 0 : a.substring(0, 20)) + "..."
       });
-      const y = await de({ optionsJSON: h });
+      const f = await de({ optionsJSON: h });
       o.debug("Credential created successfully", {
         component: "WebAuthn",
-        credentialId: y.id.substring(0, 20) + "..."
+        credentialId: f.id.substring(0, 20) + "..."
       });
-      const f = await fetch(`${this.backendUrl}/passkeys/register/finish`, {
+      const g = await fetch(`${this.backendUrl}/passkeys/register/finish`, {
         method: "POST",
         headers: this.getHeaders(),
         credentials: "include",
         body: JSON.stringify({
           username: e,
           // Backend expects 'username' not 'userId'
-          credential: y
+          credential: f
         })
       });
-      if (!f.ok) {
-        const w = await f.json().catch(() => ({}));
-        throw new Error(w.message || "Failed to verify credential");
+      if (!g.ok) {
+        const w = await g.json().catch(() => ({})), y = w.error || w.message || "Failed to verify credential";
+        throw console.error("[WebAuthn] Credential verification failed:", w), new Error(y);
       }
-      const p = await f.json();
+      const p = await g.json();
       return o.info("Passkey registered successfully", {
         component: "WebAuthn",
-        credentialId: y.id.substring(0, 20) + "..."
+        credentialId: f.id.substring(0, 20) + "..."
       }), {
-        id: y.id,
-        publicKey: p.publicKey || y.id,
+        id: f.id,
+        publicKey: p.publicKey || f.id,
         // Backend should return the actual public key
         userId: e,
         // Include userId as required by PasskeyCredential interface
@@ -1533,7 +1533,7 @@ function Ge(r) {
   return ((e = G[r]) == null ? void 0 : e.nativeUSDC) ?? !1;
 }
 const $ = "0x0000000000000000000000000000000000000000", V = /^0x\.\.\.$/;
-function F(r, e) {
+function W(r, e) {
   var i, c, d;
   const t = {
     isValid: !0,
@@ -1566,7 +1566,7 @@ function F(r, e) {
   }), t;
 }
 function Le(r) {
-  const e = F(r, 412346);
+  const e = W(r, 412346);
   return e.isValid && e.warnings.length === 0;
 }
 function z(r) {
@@ -1599,7 +1599,7 @@ class Re {
    * Transfer USDC cross-chain using CCTP
    */
   async transferUSDC(e, t) {
-    const { amount: n, destinationAddress: a, destinationChainId: s } = t, i = await e.provider.getNetwork().then((l) => Number(l.chainId)), c = F(this.config, i);
+    const { amount: n, destinationAddress: a, destinationChainId: s } = t, i = await e.provider.getNetwork().then((l) => Number(l.chainId)), c = W(this.config, i);
     if (!c.isValid) {
       const l = z(i);
       throw o.error("CCTP configuration invalid for source chain", void 0, {
@@ -1608,7 +1608,7 @@ class Re {
         errors: c.errors
       }), new Error(l);
     }
-    const d = F(this.config, s);
+    const d = W(this.config, s);
     if (!d.isValid) {
       const l = z(s);
       throw o.error("CCTP configuration invalid for destination chain", void 0, {
@@ -1623,24 +1623,24 @@ class Re {
         to: s,
         amount: n
       });
-      const l = this.config.tokenMessengerAddresses[i], h = this.config.usdcAddresses[i], y = this.config.domainIds[s];
-      if (!l || !h || y === void 0)
+      const l = this.config.tokenMessengerAddresses[i], h = this.config.usdcAddresses[i], f = this.config.domainIds[s];
+      if (!l || !h || f === void 0)
         throw new Error(`CCTP not supported for chain ${i}`);
-      const f = ee(n, 6), p = new E(h, H, e);
-      await p.allowance(e.address, l) < f && (console.log("[CCTP] Approving USDC..."), await (await p.approve(
+      const g = ee(n, 6), p = new E(h, H, e);
+      await p.allowance(e.address, l) < g && (console.log("[CCTP] Approving USDC..."), await (await p.approve(
         l,
-        f
+        g
       )).wait(), console.log("[CCTP] USDC approved"));
-      const g = this.addressToBytes32(a);
+      const y = this.addressToBytes32(a);
       console.log("[CCTP] Calling depositForBurn...");
       const K = await (await new E(
         l,
         Pe,
         e
       ).depositForBurn(
+        g,
         f,
         y,
-        g,
         h
       )).wait();
       console.log("[CCTP] Burn transaction confirmed:", K.hash);
@@ -1807,7 +1807,7 @@ class Ke {
    * Build UserOperation for single transaction
    */
   async buildUserOperation(e, t) {
-    var f;
+    var g;
     const n = this.accountAddress || this.getAccountAddress(e.address);
     this.accountAddress = n;
     const a = await this.isDeployed(n), i = new U(R).encodeFunctionData("execute", [
@@ -1831,12 +1831,12 @@ class Ke {
       paymasterAndData: "0x",
       signature: "0x"
     };
-    if (t.sponsored && ((f = this.paymasterConfig) != null && f.enabled)) {
+    if (t.sponsored && ((g = this.paymasterConfig) != null && g.enabled)) {
       const p = await this.getPaymasterData(h);
       p && (h.paymasterAndData = p.paymasterAndData, p.callGasLimit && (h.callGasLimit = p.callGasLimit), p.verificationGasLimit && (h.verificationGasLimit = p.verificationGasLimit), p.preVerificationGas && (h.preVerificationGas = p.preVerificationGas));
     }
-    const y = await this.signUserOperation(e, h);
-    return h.signature = y, h;
+    const f = await this.signUserOperation(e, h);
+    return h.signature = f, h;
   }
   /**
    * Build UserOperation for batch transactions
@@ -1850,12 +1850,12 @@ class Ke {
       d,
       l
     ]);
-    let y = 0n;
-    s && (y = await new E(a, R, this.provider).getNonce());
-    const f = s ? "0x" : this.buildInitCode(e.address), p = await this.provider.getFeeData(), w = {
+    let f = 0n;
+    s && (f = await new E(a, R, this.provider).getNonce());
+    const g = s ? "0x" : this.buildInitCode(e.address), p = await this.provider.getFeeData(), w = {
       sender: a,
-      nonce: y,
-      initCode: f,
+      nonce: f,
+      initCode: g,
       callData: h,
       callGasLimit: 150000n * BigInt(t.length),
       // Scale with batch size
@@ -1870,8 +1870,8 @@ class Ke {
       const A = await this.getPaymasterData(w);
       A && (w.paymasterAndData = A.paymasterAndData);
     }
-    const g = await this.signUserOperation(e, w);
-    return w.signature = g, w;
+    const y = await this.signUserOperation(e, w);
+    return w.signature = y, w;
   }
   /**
    * Send UserOperation to bundler
@@ -2388,14 +2388,14 @@ export {
   Te as KeyManager,
   ye as LogLevel,
   T as PASSKEY_DIAGNOSTIC_MESSAGES,
-  We as PasskeyDiagnosticError,
+  Fe as PasskeyDiagnosticError,
   Se as SecureStorage,
   Ke as SmartAccountManager,
   Ve as VERSION,
   Be as WalletSDK,
   Ee as WebAuthnManager,
   Ae as checkPlatformAuthenticatorSupport,
-  Fe as createLogger,
+  We as createLogger,
   z as getCCTPConfigErrorMessage,
   Ie as getCircleNetwork,
   we as getDeviceRiskLevel,
@@ -2408,6 +2408,6 @@ export {
   Ge as isNativeUSDC,
   o as logger,
   be as runPasskeyDiagnostic,
-  F as validateCCTPConfig
+  W as validateCCTPConfig
 };
 //# sourceMappingURL=index.mjs.map
