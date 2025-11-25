@@ -196,12 +196,20 @@ export class PasskeyController {
                     ownerAddress,
                     credentialId: credentialIdB64Url,
                     credentialIdLength: credentialIdB64Url.length,
-                    userId: user.id
+                    userId: user.id,
+                    existingWalletAddress: user.walletAddress
                 });
-                // Update user with wallet address (owner address)
-                await this.db.updateUser(user.id, {
-                    walletAddress: ownerAddress
-                });
+                // IMPORTANT: Only set wallet address if user doesn't have one yet
+                // This prevents duplicate wallet creation when adding a new device
+                if (!user.walletAddress) {
+                    await this.db.updateUser(user.id, {
+                        walletAddress: ownerAddress
+                    });
+                    console.log('[PasskeyReg] Set wallet address for new user:', ownerAddress);
+                }
+                else {
+                    console.log('[PasskeyReg] User already has wallet address, keeping existing:', user.walletAddress);
+                }
                 await this.db.createPasskeyCredential({
                     id: randomUUID(),
                     userId: user.id,

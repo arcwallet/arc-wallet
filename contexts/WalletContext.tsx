@@ -323,14 +323,42 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
     setIsConnecting(true);
     try {
-      // Use discoverable credentials (no username needed)
-      // Browser will show all passkeys registered on this device for this RP_ID
-      let session = await authenticateWithPasskey();
-      const storedWallet = await loadStoredWalletForCurrentEmail();
-      finalizeSession(storedWallet ?? session);
-    } catch (firstError) {
-      if (firstError instanceof PasskeyClientError && firstError.status === 404) {
-        console.info('No existing passkey. Attempting registration.');
+      // STEP 1: Check if user already has registered passkeys in the database
+      const passkeyCheck = await passkeyClient.checkUserPasskeys(currentEmail);
+      const hasExistingPasskey = passkeyCheck.data?.hasPasskey ?? false;
+      const passkeyCount = passkeyCheck.data?.passkeyCount ?? 0;
+
+      console.log('[Wallet] Passkey check result:', { hasExistingPasskey, passkeyCount, email: currentEmail });
+
+      if (hasExistingPasskey) {
+        // User HAS passkeys - only allow authentication, not registration
+        try {
+          // Try authentication with username to get specific credentials
+          const session = await authenticateWithPasskey(currentEmail);
+          const storedWallet = await loadStoredWalletForCurrentEmail();
+          finalizeSession(storedWallet ?? session);
+          return;
+        } catch (authError) {
+          // If authentication fails and user has passkeys, they need to use the original device or recovery
+          if (authError instanceof PasskeyClientError && authError.status === 404) {
+            window.alert(
+              'Your passkey is registered on another device or browser.\n\n' +
+              'Please:\n' +
+              '1. Use the same device/browser where you created your passkey, OR\n' +
+              '2. Use Account Recovery to reset your passkey\n\n' +
+              'Each email can only have one wallet.'
+            );
+            return;
+          }
+          if (authError instanceof DOMException && authError.name === 'NotAllowedError') {
+            console.warn('Passkey authentication was cancelled by the user.');
+            return;
+          }
+          throw authError;
+        }
+      } else {
+        // User has NO passkeys - this is a new user, allow registration
+        console.log('[Wallet] New user detected, starting passkey registration');
         try {
           const newSession = await registerPasskey(currentEmail);
           if (newSession) {
@@ -338,23 +366,31 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           }
           return;
         } catch (registerErr) {
-          console.error('Automatic passkey registration failed', registerErr);
-          window.alert('No passkey found and registration failed. Please try again.');
+          // If registration fails because passkey already exists on device
+          if (registerErr instanceof DOMException && registerErr.name === 'InvalidStateError') {
+            console.info('Credential already exists on authenticator, trying to authenticate');
+            const session = await authenticateWithPasskey(currentEmail);
+            const storedWallet = await loadStoredWalletForCurrentEmail();
+            finalizeSession(storedWallet ?? session);
+            return;
+          }
+          console.error('Passkey registration failed', registerErr);
+          window.alert('Passkey registration failed. Please try again.');
           return;
         }
       }
-
-      if (firstError instanceof DOMException && firstError.name === 'NotAllowedError') {
-        console.warn('Passkey authentication was cancelled by the user.');
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'NotAllowedError') {
+        console.warn('Passkey operation was cancelled by the user.');
         return;
       }
 
-      console.error('Passkey authentication failed', firstError);
+      console.error('Passkey authentication failed', error);
       window.alert('Passkey authentication failed. Please try again.');
     } finally {
       setIsConnecting(false);
     }
-  }, [authenticateWithPasskey, finalizeSession, currentEmail, loadStoredWalletForCurrentEmail]);
+  }, [authenticateWithPasskey, registerPasskey, finalizeSession, currentEmail, loadStoredWalletForCurrentEmail]);
 
   const logout = useCallback(() => {
     setAddress(null);
