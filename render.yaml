@@ -15,7 +15,7 @@ services:
       - key: ORIGIN
         value: https://app.arcwallet.network
       - key: ALLOWED_ORIGINS
-        value: https://app.arcwallet.network
+        value: https://app.arcwallet.network,https://arc-wallet.vercel.app,https://arcwallet.vercel.app,https://arc-wallet-git-main.vercel.app
       - key: SESSION_SECRET
         generateValue: true
       - key: JWT_SECRET

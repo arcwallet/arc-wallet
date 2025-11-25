@@ -146,7 +146,14 @@ export class WebAuthnManager {
 
       if (!verifyResponse.ok) {
         const errorData = await verifyResponse.json().catch(() => ({}));
-        throw new Error(errorData.message || 'Failed to verify credential');
+        const errorMessage = errorData.message || errorData.error || 'Failed to verify credential';
+        logger.error('Backend verification failed', {
+          component: 'WebAuthn',
+          status: verifyResponse.status,
+          errorCode: errorData.code,
+          errorMessage,
+        });
+        throw new Error(errorMessage);
       }
 
       const verifyResult = await verifyResponse.json();

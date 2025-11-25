@@ -7,6 +7,10 @@ export declare class PasskeyController {
     private config;
     constructor(db: Database, config: EnvConfig);
     /**
+     * Derive RP_ID from request origin
+     */
+    private getRPIDFromRequest;
+    /**
      * Start passkey registration
      */
     registrationStart: (req: Request, res: Response) => Promise<void>;

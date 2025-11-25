@@ -40,6 +40,22 @@ export class PasskeyController {
         this.config = config;
     }
     /**
+     * Derive RP_ID from request origin
+     */
+    getRPIDFromRequest(req) {
+        const origin = req.get('origin') || req.get('referer');
+        if (origin) {
+            try {
+                const url = new URL(origin);
+                return url.hostname;
+            }
+            catch {
+                // Fall back to config
+            }
+        }
+        return this.config.RP_ID;
+    }
+    /**
      * Start passkey registration
      */
     registrationStart = async (req, res) => {
@@ -51,6 +67,9 @@ export class PasskeyController {
             }
             const normalizedUsername = normalizeUsername(rawUsername);
             const friendlyDisplayName = (displayName?.trim() || rawUsername).slice(0, 64);
+            // Get RP_ID from request origin for multi-domain support
+            const rpID = this.getRPIDFromRequest(req);
+            console.log('[PasskeyReg] Using RP_ID:', rpID, 'from origin:', req.get('origin'));
             // Check if user already exists
             const existingUser = await this.db.getUserByUsername(normalizedUsername);
             let options;
@@ -60,7 +79,7 @@ export class PasskeyController {
                 const userPasskeys = await this.db.getPasskeysByUserId(existingUser.id);
                 options = await generateRegistrationOptions({
                     rpName: this.config.RP_NAME,
-                    rpID: this.config.RP_ID,
+                    rpID: rpID,
                     userID: new Uint8Array(Buffer.from(existingUser.id)),
                     userName: existingUser.username,
                     userDisplayName: existingUser.displayName,
@@ -92,7 +111,7 @@ export class PasskeyController {
                 // New user: proceed as initial registration
                 options = await generateRegistrationOptions({
                     rpName: this.config.RP_NAME,
-                    rpID: this.config.RP_ID,
+                    rpID: rpID,
                     userID: new Uint8Array(Buffer.from(randomUUID())),
                     userName: normalizedUsername,
                     userDisplayName: friendlyDisplayName,
@@ -142,19 +161,41 @@ export class PasskeyController {
                 console.error('[PasskeyReg] Challenge not found or expired:', clientChallenge);
                 throw new ApiError('Invalid or expired challenge', 400, 'INVALID_CHALLENGE');
             }
+            const decodedClientData = decodeClientDataJSON(credential.response.clientDataJSON);
             console.log('[PasskeyReg] Verifying registration response...', {
                 expectedChallenge: challengeRecord.challenge,
                 expectedOrigin: this.config.ORIGIN,
                 expectedRPID: this.config.RP_ID,
+                actualOrigin: decodedClientData.origin,
                 clientDataJSON: credential.response.clientDataJSON,
-                decodedClientData: decodeClientDataJSON(credential.response.clientDataJSON)
+                decodedClientData
             });
-            // Verify registration response
+            // Check origin - support multiple origins from ALLOWED_ORIGINS
+            const allowedOrigins = this.config.ALLOWED_ORIGINS;
+            const actualOrigin = decodedClientData.origin;
+            const isOriginAllowed = allowedOrigins.includes(actualOrigin);
+            if (!isOriginAllowed) {
+                console.error('[PasskeyReg] ❌ ORIGIN MISMATCH:', {
+                    expected: allowedOrigins,
+                    actual: actualOrigin,
+                    hint: 'Add the frontend domain to ALLOWED_ORIGINS env var in render.yaml'
+                });
+                throw new ApiError(`Origin not allowed: ${actualOrigin}. Add it to ALLOWED_ORIGINS config.`, 400, 'ORIGIN_MISMATCH');
+            }
+            // Derive RP_ID from origin if not matching primary config
+            // RP_ID should be the hostname (without protocol/port)
+            const expectedRPID = new URL(actualOrigin).hostname;
+            console.log('[PasskeyReg] Using RP_ID derived from origin:', {
+                configRPID: this.config.RP_ID,
+                derivedRPID: expectedRPID,
+                actualOrigin
+            });
+            // Verify registration response with origin-specific settings
             const verification = await verifyRegistrationResponse({
                 response: credential,
                 expectedChallenge: challengeRecord.challenge,
-                expectedOrigin: this.config.ORIGIN,
-                expectedRPID: this.config.RP_ID,
+                expectedOrigin: actualOrigin,
+                expectedRPID: expectedRPID,
                 requireUserVerification: true
             });
             console.log('[PasskeyReg] Verification result:', verification.verified, verification.registrationInfo);
@@ -250,9 +291,12 @@ export class PasskeyController {
                     transports: ['internal']
                 }));
             }
+            // Get RP_ID from request origin for multi-domain support
+            const rpID = this.getRPIDFromRequest(req);
+            console.log('[PasskeyAuth] Using RP_ID:', rpID, 'from origin:', req.get('origin'));
             // Generate authentication options
             const options = await generateAuthenticationOptions({
-                rpID: this.config.RP_ID,
+                rpID: rpID,
                 allowCredentials,
                 userVerification: 'required',
                 timeout: 60000 // 60 seconds timeout
@@ -337,12 +381,25 @@ export class PasskeyController {
                 credentialPublicKeyIsBuffer: Buffer.isBuffer(passkeyCredential.credentialPublicKey),
                 credentialPublicKeyLength: passkeyCredential.credentialPublicKey?.length
             });
+            // Get actual origin from client data and validate
+            const decodedClientData = decodeClientDataJSON(credential.response.clientDataJSON);
+            const actualOrigin = decodedClientData.origin;
+            const allowedOrigins = this.config.ALLOWED_ORIGINS;
+            if (!allowedOrigins.includes(actualOrigin)) {
+                console.error('[PasskeyAuth] ❌ ORIGIN MISMATCH:', {
+                    expected: allowedOrigins,
+                    actual: actualOrigin
+                });
+                throw new ApiError(`Origin not allowed: ${actualOrigin}. Add it to ALLOWED_ORIGINS config.`, 400, 'ORIGIN_MISMATCH');
+            }
+            // Derive RP_ID from origin
+            const expectedRPID = new URL(actualOrigin).hostname;
             // Verify authentication response
             const verification = await verifyAuthenticationResponse({
                 response: credential,
                 expectedChallenge: challenge.challenge,
-                expectedOrigin: this.config.ORIGIN,
-                expectedRPID: this.config.RP_ID,
+                expectedOrigin: actualOrigin,
+                expectedRPID: expectedRPID,
                 authenticator: {
                     credentialID: passkeyCredential.credentialID,
                     credentialPublicKey: passkeyCredential.credentialPublicKey,
