@@ -25,6 +25,7 @@ import { ExpandIcon, ContactIcon, LockIcon } from './Icons';
 import { getAllSupportedTokens, TokenInfo, formatTokenAmount } from '../config/tokens';
 import { tokenService } from '../services/tokenService';
 import { paymasterClient } from '../services/paymasterClient';
+import { gasStationClient } from '../services/gasStationClient';
 import { GasSponsorshipIndicator, GasFeeBadge } from './GasSponsorshipIndicator';
 import { BatchTransfer } from './BatchTransfer';
 import { TX_EXPLORER_URL } from '../config/app.config';
@@ -77,6 +78,11 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
   const [encryptedAmountPreview, setEncryptedAmountPreview] = useState<string | null>(null);
   const [isGasSponsored, setIsGasSponsored] = useState(false);
   const [checkingSponsorship, setCheckingSponsorship] = useState(false);
+  const [gasEligibility, setGasEligibility] = useState<{
+    eligible: boolean;
+    balance: string;
+    message: string;
+  } | null>(null);
 
   // Batch Mode State
   const [isBatchMode, setIsBatchMode] = useState(false);
@@ -140,6 +146,34 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
 
     fetchTokenBalance();
   }, [selectedToken, walletAddress]);
+
+  // Check gas sponsorship eligibility when wallet address changes
+  useEffect(() => {
+    const checkGasEligibility = async () => {
+      if (!walletAddress) {
+        setGasEligibility(null);
+        return;
+      }
+
+      try {
+        const result = await gasStationClient.shouldShowGasSponsorship(walletAddress);
+        setGasEligibility({
+          eligible: result.eligible,
+          balance: result.balance,
+          message: result.message,
+        });
+        // If eligible, mark as sponsored for UI purposes
+        if (result.eligible) {
+          setIsGasSponsored(true);
+        }
+      } catch (error) {
+        console.error('Error checking gas eligibility:', error);
+        setGasEligibility(null);
+      }
+    };
+
+    checkGasEligibility();
+  }, [walletAddress]);
 
   // On mount or address change: auto-select the token that has non-zero balance on Arc Testnet
   useEffect(() => {
@@ -349,6 +383,20 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
         }
       }
 
+
+      // Auto-sponsor gas if needed (Phase 1 Gas Station)
+      try {
+        console.log('[SEND] Checking gas sponsorship eligibility...');
+        const sponsorResult = await gasStationClient.autoSponsor(walletAddress);
+        if (sponsorResult.sponsored) {
+          console.log(`[SEND] Gas sponsored: ${sponsorResult.amount} USDC, tx: ${sponsorResult.txHash}`);
+        } else {
+          console.log(`[SEND] Gas sponsorship not needed: ${sponsorResult.reason}`);
+        }
+      } catch (gasError) {
+        // Gas sponsorship is optional, continue with transaction
+        console.warn('[SEND] Gas sponsorship check failed, continuing:', gasError);
+      }
 
       // TEE Privacy Logic (Simulation Mode)
       if (isPrivacyMode) {

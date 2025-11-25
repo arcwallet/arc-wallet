@@ -17,7 +17,42 @@ export const BACKEND_URL = getEnv('VITE_BACKEND_URL', 'http://localhost:3001');
 
 // Blockchain Configuration
 export const RPC_URL = getEnv('VITE_ARC_RPC_URL', 'https://rpc.testnet.arc.network');
-export const ENTRY_POINT = getEnv('VITE_ARC_ENTRY_POINT', '0x0000000000000000000000000000000000000000');
+export const ENTRY_POINT = getEnv('VITE_ARC_ENTRY_POINT', '0x0000000071727De22E5E9d8BAf0edAc6f37da032'); // ERC-4337 v0.7 EntryPoint
+
+// Arc Testnet Chain Configuration
+export const ARC_TESTNET = {
+    chainId: 5042002,
+    name: 'Arc Testnet',
+    network: 'arc-testnet',
+    nativeCurrency: {
+        name: 'USDC',
+        symbol: 'USDC',
+        decimals: 6,
+    },
+    rpcUrls: {
+        default: RPC_URL,
+        public: 'https://rpc.testnet.arc.network',
+    },
+    blockExplorers: {
+        default: { name: 'ArcScan', url: 'https://testnet.arcscan.app' },
+    },
+} as const;
+
+// Pimlico Configuration (Account Abstraction Infrastructure)
+export const PIMLICO_CONFIG = {
+    apiKey: getEnv('VITE_PIMLICO_API_KEY', ''),
+    bundlerUrl: `https://api.pimlico.io/v1/arc-testnet/rpc`,
+    paymasterUrl: `https://api.pimlico.io/v2/arc-testnet/rpc`,
+    entryPoint: ENTRY_POINT,
+} as const;
+
+// Gas Sponsorship Configuration
+export const GAS_SPONSORSHIP = {
+    enabled: true,
+    maxDailySponsorship: 1_000_000, // $1 USDC per user per day (in micro units)
+    minBalanceThreshold: 100_000,   // Sponsor if balance < $0.10 USDC
+    topUpAmount: 500_000,           // Top up $0.50 USDC for gas
+} as const;
 
 // Explorer Configuration
 export const EXPLORER_BASE_URL = getEnv('VITE_EXPLORER_URL', 'https://testnet.arcscan.app');
@@ -106,6 +141,9 @@ export const config = {
     backendUrl: BACKEND_URL,
     rpcUrl: RPC_URL,
     entryPoint: ENTRY_POINT,
+    chain: ARC_TESTNET,
+    pimlico: PIMLICO_CONFIG,
+    gasSponsorship: GAS_SPONSORSHIP,
     explorer: {
         base: EXPLORER_BASE_URL,
         tx: TX_EXPLORER_URL,

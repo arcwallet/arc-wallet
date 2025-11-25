@@ -15,6 +15,7 @@ import { createOAuthRouter } from './routes/oauth.js';
 import paymasterRouter from './routes/paymaster.js';
 import { createHistoryRouter } from './routes/history.js';
 import { createWebhookRouter } from './routes/webhooks.js';
+import { createGasStationRouter } from './routes/gasStation.js';
 import { createMagicLinkMailer } from './services/magicLinkMailer.js';
 import { WalletBackupService } from './services/walletBackupService.js';
 import { IndexerService } from './services/indexerService.js';
@@ -99,6 +100,7 @@ app.use('/multisig', createMultiSigRoutes(db, config));
 app.use('/api/paymaster', paymasterRouter);
 app.use('/api/history', createHistoryRouter());
 app.use('/api/webhooks', createWebhookRouter());
+app.use('/api/gas-station', createGasStationRouter());
 app.use('/api/agent', agentRouter);
 // Initialize indexer database
 console.log('🔧 Initializing indexer database...');
@@ -152,6 +154,14 @@ app.get('/', (req, res) => {
                 approveTransaction: 'POST /multisig/transactions/:transactionId/approve',
                 rejectTransaction: 'POST /multisig/transactions/:transactionId/reject',
                 deployContract: 'POST /multisig/accounts/:accountId/deploy'
+            },
+            gasStation: {
+                health: 'GET /api/gas-station/health',
+                stats: 'GET /api/gas-station/stats',
+                balance: 'GET /api/gas-station/balance',
+                eligibility: 'GET /api/gas-station/eligibility/:address',
+                sponsor: 'POST /api/gas-station/sponsor',
+                autoSponsor: 'POST /api/gas-station/auto-sponsor'
             }
         }
     });
