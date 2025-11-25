@@ -33,17 +33,17 @@ export const DEFAULT_TOKEN_ICON = 'https://mintcdn.com/arc-docs/FYqE2_-PsObv0l4x
 
 // API Endpoints
 export const API_ENDPOINTS = {
-    history: (address: string, limit: number = 20) => `${BACKEND_URL}/history/${address}?limit=${limit}`,
+    history: (address: string, limit: number = 20) => `${BACKEND_URL}/api/history/${address}?limit=${limit}`,
     webhooks: {
-        list: (address: string) => `${BACKEND_URL}/webhooks/${address}`,
-        create: () => `${BACKEND_URL}/webhooks`,
-        delete: (id: string) => `${BACKEND_URL}/webhooks/${id}`,
-        test: (id: string) => `${BACKEND_URL}/webhooks/${id}/test`,
+        list: (address: string) => `${BACKEND_URL}/api/webhooks/${address}`,
+        create: () => `${BACKEND_URL}/api/webhooks`,
+        delete: (id: string) => `${BACKEND_URL}/api/webhooks/${id}`,
+        test: (id: string) => `${BACKEND_URL}/api/webhooks/${id}/test`,
     },
     notifications: {
-        vapidKey: () => `${BACKEND_URL}/notifications/vapid-public-key`,
-        subscribe: () => `${BACKEND_URL}/notifications/subscribe`,
-        test: () => `${BACKEND_URL}/notifications/test`,
+        vapidKey: () => `${BACKEND_URL}/api/notifications/vapid-public-key`,
+        subscribe: () => `${BACKEND_URL}/api/notifications/subscribe`,
+        test: () => `${BACKEND_URL}/api/notifications/test`,
     },
     oauth: {
         google: () => `${BACKEND_URL}/auth/google`,
