@@ -14,6 +14,7 @@ import AgentScreen from './AgentScreen';
 import { Transaction } from '../types';
 import { useWallet } from '../contexts/WalletContext';
 import { useSelfCustodialWallet } from '../contexts/SelfCustodialWalletContext';
+import { usePasskeyAccount } from '../contexts/PasskeyAccountContext';
 import { useArcAccount } from '../contexts/ArcAccountContext';
 import type { AccountSnapshot } from '../services/arcRpcClient';
 import { formatBlockTime } from '../utils/format';
@@ -49,10 +50,11 @@ interface NotificationDropdownProps {
 
 const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ isOpen, onClose, onNavigateToTransactions }) => {
   const { activities } = useActivity();
-  // Get address from self-custodial context first
+  // Get address from passkey account (smart contract) or self-custodial (EOA)
+  const { address: passkeyAddress } = usePasskeyAccount();
   const { address: selfCustodialAddress } = useSelfCustodialWallet();
   const { sessionKey } = useWallet();
-  const walletAddress = selfCustodialAddress || sessionKey?.address;
+  const walletAddress = passkeyAddress || selfCustodialAddress || sessionKey?.address;
 
   if (!isOpen) return null;
 
@@ -153,11 +155,12 @@ interface AgentIntentData {
 }
 
 const DashboardHeader: React.FC<DashboardHeaderPropsWithNav> = ({ account, isRefreshing, onRefresh, error, onNavigate }) => {
-  // Get address from self-custodial context first
+  // Get address from passkey account (smart contract) or self-custodial (EOA) or legacy
+  const { address: passkeyAddress, disconnect: passkeyDisconnect } = usePasskeyAccount();
   const { address: selfCustodialAddress, lockWallet } = useSelfCustodialWallet();
   const { address: legacyAddress, logout: legacyLogout } = useWallet();
-  const address = selfCustodialAddress || legacyAddress;
-  const logout = selfCustodialAddress ? lockWallet : legacyLogout;
+  const address = passkeyAddress || selfCustodialAddress || legacyAddress;
+  const logout = passkeyAddress ? passkeyDisconnect : (selfCustodialAddress ? lockWallet : legacyLogout);
   const { isPrivacyMode, togglePrivacyMode } = usePrivacy();
 
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
@@ -334,10 +337,11 @@ interface TokenAssetData {
 }
 
 const AssetsTable: React.FC<AssetsTableProps> = ({ balanceDisplay, isLoading }) => {
-  // Get address from self-custodial context first
+  // Get address from passkey account (smart contract) or self-custodial (EOA) or legacy
+  const { address: passkeyAddress } = usePasskeyAccount();
   const { address: selfCustodialAddress } = useSelfCustodialWallet();
   const { sessionKey } = useWallet();
-  const walletAddress = selfCustodialAddress || sessionKey?.address;
+  const walletAddress = passkeyAddress || selfCustodialAddress || sessionKey?.address;
 
   const [activeTab, setActiveTab] = useState<'tokens'>('tokens');
   const [tokenBalances, setTokenBalances] = useState<TokenBalance[]>([]);
@@ -548,10 +552,11 @@ const WalletDashboard: React.FC = () => {
     }
   };
 
-  // Get address from self-custodial context first, fall back to legacy wallet
-  const { address: selfCustodialAddress, lockWallet } = useSelfCustodialWallet();
+  // Get address from passkey account (smart contract) or self-custodial (EOA) or legacy
+  const { address: passkeyAddress } = usePasskeyAccount();
+  const { address: selfCustodialAddress } = useSelfCustodialWallet();
   const { address: legacyAddress, sessionKey } = useWallet();
-  const address = selfCustodialAddress || legacyAddress;
+  const address = passkeyAddress || selfCustodialAddress || legacyAddress;
 
   const { snapshot, formattedBalance, isLoading: isAccountLoading, error: accountError, refresh, lastUpdated } = useArcAccount();
 
