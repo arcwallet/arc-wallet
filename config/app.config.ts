@@ -60,6 +60,15 @@ export const PIMLICO_CONFIG = {
     enabled: false, // DISABLED - Arc has native USDC gas
 } as const;
 
+// Gas Sponsorship Configuration (Legacy - Arc uses native USDC gas)
+// Kept for backwards compatibility
+export const GAS_SPONSORSHIP = {
+    enabled: false, // Disabled - Arc uses native USDC gas, no sponsorship needed
+    maxDailySponsorship: 0,
+    minBalanceThreshold: 0,
+    topUpAmount: 0,
+} as const;
+
 // Explorer Configuration
 export const EXPLORER_BASE_URL = getEnv('VITE_EXPLORER_URL', 'https://testnet.arcscan.app');
 export const TX_EXPLORER_URL = `${EXPLORER_BASE_URL}/tx/`;
