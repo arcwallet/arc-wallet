@@ -64,8 +64,8 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
   const { addActivity } = useActivity();
   const { isPrivacyMode, fheKeypair } = usePrivacy();
 
-  // ALWAYS use self-custodial wallet - fallback to session ONLY for address display
-  const walletAddress = selfCustodialAddress || sessionKey?.address;
+  // Priority: Passkey wallet > Self-custodial > Session key (for address display)
+  const walletAddress = passkeyAddress || selfCustodialAddress || sessionKey?.address;
 
   // Private key MUST come from SDK only (never from server session key)
   const walletPrivateKey = getPrivateKey();

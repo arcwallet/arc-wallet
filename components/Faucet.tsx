@@ -1,11 +1,14 @@
 import React, { useMemo, useState } from 'react';
+import { usePasskeyAccount } from '../contexts/PasskeyAccountContext';
 import { useArcAccount } from '../contexts/ArcAccountContext';
 import { CIRCLE_FAUCET_URL } from '../config/app.config';
 import { formatUSDCAmount } from '../utils/format';
 import { CopyIcon, CheckCircleIcon } from './Icons';
 
 const Faucet: React.FC = () => {
-    const { address } = useArcAccount();
+    const { address: passkeyAddress } = usePasskeyAccount();
+    const { address: arcAddress } = useArcAccount();
+    const address = passkeyAddress || arcAddress;
     const walletAddress = address || "0x0000000000000000000000000000000000000000";
 
     const [statusMessage] = useState('Circle testnet faucet limits requests to 1 USDC per hour.');

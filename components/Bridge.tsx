@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
+import { usePasskeyAccount } from '../contexts/PasskeyAccountContext';
 import { useSelfCustodialWallet } from '../contexts/SelfCustodialWalletContext';
 import { useWallet } from '../contexts/WalletContext';
 import { useActivity } from '../contexts/ActivityContext';
@@ -27,7 +28,9 @@ const DIRECTIONS: { id: BridgeDirection; label: string; description: string }[] 
 const PRIMARY_TOKEN_DECIMALS = 6;
 
 const Bridge: React.FC = () => {
-  const { address, userId } = useSelfCustodialWallet();
+  const { address: passkeyAddress } = usePasskeyAccount();
+  const { address: selfCustodialAddress, userId } = useSelfCustodialWallet();
+  const address = passkeyAddress || selfCustodialAddress;
   const { loginWithPasskey } = useWallet();
   const { addActivity } = useActivity();
   const [needsReauth, setNeedsReauth] = useState(false);

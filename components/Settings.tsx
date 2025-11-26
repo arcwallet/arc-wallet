@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useWallet } from '../contexts/WalletContext';
 import { useSession } from '../contexts/SessionContext';
+import { usePasskeyAccount } from '../contexts/PasskeyAccountContext';
 import { useSelfCustodialWallet } from '../contexts/SelfCustodialWalletContext';
 
 import { passkeyClient, type SessionKeySummary } from '../services/passkeyClient';
@@ -10,7 +11,9 @@ import WebhookManager from './WebhookManager';
 import NotificationManager from './NotificationManager';
 
 const SecuritySection: React.FC = () => {
-    const { userId, address } = useSelfCustodialWallet();
+    const { address: passkeyAddress } = usePasskeyAccount();
+    const { userId, address: selfCustodialAddress } = useSelfCustodialWallet();
+    const address = passkeyAddress || selfCustodialAddress;
     const [loading, setLoading] = useState(false);
     const [keys, setKeys] = useState<SessionKeySummary[]>([]);
     const [devices, setDevices] = useState<any[]>([]);
@@ -154,7 +157,9 @@ const NetworkSection: React.FC = () => (
 
 
 const OrganizationRolesSection: React.FC = () => {
-    const { address } = useSelfCustodialWallet();
+    const { address: passkeyAddress } = usePasskeyAccount();
+    const { address: selfCustodialAddress } = useSelfCustodialWallet();
+    const address = passkeyAddress || selfCustodialAddress;
     const { email } = useSession();
 
     return (

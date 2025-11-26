@@ -3,6 +3,7 @@ import { SwapIcon, SpinnerIcon } from './Icons';
 import { getAllSupportedTokens, TokenInfo } from '../config/tokens';
 import { swapService, Quote } from '../services/swapService';
 import { useWallet } from '../contexts/WalletContext';
+import { usePasskeyAccount } from '../contexts/PasskeyAccountContext';
 import { useSelfCustodialWallet } from '../contexts/SelfCustodialWalletContext';
 import { useActivity } from '../contexts/ActivityContext';
 import { TransactionStatus, TransactionType } from '../types';
@@ -17,11 +18,12 @@ interface SwapScreenProps {
 const SwapScreen: React.FC<SwapScreenProps> = ({ initialFromToken, initialToToken, initialAmount = '' }) => {
     const tokens = getAllSupportedTokens();
     const { sessionKey } = useWallet();
+    const { address: passkeyAddress } = usePasskeyAccount();
     const { address: selfCustodialAddress, getPrivateKey } = useSelfCustodialWallet();
     const { addActivity } = useActivity();
 
-    // Get wallet address and private key
-    const walletAddress = selfCustodialAddress || sessionKey?.address;
+    // Get wallet address - prioritize passkey wallet
+    const walletAddress = passkeyAddress || selfCustodialAddress || sessionKey?.address;
     const walletPrivateKey = selfCustodialAddress ? getPrivateKey() : sessionKey?.privateKey;
 
     const [fromToken, setFromToken] = useState<TokenInfo>(() => {
