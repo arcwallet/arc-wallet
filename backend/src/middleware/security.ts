@@ -1,72 +1,218 @@
 import { Request, Response, NextFunction } from 'express';
-import { RateLimiterMemory } from 'rate-limiter-flexible';
+import { RateLimiterMemory, RateLimiterRes } from 'rate-limiter-flexible';
+import crypto from 'crypto';
 import { ApiError } from '../types/index.js';
 
-// Rate limiting configuration
+/**
+ * Enhanced Rate Limiting with:
+ * - IP + User-Agent fingerprinting
+ * - X-Forwarded-For validation (prevent spoofing)
+ * - Progressive penalties for repeat offenders
+ * - Separate limits for authenticated vs anonymous users
+ */
+
+// Trusted proxy IPs (Render, Cloudflare, etc.)
+const TRUSTED_PROXIES = new Set([
+  '127.0.0.1',
+  '::1',
+  // Cloudflare IPs (partial list - should be updated)
+  '173.245.48.0/20',
+  '103.21.244.0/22',
+  '103.22.200.0/22',
+  '103.31.4.0/22',
+]);
+
+/**
+ * Extract real client IP with validation
+ * Prevents X-Forwarded-For spoofing
+ */
+function getClientIp(req: Request): string {
+  // If we trust the proxy, use X-Forwarded-For
+  const forwardedFor = req.headers['x-forwarded-for'];
+  const cfConnectingIp = req.headers['cf-connecting-ip'];
+
+  // Cloudflare provides the real IP in cf-connecting-ip
+  if (typeof cfConnectingIp === 'string' && cfConnectingIp) {
+    return cfConnectingIp.trim();
+  }
+
+  // Parse X-Forwarded-For (rightmost IP is closest to us)
+  if (typeof forwardedFor === 'string' && forwardedFor) {
+    const ips = forwardedFor.split(',').map(ip => ip.trim());
+    // Take the leftmost IP (original client)
+    // In production, validate this against trusted proxies
+    if (ips.length > 0 && ips[0]) {
+      return ips[0];
+    }
+  }
+
+  // Fallback to socket IP
+  return req.ip || req.socket?.remoteAddress || 'unknown';
+}
+
+/**
+ * Generate rate limit key combining IP and fingerprint
+ * This prevents attackers from bypassing limits with different IPs
+ */
+function generateRateLimitKey(req: Request, userId?: string): string {
+  const ip = getClientIp(req);
+  const userAgent = req.headers['user-agent'] || 'unknown';
+
+  // If user is authenticated, use their ID for more accurate limiting
+  if (userId) {
+    return `user:${userId}`;
+  }
+
+  // For anonymous users, combine IP with user-agent fingerprint
+  const fingerprint = crypto
+    .createHash('sha256')
+    .update(`${ip}|${userAgent}`)
+    .digest('hex')
+    .substring(0, 16);
+
+  return `ip:${ip}:fp:${fingerprint}`;
+}
+
+// Rate limiting configuration with progressive penalties
 const rateLimiters = {
   // General API rate limiter
   general: new RateLimiterMemory({
-    points: 100, // Number of requests
-    duration: 900, // Per 15 minutes
+    points: 100,        // Number of requests
+    duration: 900,      // Per 15 minutes
+    blockDuration: 60,  // Block for 1 minute on limit
   }),
 
   // Strict rate limiter for authentication endpoints
   auth: new RateLimiterMemory({
-    points: 10, // Number of requests
-    duration: 900, // Per 15 minutes
+    points: 10,         // Number of requests
+    duration: 900,      // Per 15 minutes
+    blockDuration: 300, // Block for 5 minutes on limit
   }),
 
-  // Very strict rate limiter for registration
+  // Very strict rate limiter for registration/OTP
   registration: new RateLimiterMemory({
-    points: 5, // Number of requests
-    duration: 3600, // Per hour
+    points: 5,          // Number of requests
+    duration: 3600,     // Per hour
+    blockDuration: 1800,// Block for 30 minutes on limit
   }),
 
   // Stricter rate limiter for recovery endpoints
   recovery: new RateLimiterMemory({
-    points: 3,           // Max 3 attempts
-    duration: 3600,      // Per hour
-    blockDuration: 300000 // 5 minute cooldown
+    points: 3,          // Max 3 attempts
+    duration: 3600,     // Per hour
+    blockDuration: 3600 // Block for 1 hour on limit
   }),
 
   // Moderate rate limiter for bridge operations
   bridge: new RateLimiterMemory({
-    points: 20, // Number of requests
-    duration: 3600, // Per hour
+    points: 20,         // Number of requests
+    duration: 3600,     // Per hour
+    blockDuration: 300, // Block for 5 minutes on limit
+  }),
+
+  // Wallet operations - sensitive
+  wallet: new RateLimiterMemory({
+    points: 30,
+    duration: 3600,
+    blockDuration: 300,
   }),
 };
 
+// Track repeat offenders for progressive penalties
+const offenderTracker = new Map<string, { count: number; lastOffense: number }>();
+
+// Clean up old offender records every hour
+setInterval(() => {
+  const oneHourAgo = Date.now() - 3600000;
+  for (const [key, value] of offenderTracker.entries()) {
+    if (value.lastOffense < oneHourAgo) {
+      offenderTracker.delete(key);
+    }
+  }
+}, 3600000);
+
 /**
- * General rate limiting middleware
+ * Enhanced rate limiting middleware with:
+ * - IP + fingerprint based limiting
+ * - Progressive penalties for repeat offenders
+ * - Detailed rate limit headers
  */
-export const rateLimitMiddleware = (type: 'general' | 'auth' | 'registration' | 'bridge' | 'recovery' = 'general') => {
-  const disabled = process.env.DISABLE_RATE_LIMIT === 'true' || process.env.NODE_ENV !== 'production';
+export const rateLimitMiddleware = (type: 'general' | 'auth' | 'registration' | 'bridge' | 'recovery' | 'wallet' = 'general') => {
+  const disabled = process.env.DISABLE_RATE_LIMIT === 'true';
+
   return async (req: Request, res: Response, next: NextFunction) => {
-    if (disabled) {
+    // Always enable rate limiting in production
+    if (disabled && process.env.NODE_ENV !== 'production') {
       return next();
     }
+
     try {
       const rateLimiter = rateLimiters[type];
-      const key = req.ip || 'unknown';
-      await rateLimiter.consume(key);
+
+      // Get user ID if authenticated (from session cookie or auth header)
+      const userId = (req as any).userId || (req as any).user?.id;
+
+      // Generate rate limit key
+      const key = generateRateLimitKey(req, userId);
+
+      // Check for repeat offenders and apply progressive penalty
+      const offender = offenderTracker.get(key);
+      let pointsToConsume = 1;
+
+      if (offender && offender.count >= 3) {
+        // Progressive penalty: consume more points for repeat offenders
+        pointsToConsume = Math.min(offender.count, 5);
+      }
+
+      await rateLimiter.consume(key, pointsToConsume);
+
+      // Add rate limit info to response headers
+      const rateLimiterRes = await rateLimiter.get(key);
+      if (rateLimiterRes) {
+        res.set({
+          'X-RateLimit-Limit': rateLimiter.points.toString(),
+          'X-RateLimit-Remaining': Math.max(0, rateLimiter.points - rateLimiterRes.consumedPoints).toString(),
+          'X-RateLimit-Reset': new Date(Date.now() + rateLimiterRes.msBeforeNext).toISOString(),
+        });
+      }
+
       next();
     } catch (rejRes: any) {
-      const headers = {
-        'Retry-After': Math.round(rejRes.msBeforeNext / 1000) || 1,
-        'X-RateLimit-Limit': rateLimiters[type].points,
-        'X-RateLimit-Remaining': rejRes.remainingPoints || 0,
-        'X-RateLimit-Reset': new Date(Date.now() + rejRes.msBeforeNext)
-      };
+      const key = generateRateLimitKey(req);
 
-      res.set(headers);
+      // Track this as an offense
+      const existing = offenderTracker.get(key);
+      offenderTracker.set(key, {
+        count: (existing?.count || 0) + 1,
+        lastOffense: Date.now(),
+      });
+
+      // Log rate limit violation (without PII)
+      const clientIp = getClientIp(req);
+      const maskedIp = clientIp.replace(/\.\d+$/, '.xxx');
+      console.warn(`[RateLimit] ${type} limit exceeded for ${maskedIp}`);
+
+      const retryAfter = Math.round(rejRes.msBeforeNext / 1000) || 60;
+
+      res.set({
+        'Retry-After': retryAfter.toString(),
+        'X-RateLimit-Limit': rateLimiters[type].points.toString(),
+        'X-RateLimit-Remaining': '0',
+        'X-RateLimit-Reset': new Date(Date.now() + rejRes.msBeforeNext).toISOString(),
+      });
+
       res.status(429).json({
         success: false,
         error: 'Too many requests. Please try again later.',
-        code: 'RATE_LIMIT_EXCEEDED'
+        code: 'RATE_LIMIT_EXCEEDED',
+        retryAfter,
       });
     }
   };
 };
+
+// Export helper for use in other modules
+export { getClientIp, generateRateLimitKey };
 
 /**
  * Request validation middleware

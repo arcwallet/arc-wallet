@@ -1,6 +1,13 @@
 /**
  * Email OTP Routes
- * Uses SendGrid for email delivery, simple OTP verification
+ * Uses SendGrid for email delivery, secure OTP verification
+ *
+ * SECURITY FEATURES:
+ * - Cryptographically secure OTP generation
+ * - Timing-safe OTP comparison (prevents timing attacks)
+ * - Account lockout after failed attempts
+ * - IP-based rate limiting
+ * - PII masking in logs
  *
  * IMPORTANT: User records are stored in SQLite Database (not file system)
  * This ensures passkey registration can find the same user created during OTP verification
@@ -13,6 +20,8 @@ import { rateLimitMiddleware } from '../middleware/security.js';
 const SESSION_COOKIE_NAME = 'arcwallet_session';
 const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
 const OTP_EXPIRY_MS = 10 * 60 * 1000; // 10 minutes
+const MAX_OTP_ATTEMPTS = 5;
+const ACCOUNT_LOCKOUT_MS = 30 * 60 * 1000; // 30 minutes lockout after max attempts
 const COOKIE_BASE_OPTIONS = (isProd) => ({
     httpOnly: true,
     sameSite: (isProd ? 'none' : 'lax'),
@@ -20,23 +29,68 @@ const COOKIE_BASE_OPTIONS = (isProd) => ({
     maxAge: 4 * 60 * 60 * 1000,
     path: '/',
 });
+/**
+ * Mask email for logging (PII protection)
+ * example@domain.com -> e***e@d***.com
+ */
+const maskEmail = (email) => {
+    const [local, domain] = email.split('@');
+    if (!domain)
+        return '***@***';
+    const [domainName, tld] = domain.split('.');
+    const maskedLocal = local.length > 2
+        ? `${local[0]}***${local[local.length - 1]}`
+        : '***';
+    const maskedDomain = domainName && domainName.length > 1
+        ? `${domainName[0]}***`
+        : '***';
+    return `${maskedLocal}@${maskedDomain}.${tld || '***'}`;
+};
 const sanitizeEmail = (email) => {
     if (typeof email !== 'string')
         return null;
     const trimmed = email.trim().toLowerCase();
-    const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/u;
-    return regex.test(trimmed) ? trimmed : null;
+    // RFC 5322 compliant email validation (simplified but more robust)
+    const regex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+    if (!regex.test(trimmed))
+        return null;
+    // Additional length checks
+    if (trimmed.length > 254)
+        return null;
+    const [local] = trimmed.split('@');
+    if (local && local.length > 64)
+        return null;
+    return trimmed;
 };
 // Generate 6-digit OTP using cryptographically secure random
 const generateOtp = () => {
     return crypto.randomInt(100000, 999999).toString();
 };
+/**
+ * Timing-safe OTP comparison
+ * Prevents timing attacks by always comparing in constant time
+ */
+const verifyOtpSecure = (provided, stored) => {
+    // Ensure both are 6 digits
+    if (provided.length !== 6 || stored.length !== 6) {
+        return false;
+    }
+    // Use timing-safe comparison
+    const providedBuffer = Buffer.from(provided, 'utf8');
+    const storedBuffer = Buffer.from(stored, 'utf8');
+    return crypto.timingSafeEqual(providedBuffer, storedBuffer);
+};
 const pendingOtps = new Map();
+// Hash OTP code for storage (in case of memory dump attack)
+const hashOtp = (code) => {
+    return crypto.createHash('sha256').update(code).digest('hex');
+};
 // Cleanup old entries every 5 minutes
 setInterval(() => {
     const now = Date.now();
     for (const [key, value] of pendingOtps.entries()) {
-        if (now - value.createdAt > OTP_EXPIRY_MS) {
+        // Clean expired OTPs and expired lockouts
+        if (now - value.createdAt > OTP_EXPIRY_MS && (!value.lockedUntil || now > value.lockedUntil)) {
             pendingOtps.delete(key);
         }
     }
@@ -88,13 +142,22 @@ export const createCircleOtpRouter = (config, db, sessionStore) => {
             return res.status(500).json({ success: false, error: 'Email service not configured' });
         }
         try {
+            const otpKey = crypto.createHash('sha256').update(email).digest('hex');
+            // Check if account is locked
+            const existing = pendingOtps.get(otpKey);
+            if (existing?.lockedUntil && Date.now() < existing.lockedUntil) {
+                const remainingMinutes = Math.ceil((existing.lockedUntil - Date.now()) / 60000);
+                return res.status(429).json({
+                    success: false,
+                    error: `Account temporarily locked. Please try again in ${remainingMinutes} minutes.`,
+                });
+            }
             // Generate OTP
             const otpCode = generateOtp();
-            const otpKey = crypto.createHash('sha256').update(email).digest('hex');
-            // Store OTP
+            // Store OTP hash (not plaintext)
             pendingOtps.set(otpKey, {
                 email,
-                code: otpCode,
+                codeHash: hashOtp(otpCode),
                 createdAt: Date.now(),
                 attempts: 0,
             });
@@ -109,7 +172,10 @@ export const createCircleOtpRouter = (config, db, sessionStore) => {
                 html: generateOtpEmailHtml(otpCode),
                 text: `Your Arc Wallet verification code is: ${otpCode}\n\nThis code expires in 10 minutes.\n\nIf you didn't request this code, you can safely ignore this email.`,
             });
-            console.log(`[OTP] Code sent to ${email}`);
+            // Log with masked email (PII protection)
+            if (process.env.NODE_ENV === 'development') {
+                console.log(`[OTP] Code sent to ${maskEmail(email)}`);
+            }
             res.json({
                 success: true,
                 message: 'Verification code sent to your email',
@@ -136,13 +202,22 @@ export const createCircleOtpRouter = (config, db, sessionStore) => {
             return res.status(500).json({ success: false, error: 'Email service not configured' });
         }
         try {
+            const otpKey = crypto.createHash('sha256').update(email).digest('hex');
+            // Check if account is locked
+            const existing = pendingOtps.get(otpKey);
+            if (existing?.lockedUntil && Date.now() < existing.lockedUntil) {
+                const remainingMinutes = Math.ceil((existing.lockedUntil - Date.now()) / 60000);
+                return res.status(429).json({
+                    success: false,
+                    error: `Account temporarily locked. Please try again in ${remainingMinutes} minutes.`,
+                });
+            }
             // Generate new OTP
             const otpCode = generateOtp();
-            const otpKey = crypto.createHash('sha256').update(email).digest('hex');
-            // Store OTP (replace old one)
+            // Store OTP hash (replace old one)
             pendingOtps.set(otpKey, {
                 email,
-                code: otpCode,
+                codeHash: hashOtp(otpCode),
                 createdAt: Date.now(),
                 attempts: 0,
             });
@@ -157,7 +232,10 @@ export const createCircleOtpRouter = (config, db, sessionStore) => {
                 html: generateOtpEmailHtml(otpCode),
                 text: `Your new Arc Wallet verification code is: ${otpCode}\n\nThis code expires in 10 minutes.\n\nIf you didn't request this code, you can safely ignore this email.`,
             });
-            console.log(`[OTP] Code resent to ${email}`);
+            // Log with masked email (PII protection)
+            if (process.env.NODE_ENV === 'development') {
+                console.log(`[OTP] Code resent to ${maskEmail(email)}`);
+            }
             res.json({
                 success: true,
                 message: 'New verification code sent to your email',
@@ -193,6 +271,14 @@ export const createCircleOtpRouter = (config, db, sessionStore) => {
                     error: 'No verification code found. Please request a new one.',
                 });
             }
+            // Check if account is locked
+            if (pending.lockedUntil && Date.now() < pending.lockedUntil) {
+                const remainingMinutes = Math.ceil((pending.lockedUntil - Date.now()) / 60000);
+                return res.status(429).json({
+                    success: false,
+                    error: `Account temporarily locked. Please try again in ${remainingMinutes} minutes.`,
+                });
+            }
             // Check expiry
             if (Date.now() - pending.createdAt > OTP_EXPIRY_MS) {
                 pendingOtps.delete(otpKey);
@@ -201,20 +287,27 @@ export const createCircleOtpRouter = (config, db, sessionStore) => {
                     error: 'Verification code has expired. Please request a new one.',
                 });
             }
-            // Check attempts (max 5)
-            if (pending.attempts >= 5) {
-                pendingOtps.delete(otpKey);
-                return res.status(400).json({
+            // Check attempts (max 5) with account lockout
+            if (pending.attempts >= MAX_OTP_ATTEMPTS) {
+                // Lock the account for 30 minutes
+                pending.lockedUntil = Date.now() + ACCOUNT_LOCKOUT_MS;
+                console.warn(`[OTP] Account locked due to too many attempts: ${maskEmail(email)}`);
+                return res.status(429).json({
                     success: false,
-                    error: 'Too many attempts. Please request a new code.',
+                    error: 'Too many failed attempts. Account locked for 30 minutes.',
                 });
             }
-            // Verify code
-            if (pending.code !== otpCode) {
+            // Verify code using timing-safe comparison
+            const providedHash = hashOtp(otpCode);
+            const isValid = crypto.timingSafeEqual(Buffer.from(providedHash, 'hex'), Buffer.from(pending.codeHash, 'hex'));
+            if (!isValid) {
                 pending.attempts++;
+                const remainingAttempts = MAX_OTP_ATTEMPTS - pending.attempts;
                 return res.status(400).json({
                     success: false,
-                    error: 'Invalid verification code. Please try again.',
+                    error: remainingAttempts > 0
+                        ? `Invalid verification code. ${remainingAttempts} attempts remaining.`
+                        : 'Invalid verification code. Account will be locked.',
                 });
             }
             // Success - clean up OTP
@@ -231,13 +324,11 @@ export const createCircleOtpRouter = (config, db, sessionStore) => {
                     username: email,
                     displayName: email.split('@')[0],
                 });
-                console.log(`[OTP] Created new user in SQLite: ${email} (${userId})`);
+                if (process.env.NODE_ENV === 'development') {
+                    console.log(`[OTP] Created new user: ${maskEmail(email)}`);
+                }
             }
-            else {
-                console.log(`[OTP] Found existing user in SQLite: ${email} (${dbUser.id})`);
-            }
-            // Create session with user info
-            // Note: sessionStore still uses file-based session, but user is in SQLite
+            // Create session with user info (now using SQLite-backed secure session store)
             const now = new Date().toISOString();
             const sessionUser = {
                 id: dbUser.id,
@@ -246,7 +337,9 @@ export const createCircleOtpRouter = (config, db, sessionStore) => {
                 updatedAt: dbUser.updatedAt?.toISOString?.() || now,
             };
             const session = sessionStore.create(sessionUser, SESSION_TTL_MS);
-            console.log(`[OTP] Session created for ${email}, userId: ${dbUser.id}`);
+            if (process.env.NODE_ENV === 'development') {
+                console.log(`[OTP] Session created for ${maskEmail(email)}`);
+            }
             // Set session cookie
             const cookieOptions = COOKIE_BASE_OPTIONS(config.NODE_ENV === 'production');
             res.cookie(SESSION_COOKIE_NAME, session.id, cookieOptions);

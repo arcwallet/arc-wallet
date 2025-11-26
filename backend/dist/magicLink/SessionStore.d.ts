@@ -1,8 +1,12 @@
-import { MagicSession, MagicUser } from './types.js';
-export declare class MagicSessionStore {
-    private sessions;
-    create(user: MagicUser, ttlMs?: number): MagicSession;
-    get(sessionId?: string | null): MagicSession | null;
-    delete(sessionId?: string | null): void;
-}
+/**
+ * Session Store - Re-exports from SecureSessionStore for backward compatibility
+ *
+ * Security improvements in SecureSessionStore:
+ * - Cryptographically secure 256-bit session IDs (not predictable UUIDs)
+ * - SQLite persistence (survives server restarts, prevents DoS via memory exhaustion)
+ * - Session fingerprinting (IP + User-Agent binding to prevent hijacking)
+ * - Automatic cleanup of expired sessions
+ * - Session regeneration support (prevents session fixation attacks)
+ */
+export { MagicSessionStore, SecureSessionStore } from './SecureSessionStore.js';
 //# sourceMappingURL=SessionStore.d.ts.map

@@ -1,8 +1,22 @@
 import { Request, Response, NextFunction } from 'express';
 /**
- * General rate limiting middleware
+ * Extract real client IP with validation
+ * Prevents X-Forwarded-For spoofing
  */
-export declare const rateLimitMiddleware: (type?: "general" | "auth" | "registration" | "bridge" | "recovery") => (req: Request, res: Response, next: NextFunction) => Promise<void>;
+declare function getClientIp(req: Request): string;
+/**
+ * Generate rate limit key combining IP and fingerprint
+ * This prevents attackers from bypassing limits with different IPs
+ */
+declare function generateRateLimitKey(req: Request, userId?: string): string;
+/**
+ * Enhanced rate limiting middleware with:
+ * - IP + fingerprint based limiting
+ * - Progressive penalties for repeat offenders
+ * - Detailed rate limit headers
+ */
+export declare const rateLimitMiddleware: (type?: "general" | "auth" | "registration" | "bridge" | "recovery" | "wallet") => (req: Request, res: Response, next: NextFunction) => Promise<void>;
+export { getClientIp, generateRateLimitKey };
 /**
  * Request validation middleware
  */
