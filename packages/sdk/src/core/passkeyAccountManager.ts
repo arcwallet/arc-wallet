@@ -17,6 +17,24 @@ import type {
 } from '@simplewebauthn/types';
 import { logger } from '../utils/logger';
 
+// Browser-compatible Buffer alternatives
+const uint8ArrayToHex = (bytes: Uint8Array): string => {
+  return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+};
+
+const hexToUint8Array = (hex: string): Uint8Array => {
+  const cleanHex = hex.startsWith('0x') ? hex.slice(2) : hex;
+  const bytes = new Uint8Array(cleanHex.length / 2);
+  for (let i = 0; i < bytes.length; i++) {
+    bytes[i] = parseInt(cleanHex.substr(i * 2, 2), 16);
+  }
+  return bytes;
+};
+
+const uint8ArrayToUtf8 = (bytes: Uint8Array): string => {
+  return new TextDecoder().decode(bytes);
+};
+
 // Contract ABIs
 const FACTORY_ABI = [
   'function getAddress(uint256 x, uint256 y, uint256 salt) view returns (address)',
@@ -326,8 +344,8 @@ export class PasskeyAccountManager {
     const { x, y } = this.parseCOSEPublicKey(authData.credentialPublicKey);
 
     return {
-      x: '0x' + Buffer.from(x).toString('hex'),
-      y: '0x' + Buffer.from(y).toString('hex'),
+      x: '0x' + uint8ArrayToHex(x),
+      y: '0x' + uint8ArrayToHex(y),
     };
   }
 
@@ -339,8 +357,8 @@ export class PasskeyAccountManager {
     challengeIndex: number;
     typeIndex: number;
   }> {
-    const authenticatorData = '0x' + Buffer.from(this.fromBase64Url(auth.response.authenticatorData)).toString('hex');
-    const clientDataJSON = Buffer.from(this.fromBase64Url(auth.response.clientDataJSON)).toString('utf8');
+    const authenticatorData = '0x' + uint8ArrayToHex(this.fromBase64Url(auth.response.authenticatorData));
+    const clientDataJSON = uint8ArrayToUtf8(this.fromBase64Url(auth.response.clientDataJSON));
 
     // Find indices in clientDataJSON
     const challengeIndex = clientDataJSON.indexOf('"challenge"');
@@ -351,8 +369,8 @@ export class PasskeyAccountManager {
     const { r, s } = this.parseDERSignature(signature);
 
     return {
-      r: BigInt('0x' + Buffer.from(r).toString('hex')),
-      s: BigInt('0x' + Buffer.from(s).toString('hex')),
+      r: BigInt('0x' + uint8ArrayToHex(r)),
+      s: BigInt('0x' + uint8ArrayToHex(s)),
       authenticatorData,
       clientDataJSON,
       challengeIndex,
@@ -430,9 +448,10 @@ export class PasskeyAccountManager {
   }
 
   private toBase64Url(hex: string): string {
-    const bytes = hex.startsWith('0x') ? hex.slice(2) : hex;
-    const buffer = Buffer.from(bytes, 'hex');
-    return buffer.toString('base64url');
+    const bytes = hexToUint8Array(hex);
+    // Convert to base64url
+    const base64 = btoa(String.fromCharCode(...bytes));
+    return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   }
 
   private fromBase64Url(base64url: string): Uint8Array {
