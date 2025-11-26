@@ -51,22 +51,36 @@ const app = express();
 // Trust proxy (important for rate limiting and IP detection)
 app.set('trust proxy', 1);
 
-// Security middleware
+// Security middleware with hardened CSP
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
       scriptSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      imgSrc: ["'self'", "data:"],
-      connectSrc: ["'self'"],
-      fontSrc: ["'self'"],
+      styleSrc: ["'self'"],  // Removed unsafe-inline for better XSS protection
+      imgSrc: ["'self'", "data:", "https:"],  // Allow HTTPS images
+      connectSrc: ["'self'", "https://api.circle.com", "wss:"],  // Allow Circle API and WebSocket
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
       objectSrc: ["'none'"],
       mediaSrc: ["'self'"],
-      frameSrc: ["'none'"]
+      frameSrc: ["'none'"],
+      frameAncestors: ["'none'"],  // Prevent clickjacking
+      baseUri: ["'self'"],  // Prevent base tag hijacking
+      formAction: ["'self'"],  // Restrict form submissions
+      upgradeInsecureRequests: [],  // Force HTTPS
     }
   },
-  crossOriginEmbedderPolicy: false
+  crossOriginEmbedderPolicy: false,
+  // Additional security headers
+  hsts: {
+    maxAge: 31536000,  // 1 year
+    includeSubDomains: true,
+    preload: true
+  },
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+  noSniff: true,
+  xssFilter: true,
+  hidePoweredBy: true
 }));
 
 // CORS configuration
