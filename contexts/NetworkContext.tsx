@@ -13,8 +13,6 @@ import {
   getNetworkByChainId,
   getNetworkById,
   getRpcUrl,
-  formatChainIdHex,
-  isArcNetwork,
 } from '../config/networks';
 
 interface NetworkContextType {
@@ -136,34 +134,8 @@ export const NetworkProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     console.log(`[NetworkContext] Switching to ${network.name}`);
     setCurrentNetwork(network);
-
-    // If MetaMask or similar is connected, request network switch
-    if (typeof window !== 'undefined' && (window as any).ethereum) {
-      try {
-        await (window as any).ethereum.request({
-          method: 'wallet_switchEthereumChain',
-          params: [{ chainId: formatChainIdHex(network.chainId) }],
-        });
-      } catch (switchError: any) {
-        // Chain not added to wallet, try to add it
-        if (switchError.code === 4902) {
-          try {
-            await (window as any).ethereum.request({
-              method: 'wallet_addEthereumChain',
-              params: [{
-                chainId: formatChainIdHex(network.chainId),
-                chainName: network.name,
-                nativeCurrency: network.nativeCurrency,
-                rpcUrls: [network.rpcUrls.default],
-                blockExplorerUrls: [network.blockExplorers.default.url],
-              }],
-            });
-          } catch (addError) {
-            console.error('[NetworkContext] Failed to add network to wallet:', addError);
-          }
-        }
-      }
-    }
+    // Arc Wallet is self-custodial - no external wallet connection needed
+    // Network switch happens internally via our own provider
   }, []);
 
   // Switch network by chain ID
