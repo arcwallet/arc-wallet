@@ -1,12 +1,10 @@
 /**
- * Circle Email OTP Routes (Server-Side Only)
- * Backend handles all Circle API calls - no frontend SDK needed
- * Uses nodemailer as fallback if Circle fails
+ * Email OTP Routes (Server-Side Only)
+ * Uses Microsoft Graph API for reliable email delivery
  */
 
 import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
-import nodemailer from 'nodemailer';
 import { EnvConfig } from '../types/index.js';
 import { MagicUserStore } from '../magicLink/UserStore.js';
 import { MagicSessionStore } from '../magicLink/SessionStore.js';
@@ -17,8 +15,6 @@ import path from 'path';
 const SESSION_COOKIE_NAME = 'arcwallet_session';
 const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
 const OTP_EXPIRY_MS = 10 * 60 * 1000; // 10 minutes
-
-type CookieRequest = Request & { cookies?: Record<string, string> };
 
 const COOKIE_BASE_OPTIONS = (isProd: boolean) => ({
   httpOnly: true,
@@ -59,36 +55,109 @@ setInterval(() => {
   }
 }, 5 * 60 * 1000);
 
-// Create nodemailer transporter
-const createTransporter = () => {
-  const smtpHost = process.env.SMTP_HOST;
-  const smtpPort = parseInt(process.env.SMTP_PORT || '587', 10);
-  const smtpUser = process.env.SMTP_USER;
-  const smtpPass = process.env.SMTP_PASS;
+// Get Microsoft Graph access token
+async function getGraphAccessToken(): Promise<string | null> {
+  const tenantId = process.env.MS_TENANT_ID;
+  const clientId = process.env.MS_CLIENT_ID;
+  const clientSecret = process.env.MS_CLIENT_SECRET;
 
-  if (!smtpHost || !smtpUser || !smtpPass) {
-    console.warn('[OTP] SMTP not configured');
+  if (!tenantId || !clientId || !clientSecret) {
+    console.warn('[OTP] Microsoft Graph not configured');
     return null;
   }
 
-  return nodemailer.createTransport({
-    host: smtpHost,
-    port: smtpPort,
-    secure: smtpPort === 465,
-    auth: {
-      user: smtpUser,
-      pass: smtpPass,
-    },
-  });
-};
+  try {
+    const tokenUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`;
+    const response = await fetch(tokenUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: clientId,
+        client_secret: clientSecret,
+        scope: 'https://graph.microsoft.com/.default',
+        grant_type: 'client_credentials',
+      }),
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      console.error('[OTP] Graph token error:', data);
+      return null;
+    }
+
+    return data.access_token;
+  } catch (error) {
+    console.error('[OTP] Graph token fetch error:', error);
+    return null;
+  }
+}
+
+// Send email via Microsoft Graph API
+async function sendEmailViaGraph(to: string, subject: string, htmlContent: string, textContent: string): Promise<boolean> {
+  const accessToken = await getGraphAccessToken();
+  const senderEmail = process.env.MS_SENDER_EMAIL || 'support@arcwallet.network';
+
+  if (!accessToken) {
+    return false;
+  }
+
+  try {
+    const response = await fetch(`https://graph.microsoft.com/v1.0/users/${senderEmail}/sendMail`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        message: {
+          subject,
+          body: {
+            contentType: 'HTML',
+            content: htmlContent,
+          },
+          toRecipients: [{ emailAddress: { address: to } }],
+        },
+        saveToSentItems: false,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      console.error('[OTP] Graph send error:', error);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error('[OTP] Graph send exception:', error);
+    return false;
+  }
+}
+
+// Generate OTP email HTML
+function generateOtpEmailHtml(otpCode: string): string {
+  return `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 500px; margin: 0 auto; padding: 40px 20px;">
+      <div style="text-align: center; margin-bottom: 30px;">
+        <h1 style="color: #1e293b; font-size: 24px; font-weight: 600; margin: 0;">Arc Wallet</h1>
+      </div>
+      <div style="background: linear-gradient(135deg, #1e293b 0%, #334155 100%); border-radius: 16px; padding: 40px; text-align: center;">
+        <p style="color: #94a3b8; font-size: 14px; margin: 0 0 20px 0;">Your verification code is:</p>
+        <div style="background: rgba(255,255,255,0.1); border-radius: 12px; padding: 20px; margin-bottom: 20px;">
+          <span style="font-size: 36px; font-weight: 700; letter-spacing: 8px; color: #ffffff;">${otpCode}</span>
+        </div>
+        <p style="color: #64748b; font-size: 12px; margin: 0;">This code expires in 10 minutes</p>
+      </div>
+      <p style="color: #64748b; font-size: 12px; text-align: center; margin-top: 20px;">
+        If you didn't request this code, you can safely ignore this email.
+      </p>
+    </div>
+  `;
+}
 
 export const createCircleOtpRouter = (config: EnvConfig, db: Database, sessionStore: MagicSessionStore) => {
   const router = Router();
   const userStore = new MagicUserStore(path.join(process.cwd(), 'data'));
-  const transporter = createTransporter();
-
-  const fromAddress = process.env.EMAIL_FROM_ADDRESS || process.env.SMTP_USER || 'noreply@arcwallet.network';
-  const fromName = process.env.EMAIL_FROM_NAME || 'Arc Wallet';
 
   /**
    * Request OTP - Send verification code via email
@@ -99,10 +168,6 @@ export const createCircleOtpRouter = (config: EnvConfig, db: Database, sessionSt
 
     if (!email) {
       return res.status(400).json({ success: false, error: 'Please provide a valid email address.' });
-    }
-
-    if (!transporter) {
-      return res.status(500).json({ success: false, error: 'Email service not configured' });
     }
 
     try {
@@ -118,30 +183,23 @@ export const createCircleOtpRouter = (config: EnvConfig, db: Database, sessionSt
         attempts: 0,
       });
 
-      // Send email
-      await transporter.sendMail({
-        from: `"${fromName}" <${fromAddress}>`,
-        to: email,
-        subject: 'Your Arc Wallet verification code',
-        html: `
-          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 500px; margin: 0 auto; padding: 40px 20px;">
-            <div style="text-align: center; margin-bottom: 30px;">
-              <h1 style="color: #1e293b; font-size: 24px; font-weight: 600; margin: 0;">Arc Wallet</h1>
-            </div>
-            <div style="background: linear-gradient(135deg, #1e293b 0%, #334155 100%); border-radius: 16px; padding: 40px; text-align: center;">
-              <p style="color: #94a3b8; font-size: 14px; margin: 0 0 20px 0;">Your verification code is:</p>
-              <div style="background: rgba(255,255,255,0.1); border-radius: 12px; padding: 20px; margin-bottom: 20px;">
-                <span style="font-size: 36px; font-weight: 700; letter-spacing: 8px; color: #ffffff;">${otpCode}</span>
-              </div>
-              <p style="color: #64748b; font-size: 12px; margin: 0;">This code expires in 10 minutes</p>
-            </div>
-            <p style="color: #64748b; font-size: 12px; text-align: center; margin-top: 20px;">
-              If you didn't request this code, you can safely ignore this email.
-            </p>
-          </div>
-        `,
-        text: `Your Arc Wallet verification code is: ${otpCode}\n\nThis code expires in 10 minutes.\n\nIf you didn't request this code, you can safely ignore this email.`,
-      });
+      // Send email via Graph API
+      const htmlContent = generateOtpEmailHtml(otpCode);
+      const textContent = `Your Arc Wallet verification code is: ${otpCode}\n\nThis code expires in 10 minutes.`;
+
+      const sent = await sendEmailViaGraph(
+        email,
+        'Your Arc Wallet verification code',
+        htmlContent,
+        textContent
+      );
+
+      if (!sent) {
+        return res.status(500).json({
+          success: false,
+          error: 'Failed to send verification code. Please try again.',
+        });
+      }
 
       console.log(`[OTP] Code sent to ${email}`);
 
@@ -169,10 +227,6 @@ export const createCircleOtpRouter = (config: EnvConfig, db: Database, sessionSt
       return res.status(400).json({ success: false, error: 'Please provide a valid email address.' });
     }
 
-    if (!transporter) {
-      return res.status(500).json({ success: false, error: 'Email service not configured' });
-    }
-
     try {
       // Generate new OTP
       const otpCode = generateOtp();
@@ -186,30 +240,23 @@ export const createCircleOtpRouter = (config: EnvConfig, db: Database, sessionSt
         attempts: 0,
       });
 
-      // Send email
-      await transporter.sendMail({
-        from: `"${fromName}" <${fromAddress}>`,
-        to: email,
-        subject: 'Your Arc Wallet verification code',
-        html: `
-          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 500px; margin: 0 auto; padding: 40px 20px;">
-            <div style="text-align: center; margin-bottom: 30px;">
-              <h1 style="color: #1e293b; font-size: 24px; font-weight: 600; margin: 0;">Arc Wallet</h1>
-            </div>
-            <div style="background: linear-gradient(135deg, #1e293b 0%, #334155 100%); border-radius: 16px; padding: 40px; text-align: center;">
-              <p style="color: #94a3b8; font-size: 14px; margin: 0 0 20px 0;">Your new verification code is:</p>
-              <div style="background: rgba(255,255,255,0.1); border-radius: 12px; padding: 20px; margin-bottom: 20px;">
-                <span style="font-size: 36px; font-weight: 700; letter-spacing: 8px; color: #ffffff;">${otpCode}</span>
-              </div>
-              <p style="color: #64748b; font-size: 12px; margin: 0;">This code expires in 10 minutes</p>
-            </div>
-            <p style="color: #64748b; font-size: 12px; text-align: center; margin-top: 20px;">
-              If you didn't request this code, you can safely ignore this email.
-            </p>
-          </div>
-        `,
-        text: `Your new Arc Wallet verification code is: ${otpCode}\n\nThis code expires in 10 minutes.\n\nIf you didn't request this code, you can safely ignore this email.`,
-      });
+      // Send email via Graph API
+      const htmlContent = generateOtpEmailHtml(otpCode);
+      const textContent = `Your new Arc Wallet verification code is: ${otpCode}\n\nThis code expires in 10 minutes.`;
+
+      const sent = await sendEmailViaGraph(
+        email,
+        'Your Arc Wallet verification code',
+        htmlContent,
+        textContent
+      );
+
+      if (!sent) {
+        return res.status(500).json({
+          success: false,
+          error: 'Failed to resend verification code. Please try again.',
+        });
+      }
 
       console.log(`[OTP] Code resent to ${email}`);
 
