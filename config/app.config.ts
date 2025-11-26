@@ -38,20 +38,26 @@ export const ARC_TESTNET = {
     },
 } as const;
 
-// Pimlico Configuration (Account Abstraction Infrastructure)
-export const PIMLICO_CONFIG = {
-    apiKey: getEnv('VITE_PIMLICO_API_KEY', ''),
-    bundlerUrl: `https://api.pimlico.io/v1/arc-testnet/rpc`,
-    paymasterUrl: `https://api.pimlico.io/v2/arc-testnet/rpc`,
-    entryPoint: ENTRY_POINT,
+// Arc Native Gas Configuration
+// Arc uses USDC as native gas token - no separate paymaster needed!
+// Users pay gas fees directly in USDC (the native token)
+export const ARC_GAS_CONFIG = {
+    // Arc's target gas fee is ~$0.01 per transaction
+    targetGasFee: '0.01', // USDC
+    // USDC has 18 decimals on Arc (not 6!)
+    decimals: 18,
+    // No external bundler/paymaster - Arc handles this natively
+    usesNativeGas: true,
 } as const;
 
-// Gas Sponsorship Configuration
-export const GAS_SPONSORSHIP = {
-    enabled: true,
-    maxDailySponsorship: 1_000_000, // $1 USDC per user per day (in micro units)
-    minBalanceThreshold: 100_000,   // Sponsor if balance < $0.10 USDC
-    topUpAmount: 500_000,           // Top up $0.50 USDC for gas
+// Legacy Pimlico Config - DISABLED (Pimlico doesn't support Arc Testnet)
+// Keeping for reference if Arc adds bundler support later
+export const PIMLICO_CONFIG = {
+    apiKey: '', // Not used
+    bundlerUrl: '', // Arc doesn't use external bundlers
+    paymasterUrl: '', // Arc uses native USDC gas
+    entryPoint: ENTRY_POINT,
+    enabled: false, // DISABLED - Arc has native USDC gas
 } as const;
 
 // Explorer Configuration
