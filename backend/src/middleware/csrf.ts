@@ -30,11 +30,13 @@ export const setCsrfCookie = (req: Request, res: Response, next: NextFunction) =
 
 // Routes that don't require CSRF validation (public endpoints)
 // Passkey endpoints are exempt because WebAuthn provides cryptographic security
+// OTP endpoints are exempt because email verification provides security
 const CSRF_EXEMPT_ROUTES = [
   '/api/send-link',
   '/api/verify',
+  '/api/otp',     // All OTP routes exempt (email verification provides security)
   '/health',
-  '/passkeys',  // All passkey routes exempt (WebAuthn provides cryptographic security)
+  '/passkeys',    // All passkey routes exempt (WebAuthn provides cryptographic security)
 ];
 
 /**
