@@ -853,6 +853,56 @@ export class PasskeyController {
   };
 
   /**
+   * Reset user passkeys (development/testing only)
+   * Deletes all passkeys for a user to allow fresh registration
+   */
+  resetUserPasskeys = async (req: Request, res: Response) => {
+    try {
+      const { email, confirmReset } = req.body;
+
+      if (!email || confirmReset !== 'DELETE_ALL_PASSKEYS') {
+        throw new ApiError('Email and confirmReset are required', 400, 'MISSING_FIELDS');
+      }
+
+      const normalizedEmail = email.trim().toLowerCase();
+      const user = await this.db.getUserByUsername(normalizedEmail);
+
+      if (!user) {
+        return res.json({
+          success: true,
+          data: { deleted: 0, message: 'No user found with this email' }
+        });
+      }
+
+      // Delete all passkeys for this user
+      const deletedPasskeys = await this.db.deletePasskeysByEmail(normalizedEmail);
+      const deletedSessionKeys = await this.db.deleteSessionKeysByEmail(normalizedEmail);
+
+      console.log('[PasskeyReset] Deleted passkeys for user:', {
+        email: normalizedEmail,
+        deletedPasskeys,
+        deletedSessionKeys
+      });
+
+      return res.json({
+        success: true,
+        data: {
+          deletedPasskeys,
+          deletedSessionKeys,
+          message: 'All passkeys deleted. You can now register a new passkey.'
+        }
+      });
+
+    } catch (error) {
+      console.error('Reset user passkeys error:', error);
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      throw new ApiError('Failed to reset passkeys', 500, 'RESET_FAILED');
+    }
+  };
+
+  /**
    * Check if user has registered passkeys
    * Used to skip magic link when user already has passkeys for this email
    */

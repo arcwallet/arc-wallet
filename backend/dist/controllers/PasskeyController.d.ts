@@ -56,6 +56,11 @@ export declare class PasskeyController {
      */
     recoveryComplete: (req: Request, res: Response) => Promise<void>;
     /**
+     * Reset user passkeys (development/testing only)
+     * Deletes all passkeys for a user to allow fresh registration
+     */
+    resetUserPasskeys: (req: Request, res: Response) => Promise<Response<any, Record<string, any>>>;
+    /**
      * Check if user has registered passkeys
      * Used to skip magic link when user already has passkeys for this email
      */

@@ -236,6 +236,23 @@ export function createPasskeyRoutes(db: Database, config: EnvConfig): Router {
   );
 
   /**
+   * POST /passkeys/reset-user
+   * Reset user passkeys (for testing/development)
+   */
+  router.post(
+    '/reset-user',
+    rateLimitMiddleware('recovery'),
+    validateRequestBody(['email', 'confirmReset']),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        await passkeyController.resetUserPasskeys(req, res);
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
+
+  /**
    * GET /passkeys/health
    * Health check for passkey service
    */
