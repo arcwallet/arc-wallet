@@ -91,6 +91,24 @@ export const SUPPORTED_TOKENS: Record<string, TokenInfo> = {
     swapable: true,
     currentPrice: 1.07, // EUR to USD approximation
   },
+  USYC: {
+    symbol: 'USYC',
+    name: 'US Yield Coin',
+    decimals: 6,
+    contractAddresses: {
+      mainnet: {
+        ethereum: '0x136471a34f6ef19fE571EFFC1CA711fdb8E49f2b', // USYC mainnet (Hashnote)
+      },
+      testnet: {
+        arcTestnet: '0xe9185F0c5F296Ed1797AaE4238D26CCaBEadb86C', // USYC on Arc Testnet
+      },
+    },
+    icon: '/usyc-logo.svg',
+    priceSource: 'coingecko:hashnote-usyc',
+    displayPriority: 3,
+    swapable: true,
+    currentPrice: 1.00, // Yield-bearing stablecoin, approximately 1 USD
+  },
 };
 
 export const SWAP_CONFIG: SwapConfig = {
@@ -111,6 +129,7 @@ export const SWAP_CONFIG: SwapConfig = {
   minimumSwapAmount: {
     USDC: '1000000', // 1 USDC (6 decimals)
     EURC: '1000000', // 1 EURC (6 decimals)
+    USYC: '1000000', // 1 USYC (6 decimals)
   },
 };
 
