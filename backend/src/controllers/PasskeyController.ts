@@ -276,8 +276,22 @@ export class PasskeyController {
       // Generate session key for the newly registered user
       const sessionKey = await this.sessionKeyManager.generateSessionKey(user.id, 24); // 24 hours
 
-      // Self-custodial: Only return user identity info
-      // Private keys are generated and stored ONLY on client-side
+      // Extract P256 public key coordinates for smart contract wallet
+      let publicKeyX: string | undefined;
+      let publicKeyY: string | undefined;
+      if (verification.registrationInfo?.credentialPublicKey) {
+        try {
+          const { COSEECDHAtoXY } = await import('../utils/passkeyUtils.js');
+          const [x, y] = COSEECDHAtoXY(verification.registrationInfo.credentialPublicKey);
+          publicKeyX = x;
+          publicKeyY = y;
+          console.log('[PasskeyReg] Extracted public key coordinates:', { x: x.substring(0, 20) + '...', y: y.substring(0, 20) + '...' });
+        } catch (e) {
+          console.error('[PasskeyReg] Failed to extract public key coordinates:', e);
+        }
+      }
+
+      // Self-custodial: Return user identity info and public key for smart contract wallet
       res.json({
         success: true,
         data: {
@@ -286,7 +300,9 @@ export class PasskeyController {
             username: user.username,
             displayName: user.displayName
           },
-          sessionKey: serializeSessionKey(sessionKey)
+          sessionKey: serializeSessionKey(sessionKey),
+          // Public key coordinates for PasskeyAccount smart contract
+          publicKey: publicKeyX && publicKeyY ? { x: publicKeyX, y: publicKeyY } : undefined
         }
       });
 
@@ -464,8 +480,21 @@ export class PasskeyController {
       // Clean up challenge
       await this.db.deleteChallenge(challenge.id);
 
-      // Self-custodial: Only return user identity info
-      // Private keys are generated and stored ONLY on client-side
+      // Extract P256 public key coordinates for smart contract wallet
+      let publicKeyX: string | undefined;
+      let publicKeyY: string | undefined;
+      if (passkeyCredential.credentialPublicKey) {
+        try {
+          const { COSEECDHAtoXY } = await import('../utils/passkeyUtils.js');
+          const [x, y] = COSEECDHAtoXY(passkeyCredential.credentialPublicKey);
+          publicKeyX = x;
+          publicKeyY = y;
+        } catch (e) {
+          console.error('[PasskeyAuth] Failed to extract public key coordinates:', e);
+        }
+      }
+
+      // Self-custodial: Return user identity info and public key for smart contract wallet
       res.json({
         success: true,
         data: {
@@ -474,7 +503,9 @@ export class PasskeyController {
             username: user.username,
             displayName: user.displayName
           },
-          sessionKey: serializeSessionKey(sessionKey)
+          sessionKey: serializeSessionKey(sessionKey),
+          // Public key coordinates for PasskeyAccount smart contract (for reconnection)
+          publicKey: publicKeyX && publicKeyY ? { x: publicKeyX, y: publicKeyY } : undefined
         }
       });
 

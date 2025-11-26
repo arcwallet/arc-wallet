@@ -78,10 +78,7 @@ export declare class PasskeyAccountManager {
      * Build init code for account deployment
      */
     getInitCode(): string;
-    private extractPublicKeyCoordinates;
     private extractSignatureComponents;
-    private parseAuthenticatorData;
-    private parseCOSEPublicKey;
     private parseDERSignature;
     private toBase64Url;
     private fromBase64Url;

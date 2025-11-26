@@ -134,10 +134,16 @@ export class PasskeyAccountManager {
       throw new Error('Failed to verify credential');
     }
 
-    await verifyResponse.json(); // Verify succeeded
+    const verifyData = await verifyResponse.json();
 
-    // 4. Extract P256 public key coordinates from credential
-    const { x, y } = await this.extractPublicKeyCoordinates(credential);
+    // 4. Get P256 public key coordinates from backend response
+    // Backend extracts these from COSE using proper CBOR library
+    const publicKey = verifyData.data?.publicKey;
+    if (!publicKey?.x || !publicKey?.y) {
+      throw new Error('Server did not return public key coordinates');
+    }
+
+    const { x, y } = publicKey;
 
     const passkeyCredential: PasskeyCredential = {
       credentialId: credential.id,
@@ -201,21 +207,37 @@ export class PasskeyAccountManager {
       throw new Error('Failed to verify authentication');
     }
 
-    await verifyResponse.json(); // Verify succeeded
+    const verifyData = await verifyResponse.json();
 
-    // 4. Load stored credential
-    const storedCredential = this.loadCredential(credential.id);
-    if (!storedCredential) {
-      throw new Error('Credential not found locally. Please create a new account.');
+    // 4. Get public key from backend response (allows reconnection even without local storage)
+    const publicKey = verifyData.data?.publicKey;
+    const userId = verifyData.data?.user?.username || verifyData.data?.user?.id;
+
+    if (!publicKey?.x || !publicKey?.y) {
+      // Fallback to local storage
+      const storedCredential = this.loadCredential(credential.id);
+      if (!storedCredential) {
+        throw new Error('Credential not found. Server did not return public key coordinates.');
+      }
+      this.currentCredential = storedCredential;
+    } else {
+      // Use public key from backend
+      const passkeyCredential: PasskeyCredential = {
+        credentialId: credential.id,
+        publicKeyX: publicKey.x,
+        publicKeyY: publicKey.y,
+        userId,
+      };
+      this.currentCredential = passkeyCredential;
+      // Update local storage with fresh data from backend
+      this.storeCredential(passkeyCredential);
     }
 
-    this.currentCredential = storedCredential;
-
     // 5. Get account address
-    const salt = BigInt(keccak256(new TextEncoder().encode(storedCredential.userId)));
+    const salt = BigInt(keccak256(new TextEncoder().encode(this.currentCredential.userId)));
     this.accountAddress = await this.factory.getAddress(
-      BigInt(storedCredential.publicKeyX),
-      BigInt(storedCredential.publicKeyY),
+      BigInt(this.currentCredential.publicKeyX),
+      BigInt(this.currentCredential.publicKeyY),
       salt
     );
 
@@ -224,7 +246,7 @@ export class PasskeyAccountManager {
       address: this.accountAddress
     });
 
-    return { address: this.accountAddress, credential: storedCredential };
+    return { address: this.accountAddress, credential: this.currentCredential };
   }
 
   /**
@@ -331,24 +353,6 @@ export class PasskeyAccountManager {
 
   // ============ Private Methods ============
 
-  private async extractPublicKeyCoordinates(credential: RegistrationResponseJSON): Promise<{ x: string; y: string }> {
-    // Decode the attestation object to get the public key
-    const attestationObject = this.fromBase64Url(credential.response.attestationObject);
-
-    // Parse CBOR to get authData
-    // For simplicity, we'll use a basic parser - in production use a proper CBOR library
-    const authData = this.parseAuthenticatorData(attestationObject);
-
-    // The public key is in COSE format in authData
-    // For P-256, the x and y coordinates are 32 bytes each
-    const { x, y } = this.parseCOSEPublicKey(authData.credentialPublicKey);
-
-    return {
-      x: '0x' + uint8ArrayToHex(x),
-      y: '0x' + uint8ArrayToHex(y),
-    };
-  }
-
   private async extractSignatureComponents(auth: AuthenticationResponseJSON): Promise<{
     r: bigint;
     s: bigint;
@@ -376,45 +380,6 @@ export class PasskeyAccountManager {
       challengeIndex,
       typeIndex,
     };
-  }
-
-  private parseAuthenticatorData(attestationObject: Uint8Array): { credentialPublicKey: Uint8Array } {
-    // Basic CBOR parsing for attestation object
-    // This is simplified - in production use a proper CBOR library
-
-    // Find authData in the CBOR structure
-    // authData starts after the format string and includes:
-    // - rpIdHash (32 bytes)
-    // - flags (1 byte)
-    // - signCount (4 bytes)
-    // - attestedCredentialData (if present)
-
-    // For now, return a placeholder - this needs proper CBOR parsing
-    // The actual implementation would decode the CBOR and extract authData
-
-    // Simplified: look for the public key pattern in the attestation
-    // Skip rpIdHash (32) + flags (1) + signCount (4) = 37 bytes
-    const credIdLen = (attestationObject[53] << 8) | attestationObject[54];
-    const publicKeyStart = 55 + credIdLen;
-
-    return {
-      credentialPublicKey: attestationObject.slice(publicKeyStart, publicKeyStart + 77) // COSE key is ~77 bytes for P-256
-    };
-  }
-
-  private parseCOSEPublicKey(coseKey: Uint8Array): { x: Uint8Array; y: Uint8Array } {
-    // COSE P-256 public key format:
-    // Map with keys: 1 (kty), 3 (alg), -1 (crv), -2 (x), -3 (y)
-    // x and y are 32 bytes each for P-256
-
-    // Simplified parsing - in production use proper COSE/CBOR library
-    // Look for the x and y coordinates (32 bytes each, usually after specific markers)
-
-    // For P-256, x starts around offset 10 and y around offset 45 in typical COSE encoding
-    const x = coseKey.slice(10, 42);
-    const y = coseKey.slice(45, 77);
-
-    return { x, y };
   }
 
   private parseDERSignature(signature: Uint8Array): { r: Uint8Array; s: Uint8Array } {
