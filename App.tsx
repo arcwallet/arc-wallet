@@ -11,6 +11,7 @@ import { ArcAccountProvider } from './contexts/ArcAccountContext';
 import { ActivityProvider } from './contexts/ActivityContext';
 import { MultiSigProvider } from './contexts/MultiSigContext';
 import { PrivacyProvider } from './contexts/PrivacyContext';
+import { NetworkProvider } from './contexts/NetworkContext';
 // Smart Contract Passkey Wallet (NEW - default)
 import { PasskeyAccountProvider, usePasskeyAccount } from './contexts/PasskeyAccountContext';
 // Legacy EOA wallet (kept for backwards compatibility)
@@ -116,25 +117,27 @@ const App: React.FC = () => {
   return (
     <ErrorBoundary>
       <SessionProvider>
-        <PasskeyAccountProvider>
-          <SelfCustodialWalletProvider>
-            <WalletProvider>
-              <ArcAccountProvider>
-                <ActivityProvider>
-                  <PrivacyProvider>
-                    <MultiSigProvider>
-                      <div className="auth-wrapper">
-                        <React.Suspense fallback={null}>
-                          <RootView />
-                        </React.Suspense>
-                      </div>
-                    </MultiSigProvider>
-                  </PrivacyProvider>
-                </ActivityProvider>
-              </ArcAccountProvider>
-            </WalletProvider>
-          </SelfCustodialWalletProvider>
-        </PasskeyAccountProvider>
+        <NetworkProvider>
+          <PasskeyAccountProvider>
+            <SelfCustodialWalletProvider>
+              <WalletProvider>
+                <ArcAccountProvider>
+                  <ActivityProvider>
+                    <PrivacyProvider>
+                      <MultiSigProvider>
+                        <div className="auth-wrapper">
+                          <React.Suspense fallback={null}>
+                            <RootView />
+                          </React.Suspense>
+                        </div>
+                      </MultiSigProvider>
+                    </PrivacyProvider>
+                  </ActivityProvider>
+                </ArcAccountProvider>
+              </WalletProvider>
+            </SelfCustodialWalletProvider>
+          </PasskeyAccountProvider>
+        </NetworkProvider>
       </SessionProvider>
     </ErrorBoundary>
   );

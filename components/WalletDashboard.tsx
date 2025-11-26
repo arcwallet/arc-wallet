@@ -10,12 +10,14 @@ import Faucet from './Faucet';
 import SwapScreen from './SwapScreen';
 import Bridge from './Bridge';
 import AgentScreen from './AgentScreen';
+import NetworkSelector from './NetworkSelector';
 // import Bridge from './Bridge';
 import { Transaction } from '../types';
 import { useWallet } from '../contexts/WalletContext';
 import { useSelfCustodialWallet } from '../contexts/SelfCustodialWalletContext';
 import { usePasskeyAccount } from '../contexts/PasskeyAccountContext';
 import { useArcAccount } from '../contexts/ArcAccountContext';
+import { useNetwork } from '../contexts/NetworkContext';
 import type { AccountSnapshot } from '../services/arcRpcClient';
 import { formatBlockTime } from '../utils/format';
 import { useActivity } from '../contexts/ActivityContext';
@@ -162,6 +164,7 @@ const DashboardHeader: React.FC<DashboardHeaderPropsWithNav> = ({ account, isRef
   const address = passkeyAddress || selfCustodialAddress || legacyAddress;
   const logout = passkeyAddress ? passkeyDisconnect : (selfCustodialAddress ? lockWallet : legacyLogout);
   const { isPrivacyMode, togglePrivacyMode } = usePrivacy();
+  const { currentNetwork } = useNetwork();
 
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [hasCopiedAddress, setHasCopiedAddress] = useState(false);
@@ -178,10 +181,8 @@ const DashboardHeader: React.FC<DashboardHeaderPropsWithNav> = ({ account, isRef
           <p className="text-sm font-semibold text-[#E6EEF3]">{account ? `#${account.latestBlock.number.toLocaleString()}` : '—'}</p>
           <p className="text-xs text-[#A7B4C8]">{lastUpdated}</p>
         </div>
-        <div className="flex items-center gap-2 rounded-lg bg-slate-900/60 backdrop-blur-sm border border-slate-600/30 px-3 py-1.5">
-          <div className="size-2 rounded-full bg-green-500" />
-          <p className="text-sm font-medium text-slate-400">Arc Testnet</p>
-        </div>
+        {/* Network Selector */}
+        <NetworkSelector compact />
         <div className="flex items-center gap-3 rounded-lg bg-[#151A22] border border-white/10 px-3 py-1.5 opacity-60 cursor-not-allowed" title="Privacy Mode with TEE - Coming Soon">
           <div className="flex items-center gap-2">
             <LockIcon size={14} className="text-slate-500" />
