@@ -43,6 +43,7 @@
     "@arc/wallet-sdk": "file:./packages/sdk",
     "@circle-fin/adapter-viem-v2": "^1.0.1",
     "@circle-fin/bridge-kit": "^1.1.0",
+    "@circle-fin/w3s-pw-web-sdk": "^1.1.11",
     "@openzeppelin/contracts": "^5.4.0",
     "@sentry/browser": "^10.26.0",
     "@types/qrcode": "^1.5.6",
@@ -59,7 +60,8 @@
     "react-dom": "^19.2.0",
     "sinon": "^21.0.0",
     "util": "^0.12.5",
-    "viem": "^2.38.6"
+    "viem": "^2.38.6",
+    "vite-plugin-node-polyfills": "^0.24.0"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-chai-matchers": "^2.0.4",
