@@ -58,9 +58,12 @@ class GeminiService {
             this.client = new GoogleGenerativeAI(apiKey);
             const modelName = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
             this.model = this.client.getGenerativeModel({ model: modelName });
-            console.log('✅ Gemini client configured');
-        } else {
-            console.warn('⚠️ GEMINI_API_KEY not configured. Gemini service will use mock responses.');
+            // Don't log in production
+            if (process.env.NODE_ENV === 'development') {
+                console.log('✅ Gemini AI configured');
+            }
+        } else if (process.env.NODE_ENV === 'development') {
+            console.warn('⚠️ GEMINI_API_KEY not configured. Using mock responses.');
         }
     }
 

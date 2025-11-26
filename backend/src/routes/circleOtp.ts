@@ -87,8 +87,8 @@ export const createCircleOtpRouter = (config: EnvConfig, db: Database, sessionSt
 
   if (sendgridApiKey) {
     sgMail.setApiKey(sendgridApiKey);
-    console.log('[OTP] SendGrid configured');
-  } else {
+    // Don't log configuration status in production
+  } else if (process.env.NODE_ENV === 'development') {
     console.warn('[OTP] SENDGRID_API_KEY not configured');
   }
 
