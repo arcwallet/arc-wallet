@@ -25,14 +25,9 @@ export default defineConfig(({ mode }) => {
       },
     },
     plugins: [react()],
-    define: {
-      // Polyfill for Circle SDK (uses Node.js globals)
-      global: 'globalThis',
-    },
     optimizeDeps: {
       // Prevent Vite from trying to prebundle the local SDK as a package
       exclude: ['@arc/wallet-sdk'],
-      include: ['util'],
     },
     resolve: {
       alias: {
@@ -42,17 +37,7 @@ export default defineConfig(({ mode }) => {
           __dirname,
           isProd ? './packages/sdk/dist/index.mjs' : './packages/sdk/src/index.ts'
         ),
-        // Node.js polyfills for Circle SDK
-        util: 'util',
       }
-    },
-    build: {
-      rollupOptions: {
-        plugins: [],
-      },
-      commonjsOptions: {
-        transformMixedEsModules: true,
-      },
-    },
+    }
   };
 });
