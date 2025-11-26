@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { arcRpcClient, type AccountSnapshot } from '../services/arcRpcClient';
+import { arcRpcClient, type AccountSnapshot, type BlockHeader } from '../services/arcRpcClient';
 import { formatUSDCAmount } from '../utils/format';
 
 export interface UseArcAccountSnapshotState {
@@ -17,18 +17,29 @@ export function useArcAccountSnapshot(address: string | null | undefined): UseAr
   const [isLoading, setIsLoading] = useState(false);
 
   const loadSnapshot = useCallback(async () => {
-    if (!address) {
-      setSnapshot(null);
-      setError(null);
-      return;
-    }
-
     setIsLoading(true);
     setError(null);
 
     try {
-      const data = await arcRpcClient.getAccountSnapshot(address);
-      setSnapshot(data);
+      if (address) {
+        // Full snapshot with balance
+        const data = await arcRpcClient.getAccountSnapshot(address);
+        setSnapshot(data);
+      } else {
+        // No address - just get block info for header display
+        const [latestBlock, chainId] = await Promise.all([
+          arcRpcClient.getLatestBlock(),
+          arcRpcClient.getChainId(),
+        ]);
+        setSnapshot({
+          address: '',
+          balanceWei: 0n,
+          nonce: 0,
+          chainId,
+          latestBlock,
+          fetchedAt: Date.now(),
+        });
+      }
     } catch (err) {
       console.error('Failed to load Arc account snapshot', err);
       setError(err instanceof Error ? err.message : 'Unexpected error');
@@ -39,11 +50,10 @@ export function useArcAccountSnapshot(address: string | null | undefined): UseAr
 
   useEffect(() => {
     void loadSnapshot();
-    const interval = address ? window.setInterval(loadSnapshot, 15_000) : null;
+    // Always poll for block updates, even without address
+    const interval = window.setInterval(loadSnapshot, 15_000);
     return () => {
-      if (interval) {
-        window.clearInterval(interval);
-      }
+      window.clearInterval(interval);
     };
   }, [address, loadSnapshot]);
 
