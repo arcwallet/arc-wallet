@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSession } from '../contexts/SessionContext';
 import { WaveBackground } from '../components/WaveBackground';
 import arcLogo from '../assets/arclogo.png';
@@ -6,18 +6,10 @@ import { Footer } from '../components/Footer';
 import { passkeyClient } from '../services/passkeyClient';
 import { createAuthenticationCredential } from '../utils/webauthn';
 import OtpInput from '../components/OtpInput';
-import { W3SSdk } from '@circle-fin/w3s-pw-web-sdk';
 
 const API_BASE = ((import.meta as any).env.VITE_PASSKEY_API_URL || 'https://arcwallet-backend.onrender.com').replace(/\/$/, '');
-const CIRCLE_APP_ID = (import.meta as any).env.VITE_CIRCLE_APP_ID || '';
 
 type LoginStep = 'email' | 'otp' | 'passkey' | 'verifying';
-
-interface OtpTokens {
-  deviceToken: string;
-  deviceEncryptionKey: string;
-  otpToken: string;
-}
 
 const LoginPage: React.FC = () => {
   const { refresh } = useSession();
@@ -28,35 +20,6 @@ const LoginPage: React.FC = () => {
   const [cooldown, setCooldown] = useState(0);
   const [message, setMessage] = useState<string | null>(null);
   const [messageType, setMessageType] = useState<'success' | 'error' | 'info'>('info');
-
-  // Circle SDK state
-  const sdkRef = useRef<W3SSdk | null>(null);
-  const [deviceId, setDeviceId] = useState<string | null>(null);
-  const [otpTokens, setOtpTokens] = useState<OtpTokens | null>(null);
-  const [sdkReady, setSdkReady] = useState(false);
-
-  // Initialize Circle SDK on mount
-  useEffect(() => {
-    const initSdk = async () => {
-      try {
-        console.log('[LoginPage] Initializing Circle SDK...');
-        const sdk = new W3SSdk();
-        sdkRef.current = sdk;
-        const id = await sdk.getDeviceId();
-        setDeviceId(id);
-        setSdkReady(true);
-        console.log('[LoginPage] Circle SDK ready, deviceId:', id);
-      } catch (error) {
-        console.error('[LoginPage] Failed to initialize Circle SDK:', error);
-        // Fallback: generate a random device ID
-        const fallbackId = crypto.randomUUID();
-        setDeviceId(fallbackId);
-        setSdkReady(true);
-        console.log('[LoginPage] Using fallback deviceId:', fallbackId);
-      }
-    };
-    initSdk();
-  }, []);
 
   // Cooldown timer
   useEffect(() => {
@@ -69,7 +32,7 @@ const LoginPage: React.FC = () => {
 
   // Auto-submit OTP when 6 digits entered
   useEffect(() => {
-    if (otpCode.length === 6 && step === 'otp' && !submitting && otpTokens) {
+    if (otpCode.length === 6 && step === 'otp' && !submitting) {
       handleVerifyOtp();
     }
   }, [otpCode]);
@@ -107,7 +70,7 @@ const LoginPage: React.FC = () => {
 
   const handleEmailSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!email || submitting || cooldown > 0 || !deviceId) return;
+    if (!email || submitting || cooldown > 0) return;
 
     setSubmitting(true);
     setMessage(null);
@@ -129,27 +92,18 @@ const LoginPage: React.FC = () => {
         showMessage('Sending verification code...', 'info');
       }
 
-      // Request OTP via Circle API
+      // Request OTP via SendGrid
       const response = await fetch(`${API_BASE}/api/circle/otp/request`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ email, deviceId }),
+        body: JSON.stringify({ email }),
       });
 
       const data = await response.json();
 
       if (!response.ok || !data.success) {
         throw new Error(data.error || 'Failed to send verification code');
-      }
-
-      // Store tokens for OTP verification
-      if (data.data) {
-        setOtpTokens({
-          deviceToken: data.data.deviceToken,
-          deviceEncryptionKey: data.data.deviceEncryptionKey,
-          otpToken: data.data.otpToken,
-        });
       }
 
       setStep('otp');
@@ -176,62 +130,7 @@ const LoginPage: React.FC = () => {
     setStep('verifying');
 
     try {
-      // Try SDK verification first if we have tokens
-      if (otpTokens && sdkRef.current && CIRCLE_APP_ID) {
-        try {
-          const sdk = new W3SSdk({
-            appSettings: { appId: CIRCLE_APP_ID },
-          });
-
-          const verifyResult = await new Promise<{
-            success: boolean;
-            userToken?: string;
-            error?: string;
-          }>((resolve) => {
-            sdk.verifyOTP(
-              otpTokens.deviceToken,
-              otpTokens.deviceEncryptionKey,
-              otpTokens.otpToken,
-              otpCode,
-              (error: any, result: any) => {
-                if (error) {
-                  resolve({ success: false, error: error.message || 'Invalid code' });
-                } else {
-                  resolve({
-                    success: true,
-                    userToken: result?.userToken,
-                  });
-                }
-              }
-            );
-          });
-
-          if (verifyResult.success) {
-            // Create session on backend
-            const sessionResponse = await fetch(`${API_BASE}/api/circle/session`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              credentials: 'include',
-              body: JSON.stringify({
-                email,
-                userToken: verifyResult.userToken,
-              }),
-            });
-
-            const sessionData = await sessionResponse.json();
-
-            if (sessionResponse.ok && sessionData.success) {
-              showMessage('Email verified successfully!', 'success');
-              await refresh();
-              return;
-            }
-          }
-        } catch (sdkError) {
-          console.warn('[LoginPage] SDK verify failed, trying backend:', sdkError);
-        }
-      }
-
-      // Fallback: verify via backend
+      // Verify OTP via backend
       const response = await fetch(`${API_BASE}/api/circle/otp/verify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -262,7 +161,7 @@ const LoginPage: React.FC = () => {
   };
 
   const handleResendOtp = async () => {
-    if (cooldown > 0 || submitting || !deviceId) return;
+    if (cooldown > 0 || submitting) return;
 
     setSubmitting(true);
     try {
@@ -270,22 +169,13 @@ const LoginPage: React.FC = () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ email, deviceId }),
+        body: JSON.stringify({ email }),
       });
 
       const data = await response.json();
 
       if (!response.ok || !data.success) {
         throw new Error(data.error || 'Failed to resend code');
-      }
-
-      // Update tokens if provided
-      if (data.data) {
-        setOtpTokens({
-          deviceToken: data.data.deviceToken,
-          deviceEncryptionKey: data.data.deviceEncryptionKey,
-          otpToken: data.data.otpToken,
-        });
       }
 
       setCooldown(60);
@@ -303,7 +193,6 @@ const LoginPage: React.FC = () => {
   const handleBackToEmail = () => {
     setStep('email');
     setOtpCode('');
-    setOtpTokens(null);
     setMessage(null);
     setCooldown(0);
   };
@@ -327,7 +216,7 @@ const LoginPage: React.FC = () => {
 
       <button
         type="submit"
-        disabled={submitting || cooldown > 0 || !sdkReady}
+        disabled={submitting || cooldown > 0}
         className="w-full bg-slate-200 hover:bg-white text-slate-900 font-medium text-lg py-3.5 rounded-lg transition-all duration-200 shadow-[0_0_20px_rgba(255,255,255,0.1)] hover:shadow-[0_0_30px_rgba(255,255,255,0.2)] disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center"
       >
         {submitting ? (
@@ -338,8 +227,6 @@ const LoginPage: React.FC = () => {
             </svg>
             Checking...
           </span>
-        ) : !sdkReady ? (
-          'Initializing...'
         ) : cooldown > 0 ? (
           `Retry in ${cooldown}s`
         ) : (
