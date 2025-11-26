@@ -145,9 +145,10 @@ export const PasskeyAccountProvider: React.FC<PasskeyAccountProviderProps> = ({ 
 
     setIsConnecting(true);
     try {
-      console.log('[PasskeyAccount] Connecting with existing passkey...');
+      console.log('[PasskeyAccount] Connecting with existing passkey...', { email: currentEmail });
 
-      const result = await manager.connect();
+      // Pass email to find user's specific passkeys
+      const result = await manager.connect(currentEmail || undefined);
 
       setAddress(result.address);
       setCredential(result.credential);

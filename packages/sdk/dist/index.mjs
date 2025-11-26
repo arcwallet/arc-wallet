@@ -1,9 +1,9 @@
 var re = Object.defineProperty;
 var ae = (r, e, t) => e in r ? re(r, e, { enumerable: !0, configurable: !0, writable: !0, value: t }) : r[e] = t;
 var h = (r, e, t) => ae(r, typeof e != "symbol" ? e + "" : e, t);
-import { Wallet as K, parseUnits as se, Contract as S, keccak256 as A, getBytes as D, formatUnits as ie, AbiCoder as Y, Interface as U, toBeHex as v, JsonRpcProvider as X } from "ethers";
+import { Wallet as K, parseUnits as se, Contract as S, keccak256 as b, getBytes as D, formatUnits as ie, AbiCoder as Y, Interface as U, toBeHex as v, JsonRpcProvider as X } from "ethers";
 import { set as N, get as P, del as oe, clear as ce } from "idb-keyval";
-function E(r) {
+function C(r) {
   const e = new Uint8Array(r);
   let t = "";
   for (const a of e)
@@ -205,23 +205,23 @@ async function te(r) {
   if (typeof d.getPublicKey == "function")
     try {
       const y = d.getPublicKey();
-      y !== null && (f = E(y));
+      y !== null && (f = C(y));
     } catch (y) {
       _("getPublicKey()", y);
     }
   let p;
   if (typeof d.getAuthenticatorData == "function")
     try {
-      p = E(d.getAuthenticatorData());
+      p = C(d.getAuthenticatorData());
     } catch (y) {
       _("getAuthenticatorData()", y);
     }
   return {
     id: i,
-    rawId: E(c),
+    rawId: C(c),
     response: {
-      attestationObject: E(d.attestationObject),
-      clientDataJSON: E(d.clientDataJSON),
+      attestationObject: C(d.attestationObject),
+      clientDataJSON: C(d.clientDataJSON),
       transports: u,
       publicKeyAlgorithm: g,
       publicKey: f,
@@ -317,13 +317,13 @@ async function G(r) {
     throw new Error("Authentication was not completed");
   const { id: d, rawId: l, response: u, type: g } = c;
   let f;
-  return u.userHandle && (f = E(u.userHandle)), {
+  return u.userHandle && (f = C(u.userHandle)), {
     id: d,
-    rawId: E(l),
+    rawId: C(l),
     response: {
-      authenticatorData: E(u.authenticatorData),
-      clientDataJSON: E(u.clientDataJSON),
-      signature: E(u.signature),
+      authenticatorData: C(u.authenticatorData),
+      clientDataJSON: C(u.clientDataJSON),
+      signature: C(u.signature),
       userHandle: f
     },
     type: g,
@@ -1783,7 +1783,7 @@ class Me {
    * Extract message hash from transaction receipt
    */
   extractMessageHash(e) {
-    const t = A(
+    const t = b(
       D(
         "MessageSent(bytes)"
       )
@@ -1791,7 +1791,7 @@ class Me {
     if (!n)
       throw new Error("MessageSent event not found in transaction");
     const a = n.data;
-    return A(a);
+    return b(a);
   }
   /**
    * Get USDC balance
@@ -1868,13 +1868,13 @@ class Ue {
    * Get counterfactual Smart Account address
    */
   getAccountAddress(e) {
-    const t = A(D(e)), n = A(
+    const t = b(D(e)), n = b(
       O.encode(
         ["address", "address"],
         [this.config.accountImplementation, e]
       )
     );
-    return "0x" + A(
+    return "0x" + b(
       O.encode(
         ["bytes1", "address", "bytes32", "bytes32"],
         ["0xff", this.config.factoryAddress, t, n]
@@ -1926,10 +1926,10 @@ class Ue {
    * Build UserOperation for batch transactions
    */
   async buildBatchUserOperation(e, t, n = !1) {
-    var b;
+    var E;
     const a = this.accountAddress || this.getAccountAddress(e.address);
     this.accountAddress = a;
-    const s = await this.isDeployed(a), i = new U(R), c = t.map((C) => C.to), d = t.map((C) => BigInt(C.value || "0")), l = t.map((C) => C.data || "0x"), u = i.encodeFunctionData("executeBatch", [
+    const s = await this.isDeployed(a), i = new U(R), c = t.map((A) => A.to), d = t.map((A) => BigInt(A.value || "0")), l = t.map((A) => A.data || "0x"), u = i.encodeFunctionData("executeBatch", [
       c,
       d,
       l
@@ -1950,9 +1950,9 @@ class Ue {
       paymasterAndData: "0x",
       signature: "0x"
     };
-    if (n && ((b = this.paymasterConfig) != null && b.enabled)) {
-      const C = await this.getPaymasterData(w);
-      C && (w.paymasterAndData = C.paymasterAndData);
+    if (n && ((E = this.paymasterConfig) != null && E.enabled)) {
+      const A = await this.getPaymasterData(w);
+      A && (w.paymasterAndData = A.paymasterAndData);
     }
     const y = await this.signUserOperation(e, w);
     return w.signature = y, w;
@@ -2008,8 +2008,8 @@ class Ue {
    */
   getUserOpHash(e) {
     var s;
-    const t = this.packUserOp(e), n = A(t), a = ((s = this.provider._network) == null ? void 0 : s.chainId) || 1n;
-    return A(
+    const t = this.packUserOp(e), n = b(t), a = ((s = this.provider._network) == null ? void 0 : s.chainId) || 1n;
+    return b(
       O.encode(
         ["bytes32", "address", "uint256"],
         [n, this.config.entryPoint, a]
@@ -2036,14 +2036,14 @@ class Ue {
       [
         e.sender,
         e.nonce,
-        A(e.initCode === "0x" ? new Uint8Array() : D(e.initCode)),
-        A(e.callData === "0x" ? new Uint8Array() : D(e.callData)),
+        b(e.initCode === "0x" ? new Uint8Array() : D(e.initCode)),
+        b(e.callData === "0x" ? new Uint8Array() : D(e.callData)),
         e.callGasLimit,
         e.verificationGasLimit,
         e.preVerificationGas,
         e.maxFeePerGas,
         e.maxPriorityFeePerGas,
-        A(
+        b(
           e.paymasterAndData === "0x" ? new Uint8Array() : D(e.paymasterAndData)
         )
       ]
@@ -2503,7 +2503,7 @@ class Xe {
    * Create new passkey and get account address
    */
   async createAccount(e, t) {
-    var y, b;
+    var y, E;
     o.info("Creating passkey account", { component: "PasskeyAccountManager", userId: e });
     const n = await fetch(`${this.config.backendUrl}/passkeys/register/start`, {
       method: "POST",
@@ -2521,7 +2521,7 @@ class Xe {
     });
     if (!c.ok)
       throw new Error("Failed to verify credential");
-    const l = (b = (await c.json()).data) == null ? void 0 : b.publicKey;
+    const l = (E = (await c.json()).data) == null ? void 0 : E.publicKey;
     if (!(l != null && l.x) || !(l != null && l.y))
       throw new Error("Server did not return public key coordinates");
     const { x: u, y: g } = l, f = {
@@ -2529,7 +2529,7 @@ class Xe {
       publicKeyX: u,
       publicKeyY: g,
       userId: e
-    }, p = BigInt(A(new TextEncoder().encode(e))), w = await this.factory.getAddress(BigInt(u), BigInt(g), p);
+    }, p = BigInt(b(new TextEncoder().encode(e))), w = await this.factory.getAddress(BigInt(u), BigInt(g), p);
     return this.currentCredential = f, this.accountAddress = w, this.storeCredential(f), o.info("Passkey account created", {
       component: "PasskeyAccountManager",
       address: w,
@@ -2538,46 +2538,47 @@ class Xe {
   }
   /**
    * Connect with existing passkey
+   * @param username Optional username/email to find specific credentials
    */
-  async connect() {
-    var u, g, f, p, w, y;
-    o.info("Connecting with existing passkey", { component: "PasskeyAccountManager" });
-    const e = await fetch(`${this.config.backendUrl}/passkeys/auth/start`, {
+  async connect(e) {
+    var g, f, p, w, y, E;
+    o.info("Connecting with existing passkey", { component: "PasskeyAccountManager", username: e });
+    const t = await fetch(`${this.config.backendUrl}/passkeys/auth/start`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body: JSON.stringify({})
+      body: JSON.stringify({ username: e })
     });
-    if (!e.ok)
+    if (!t.ok)
       throw new Error("Failed to get authentication options");
-    const t = await e.json(), n = ((u = t.data) == null ? void 0 : u.options) || t, a = await G({ optionsJSON: n }), s = await fetch(`${this.config.backendUrl}/passkeys/auth/finish`, {
+    const n = await t.json(), a = ((g = n.data) == null ? void 0 : g.options) || n, s = await G({ optionsJSON: a }), i = await fetch(`${this.config.backendUrl}/passkeys/auth/finish`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body: JSON.stringify({ credential: a })
+      body: JSON.stringify({ credential: s })
     });
-    if (!s.ok)
+    if (!i.ok)
       throw new Error("Failed to verify authentication");
-    const i = await s.json(), c = (g = i.data) == null ? void 0 : g.publicKey, d = ((p = (f = i.data) == null ? void 0 : f.user) == null ? void 0 : p.username) || ((y = (w = i.data) == null ? void 0 : w.user) == null ? void 0 : y.id);
-    if (!(c != null && c.x) || !(c != null && c.y)) {
-      const b = this.loadCredential(a.id);
-      if (!b)
+    const c = await i.json(), d = (f = c.data) == null ? void 0 : f.publicKey, l = ((w = (p = c.data) == null ? void 0 : p.user) == null ? void 0 : w.username) || ((E = (y = c.data) == null ? void 0 : y.user) == null ? void 0 : E.id);
+    if (!(d != null && d.x) || !(d != null && d.y)) {
+      const A = this.loadCredential(s.id);
+      if (!A)
         throw new Error("Credential not found. Server did not return public key coordinates.");
-      this.currentCredential = b;
+      this.currentCredential = A;
     } else {
-      const b = {
-        credentialId: a.id,
-        publicKeyX: c.x,
-        publicKeyY: c.y,
-        userId: d
+      const A = {
+        credentialId: s.id,
+        publicKeyX: d.x,
+        publicKeyY: d.y,
+        userId: l
       };
-      this.currentCredential = b, this.storeCredential(b);
+      this.currentCredential = A, this.storeCredential(A);
     }
-    const l = BigInt(A(new TextEncoder().encode(this.currentCredential.userId)));
+    const u = BigInt(b(new TextEncoder().encode(this.currentCredential.userId)));
     return this.accountAddress = await this.factory.getAddress(
       BigInt(this.currentCredential.publicKeyX),
       BigInt(this.currentCredential.publicKeyY),
-      l
+      u
     ), o.info("Connected with passkey", {
       component: "PasskeyAccountManager",
       address: this.accountAddress
@@ -2641,7 +2642,7 @@ class Xe {
    */
   getInitCode() {
     if (!this.currentCredential) throw new Error("No credential connected");
-    const e = BigInt(A(new TextEncoder().encode(this.currentCredential.userId))), t = this.factory.interface.encodeFunctionData("createAccount", [
+    const e = BigInt(b(new TextEncoder().encode(this.currentCredential.userId))), t = this.factory.interface.encodeFunctionData("createAccount", [
       BigInt(this.currentCredential.publicKeyX),
       BigInt(this.currentCredential.publicKeyY),
       e

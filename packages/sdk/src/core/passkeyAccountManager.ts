@@ -173,16 +173,18 @@ export class PasskeyAccountManager {
 
   /**
    * Connect with existing passkey
+   * @param username Optional username/email to find specific credentials
    */
-  async connect(): Promise<{ address: string; credential: PasskeyCredential }> {
-    logger.info('Connecting with existing passkey', { component: 'PasskeyAccountManager' });
+  async connect(username?: string): Promise<{ address: string; credential: PasskeyCredential }> {
+    logger.info('Connecting with existing passkey', { component: 'PasskeyAccountManager', username });
 
     // 1. Get authentication options from backend
+    // Send username if provided to get user's specific credentials
     const optionsResponse = await fetch(`${this.config.backendUrl}/passkeys/auth/start`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({}),
+      body: JSON.stringify({ username }),
     });
 
     if (!optionsResponse.ok) {
