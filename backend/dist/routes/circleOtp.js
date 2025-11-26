@@ -1,15 +1,16 @@
 /**
- * Circle Email OTP Routes
- * Backend proxy for Circle's email OTP authentication
+ * Email OTP Routes
+ * Simple email-based OTP authentication using nodemailer
  */
 import { Router } from 'express';
 import crypto from 'crypto';
+import nodemailer from 'nodemailer';
 import { MagicUserStore } from '../magicLink/UserStore.js';
 import { rateLimitMiddleware } from '../middleware/security.js';
 import path from 'path';
-const CIRCLE_API_BASE = 'https://api.circle.com/v1/w3s';
 const SESSION_COOKIE_NAME = 'arcwallet_session';
 const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
+const OTP_EXPIRY_MS = 10 * 60 * 1000; // 10 minutes
 const COOKIE_BASE_OPTIONS = (isProd) => ({
     httpOnly: true,
     sameSite: (isProd ? 'none' : 'lax'),
@@ -24,13 +25,16 @@ const sanitizeEmail = (email) => {
     const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/u;
     return regex.test(trimmed) ? trimmed : null;
 };
-// OTP storage (in-memory, production should use Redis)
+// Generate 6-digit OTP
+const generateOtp = () => {
+    return Math.floor(100000 + Math.random() * 900000).toString();
+};
 const pendingOtps = new Map();
 // Cleanup old OTPs every 5 minutes
 setInterval(() => {
     const now = Date.now();
     for (const [key, value] of pendingOtps.entries()) {
-        if (now - value.createdAt > 10 * 60 * 1000) { // 10 minutes expiry
+        if (now - value.createdAt > OTP_EXPIRY_MS) {
             pendingOtps.delete(key);
         }
     }
@@ -38,13 +42,88 @@ setInterval(() => {
 export const createCircleOtpRouter = (config, db, sessionStore) => {
     const router = Router();
     const userStore = new MagicUserStore(path.join(process.cwd(), 'data'));
-    const circleApiKey = process.env.CIRCLE_API_KEY;
-    if (!circleApiKey) {
-        console.warn('[CircleOTP] CIRCLE_API_KEY not configured, OTP routes will fail');
+    // Create nodemailer transporter
+    const smtpHost = process.env.SMTP_HOST;
+    const smtpUser = process.env.SMTP_USER;
+    const smtpPass = process.env.SMTP_PASS;
+    const fromAddress = process.env.EMAIL_FROM_ADDRESS || smtpUser;
+    const fromName = process.env.EMAIL_FROM_NAME || 'Arc Wallet';
+    const hasSmtp = Boolean(smtpHost && smtpUser && smtpPass);
+    let transporter = null;
+    if (hasSmtp) {
+        transporter = nodemailer.createTransport({
+            host: smtpHost,
+            port: parseInt(process.env.SMTP_PORT || '587'),
+            secure: false,
+            auth: {
+                user: smtpUser,
+                pass: smtpPass,
+            },
+        });
+        transporter.verify((error) => {
+            if (error) {
+                console.error('[OTP] SMTP connection failed:', error.message);
+            }
+            else {
+                console.log('[OTP] SMTP connection verified successfully');
+            }
+        });
     }
-    const requireSession = (req) => {
-        const sessionId = req.cookies?.[SESSION_COOKIE_NAME];
-        return sessionStore.get(sessionId);
+    else {
+        console.warn('[OTP] SMTP not configured, OTP codes will be logged to console');
+    }
+    // Send OTP email
+    const sendOtpEmail = async (email, code) => {
+        if (!transporter || !hasSmtp) {
+            console.log(`📧 [OTP Preview] Code for ${email}: ${code}`);
+            return true;
+        }
+        try {
+            await transporter.sendMail({
+                from: { name: fromName, address: fromAddress },
+                to: email,
+                subject: 'Your Arc Wallet verification code',
+                text: `Your verification code is: ${code}\n\nThis code expires in 10 minutes.\n\nIf you didn't request this code, please ignore this email.`,
+                html: `
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          </head>
+          <body style="margin:0;padding:0;background-color:#f4f4f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+            <table width="100%" style="background-color:#f4f4f7;padding:40px 20px;">
+              <tr>
+                <td align="center">
+                  <table width="100%" style="max-width:400px;background:#ffffff;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.05);">
+                    <tr>
+                      <td style="padding:32px;text-align:center;">
+                        <h1 style="margin:0 0 8px;font-size:24px;color:#1a1a1a;">Arc Wallet</h1>
+                        <p style="margin:0 0 24px;color:#666;font-size:14px;">Your verification code</p>
+                        <div style="background:#f8f9fa;border-radius:8px;padding:20px;margin:0 0 24px;">
+                          <span style="font-size:32px;font-weight:700;letter-spacing:8px;color:#1a1a1a;">${code}</span>
+                        </div>
+                        <p style="margin:0;color:#888;font-size:13px;">
+                          This code expires in 10 minutes.<br>
+                          If you didn't request this, ignore this email.
+                        </p>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+          </body>
+          </html>
+        `,
+            });
+            console.log(`[OTP] Code sent to ${email}`);
+            return true;
+        }
+        catch (error) {
+            console.error('[OTP] Failed to send email:', error);
+            return false;
+        }
     };
     /**
      * Request OTP - Send verification code to email
@@ -55,37 +134,31 @@ export const createCircleOtpRouter = (config, db, sessionStore) => {
         if (!email) {
             return res.status(400).json({ success: false, error: 'Please provide a valid email address.' });
         }
-        if (!circleApiKey) {
-            return res.status(500).json({ success: false, error: 'Circle API not configured' });
-        }
         try {
-            const response = await fetch(`${CIRCLE_API_BASE}/users/email/token`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${circleApiKey}`,
-                },
-                body: JSON.stringify({ email }),
+            const code = generateOtp();
+            const otpKey = crypto.createHash('sha256').update(email).digest('hex');
+            // Store OTP
+            pendingOtps.set(otpKey, {
+                email,
+                code,
+                createdAt: Date.now(),
+                attempts: 0,
             });
-            const data = await response.json();
-            if (!response.ok) {
-                console.error('[CircleOTP] Request failed:', data);
-                return res.status(response.status).json({
+            // Send email
+            const sent = await sendOtpEmail(email, code);
+            if (!sent) {
+                return res.status(500).json({
                     success: false,
-                    error: data.message || data.error || 'Failed to send OTP',
+                    error: 'Failed to send verification code. Please try again.',
                 });
             }
-            // Store pending OTP request
-            const otpKey = crypto.createHash('sha256').update(email).digest('hex');
-            pendingOtps.set(otpKey, { email, createdAt: Date.now(), attempts: 0 });
-            console.log(`[CircleOTP] OTP requested for ${email}`);
             res.json({
                 success: true,
                 message: 'Verification code sent to your email',
             });
         }
         catch (error) {
-            console.error('[CircleOTP] Request error:', error);
+            console.error('[OTP] Request error:', error);
             res.status(500).json({
                 success: false,
                 error: 'Failed to send verification code. Please try again.',
@@ -101,34 +174,31 @@ export const createCircleOtpRouter = (config, db, sessionStore) => {
         if (!email) {
             return res.status(400).json({ success: false, error: 'Please provide a valid email address.' });
         }
-        if (!circleApiKey) {
-            return res.status(500).json({ success: false, error: 'Circle API not configured' });
-        }
         try {
-            const response = await fetch(`${CIRCLE_API_BASE}/users/email/resendOTP`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${circleApiKey}`,
-                },
-                body: JSON.stringify({ email }),
+            const code = generateOtp();
+            const otpKey = crypto.createHash('sha256').update(email).digest('hex');
+            // Update or create OTP
+            pendingOtps.set(otpKey, {
+                email,
+                code,
+                createdAt: Date.now(),
+                attempts: 0,
             });
-            const data = await response.json();
-            if (!response.ok) {
-                console.error('[CircleOTP] Resend failed:', data);
-                return res.status(response.status).json({
+            // Send email
+            const sent = await sendOtpEmail(email, code);
+            if (!sent) {
+                return res.status(500).json({
                     success: false,
-                    error: data.message || data.error || 'Failed to resend OTP',
+                    error: 'Failed to resend verification code. Please try again.',
                 });
             }
-            console.log(`[CircleOTP] OTP resent for ${email}`);
             res.json({
                 success: true,
                 message: 'New verification code sent to your email',
             });
         }
         catch (error) {
-            console.error('[CircleOTP] Resend error:', error);
+            console.error('[OTP] Resend error:', error);
             res.status(500).json({
                 success: false,
                 error: 'Failed to resend verification code. Please try again.',
@@ -148,56 +218,46 @@ export const createCircleOtpRouter = (config, db, sessionStore) => {
         if (!otpCode || otpCode.length !== 6) {
             return res.status(400).json({ success: false, error: 'Please provide a valid 6-digit code.' });
         }
-        if (!circleApiKey) {
-            return res.status(500).json({ success: false, error: 'Circle API not configured' });
-        }
-        // Check rate limiting on OTP attempts
         const otpKey = crypto.createHash('sha256').update(email).digest('hex');
         const pending = pendingOtps.get(otpKey);
-        if (pending) {
-            pending.attempts++;
-            if (pending.attempts > 5) {
-                pendingOtps.delete(otpKey);
-                return res.status(429).json({
-                    success: false,
-                    error: 'Too many attempts. Please request a new code.',
-                });
-            }
+        // Check if OTP exists
+        if (!pending) {
+            return res.status(400).json({
+                success: false,
+                error: 'No verification code found. Please request a new code.',
+            });
+        }
+        // Check expiry
+        if (Date.now() - pending.createdAt > OTP_EXPIRY_MS) {
+            pendingOtps.delete(otpKey);
+            return res.status(400).json({
+                success: false,
+                error: 'Verification code expired. Please request a new code.',
+            });
+        }
+        // Check attempts
+        pending.attempts++;
+        if (pending.attempts > 5) {
+            pendingOtps.delete(otpKey);
+            return res.status(429).json({
+                success: false,
+                error: 'Too many attempts. Please request a new code.',
+            });
+        }
+        // Verify code
+        if (pending.code !== otpCode) {
+            return res.status(400).json({
+                success: false,
+                error: 'Invalid verification code. Please try again.',
+            });
         }
         try {
-            // Verify with Circle API
-            const response = await fetch(`${CIRCLE_API_BASE}/users/email/token`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${circleApiKey}`,
-                },
-                body: JSON.stringify({
-                    email,
-                    otpToken: otpCode,
-                }),
-            });
-            const data = await response.json();
-            if (!response.ok) {
-                console.error('[CircleOTP] Verify failed:', data);
-                return res.status(response.status).json({
-                    success: false,
-                    error: data.message || data.error || 'Invalid or expired code',
-                });
-            }
             // OTP verified successfully - create session
             const user = userStore.findOrCreate(email);
             const session = sessionStore.create(user, SESSION_TTL_MS);
-            // Clean up pending OTP
+            // Clean up OTP
             pendingOtps.delete(otpKey);
-            console.log(`[CircleOTP] Verified OTP for ${email}, creating session ${session.id}`);
-            // Store Circle tokens if needed for MPC wallet later
-            const circleTokens = {
-                userToken: data.data?.userToken,
-                encryptionKey: data.data?.encryptionKey,
-                refreshToken: data.data?.refreshToken,
-                userId: data.data?.userId,
-            };
+            console.log(`[OTP] Verified for ${email}, creating session ${session.id}`);
             // Set session cookie
             const cookieOptions = COOKIE_BASE_OPTIONS(config.NODE_ENV === 'production');
             res.cookie(SESSION_COOKIE_NAME, session.id, cookieOptions);
@@ -206,13 +266,11 @@ export const createCircleOtpRouter = (config, db, sessionStore) => {
                 message: 'Email verified successfully',
                 data: {
                     email: session.email,
-                    // Include Circle user info if available
-                    circleUserId: circleTokens.userId,
                 },
             });
         }
         catch (error) {
-            console.error('[CircleOTP] Verify error:', error);
+            console.error('[OTP] Verify error:', error);
             res.status(500).json({
                 success: false,
                 error: 'Verification failed. Please try again.',

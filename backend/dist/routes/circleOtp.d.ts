@@ -1,6 +1,6 @@
 /**
- * Circle Email OTP Routes
- * Backend proxy for Circle's email OTP authentication
+ * Email OTP Routes
+ * Simple email-based OTP authentication using nodemailer
  */
 import { EnvConfig } from '../types/index.js';
 import { MagicSessionStore } from '../magicLink/SessionStore.js';
