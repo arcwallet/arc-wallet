@@ -1,14 +1,23 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSession } from '../contexts/SessionContext';
 import { WaveBackground } from '../components/WaveBackground';
 import arcLogo from '../assets/arclogo.png';
 import { Footer } from '../components/Footer';
 import { passkeyClient } from '../services/passkeyClient';
 import { createAuthenticationCredential } from '../utils/webauthn';
-import { sessionApi } from '../services/sessionApi';
 import OtpInput from '../components/OtpInput';
+import { W3SSdk } from '@circle-fin/w3s-pw-web-sdk';
 
-type LoginStep = 'email' | 'otp' | 'passkey';
+const API_BASE = ((import.meta as any).env.VITE_PASSKEY_API_URL || 'https://arcwallet-backend.onrender.com').replace(/\/$/, '');
+const CIRCLE_APP_ID = (import.meta as any).env.VITE_CIRCLE_APP_ID || '';
+
+type LoginStep = 'email' | 'otp' | 'passkey' | 'verifying';
+
+interface OtpTokens {
+  deviceToken: string;
+  deviceEncryptionKey: string;
+  otpToken: string;
+}
 
 const LoginPage: React.FC = () => {
   const { refresh } = useSession();
@@ -19,6 +28,27 @@ const LoginPage: React.FC = () => {
   const [cooldown, setCooldown] = useState(0);
   const [message, setMessage] = useState<string | null>(null);
   const [messageType, setMessageType] = useState<'success' | 'error' | 'info'>('info');
+
+  // Circle SDK state
+  const sdkRef = useRef<W3SSdk | null>(null);
+  const [deviceId, setDeviceId] = useState<string | null>(null);
+  const [otpTokens, setOtpTokens] = useState<OtpTokens | null>(null);
+
+  // Initialize Circle SDK on mount
+  useEffect(() => {
+    const initSdk = async () => {
+      try {
+        const sdk = new W3SSdk();
+        sdkRef.current = sdk;
+        const id = await sdk.getDeviceId();
+        setDeviceId(id);
+        console.log('[LoginPage] Circle SDK initialized, deviceId:', id);
+      } catch (error) {
+        console.error('[LoginPage] Failed to initialize Circle SDK:', error);
+      }
+    };
+    initSdk();
+  }, []);
 
   // Cooldown timer
   useEffect(() => {
@@ -31,7 +61,7 @@ const LoginPage: React.FC = () => {
 
   // Auto-submit OTP when 6 digits entered
   useEffect(() => {
-    if (otpCode.length === 6 && step === 'otp' && !submitting) {
+    if (otpCode.length === 6 && step === 'otp' && !submitting && otpTokens) {
       handleVerifyOtp();
     }
   }, [otpCode]);
@@ -88,11 +118,34 @@ const LoginPage: React.FC = () => {
           return; // Auth successful
         }
         // Passkey failed, fall back to OTP
-        showMessage('Passkey authentication cancelled. Sending verification code...', 'info');
+        showMessage('Sending verification code...', 'info');
       }
 
-      // Request OTP
-      await sessionApi.requestOtp(email);
+      // Request OTP via Circle API
+      if (!deviceId) {
+        throw new Error('Device not initialized. Please refresh the page.');
+      }
+
+      const response = await fetch(`${API_BASE}/api/circle/otp/request`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ email, deviceId }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Failed to send verification code');
+      }
+
+      // Store tokens for OTP verification
+      setOtpTokens({
+        deviceToken: data.data.deviceToken,
+        deviceEncryptionKey: data.data.deviceEncryptionKey,
+        otpToken: data.data.otpToken,
+      });
+
       setStep('otp');
       setCooldown(60);
       showMessage('Verification code sent to your email', 'success');
@@ -110,16 +163,68 @@ const LoginPage: React.FC = () => {
   };
 
   const handleVerifyOtp = async () => {
-    if (otpCode.length !== 6 || submitting) return;
+    if (otpCode.length !== 6 || submitting || !otpTokens || !sdkRef.current) return;
 
     setSubmitting(true);
     setMessage(null);
+    setStep('verifying');
 
     try {
-      await sessionApi.verifyOtp(email, otpCode);
+      // Verify OTP using Circle SDK
+      const sdk = new W3SSdk({
+        appSettings: { appId: CIRCLE_APP_ID },
+      });
+
+      const verifyResult = await new Promise<{
+        success: boolean;
+        userToken?: string;
+        encryptionKey?: string;
+        error?: string;
+      }>((resolve) => {
+        sdk.verifyOTP(
+          otpTokens.deviceToken,
+          otpTokens.deviceEncryptionKey,
+          otpTokens.otpToken,
+          otpCode,
+          (error: any, result: any) => {
+            if (error) {
+              resolve({ success: false, error: error.message || 'Invalid code' });
+            } else {
+              resolve({
+                success: true,
+                userToken: result?.userToken,
+                encryptionKey: result?.encryptionKey,
+              });
+            }
+          }
+        );
+      });
+
+      if (!verifyResult.success) {
+        throw new Error(verifyResult.error || 'Invalid verification code');
+      }
+
+      // Create session on backend (hybrid mode - no Circle wallet)
+      const sessionResponse = await fetch(`${API_BASE}/api/circle/session`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          email,
+          userToken: verifyResult.userToken,
+        }),
+      });
+
+      const sessionData = await sessionResponse.json();
+
+      if (!sessionResponse.ok || !sessionData.success) {
+        throw new Error(sessionData.error || 'Failed to create session');
+      }
+
       showMessage('Email verified successfully!', 'success');
       await refresh();
       // Session will update and redirect to dashboard
+
     } catch (error) {
       console.error('[LoginPage] OTP verification failed:', error);
       showMessage(
@@ -127,17 +232,37 @@ const LoginPage: React.FC = () => {
         'error'
       );
       setOtpCode('');
+      setStep('otp');
     } finally {
       setSubmitting(false);
     }
   };
 
   const handleResendOtp = async () => {
-    if (cooldown > 0 || submitting) return;
+    if (cooldown > 0 || submitting || !deviceId) return;
 
     setSubmitting(true);
     try {
-      await sessionApi.resendOtp(email);
+      const response = await fetch(`${API_BASE}/api/circle/otp/resend`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ email, deviceId }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Failed to resend code');
+      }
+
+      // Update tokens
+      setOtpTokens({
+        deviceToken: data.data.deviceToken,
+        deviceEncryptionKey: data.data.deviceEncryptionKey,
+        otpToken: data.data.otpToken,
+      });
+
       setCooldown(60);
       showMessage('New verification code sent', 'success');
     } catch (error) {
@@ -153,6 +278,7 @@ const LoginPage: React.FC = () => {
   const handleBackToEmail = () => {
     setStep('email');
     setOtpCode('');
+    setOtpTokens(null);
     setMessage(null);
     setCooldown(0);
   };
@@ -176,7 +302,7 @@ const LoginPage: React.FC = () => {
 
       <button
         type="submit"
-        disabled={submitting || cooldown > 0}
+        disabled={submitting || cooldown > 0 || !deviceId}
         className="w-full bg-slate-200 hover:bg-white text-slate-900 font-medium text-lg py-3.5 rounded-lg transition-all duration-200 shadow-[0_0_20px_rgba(255,255,255,0.1)] hover:shadow-[0_0_30px_rgba(255,255,255,0.2)] disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center"
       >
         {submitting ? (
@@ -187,10 +313,12 @@ const LoginPage: React.FC = () => {
             </svg>
             Checking...
           </span>
+        ) : !deviceId ? (
+          'Initializing...'
         ) : cooldown > 0 ? (
           `Retry in ${cooldown}s`
         ) : (
-          "Continue"
+          'Continue'
         )}
       </button>
     </form>
@@ -224,7 +352,7 @@ const LoginPage: React.FC = () => {
             Verifying...
           </span>
         ) : (
-          "Verify"
+          'Verify'
         )}
       </button>
 
@@ -265,6 +393,20 @@ const LoginPage: React.FC = () => {
     </div>
   );
 
+  const renderVerifyingStep = () => (
+    <div className="flex flex-col items-center gap-6">
+      <div className="w-16 h-16 rounded-full bg-blue-500/20 flex items-center justify-center">
+        <svg className="animate-spin h-8 w-8 text-blue-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+      </div>
+      <p className="text-slate-300 text-center">
+        Verifying your code...
+      </p>
+    </div>
+  );
+
   return (
     <div className="fixed inset-0 w-full h-full flex flex-col items-center justify-center overflow-hidden bg-transparent">
       {/* Background Pattern */}
@@ -280,15 +422,16 @@ const LoginPage: React.FC = () => {
       {/* Login Container */}
       <div className="relative z-20 w-full max-w-md px-4 animate-in fade-in zoom-in duration-700">
         <h1 className="text-5xl font-light text-center mb-12 text-slate-100 tracking-tight drop-shadow-lg">
-          {step === 'otp' ? 'Verify email' : 'Sign in'}
+          {step === 'otp' || step === 'verifying' ? 'Verify email' : 'Sign in'}
         </h1>
 
         {step === 'email' && renderEmailStep()}
         {step === 'otp' && renderOtpStep()}
         {step === 'passkey' && renderPasskeyStep()}
+        {step === 'verifying' && renderVerifyingStep()}
 
         {/* Status Messages (not for OTP step - handled by OtpInput) */}
-        {message && step !== 'otp' && (
+        {message && step !== 'otp' && step !== 'verifying' && (
           <div className={`mt-4 p-3 rounded-lg backdrop-blur-sm border text-center ${
             messageType === 'error'
               ? 'bg-red-900/20 border-red-500/50 text-red-200'

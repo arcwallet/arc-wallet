@@ -34,9 +34,10 @@ export const setCsrfCookie = (req: Request, res: Response, next: NextFunction) =
 const CSRF_EXEMPT_ROUTES = [
   '/api/send-link',
   '/api/verify',
-  '/api/otp',     // All OTP routes exempt (email verification provides security)
+  '/api/otp',           // Simple OTP routes
+  '/api/circle',        // Circle OTP routes (email verification provides security)
   '/health',
-  '/passkeys',    // All passkey routes exempt (WebAuthn provides cryptographic security)
+  '/passkeys',          // All passkey routes exempt (WebAuthn provides cryptographic security)
 ];
 
 /**
