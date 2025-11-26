@@ -20,8 +20,7 @@ import WalletSetup from './components/WalletSetup';
 // Smart Contract Passkey Wallet Experience
 // NEW ARCHITECTURE: Passkey IS the signing key, no private key stored
 const PasskeyWalletExperience: React.FC = () => {
-  const { isConnected, hasAccount } = usePasskeyAccount();
-  const { logout: sessionLogout } = useSession();
+  const { isConnected } = usePasskeyAccount();
 
   const handleComplete = () => {
     // Wallet created/connected successfully
