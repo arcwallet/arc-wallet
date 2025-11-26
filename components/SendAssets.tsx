@@ -118,8 +118,6 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
   const [smartAccountAvailable, setSmartAccountAvailable] = useState(false);
   const [smartAccountAddress, setSmartAccountAddress] = useState<string | null>(null);
 
-  // Passkey-native Account Mode (P256 signing)
-  const [usePasskeyNative, setUsePasskeyNative] = useState(false);
 
   const balance = useMemo(() => {
     return parseFloat(tokenBalance) || 0;
@@ -706,53 +704,6 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
             {useSmartAccount && (
               <p className="text-xs text-green-400 mt-2">
                 ✓ Transactions will be sponsored by Pimlico Paymaster
-              </p>
-            )}
-          </div>
-        )}
-
-        {/* Passkey-Native Account Toggle */}
-        {hasPasskeyAccount && (
-          <div className="rounded-lg border border-purple-500/30 bg-purple-500/10 p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-semibold text-purple-400">Passkey-Native Account</span>
-                  <span className="text-xs bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded">P256</span>
-                </div>
-                <p className="text-xs text-purple-300/70 mt-1">
-                  {passkeyAddress ? `${passkeyAddress.slice(0, 8)}...${passkeyAddress.slice(-6)}` : 'Not connected'}
-                </p>
-              </div>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  className="sr-only peer"
-                  checked={usePasskeyNative}
-                  onChange={(e) => setUsePasskeyNative(e.target.checked)}
-                  disabled={!passkeyConnected}
-                />
-                <div className="w-11 h-6 bg-slate-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600 peer-disabled:opacity-50"></div>
-              </label>
-            </div>
-            {!passkeyConnected && (
-              <button
-                onClick={async () => {
-                  try {
-                    await connectPasskey();
-                  } catch (err) {
-                    console.error('Passkey connect failed:', err);
-                  }
-                }}
-                disabled={passkeyConnecting}
-                className="mt-2 w-full text-xs bg-purple-600 hover:bg-purple-500 text-white py-1.5 px-3 rounded transition-colors disabled:opacity-50"
-              >
-                {passkeyConnecting ? 'Connecting...' : 'Connect Passkey Account'}
-              </button>
-            )}
-            {usePasskeyNative && passkeyConnected && (
-              <p className="text-xs text-green-400 mt-2">
-                ✓ Signing with passkey (no private key stored)
               </p>
             )}
           </div>
