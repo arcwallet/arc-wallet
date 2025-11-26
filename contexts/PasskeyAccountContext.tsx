@@ -90,25 +90,49 @@ export const PasskeyAccountProvider: React.FC<PasskeyAccountProviderProps> = ({ 
   const [address, setAddress] = useState<string | null>(null);
   const [credential, setCredential] = useState<PasskeyAccountCredential | null>(null);
 
-  // Initialize manager on mount
+  // Initialize manager on mount and restore address from localStorage
   useEffect(() => {
-    try {
-      const mgr = initializeManager();
-      setManager(mgr);
-      console.log('[PasskeyAccount] Manager initialized');
+    const initAndRestore = async () => {
+      try {
+        const mgr = initializeManager();
+        setManager(mgr);
+        console.log('[PasskeyAccount] Manager initialized');
 
-      // Check for existing credential in localStorage
-      const storedCredentialId = localStorage.getItem('arcwallet:passkey:current');
-      if (storedCredentialId) {
-        const storedCred = localStorage.getItem(`arcwallet:passkey:${storedCredentialId}`);
-        if (storedCred) {
-          setHasAccount(true);
-          console.log('[PasskeyAccount] Found existing credential');
+        // Check for existing credential in localStorage
+        const storedCredentialId = localStorage.getItem('arcwallet:passkey:current');
+        if (storedCredentialId) {
+          const storedCredStr = localStorage.getItem(`arcwallet:passkey:${storedCredentialId}`);
+          if (storedCredStr) {
+            const storedCred = JSON.parse(storedCredStr);
+            setHasAccount(true);
+            setCredential(storedCred);
+            console.log('[PasskeyAccount] Found existing credential:', storedCred);
+
+            // Restore address from stored credential using factory.getAddress
+            if (storedCred.publicKeyX && storedCred.publicKeyY && storedCred.userId) {
+              try {
+                const { keccak256 } = await import('ethers');
+                const salt = BigInt(keccak256(new TextEncoder().encode(storedCred.userId)));
+                const restoredAddress = await mgr['factory'].getAddress(
+                  BigInt(storedCred.publicKeyX),
+                  BigInt(storedCred.publicKeyY),
+                  salt
+                );
+                setAddress(restoredAddress);
+                setIsConnected(true);
+                console.log('[PasskeyAccount] Restored address from credential:', restoredAddress);
+              } catch (err) {
+                console.error('[PasskeyAccount] Failed to restore address:', err);
+              }
+            }
+          }
         }
+      } catch (error) {
+        console.error('[PasskeyAccount] Failed to initialize manager:', error);
       }
-    } catch (error) {
-      console.error('[PasskeyAccount] Failed to initialize manager:', error);
-    }
+    };
+
+    initAndRestore();
   }, []);
 
   // Create new account with passkey
