@@ -27,9 +27,6 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
     createAccount,
     connect,
     isConnecting,
-    hasAccount,
-    isConnected,
-    address
   } = usePasskeyAccount();
 
   const { currentEmail } = useSession();
@@ -82,8 +79,8 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
         email: currentEmail
       });
 
-      if (hasAccount || userHasServerPasskey) {
-        // User has passkey - connect with existing passkey
+      if (userHasServerPasskey) {
+        // User has passkey on server - connect with existing passkey
         // Smart Contract: Same passkey = Same address (no recovery needed!)
         console.log('[WalletSetup] Connecting with existing passkey...');
         setStatusMessage(`Authenticating ${currentEmail} with passkey...`);
@@ -168,7 +165,7 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
           {/* Header */}
           <div className="text-center space-y-4">
             <h2 className="text-4xl font-light text-slate-100 tracking-tight drop-shadow-lg">
-              {hasAccount || hasServerPasskey ? 'Welcome Back' : 'Create Your Wallet'}
+              {hasServerPasskey ? 'Welcome Back' : 'Create Your Wallet'}
             </h2>
             <p className="text-sm text-slate-400">
               Smart Contract Wallet with Passkey Security
@@ -209,7 +206,7 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                   </svg>
-                  <span>{hasAccount || hasServerPasskey ? 'Connecting...' : 'Creating wallet...'}</span>
+                  <span>{hasServerPasskey ? 'Connecting...' : 'Creating wallet...'}</span>
                 </>
               ) : (
                 <>
@@ -219,7 +216,7 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
                   <span>
                     {!currentEmail
                       ? 'Waiting for email...'
-                      : hasAccount || hasServerPasskey
+                      : hasServerPasskey
                         ? 'Connect with Passkey'
                         : 'Create Wallet with Passkey'}
                   </span>
