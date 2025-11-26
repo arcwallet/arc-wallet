@@ -348,8 +348,8 @@ const LoginPage: React.FC = () => {
             messageType === 'error'
               ? 'bg-red-900/20 border-red-500/50 text-red-200'
               : messageType === 'success'
-                ? 'bg-green-900/20 border-green-500/50 text-green-200'
-                : 'bg-blue-900/20 border-blue-500/50 text-blue-200'
+                ? 'bg-blue-900/20 border-blue-500/50 text-blue-200'
+                : 'bg-slate-900/20 border-slate-500/50 text-slate-200'
           }`}>
             {message}
           </div>
@@ -357,7 +357,7 @@ const LoginPage: React.FC = () => {
 
         {/* Success message for OTP step */}
         {message && step === 'otp' && messageType === 'success' && (
-          <div className="mt-4 p-3 rounded-lg backdrop-blur-sm border text-center bg-green-900/20 border-green-500/50 text-green-200">
+          <div className="mt-4 p-3 rounded-lg backdrop-blur-sm border text-center bg-blue-900/20 border-blue-500/50 text-blue-200">
             {message}
           </div>
         )}
