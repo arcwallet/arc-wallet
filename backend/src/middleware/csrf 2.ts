@@ -13,10 +13,15 @@ export const setCsrfCookie = (req: Request, res: Response, next: NextFunction) =
 
   if (!csrfToken) {
     const newCsrfToken = randomBytes(16).toString('hex');
+
+    // Production: cross-origin support (sameSite='none' requires secure=true and HTTPS)
+    // Development: same-site support (sameSite='lax' allows HTTP)
+    const isProduction = process.env.NODE_ENV === 'production';
+
     res.cookie(CSRF_COOKIE_NAME, newCsrfToken, {
       httpOnly: false,  // Client-side script needs to read this
-      sameSite: 'lax',
-      secure: false,    // Allow HTTP in development
+      sameSite: isProduction ? 'none' : 'lax',  // 'none' for cross-origin in production
+      secure: isProduction,  // true in production (HTTPS required)
       path: '/',
     });
   }
@@ -24,10 +29,15 @@ export const setCsrfCookie = (req: Request, res: Response, next: NextFunction) =
 };
 
 // Routes that don't require CSRF validation (public endpoints)
+// Passkey endpoints are exempt because WebAuthn provides cryptographic security
+// OTP endpoints are exempt because email verification provides security
 const CSRF_EXEMPT_ROUTES = [
   '/api/send-link',
   '/api/verify',
+  '/api/otp',           // Simple OTP routes
+  '/api/circle',        // Circle OTP routes (email verification provides security)
   '/health',
+  '/passkeys',          // All passkey routes exempt (WebAuthn provides cryptographic security)
 ];
 
 /**
