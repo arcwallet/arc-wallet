@@ -25,6 +25,131 @@ const handleResponse = async <T>(response: Response): Promise<T> => {
 };
 
 export const sessionApi = {
+  // Circle OTP Methods
+  async requestOtp(email: string, timeoutMs = 30000, isRetry = false) {
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const csrfToken = getCsrfToken();
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (csrfToken) {
+        headers['X-CSRF-Token'] = csrfToken;
+      }
+      const response = await fetch(resolveUrl('/api/otp/request'), {
+        method: 'POST',
+        credentials: 'include',
+        headers,
+        body: JSON.stringify({ email }),
+        signal: controller.signal,
+      });
+
+      if (response.status === 403 && !isRetry) {
+        const clone = response.clone();
+        try {
+          const errorBody = await clone.json();
+          if (errorBody.code === 'CSRF_VALIDATION_FAILED' || errorBody.error === 'Invalid CSRF token') {
+            await refreshCsrfToken();
+            return sessionApi.requestOtp(email, timeoutMs, true);
+          }
+        } catch (e) {
+          // Ignore JSON parse error
+        }
+      }
+
+      return handleResponse<ApiResponse>(response);
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        throw new Error('Request timed out. Please try again.');
+      }
+      throw new Error(error instanceof Error ? error.message : 'Failed to send verification code.');
+    } finally {
+      window.clearTimeout(timer);
+    }
+  },
+
+  async verifyOtp(email: string, code: string, timeoutMs = 15000, isRetry = false) {
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const csrfToken = getCsrfToken();
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (csrfToken) {
+        headers['X-CSRF-Token'] = csrfToken;
+      }
+      const response = await fetch(resolveUrl('/api/otp/verify'), {
+        method: 'POST',
+        credentials: 'include',
+        headers,
+        body: JSON.stringify({ email, code }),
+        signal: controller.signal,
+      });
+
+      if (response.status === 403 && !isRetry) {
+        const clone = response.clone();
+        try {
+          const errorBody = await clone.json();
+          if (errorBody.code === 'CSRF_VALIDATION_FAILED' || errorBody.error === 'Invalid CSRF token') {
+            await refreshCsrfToken();
+            return sessionApi.verifyOtp(email, code, timeoutMs, true);
+          }
+        } catch (e) {
+          // Ignore JSON parse error
+        }
+      }
+
+      return handleResponse<ApiResponse>(response);
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        throw new Error('Verification timed out. Please try again.');
+      }
+      throw new Error(error instanceof Error ? error.message : 'Verification failed.');
+    } finally {
+      window.clearTimeout(timer);
+    }
+  },
+
+  async resendOtp(email: string, timeoutMs = 30000, isRetry = false) {
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const csrfToken = getCsrfToken();
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (csrfToken) {
+        headers['X-CSRF-Token'] = csrfToken;
+      }
+      const response = await fetch(resolveUrl('/api/otp/resend'), {
+        method: 'POST',
+        credentials: 'include',
+        headers,
+        body: JSON.stringify({ email }),
+        signal: controller.signal,
+      });
+
+      if (response.status === 403 && !isRetry) {
+        const clone = response.clone();
+        try {
+          const errorBody = await clone.json();
+          if (errorBody.code === 'CSRF_VALIDATION_FAILED' || errorBody.error === 'Invalid CSRF token') {
+            await refreshCsrfToken();
+            return sessionApi.resendOtp(email, timeoutMs, true);
+          }
+        } catch (e) {
+          // Ignore JSON parse error
+        }
+      }
+
+      return handleResponse<ApiResponse>(response);
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        throw new Error('Request timed out. Please try again.');
+      }
+      throw new Error(error instanceof Error ? error.message : 'Failed to resend code.');
+    } finally {
+      window.clearTimeout(timer);
+    }
+  },
+
+  // Legacy Magic Link Methods
   async sendLink(email: string, timeoutMs = 30000, isRetry = false) {
     const controller = new AbortController();
     const timer = window.setTimeout(() => controller.abort(), timeoutMs);

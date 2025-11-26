@@ -41,8 +41,7 @@ const PasskeyWalletExperience: React.FC = () => {
 
 
 const RootView: React.FC = () => {
-  const { email, verifyMagicToken } = useSession();
-  const [tokenHandled, setTokenHandled] = useState(false);
+  const { email } = useSession();
   const [currentPath, setCurrentPath] = useState(window.location.pathname);
 
   // Listen for path changes
@@ -51,41 +50,6 @@ const RootView: React.FC = () => {
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
-
-  const verificationStarted = React.useRef(false);
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const token = params.get('token');
-
-    if (!token || tokenHandled || verificationStarted.current) return;
-
-    // Skip magic link verification if we're on recovery page (recovery has its own token handling)
-    // if (currentPath === '/recovery') return;
-
-    verificationStarted.current = true;
-    console.log('[App] Verifying magic link token...');
-
-    verifyMagicToken(token)
-      .then(() => {
-        console.log('[App] Magic link verified successfully');
-      })
-      .catch((error) => {
-        console.error('[App] Magic link verification failed:', error);
-      })
-      .finally(() => {
-        params.delete('token');
-        const next = params.toString();
-        const url = `${window.location.pathname}${next ? `?${next}` : ''}`;
-        window.history.replaceState({}, '', url);
-        setTokenHandled(true);
-      });
-  }, [tokenHandled, verifyMagicToken, currentPath]);
-
-  // Show recovery page if on /recovery path
-  // if (currentPath === '/recovery') {
-  //   return <RecoveryPage />;
-  // }
 
   if (currentPath === '/privacy-policy') {
     return <PrivacyPolicy />;
@@ -96,6 +60,7 @@ const RootView: React.FC = () => {
   }
 
   // Email is required for multi-device support and recovery
+  // User authenticates via Circle Email OTP
   if (!email) {
     return <LoginPage />;
   }

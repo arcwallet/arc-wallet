@@ -7,16 +7,11 @@ interface SessionState {
   walletAddress: string | null;
   userId: string | null;
   loading: boolean;
-  requestStatus: 'idle' | 'success' | 'error';
-  message: string | null;
-  verifyingToken: boolean;
 }
 
 interface SessionContextValue extends SessionState {
-  sendMagicLink: (email: string) => Promise<void>;
   refresh: () => Promise<void>;
   logout: () => Promise<void>;
-  verifyMagicToken: (token: string) => Promise<void>;
   currentEmail: string | null;
 }
 
@@ -28,10 +23,7 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
     hasWallet: false,
     walletAddress: null,
     userId: null,
-    loading: false,
-    requestStatus: 'idle',
-    message: null,
-    verifyingToken: false,
+    loading: true,
   });
 
   const refresh = useCallback(async () => {
@@ -64,59 +56,16 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
     void refresh();
   }, [refresh]);
 
-  const sendMagicLink = useCallback(async (email: string) => {
-    setState((prev) => ({
-      ...prev,
-      requestStatus: 'idle',
-      message: null,
-    }));
-    try {
-      const response = await sessionApi.sendLink(email);
-      setState((prev) => ({
-        ...prev,
-        requestStatus: 'success',
-        message: response?.message ?? 'Magic link sent. Please check your inbox.',
-      }));
-    } catch (error) {
-      setState((prev) => ({
-        ...prev,
-        requestStatus: 'error',
-        message: error instanceof Error ? error.message : 'Unable to send magic link.',
-      }));
-    }
-  }, []);
-
   const logout = useCallback(async () => {
     await sessionApi.logout();
     await refresh();
   }, [refresh]);
 
-  const verifyMagicToken = useCallback(
-    async (token: string) => {
-      setState((prev) => ({ ...prev, verifyingToken: true, message: null }));
-      try {
-        await sessionApi.verify(token);
-        await refresh();
-        setState((prev) => ({ ...prev, verifyingToken: false }));
-      } catch (error) {
-        setState((prev) => ({
-          ...prev,
-          verifyingToken: false,
-          message: error instanceof Error ? error.message : 'Failed to verify magic link.',
-        }));
-        throw error;
-      }
-    },
-    [refresh],
-  );
-
   const value: SessionContextValue = {
     ...state,
     currentEmail: state.email,
-    sendMagicLink,
     refresh,
     logout,
-    verifyMagicToken,
   };
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;

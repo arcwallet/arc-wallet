@@ -1,22 +1,45 @@
-import sgMail from '@sendgrid/mail';
+import nodemailer from 'nodemailer';
 export const createMagicLinkMailer = (config) => {
-    const hasCreds = Boolean(config.apiKey && config.fromAddress);
-    if (config.apiKey) {
-        sgMail.setApiKey(config.apiKey);
+    // Check if SMTP is configured
+    const hasSmtp = Boolean(config.smtpHost &&
+        config.smtpUser &&
+        config.smtpPass &&
+        config.fromAddress);
+    // Create nodemailer transporter if SMTP configured
+    let transporter = null;
+    if (hasSmtp) {
+        transporter = nodemailer.createTransport({
+            host: config.smtpHost,
+            port: config.smtpPort || 587,
+            secure: false, // STARTTLS
+            auth: {
+                user: config.smtpUser,
+                pass: config.smtpPass,
+            },
+        });
+        // Verify connection
+        transporter.verify((error) => {
+            if (error) {
+                console.error('[Mailer] SMTP connection failed:', error.message);
+            }
+            else {
+                console.log('[Mailer] SMTP connection verified successfully');
+            }
+        });
     }
     return {
-        isConfigured: () => hasCreds,
+        isConfigured: () => hasSmtp,
         async sendMagicLink({ to, url }) {
-            if (!hasCreds) {
+            if (!hasSmtp || !transporter) {
                 console.log('📬 [Magic Link Preview]', to, url);
                 return;
             }
-            const msg = {
-                to,
+            const mailOptions = {
                 from: {
-                    email: config.fromAddress,
                     name: config.fromName ?? 'Arc Wallet',
+                    address: config.fromAddress,
                 },
+                to,
                 subject: 'Sign in to Arc Wallet - Your secure access link',
                 text: `Hello,\n\nClick the link below to sign in to your Arc Wallet account:\n\n${url}\n\nThis link is valid for 15 minutes and can only be used once.\n\nIf you did not request this email, you can safely ignore it.\n\nBest regards,\nArc Wallet Team`,
                 html: `
@@ -27,11 +50,6 @@ export const createMagicLinkMailer = (config) => {
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <meta name="x-apple-disable-message-reformatting">
             <title>Sign in to Arc Wallet</title>
-            <!--[if mso]>
-            <style type="text/css">
-              body, table, td {font-family: Arial, Helvetica, sans-serif !important;}
-            </style>
-            <![endif]-->
           </head>
           <body style="margin:0;padding:0;background-color:#f4f4f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
             <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color:#f4f4f7;">
@@ -91,7 +109,7 @@ export const createMagicLinkMailer = (config) => {
           </html>
         `,
             };
-            await sgMail.send(msg);
+            await transporter.sendMail(mailOptions);
             console.log('✉️  Magic link email sent to', to);
         },
     };

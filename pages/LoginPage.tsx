@@ -1,21 +1,27 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSession } from '../contexts/SessionContext';
-import { ArrowUpRightIcon } from '../components/Icons';
 import { WaveBackground } from '../components/WaveBackground';
 import arcLogo from '../assets/arclogo.png';
 import { Footer } from '../components/Footer';
 import { passkeyClient } from '../services/passkeyClient';
 import { createAuthenticationCredential } from '../utils/webauthn';
+import { sessionApi } from '../services/sessionApi';
+import OtpInput from '../components/OtpInput';
+
+type LoginStep = 'email' | 'otp' | 'passkey';
 
 const LoginPage: React.FC = () => {
-  const { sendMagicLink, requestStatus, message, refresh } = useSession();
+  const { refresh } = useSession();
   const [email, setEmail] = useState('');
+  const [otpCode, setOtpCode] = useState('');
+  const [step, setStep] = useState<LoginStep>('email');
   const [submitting, setSubmitting] = useState(false);
   const [cooldown, setCooldown] = useState(0);
-  const [localMessage, setLocalMessage] = useState<string | null>(null);
-  const [localStatus, setLocalStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [message, setMessage] = useState<string | null>(null);
+  const [messageType, setMessageType] = useState<'success' | 'error' | 'info'>('info');
 
-  React.useEffect(() => {
+  // Cooldown timer
+  useEffect(() => {
     if (cooldown <= 0) return;
     const timer = window.setInterval(() => {
       setCooldown((current) => Math.max(current - 1, 0));
@@ -23,29 +29,36 @@ const LoginPage: React.FC = () => {
     return () => window.clearInterval(timer);
   }, [cooldown]);
 
+  // Auto-submit OTP when 6 digits entered
+  useEffect(() => {
+    if (otpCode.length === 6 && step === 'otp' && !submitting) {
+      handleVerifyOtp();
+    }
+  }, [otpCode]);
+
+  const showMessage = (text: string, type: 'success' | 'error' | 'info') => {
+    setMessage(text);
+    setMessageType(type);
+  };
+
   const handlePasskeyAuth = async (userEmail: string): Promise<boolean> => {
     try {
-      // Start authentication
       const startResult = await passkeyClient.beginAuthentication(userEmail);
       if (!startResult.success || !startResult.data?.options) {
         throw new Error('Failed to start passkey authentication');
       }
 
-      // Create credential with browser
       const credential = await createAuthenticationCredential(startResult.data.options);
-
-      // Finish authentication
       const finishResult = await passkeyClient.finishAuthentication(credential);
+
       if (!finishResult.success) {
         throw new Error('Failed to verify passkey');
       }
 
-      // Store session key if returned
       if (finishResult.data?.sessionKey) {
         localStorage.setItem('arc_session_key', JSON.stringify(finishResult.data.sessionKey));
       }
 
-      // Refresh session to update state
       await refresh();
       return true;
     } catch (error) {
@@ -54,47 +67,203 @@ const LoginPage: React.FC = () => {
     }
   };
 
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+  const handleEmailSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!email || submitting || cooldown > 0) return;
+
     setSubmitting(true);
-    setLocalMessage(null);
-    setLocalStatus('idle');
+    setMessage(null);
 
     try {
       // First check if user has passkeys
       const checkResult = await passkeyClient.checkUserPasskeys(email);
 
       if (checkResult.success && checkResult.data?.hasPasskey) {
-        // User has passkeys, try direct passkey authentication
-        setLocalMessage('Passkey found! Please authenticate with your passkey...');
-        setLocalStatus('success');
+        // User has passkeys - try direct passkey authentication
+        showMessage('Passkey found! Please authenticate...', 'info');
+        setStep('passkey');
 
         const authSuccess = await handlePasskeyAuth(email);
         if (authSuccess) {
-          // Auth successful, session will be refreshed and user redirected
-          return;
-        } else {
-          // Passkey auth failed, fall back to magic link
-          setLocalMessage('Passkey authentication failed. Sending magic link...');
-          setLocalStatus('error');
-          await sendMagicLink(email);
-          setCooldown(30);
+          return; // Auth successful
         }
-      } else {
-        // No passkeys, send magic link
-        await sendMagicLink(email);
-        setCooldown(30);
+        // Passkey failed, fall back to OTP
+        showMessage('Passkey authentication cancelled. Sending verification code...', 'info');
       }
+
+      // Request OTP
+      await sessionApi.requestOtp(email);
+      setStep('otp');
+      setCooldown(60);
+      showMessage('Verification code sent to your email', 'success');
+
     } catch (error) {
-      // If checkUserPasskeys fails, fall back to magic link
-      console.error('[LoginPage] Check passkeys failed:', error);
-      await sendMagicLink(email);
-      setCooldown(30);
+      console.error('[LoginPage] Error:', error);
+      showMessage(
+        error instanceof Error ? error.message : 'Something went wrong. Please try again.',
+        'error'
+      );
+      setStep('email');
     } finally {
       setSubmitting(false);
     }
   };
+
+  const handleVerifyOtp = async () => {
+    if (otpCode.length !== 6 || submitting) return;
+
+    setSubmitting(true);
+    setMessage(null);
+
+    try {
+      await sessionApi.verifyOtp(email, otpCode);
+      showMessage('Email verified successfully!', 'success');
+      await refresh();
+      // Session will update and redirect to dashboard
+    } catch (error) {
+      console.error('[LoginPage] OTP verification failed:', error);
+      showMessage(
+        error instanceof Error ? error.message : 'Invalid or expired code. Please try again.',
+        'error'
+      );
+      setOtpCode('');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    if (cooldown > 0 || submitting) return;
+
+    setSubmitting(true);
+    try {
+      await sessionApi.resendOtp(email);
+      setCooldown(60);
+      showMessage('New verification code sent', 'success');
+    } catch (error) {
+      showMessage(
+        error instanceof Error ? error.message : 'Failed to resend code',
+        'error'
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleBackToEmail = () => {
+    setStep('email');
+    setOtpCode('');
+    setMessage(null);
+    setCooldown(0);
+  };
+
+  const renderEmailStep = () => (
+    <form onSubmit={handleEmailSubmit} className="flex flex-col gap-6">
+      <div className="group">
+        <div className="relative">
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="Email address"
+            required
+            autoComplete="email"
+            className="w-full bg-slate-900/60 border border-slate-500/50 rounded-lg px-4 py-4 text-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 transition-all backdrop-blur-sm"
+          />
+          <div className="absolute inset-0 rounded-lg bg-blue-500/5 opacity-0 group-focus-within:opacity-100 pointer-events-none transition-opacity duration-500" />
+        </div>
+      </div>
+
+      <button
+        type="submit"
+        disabled={submitting || cooldown > 0}
+        className="w-full bg-slate-200 hover:bg-white text-slate-900 font-medium text-lg py-3.5 rounded-lg transition-all duration-200 shadow-[0_0_20px_rgba(255,255,255,0.1)] hover:shadow-[0_0_30px_rgba(255,255,255,0.2)] disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center"
+      >
+        {submitting ? (
+          <span className="flex items-center gap-2">
+            <svg className="animate-spin h-5 w-5 text-slate-900" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            Checking...
+          </span>
+        ) : cooldown > 0 ? (
+          `Retry in ${cooldown}s`
+        ) : (
+          "Continue"
+        )}
+      </button>
+    </form>
+  );
+
+  const renderOtpStep = () => (
+    <div className="flex flex-col gap-6">
+      <div className="text-center">
+        <p className="text-slate-400 text-sm mb-1">Enter the 6-digit code sent to</p>
+        <p className="text-white font-medium">{email}</p>
+      </div>
+
+      <OtpInput
+        value={otpCode}
+        onChange={setOtpCode}
+        disabled={submitting}
+        error={messageType === 'error' ? message : null}
+      />
+
+      <button
+        onClick={handleVerifyOtp}
+        disabled={otpCode.length !== 6 || submitting}
+        className="w-full bg-slate-200 hover:bg-white text-slate-900 font-medium text-lg py-3.5 rounded-lg transition-all duration-200 shadow-[0_0_20px_rgba(255,255,255,0.1)] hover:shadow-[0_0_30px_rgba(255,255,255,0.2)] disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center"
+      >
+        {submitting ? (
+          <span className="flex items-center gap-2">
+            <svg className="animate-spin h-5 w-5 text-slate-900" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            Verifying...
+          </span>
+        ) : (
+          "Verify"
+        )}
+      </button>
+
+      <div className="flex items-center justify-between text-sm">
+        <button
+          onClick={handleBackToEmail}
+          className="text-slate-400 hover:text-white transition-colors"
+        >
+          Change email
+        </button>
+        <button
+          onClick={handleResendOtp}
+          disabled={cooldown > 0 || submitting}
+          className="text-blue-400 hover:text-blue-300 transition-colors disabled:text-slate-500 disabled:cursor-not-allowed"
+        >
+          {cooldown > 0 ? `Resend in ${cooldown}s` : 'Resend code'}
+        </button>
+      </div>
+    </div>
+  );
+
+  const renderPasskeyStep = () => (
+    <div className="flex flex-col items-center gap-6">
+      <div className="w-16 h-16 rounded-full bg-blue-500/20 flex items-center justify-center animate-pulse">
+        <svg className="w-8 h-8 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4" />
+        </svg>
+      </div>
+      <p className="text-slate-300 text-center">
+        Complete authentication with your passkey...
+      </p>
+      <button
+        onClick={handleBackToEmail}
+        className="text-sm text-slate-400 hover:text-white transition-colors"
+      >
+        Use verification code instead
+      </button>
+    </div>
+  );
 
   return (
     <div className="fixed inset-0 w-full h-full flex flex-col items-center justify-center overflow-hidden bg-transparent">
@@ -111,83 +280,44 @@ const LoginPage: React.FC = () => {
       {/* Login Container */}
       <div className="relative z-20 w-full max-w-md px-4 animate-in fade-in zoom-in duration-700">
         <h1 className="text-5xl font-light text-center mb-12 text-slate-100 tracking-tight drop-shadow-lg">
-          Sign in
+          {step === 'otp' ? 'Verify email' : 'Sign in'}
         </h1>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-6">
-          <div className="group">
-            <div className="relative">
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Email address"
-                required
-                className="w-full bg-slate-900/60 border border-slate-500/50 rounded-lg px-4 py-4 text-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 transition-all backdrop-blur-sm"
-              />
-              {/* Subtle glow effect on focus */}
-              <div className="absolute inset-0 rounded-lg bg-blue-500/5 opacity-0 group-focus-within:opacity-100 pointer-events-none transition-opacity duration-500" />
-            </div>
-          </div>
+        {step === 'email' && renderEmailStep()}
+        {step === 'otp' && renderOtpStep()}
+        {step === 'passkey' && renderPasskeyStep()}
 
-          <button
-            type="submit"
-            disabled={submitting || cooldown > 0}
-            className="w-full bg-slate-200 hover:bg-white text-slate-900 font-medium text-lg py-3.5 rounded-lg transition-all duration-200 shadow-[0_0_20px_rgba(255,255,255,0.1)] hover:shadow-[0_0_30px_rgba(255,255,255,0.2)] disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center"
-          >
-            {submitting ? (
-              <span className="flex items-center gap-2">
-                <svg className="animate-spin h-5 w-5 text-slate-900" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Authenticating...
-              </span>
-            ) : cooldown > 0 ? (
-              `Retry in ${cooldown}s`
-            ) : (
-              "Sign in"
-            )}
-          </button>
-        </form>
-
-        {/* Status Messages */}
-        {(localMessage || message) && (
-          <div className={`mt-4 p-3 rounded-lg backdrop-blur-sm border text-center ${(localStatus === 'error' || requestStatus === 'error')
-            ? 'bg-red-900/20 border-red-500/50 text-red-200'
-            : 'bg-blue-900/20 border-blue-500/50 text-blue-200'
-            }`}>
-            {localMessage || message}
+        {/* Status Messages (not for OTP step - handled by OtpInput) */}
+        {message && step !== 'otp' && (
+          <div className={`mt-4 p-3 rounded-lg backdrop-blur-sm border text-center ${
+            messageType === 'error'
+              ? 'bg-red-900/20 border-red-500/50 text-red-200'
+              : messageType === 'success'
+                ? 'bg-green-900/20 border-green-500/50 text-green-200'
+                : 'bg-blue-900/20 border-blue-500/50 text-blue-200'
+          }`}>
+            {message}
           </div>
         )}
 
-        {cooldown > 0 && (
-          <p className="mt-3 text-center text-sm text-slate-400">
-            Please check your inbox. You can request another link after the countdown.
-          </p>
+        {/* Success message for OTP step */}
+        {message && step === 'otp' && messageType === 'success' && (
+          <div className="mt-4 p-3 rounded-lg backdrop-blur-sm border text-center bg-green-900/20 border-green-500/50 text-green-200">
+            {message}
+          </div>
         )}
-
-
       </div>
 
       <Footer />
 
       <style>{`
         @keyframes fade-in {
-          from {
-            opacity: 0;
-          }
-          to {
-            opacity: 1;
-          }
+          from { opacity: 0; }
+          to { opacity: 1; }
         }
         @keyframes zoom-in {
-          from {
-            transform: scale(0.95);
-          }
-          to {
-            transform: scale(1);
-          }
+          from { transform: scale(0.95); }
+          to { transform: scale(1); }
         }
         .animate-in {
           animation: fade-in 0.7s ease-out, zoom-in 0.7s ease-out;

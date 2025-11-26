@@ -7,6 +7,7 @@ import { Database } from './models/Database.js';
 import { SessionKeyManager } from './utils/SessionKeyManager.js';
 import { createPasskeyRoutes } from './routes/passkeys.js';
 import { createMagicLinkRouter } from './routes/magicLink.js';
+import { createCircleOtpRouter } from './routes/circleOtp.js';
 import { createWalletRouter } from './routes/wallet.js';
 import { createWalletBackupRouter } from './routes/walletBackup.js';
 import { createBridgeRoutes } from './routes/bridge.js';
@@ -36,7 +37,10 @@ const db = new Database(config.DB_PATH);
 const sessionKeyManager = new SessionKeyManager(db);
 const walletBackupService = new WalletBackupService(db);
 const magicLinkMailer = createMagicLinkMailer({
-    apiKey: process.env.SENDGRID_API_KEY,
+    smtpHost: process.env.SMTP_HOST,
+    smtpPort: parseInt(process.env.SMTP_PORT || '587'),
+    smtpUser: process.env.SMTP_USER,
+    smtpPass: process.env.SMTP_PASS,
     fromAddress: process.env.EMAIL_FROM_ADDRESS,
     fromName: process.env.EMAIL_FROM_NAME ?? 'Arc Wallet',
 });
@@ -87,6 +91,7 @@ app.use(healthCheck);
 app.use(rateLimitMiddleware('general'));
 // Routes
 app.use(createMagicLinkRouter(config, magicLinkMailer, db, magicSessionStore));
+app.use(createCircleOtpRouter(config, db, magicSessionStore));
 app.use('/api/wallet', createWalletRouter(db, config, magicSessionStore));
 app.use('/api/wallet-backup', createWalletBackupRouter(walletBackupService));
 app.use('/passkeys', createPasskeyRoutes(db, config));

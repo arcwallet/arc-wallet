@@ -1,7 +1,11 @@
 export interface MagicLinkMailerConfig {
-    apiKey?: string;
+    smtpHost?: string;
+    smtpPort?: number;
+    smtpUser?: string;
+    smtpPass?: string;
     fromAddress?: string;
     fromName?: string;
+    apiKey?: string;
 }
 export interface MagicLinkMessage {
     to: string;

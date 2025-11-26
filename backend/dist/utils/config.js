@@ -38,9 +38,7 @@ export function loadConfig() {
         if (JWT_SECRET === 'default-jwt-secret-change-in-production') {
             throw new Error('JWT_SECRET must be set in production');
         }
-        if (!MAGIC_LINK_BASE_URL) {
-            throw new Error('MAGIC_LINK_BASE_URL must be set in production');
-        }
+        // Note: MAGIC_LINK_BASE_URL no longer required - using Circle OTP
     }
     // Validate port
     if (isNaN(PORT) || PORT < 1 || PORT > 65535) {
