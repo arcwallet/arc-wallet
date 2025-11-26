@@ -98,4 +98,10 @@ export declare class WalletSDK {
      * Delete wallet permanently
      */
     deleteWallet(): Promise<void>;
+    /**
+     * Recover wallet using existing passkey (when local data is lost)
+     * This authenticates with the existing passkey and creates a NEW wallet
+     * NOTE: This creates a new wallet address since the original private key is lost
+     */
+    recoverWithExistingPasskey(): Promise<WalletAccount>;
 }

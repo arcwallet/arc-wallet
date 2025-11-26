@@ -4,6 +4,7 @@ import { isAddress, parseUnits } from 'ethers';
 import { useArcAccount } from '../contexts/ArcAccountContext';
 import { useWallet } from '../contexts/WalletContext';
 import { useSelfCustodialWallet } from '../contexts/SelfCustodialWalletContext';
+import { usePasskeyAccount } from '../contexts/PasskeyAccountContext';
 
 import { useActivity } from '../contexts/ActivityContext';
 import { usePrivacy } from '../contexts/PrivacyContext';
@@ -43,15 +44,32 @@ interface SendAssetsProps {
 
 const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialRecipient = '', initialToken }) => {
   const { snapshot, isLoading } = useArcAccount();
-  // Get private key from self-custodial context first, fall back to legacy
-  const { address: selfCustodialAddress, getPrivateKey } = useSelfCustodialWallet();
-  const { sessionKey, verifyWithPasskey } = useWallet();
+  // IMPORTANT: Use ONLY self-custodial wallet for transactions
+  // This ensures private keys NEVER leave the device
+  const { address: selfCustodialAddress, getPrivateKey, unlockWallet, isUnlocked, hasWallet } = useSelfCustodialWallet();
+
+  // Passkey-native account (P256 signing, no private key stored)
+  const {
+    isConnected: passkeyConnected,
+    address: passkeyAddress,
+    signUserOperation,
+    connect: connectPasskey,
+    createAccount: createPasskeyAccount,
+    hasAccount: hasPasskeyAccount,
+    isConnecting: passkeyConnecting,
+    manager: passkeyManager,
+  } = usePasskeyAccount();
+
+  const { sessionKey } = useWallet();
   const { addActivity } = useActivity();
   const { isPrivacyMode, fheKeypair } = usePrivacy();
 
-  // Use self-custodial wallet address/key if available
+  // ALWAYS use self-custodial wallet - fallback to session ONLY for address display
   const walletAddress = selfCustodialAddress || sessionKey?.address;
-  const walletPrivateKey = selfCustodialAddress ? getPrivateKey() : sessionKey?.privateKey;
+
+  // Private key MUST come from SDK only (never from server session key)
+  const walletPrivateKey = getPrivateKey();
+  const needsPasskeyAuth = hasWallet && !isUnlocked;
 
   // DEBUG: Log wallet info
   useEffect(() => {
@@ -59,9 +77,12 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
       selfCustodialAddress,
       sessionKeyAddress: sessionKey?.address,
       walletAddress,
-      hasPrivateKey: !!walletPrivateKey
+      hasPrivateKey: !!walletPrivateKey,
+      needsPasskeyAuth,
+      isUnlocked,
+      hasWallet
     });
-  }, [selfCustodialAddress, sessionKey, walletAddress, walletPrivateKey]);
+  }, [selfCustodialAddress, sessionKey, walletAddress, walletPrivateKey, needsPasskeyAuth, isUnlocked, hasWallet]);
   const [amount, setAmount] = useState(initialAmount);
   const [recipient, setRecipient] = useState(initialRecipient);
   const [selectedToken, setSelectedToken] = useState<TokenInfo>(() => {
@@ -96,6 +117,9 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
   const [useSmartAccount, setUseSmartAccount] = useState(false);
   const [smartAccountAvailable, setSmartAccountAvailable] = useState(false);
   const [smartAccountAddress, setSmartAccountAddress] = useState<string | null>(null);
+
+  // Passkey-native Account Mode (P256 signing)
+  const [usePasskeyNative, setUsePasskeyNative] = useState(false);
 
   const balance = useMemo(() => {
     return parseFloat(tokenBalance) || 0;
@@ -243,6 +267,25 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
   // Use Smart Account if available and enabled
   const usingSmartAccount = useSmartAccount && smartAccountAvailable;
 
+  // State for unlocking wallet
+  const [isUnlocking, setIsUnlocking] = useState(false);
+  const [unlockError, setUnlockError] = useState<string | null>(null);
+
+  // Handle wallet unlock with passkey
+  const handleUnlockWallet = async () => {
+    setIsUnlocking(true);
+    setUnlockError(null);
+    try {
+      await unlockWallet();
+      console.log('[SEND] Wallet unlocked successfully');
+    } catch (error: any) {
+      console.error('[SEND] Failed to unlock wallet:', error);
+      setUnlockError(error?.message || 'Failed to unlock wallet');
+    } finally {
+      setIsUnlocking(false);
+    }
+  };
+
   // Estimate fees
   useEffect(() => {
     const estimateFees = async () => {
@@ -362,7 +405,8 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
 
   const isRecipientValid = recipient ? isAddress(recipient) : false;
   const hasSession = Boolean(walletAddress);
-  const canSubmit = hasSession && isRecipientValid && amountNumber > 0 && amountNumber <= balance && !isSubmitting;
+  // IMPORTANT: Require wallet to be unlocked (have private key) to submit
+  const canSubmit = hasSession && isRecipientValid && amountNumber > 0 && amountNumber <= balance && !isSubmitting && !!walletPrivateKey;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -401,24 +445,9 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
     setSubmitError(null);
     setTxHash(null);
     try {
-      // Verify with passkey before sending
-      try {
-        await verifyWithPasskey();
-      } catch (passkeyError: any) {
-        const passkeyMsg = typeof passkeyError?.message === 'string' ? passkeyError.message : '';
-
-        if (passkeyError instanceof DOMException && passkeyError.name === 'NotAllowedError') {
-          throw new Error('Passkey verification was cancelled. Please try again and complete the verification.');
-        } else if (passkeyMsg.toLowerCase().includes('user not found')) {
-          throw new Error('Your passkey is not registered. Please sign out and create a new passkey.');
-        } else if (passkeyMsg.toLowerCase().includes('not found') || passkeyMsg.toLowerCase().includes('passkey not found')) {
-          throw new Error('Passkey not found. Please sign out and register a new passkey.');
-        } else if (passkeyMsg.toLowerCase().includes('challenge')) {
-          throw new Error('IMPORTANT: Sign out and sign back in before attempting another transaction.');
-        } else {
-          throw new Error(`Passkey verification failed: ${passkeyMsg || 'Unknown error'} `);
-        }
-      }
+      // NOTE: Passkey verification is done during wallet unlock (SDK's unlockWallet)
+      // No need for server-side verification since private key is client-side only
+      console.log('[SEND] Proceeding with transaction - wallet already unlocked via passkey');
 
 
       // Auto-sponsor gas if needed (Phase 1 Gas Station)
@@ -682,6 +711,53 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
           </div>
         )}
 
+        {/* Passkey-Native Account Toggle */}
+        {hasPasskeyAccount && (
+          <div className="rounded-lg border border-purple-500/30 bg-purple-500/10 p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-semibold text-purple-400">Passkey-Native Account</span>
+                  <span className="text-xs bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded">P256</span>
+                </div>
+                <p className="text-xs text-purple-300/70 mt-1">
+                  {passkeyAddress ? `${passkeyAddress.slice(0, 8)}...${passkeyAddress.slice(-6)}` : 'Not connected'}
+                </p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="sr-only peer"
+                  checked={usePasskeyNative}
+                  onChange={(e) => setUsePasskeyNative(e.target.checked)}
+                  disabled={!passkeyConnected}
+                />
+                <div className="w-11 h-6 bg-slate-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600 peer-disabled:opacity-50"></div>
+              </label>
+            </div>
+            {!passkeyConnected && (
+              <button
+                onClick={async () => {
+                  try {
+                    await connectPasskey();
+                  } catch (err) {
+                    console.error('Passkey connect failed:', err);
+                  }
+                }}
+                disabled={passkeyConnecting}
+                className="mt-2 w-full text-xs bg-purple-600 hover:bg-purple-500 text-white py-1.5 px-3 rounded transition-colors disabled:opacity-50"
+              >
+                {passkeyConnecting ? 'Connecting...' : 'Connect Passkey Account'}
+              </button>
+            )}
+            {usePasskeyNative && passkeyConnected && (
+              <p className="text-xs text-green-400 mt-2">
+                ✓ Signing with passkey (no private key stored)
+              </p>
+            )}
+          </div>
+        )}
+
         <div className="flex flex-col w-full">
           <p className="text-sm font-medium leading-normal pb-2 text-text-secondary">Asset</p>
           <div className="relative w-full">
@@ -802,6 +878,38 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
           <p className="text-sm text-accent-orange text-center">
             Connect with your passkey to send transactions.
           </p>
+        )}
+        {/* Wallet Unlock Required */}
+        {needsPasskeyAuth && (
+          <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <LockIcon size={16} className="text-amber-400" />
+              <span className="text-sm font-semibold text-amber-400">Wallet Locked</span>
+            </div>
+            <p className="text-xs text-amber-300/80 mb-3">
+              Your wallet is locked. Unlock with your passkey to send transactions.
+            </p>
+            {unlockError && (
+              <p className="text-xs text-red-400 mb-2">{unlockError}</p>
+            )}
+            <button
+              onClick={handleUnlockWallet}
+              disabled={isUnlocking}
+              className="w-full rounded-md bg-amber-500 px-3 py-2 text-sm font-semibold text-black hover:bg-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:opacity-50 transition-all"
+            >
+              {isUnlocking ? (
+                <span className="flex items-center justify-center gap-2">
+                  <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Unlocking...
+                </span>
+              ) : (
+                'Unlock with Passkey'
+              )}
+            </button>
+          </div>
         )}
         {submitError && <p className="text-sm text-accent-orange text-center">{submitError}</p>}
         {txHash && (

@@ -54,6 +54,12 @@ export declare class KeyManager {
      */
     hasWallet(credentialId: string): Promise<boolean>;
     /**
+     * Recover wallet using existing passkey (when local data is lost)
+     * This authenticates with existing passkey and creates a NEW wallet
+     * NOTE: This creates a new wallet address since the original private key is lost
+     */
+    recoverWithExistingPasskey(): Promise<WalletAccount>;
+    /**
      * Get all wallet metadata (without private keys)
      */
     getAllWallets(): Promise<Array<{

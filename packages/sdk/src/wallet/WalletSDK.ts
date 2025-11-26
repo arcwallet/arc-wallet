@@ -468,4 +468,30 @@ export class WalletSDK {
 
     logger.info('Wallet deleted permanently', { component: 'WalletSDK' });
   }
+
+  /**
+   * Recover wallet using existing passkey (when local data is lost)
+   * This authenticates with the existing passkey and creates a NEW wallet
+   * NOTE: This creates a new wallet address since the original private key is lost
+   */
+  async recoverWithExistingPasskey(): Promise<WalletAccount> {
+    try {
+      logger.info('Recovering wallet with existing passkey', { component: 'WalletSDK', action: 'recoverWithExistingPasskey' });
+
+      const account = await this.keyManager.recoverWithExistingPasskey();
+      this.currentAccount = account;
+
+      this.emit('connect', { address: account.address });
+
+      logger.info('Wallet recovered with new address', { component: 'WalletSDK', address: account.address });
+
+      return account;
+    } catch (error: any) {
+      this.emit('error', {
+        message: error.message,
+        code: 'RECOVER_WALLET_FAILED',
+      });
+      throw error;
+    }
+  }
 }

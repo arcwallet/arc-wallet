@@ -52,6 +52,8 @@ export { CCTPManager } from './core/cctpManager';
 export { SmartAccountManager } from './core/smartAccountManager';
 export { CirclePaymasterClient } from './core/circlePaymaster';
 export { CircleApiClient } from './services/circleApi';
+export { PasskeyAccountManager } from './core/passkeyAccountManager';
+export type { PasskeyAccountConfig, PasskeyCredential as PasskeyAccountCredential } from './core/passkeyAccountManager';
 
 // Utils
 export { logger, createLogger, LogLevel } from './utils/logger';

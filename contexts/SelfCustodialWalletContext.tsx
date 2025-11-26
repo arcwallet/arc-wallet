@@ -39,6 +39,9 @@ export interface SelfCustodialWalletContextValue {
   // Wallet creation (no password needed!)
   createWallet: (userName: string) => Promise<{ address: string }>;
 
+  // Wallet recovery (when local data is lost but passkey exists)
+  recoverWithExistingPasskey: () => Promise<{ address: string }>;
+
   // Authentication with biometrics
   unlockWallet: () => Promise<void>;
   lockWallet: () => void;
@@ -80,8 +83,8 @@ const initializeSDK = (): WalletSDK => {
   // 1. VITE_PASSKEY_API_URL (set in .env for both dev and production)
   // 2. Fallback to localhost for development
   const backendUrl = typeof window !== 'undefined'
-    ? ((import.meta as any).env.VITE_PASSKEY_API_URL || 'http://localhost:4000')
-    : 'http://localhost:4000';
+    ? ((import.meta as any).env.VITE_PASSKEY_API_URL || 'https://arcwallet-backend.onrender.com')
+    : 'https://arcwallet-backend.onrender.com';
 
   // rpId must match backend RP_ID configuration
   // In production: app.arcwallet.network
@@ -272,6 +275,51 @@ export const SelfCustodialWalletProvider: React.FC<{ children: ReactNode }> = ({
     }
   }, [sdk, normalizedEmail, currentEmail]);
 
+  // Recover wallet with existing passkey (when local data is lost)
+  const recoverWithExistingPasskey = useCallback(async (): Promise<{ address: string }> => {
+    if (!sdk) throw new Error('SDK not initialized');
+    if (!normalizedEmail) throw new Error('Email verification required. Please login first.');
+
+    setIsConnecting(true);
+
+    try {
+      console.log('[Wallet] Recovering wallet with existing passkey...');
+
+      // Recover wallet - This will:
+      // 1. Authenticate with existing passkey
+      // 2. Create NEW wallet (original is lost)
+      // 3. Encrypt with existing credential ID
+      // 4. Store in IndexedDB
+      const account = await sdk.recoverWithExistingPasskey();
+
+      console.log('[Wallet] Wallet recovered with new address:', account.address);
+
+      // Update state
+      setCurrentAccount(account);
+      setAddress(account.address);
+      setHasWallet(true);
+      setIsUnlocked(true);
+      setIsAuthenticated(true);
+      setUserId(normalizedEmail);
+
+      // Persist wallet existence
+      const hasWalletKey = getStorageKey(normalizedEmail, 'has-wallet');
+      const addressKey = getStorageKey(normalizedEmail, 'wallet-address');
+      const userIdKey = getStorageKey(normalizedEmail, 'user-id');
+
+      localStorage.setItem(hasWalletKey, 'true');
+      localStorage.setItem(addressKey, account.address);
+      localStorage.setItem(userIdKey, normalizedEmail);
+
+      return { address: account.address };
+    } catch (error: any) {
+      console.error('[Wallet] Recovery failed:', error);
+      throw new Error(error.message || 'Failed to recover wallet');
+    } finally {
+      setIsConnecting(false);
+    }
+  }, [sdk, normalizedEmail]);
+
   // Unlock wallet with passkey (biometric authentication)
   const unlockWallet = useCallback(async () => {
     if (!sdk) throw new Error('SDK not initialized');
@@ -414,6 +462,7 @@ export const SelfCustodialWalletProvider: React.FC<{ children: ReactNode }> = ({
     address,
     userId,
     createWallet,
+    recoverWithExistingPasskey,
     unlockWallet,
     lockWallet,
     getPrivateKey,
@@ -430,6 +479,7 @@ export const SelfCustodialWalletProvider: React.FC<{ children: ReactNode }> = ({
     address,
     userId,
     createWallet,
+    recoverWithExistingPasskey,
     unlockWallet,
     lockWallet,
     getPrivateKey,

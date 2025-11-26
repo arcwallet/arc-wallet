@@ -1,5 +1,5 @@
 // Prefer explicit env. In production, default to same-origin '/api' to avoid CORS
-const API_BASE = (import.meta as any).env.VITE_PASSKEY_API_URL ?? ((import.meta as any).env.PROD ? `${window.location.origin}/api` : 'http://localhost:4000');
+const API_BASE = (import.meta as any).env.VITE_PASSKEY_API_URL || 'https://arcwallet-backend.onrender.com';
 
 class PasskeyClientError extends Error {
   status?: number;

@@ -448,6 +448,47 @@
       "artifacts": [
         "ArcPaymaster"
       ]
+    },
+    "/Users/seher/Desktop/arcwallet/contracts/PasskeyAccount.sol": {
+      "lastModificationDate": 1764112689744,
+      "contentHash": "408e67845f7d1e68ab144a7b39e5250b",
+      "sourceName": "contracts/PasskeyAccount.sol",
+      "solcConfig": {
+        "version": "0.8.20",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "evmVersion": "paris",
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [
+        "./IEntryPoint.sol"
+      ],
+      "versionPragmas": [
+        "^0.8.20"
+      ],
+      "artifacts": [
+        "IP256Verifier",
+        "PasskeyAccount",
+        "PasskeyAccountFactory",
+        "WebAuthn"
+      ]
     }
   }
 }

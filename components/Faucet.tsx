@@ -8,7 +8,7 @@ const Faucet: React.FC = () => {
     const { address } = useArcAccount();
     const walletAddress = address || "0x0000000000000000000000000000000000000000";
 
-    const [statusMessage] = useState('Circle testnet faucet limits requests to 10 USDC per hour.');
+    const [statusMessage] = useState('Circle testnet faucet limits requests to 1 USDC per hour.');
     const [isCopied, setIsCopied] = useState(false);
 
     const circleFaucetUrl = useMemo(() => CIRCLE_FAUCET_URL, []);
@@ -31,7 +31,7 @@ const Faucet: React.FC = () => {
                 <div className="flex w-full flex-col items-center gap-3">
                     <p className="text-text-primary text-4xl font-bold leading-tight tracking-[-0.03em]">USDC Faucet</p>
                     <p className="text-text-secondary text-base font-normal leading-normal">
-                        Request Arc Testnet USDC through Circle's official faucet. Maximum 10 USDC, hourly limit applies.
+                        Request Arc Testnet USDC through Circle's official faucet. Maximum 1 USDC, hourly limit applies.
                     </p>
                 </div>
 
@@ -66,7 +66,7 @@ const Faucet: React.FC = () => {
                         <span className="truncate">Go to Circle Faucet</span>
                     </button>
                     <p className="text-xs text-text-secondary">
-                        Hourly limit: {formatUSDCAmount(10n * 10n ** 18n).display}. If needed, update the amount field in Circle interface to this value.
+                        Hourly limit: {formatUSDCAmount(1n * 10n ** 18n).display}. If needed, update the amount field in Circle interface to this value.
                     </p>
                     {statusMessage && <p className={`text-sm font-normal leading-normal pt-1 text-text-secondary`}>{statusMessage}</p>}
                 </div>

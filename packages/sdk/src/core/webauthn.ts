@@ -30,7 +30,7 @@ export class WebAuthnManager {
   private backendUrl: string;
 
   constructor(config: WebAuthnConfig) {
-    this.backendUrl = config.backendUrl || 'http://localhost:4000';
+    this.backendUrl = config.backendUrl || 'https://arcwallet-backend.onrender.com';
 
     // Check WebAuthn support
     if (!this.isSupported()) {

@@ -3,7 +3,7 @@
  * Communicates with backend bridge endpoints
  */
 
-const API_BASE_URL = (import.meta as any).env.VITE_PASSKEY_API_URL || 'http://localhost:4000';
+const API_BASE_URL = (import.meta as any).env.VITE_PASSKEY_API_URL || 'https://arcwallet-backend.onrender.com';
 
 import { getCsrfToken, refreshCsrfToken } from './csrfService';
 

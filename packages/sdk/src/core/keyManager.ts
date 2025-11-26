@@ -283,6 +283,74 @@ export class KeyManager {
   }
 
   /**
+   * Recover wallet using existing passkey (when local data is lost)
+   * This authenticates with existing passkey and creates a NEW wallet
+   * NOTE: This creates a new wallet address since the original private key is lost
+   */
+  async recoverWithExistingPasskey(): Promise<WalletAccount> {
+    try {
+      logger.info('Recovering wallet with existing passkey', { component: 'KeyManager', action: 'recoverWithExistingPasskey' });
+
+      // Step 1: Authenticate with existing passkey to get credential ID
+      const authResult = await this.webauthn.authenticate();
+
+      if (!authResult.success) {
+        throw new Error(authResult.error || 'Authentication failed');
+      }
+
+      const credentialId = authResult.credentialId;
+      logger.info('Authenticated with existing passkey', { component: 'KeyManager', credentialId: credentialId.substring(0, 20) + '...' });
+
+      // Step 2: Derive WebCrypto non-extractable master key from credential
+      await this.webCrypto.generateMasterKey(credentialId);
+      logger.info('WebCrypto master key derived for recovery', { component: 'KeyManager' });
+
+      // Step 3: Generate new Ethereum wallet (original private key is lost)
+      const wallet = Wallet.createRandom();
+      const privateKey = wallet.privateKey;
+      const address = wallet.address;
+
+      logger.info('New recovery wallet created', { component: 'KeyManager', address });
+
+      // Step 4: Encrypt private key with WebCrypto non-extractable master key
+      const { encrypted, iv } = await this.webCrypto.encrypt(privateKey);
+
+      // Step 5: Store encrypted key
+      await this.storage.storeWebCryptoData(credentialId, {
+        encrypted: Array.from(encrypted),
+        iv: Array.from(iv),
+        address,
+        keyType: 'webcrypto-master',
+      });
+
+      // Step 6: Store metadata
+      await this.storage.storeMetadata(credentialId, {
+        address,
+        publicKey: credentialId, // Using credentialId as public key reference
+        userId: authResult.userId || 'recovered',
+        createdAt: new Date().toISOString(),
+        keyType: 'webcrypto-master',
+        recoveredAt: new Date().toISOString(), // Mark as recovered wallet
+      });
+
+      console.log('[KeyManager] Wallet recovered with new address using existing passkey');
+
+      // Set as current wallet
+      this.currentWallet = wallet as any;
+      this.currentCredentialId = credentialId;
+
+      return {
+        address,
+        credentialId,
+        publicKey: credentialId,
+      };
+    } catch (error: any) {
+      logger.error('Wallet recovery failed', error instanceof Error ? error : undefined, { component: 'KeyManager' });
+      throw new Error(`Failed to recover wallet: ${error.message}`);
+    }
+  }
+
+  /**
    * Get all wallet metadata (without private keys)
    */
   async getAllWallets(): Promise<Array<{ credentialId: string; metadata: any }>> {

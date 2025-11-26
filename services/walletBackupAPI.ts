@@ -3,7 +3,7 @@
  * Client-side API for encrypted wallet backup and restore
  */
 
-const BACKEND_URL = 'http://localhost:4000';
+const BACKEND_URL = (import.meta as any).env.VITE_BACKEND_URL || 'https://arcwallet-backend.onrender.com';
 
 export interface WalletBackup {
     encryptedWallet: string;

@@ -3,7 +3,7 @@
  * Centralized management for CSRF tokens
  */
 
-const API_BASE_URL = ((import.meta as any).env.VITE_PASSKEY_API_URL ?? ((import.meta as any).env.PROD ? `${window.location.origin}/api` : 'http://localhost:4000')).replace(/\/$/, '');
+const API_BASE_URL = ((import.meta as any).env.VITE_PASSKEY_API_URL || 'https://arcwallet-backend.onrender.com').replace(/\/$/, '');
 const resolveUrl = (path: string) => (API_BASE_URL ? `${API_BASE_URL}${path}` : path);
 
 /**

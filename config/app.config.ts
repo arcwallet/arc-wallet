@@ -13,7 +13,7 @@ export const isDevelopment = (import.meta as any).env?.DEV || false;
 export const isProduction = (import.meta as any).env?.PROD || false;
 
 // Backend API Configuration
-export const BACKEND_URL = getEnv('VITE_BACKEND_URL', 'http://localhost:3001');
+export const BACKEND_URL = getEnv('VITE_BACKEND_URL', 'https://arcwallet-backend.onrender.com');
 
 // Blockchain Configuration
 export const RPC_URL = getEnv('VITE_ARC_RPC_URL', 'https://rpc.testnet.arc.network');

@@ -13,6 +13,7 @@ import { MultiSigProvider } from './contexts/MultiSigContext';
 import { PrivacyProvider } from './contexts/PrivacyContext';
 // Self-custodial wallet imports
 import { SelfCustodialWalletProvider, useSelfCustodialWallet } from './contexts/SelfCustodialWalletContext';
+import { PasskeyAccountProvider } from './contexts/PasskeyAccountContext';
 import WalletSetup from './components/WalletSetup';
 import UnlockWalletPasskey from './components/UnlockWalletPasskey';
 
@@ -151,23 +152,25 @@ const App: React.FC = () => {
   return (
     <ErrorBoundary>
       <SessionProvider>
-        <SelfCustodialWalletProvider>
-          <WalletProvider>
-            <ArcAccountProvider>
-              <ActivityProvider>
-                <PrivacyProvider>
-                  <MultiSigProvider>
-                    <div className="auth-wrapper">
-                      <React.Suspense fallback={null}>
-                        <RootView />
-                      </React.Suspense>
-                    </div>
-                  </MultiSigProvider>
-                </PrivacyProvider>
-              </ActivityProvider>
-            </ArcAccountProvider>
-          </WalletProvider>
-        </SelfCustodialWalletProvider>
+        <PasskeyAccountProvider>
+          <SelfCustodialWalletProvider>
+            <WalletProvider>
+              <ArcAccountProvider>
+                <ActivityProvider>
+                  <PrivacyProvider>
+                    <MultiSigProvider>
+                      <div className="auth-wrapper">
+                        <React.Suspense fallback={null}>
+                          <RootView />
+                        </React.Suspense>
+                      </div>
+                    </MultiSigProvider>
+                  </PrivacyProvider>
+                </ActivityProvider>
+              </ArcAccountProvider>
+            </WalletProvider>
+          </SelfCustodialWalletProvider>
+        </PasskeyAccountProvider>
       </SessionProvider>
     </ErrorBoundary>
   );
