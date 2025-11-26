@@ -39,27 +39,57 @@ const NetworkSelector: React.FC<NetworkSelectorProps> = ({ compact = false, clas
     }
   };
 
-  // Get network icon or fallback
+  // Network logo mappings
+  const networkLogos: Record<string, string> = {
+    'arc-testnet': '/arcwalletlogo.png',
+    'ethereum': '/networks/ethereum.svg',
+    'sepolia': '/networks/ethereum.svg',
+    'base': '/networks/base.jpg',
+    'base-sepolia': '/networks/base.jpg',
+    'arbitrum': '/networks/arbitrum.jpg',
+    'arbitrum-sepolia': '/networks/arbitrum.jpg',
+    'optimism': '/networks/optimism.jpg',
+    'optimism-sepolia': '/networks/optimism.jpg',
+    'polygon': '/networks/polygon.jpg',
+    'polygon-amoy': '/networks/polygon.jpg',
+    'avalanche': '/networks/avalanche.jpg',
+    'avalanche-fuji': '/networks/avalanche.jpg',
+    'bsc': '/networks/bsc.jpg',
+    'bsc-testnet': '/networks/bsc.jpg',
+  };
+
+  // Get network icon with real logos
   const getNetworkIcon = (network: NetworkConfig) => {
-    // Use colored circles as fallback icons
+    const logoPath = networkLogos[network.id];
+
+    if (logoPath) {
+      return (
+        <img
+          src={logoPath}
+          alt={network.name}
+          className="w-5 h-5 rounded-full object-cover"
+          onError={(e) => {
+            // Fallback to colored circle if image fails
+            const target = e.target as HTMLImageElement;
+            target.style.display = 'none';
+            target.nextElementSibling?.classList.remove('hidden');
+          }}
+        />
+      );
+    }
+
+    // Fallback colored circle
     const colors: Record<string, string> = {
       'arc-testnet': 'bg-purple-500',
       'ethereum': 'bg-blue-500',
       'sepolia': 'bg-blue-400',
       'base': 'bg-blue-600',
-      'base-sepolia': 'bg-blue-500',
       'arbitrum': 'bg-sky-500',
-      'arbitrum-sepolia': 'bg-sky-400',
       'optimism': 'bg-red-500',
-      'optimism-sepolia': 'bg-red-400',
       'polygon': 'bg-purple-600',
-      'polygon-amoy': 'bg-purple-500',
       'avalanche': 'bg-red-600',
-      'avalanche-fuji': 'bg-red-500',
       'bsc': 'bg-yellow-500',
-      'bsc-testnet': 'bg-yellow-400',
     };
-
     const colorClass = colors[network.id] || 'bg-gray-500';
 
     return (
