@@ -46,7 +46,7 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
   const { snapshot, isLoading } = useArcAccount();
   // IMPORTANT: Use ONLY self-custodial wallet for transactions
   // This ensures private keys NEVER leave the device
-  const { address: selfCustodialAddress, getPrivateKey, unlockWallet, isUnlocked, hasWallet } = useSelfCustodialWallet();
+  const { address: selfCustodialAddress, getPrivateKey } = useSelfCustodialWallet();
 
   // Passkey-native account (P256 signing, no private key stored)
   const {
@@ -69,20 +69,16 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
 
   // Private key MUST come from SDK only (never from server session key)
   const walletPrivateKey = getPrivateKey();
-  const needsPasskeyAuth = hasWallet && !isUnlocked;
-
   // DEBUG: Log wallet info
   useEffect(() => {
     console.log('[SEND DEBUG] Wallet Info:', {
       selfCustodialAddress,
+      passkeyAddress,
       sessionKeyAddress: sessionKey?.address,
       walletAddress,
       hasPrivateKey: !!walletPrivateKey,
-      needsPasskeyAuth,
-      isUnlocked,
-      hasWallet
     });
-  }, [selfCustodialAddress, sessionKey, walletAddress, walletPrivateKey, needsPasskeyAuth, isUnlocked, hasWallet]);
+  }, [selfCustodialAddress, passkeyAddress, sessionKey, walletAddress, walletPrivateKey]);
   const [amount, setAmount] = useState(initialAmount);
   const [recipient, setRecipient] = useState(initialRecipient);
   const [selectedToken, setSelectedToken] = useState<TokenInfo>(() => {
@@ -264,25 +260,6 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
 
   // Use Smart Account if available and enabled
   const usingSmartAccount = useSmartAccount && smartAccountAvailable;
-
-  // State for unlocking wallet
-  const [isUnlocking, setIsUnlocking] = useState(false);
-  const [unlockError, setUnlockError] = useState<string | null>(null);
-
-  // Handle wallet unlock with passkey
-  const handleUnlockWallet = async () => {
-    setIsUnlocking(true);
-    setUnlockError(null);
-    try {
-      await unlockWallet();
-      console.log('[SEND] Wallet unlocked successfully');
-    } catch (error: any) {
-      console.error('[SEND] Failed to unlock wallet:', error);
-      setUnlockError(error?.message || 'Failed to unlock wallet');
-    } finally {
-      setIsUnlocking(false);
-    }
-  };
 
   // Estimate fees
   useEffect(() => {
@@ -829,38 +806,6 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
           <p className="text-sm text-accent-orange text-center">
             Connect with your passkey to send transactions.
           </p>
-        )}
-        {/* Wallet Unlock Required */}
-        {needsPasskeyAuth && (
-          <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <LockIcon size={16} className="text-amber-400" />
-              <span className="text-sm font-semibold text-amber-400">Wallet Locked</span>
-            </div>
-            <p className="text-xs text-amber-300/80 mb-3">
-              Your wallet is locked. Unlock with your passkey to send transactions.
-            </p>
-            {unlockError && (
-              <p className="text-xs text-red-400 mb-2">{unlockError}</p>
-            )}
-            <button
-              onClick={handleUnlockWallet}
-              disabled={isUnlocking}
-              className="w-full rounded-md bg-amber-500 px-3 py-2 text-sm font-semibold text-black hover:bg-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:opacity-50 transition-all"
-            >
-              {isUnlocking ? (
-                <span className="flex items-center justify-center gap-2">
-                  <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Unlocking...
-                </span>
-              ) : (
-                'Unlock with Passkey'
-              )}
-            </button>
-          </div>
         )}
         {submitError && <p className="text-sm text-accent-orange text-center">{submitError}</p>}
         {txHash && (
