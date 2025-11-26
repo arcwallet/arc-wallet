@@ -103,7 +103,7 @@ export const SUPPORTED_TOKENS: Record<string, TokenInfo> = {
         arcTestnet: '0xe9185F0c5F296Ed1797AaE4238D26CCaBEadb86C', // USYC on Arc Testnet
       },
     },
-    icon: '/usyc-logo.svg',
+    icon: '/usyc-logo.png',
     priceSource: 'coingecko:hashnote-usyc',
     displayPriority: 3,
     swapable: true,
