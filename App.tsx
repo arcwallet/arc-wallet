@@ -6,70 +6,44 @@ import LoginPage from './pages/LoginPage';
 const PrivacyPolicy = React.lazy(() => import('./pages/PrivacyPolicy'));
 const TermsAndConditions = React.lazy(() => import('./pages/TermsAndConditions'));
 import { SessionProvider, useSession } from './contexts/SessionContext';
-import { WalletProvider, useWallet } from './contexts/WalletContext';
+import { WalletProvider } from './contexts/WalletContext';
 import { ArcAccountProvider } from './contexts/ArcAccountContext';
 import { ActivityProvider } from './contexts/ActivityContext';
 import { MultiSigProvider } from './contexts/MultiSigContext';
 import { PrivacyProvider } from './contexts/PrivacyContext';
-// Self-custodial wallet imports
-import { SelfCustodialWalletProvider, useSelfCustodialWallet } from './contexts/SelfCustodialWalletContext';
-import { PasskeyAccountProvider } from './contexts/PasskeyAccountContext';
+// Smart Contract Passkey Wallet (NEW - default)
+import { PasskeyAccountProvider, usePasskeyAccount } from './contexts/PasskeyAccountContext';
+// Legacy EOA wallet (kept for backwards compatibility)
+import { SelfCustodialWalletProvider } from './contexts/SelfCustodialWalletContext';
 import WalletSetup from './components/WalletSetup';
-import UnlockWalletPasskey from './components/UnlockWalletPasskey';
 
-// Self-custodial wallet experience - new architecture
-const SelfCustodialWalletExperience: React.FC = () => {
-  const {
-    hasWallet,
-    isUnlocked,
-    logout,
-  } = useSelfCustodialWallet();
+// Smart Contract Passkey Wallet Experience
+// NEW ARCHITECTURE: Passkey IS the signing key, no private key stored
+const PasskeyWalletExperience: React.FC = () => {
+  const { isConnected, hasAccount } = usePasskeyAccount();
   const { logout: sessionLogout } = useSession();
 
-  const handleComplete = async () => {
-    // Wallet created successfully with SDK
-    console.log('[App] Wallet creation complete');
+  const handleComplete = () => {
+    // Wallet created/connected successfully
+    console.log('[App] Smart Contract Wallet ready');
   };
 
-  const handleUnlock = () => {
-    // Wallet unlocked, show dashboard
-    console.log('[App] Wallet unlocked');
-  };
-
-  const handleReset = () => {
-    // Wallet reset, go back to setup
-    console.log('[App] Wallet reset');
-  };
-
-  const handleLogout = async () => {
-    await sessionLogout();
-    logout();
-  };
-
-  // No wallet - show setup (Create Passkey directly)
-  if (!hasWallet) {
+  // No account or not connected - show setup
+  // WalletSetup now uses PasskeyAccountContext (Smart Contract)
+  if (!isConnected) {
     return <WalletSetup onComplete={handleComplete} />;
   }
 
-  // Wallet exists but locked - show unlock (Verify Passkey)
-  // This enforces passkey authentication even after magic link login
-  if (!isUnlocked) {
-    return <UnlockWalletPasskey onUnlock={handleUnlock} onReset={handleReset} />;
-  }
-
-  // Only show dashboard if wallet is UNLOCKED (Passkey verified)
+  // Connected - show dashboard
   return <WalletDashboard />;
 };
 
 
 
 const RootView: React.FC = () => {
-  const { email, loading, verifyMagicToken, verifyingToken, message } = useSession();
+  const { email, verifyMagicToken } = useSession();
   const [tokenHandled, setTokenHandled] = useState(false);
   const [currentPath, setCurrentPath] = useState(window.location.pathname);
-
-  // Feature flag for self-custodial mode
-  const useSelfCustodial = true; // Set to true to enable self-custodial wallet
 
   // Listen for path changes
   useEffect(() => {
@@ -121,22 +95,13 @@ const RootView: React.FC = () => {
     return <TermsAndConditions />;
   }
 
-  // Use self-custodial or legacy wallet experience
-  // if (useSelfCustodial) {
-  // Hybrid auth: Email + Passkey
   // Email is required for multi-device support and recovery
   if (!email) {
     return <LoginPage />;
   }
-  return <SelfCustodialWalletExperience />;
-  // }
 
-  // Legacy wallet requires email
-  // if (!email) {
-  //   return <LoginPage />;
-  // }
-
-  // return <WalletExperience email={email} />;
+  // Use Smart Contract Passkey Wallet (NEW - default)
+  return <PasskeyWalletExperience />;
 };
 
 const App: React.FC = () => {
