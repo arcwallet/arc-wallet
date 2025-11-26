@@ -103,33 +103,40 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
     } catch (err: any) {
       console.error('[WalletSetup] Wallet access failed:', err);
 
-      // Handle specific WebAuthn errors
-      if (err.message?.includes('User cancelled') || err.message?.includes('cancelled')) {
-        setError('Biometric authentication was cancelled. Please try again.');
-      } else if (err.message?.includes('not supported')) {
-        setError('Your device does not support biometric authentication. Please use a compatible device.');
-      } else if (err.message?.includes('not available')) {
-        setError('Biometric authentication is not available. Please enable it in your device settings.');
-      } else if (err.message?.includes('Failed to fetch')) {
-        setError('Could not reach the server. Please check your connection.');
-      } else if (err.message?.includes('passkey already exists') || err.message?.includes('already registered')) {
+      // Handle specific WebAuthn errors with user-friendly messages
+      const errorMessage = err.message?.toLowerCase() || '';
+
+      if (errorMessage.includes('cancelled') || errorMessage.includes('canceled') || errorMessage.includes('user refused')) {
+        // User cancelled - not an error, just info
+        setError(null);
+        setStatusMessage('Authentication cancelled. Tap the button to try again.');
+      } else if (errorMessage.includes('timed out') || errorMessage.includes('not allowed')) {
+        // Timeout or user dismissed the prompt
+        setError(null);
+        setStatusMessage('Authentication was dismissed. Tap the button when ready.');
+      } else if (errorMessage.includes('not supported')) {
+        setError('Your device does not support passkey authentication.');
+      } else if (errorMessage.includes('not available')) {
+        setError('Passkey authentication is not available. Please check your device settings.');
+      } else if (errorMessage.includes('failed to fetch') || errorMessage.includes('network')) {
+        setError('Connection error. Please check your internet and try again.');
+      } else if (errorMessage.includes('passkey already exists') || errorMessage.includes('already registered')) {
         // Passkey exists - try to connect instead
-        setError('A passkey already exists. Trying to connect...');
+        setStatusMessage('Passkey found. Connecting...');
         try {
           await connect();
           onComplete();
           return;
         } catch (connectErr) {
-          setError('Failed to connect with existing passkey. Please try again.');
+          setError('Could not connect with existing passkey. Please try again.');
         }
+      } else if (errorMessage.includes('credential not found')) {
+        setError('Passkey not found. Please create a new wallet.');
       } else {
-        setError(err.message || 'Failed to access wallet. Please try again.');
+        setError('Something went wrong. Please try again.');
       }
     } finally {
       setIsCreating(false);
-      if (currentEmail) {
-        setStatusMessage('Ready to try again.');
-      }
     }
   }, [createAccount, connect, onComplete, currentEmail]);
 
