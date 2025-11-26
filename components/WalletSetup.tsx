@@ -74,7 +74,6 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
       const userHasServerPasskey = serverCheck.data?.hasPasskey ?? false;
 
       console.log('[WalletSetup] Smart Contract Wallet access check:', {
-        hasLocalAccount: hasAccount,
         hasServerPasskey: userHasServerPasskey,
         email: currentEmail
       });
@@ -132,7 +131,7 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
         setStatusMessage('Ready to try again.');
       }
     }
-  }, [createAccount, connect, onComplete, currentEmail, hasAccount]);
+  }, [createAccount, connect, onComplete, currentEmail]);
 
   // Auto-start wallet access when email is verified
   useEffect(() => {
