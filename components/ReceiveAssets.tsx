@@ -1,11 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { usePasskeyAccount } from '../contexts/PasskeyAccountContext';
 import { useArcAccount } from '../contexts/ArcAccountContext';
 import { CopyIcon, ChevronDownIcon } from './Icons';
 import QRCode from 'qrcode';
 import { getAllSupportedTokens, TokenInfo } from '../config/tokens';
 
 const ReceiveAssets: React.FC = () => {
-    const { address } = useArcAccount();
+    const { address: passkeyAddress } = usePasskeyAccount();
+    const { address: arcAddress } = useArcAccount();
+    // Prefer passkey wallet address, fallback to arc account
+    const address = passkeyAddress || arcAddress;
     const walletAddress = address || "0x0000000000000000000000000000000000000000";
     const [copyButtonText, setCopyButtonText] = useState('Copy Address');
     const [selectedToken, setSelectedToken] = useState<TokenInfo>(getAllSupportedTokens()[0]);
