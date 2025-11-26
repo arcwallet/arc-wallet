@@ -7,7 +7,6 @@ import helmet from 'helmet';
 import { Database } from './models/Database.js';
 import { SessionKeyManager } from './utils/SessionKeyManager.js';
 import { createPasskeyRoutes } from './routes/passkeys.js';
-import { createMagicLinkRouter } from './routes/magicLink.js';
 import { createCircleOtpRouter } from './routes/circleOtp.js';
 import { createWalletRouter } from './routes/wallet.js';
 import { createWalletBackupRouter } from './routes/walletBackup.js';
@@ -18,7 +17,6 @@ import paymasterRouter from './routes/paymaster.js';
 import { createHistoryRouter } from './routes/history.js';
 import { createWebhookRouter } from './routes/webhooks.js';
 import { createGasStationRouter } from './routes/gasStation.js';
-import { createMagicLinkMailer } from './services/magicLinkMailer.js';
 import { WalletBackupService } from './services/walletBackupService.js';
 import { IndexerService } from './services/indexerService.js';
 import { webhookService } from './services/webhookService.js';
@@ -45,14 +43,6 @@ validateConfig(config);
 const db = new Database(config.DB_PATH);
 const sessionKeyManager = new SessionKeyManager(db);
 const walletBackupService = new WalletBackupService(db);
-const magicLinkMailer = createMagicLinkMailer({
-  smtpHost: process.env.SMTP_HOST,
-  smtpPort: parseInt(process.env.SMTP_PORT || '587'),
-  smtpUser: process.env.SMTP_USER,
-  smtpPass: process.env.SMTP_PASS,
-  fromAddress: process.env.EMAIL_FROM_ADDRESS,
-  fromName: process.env.EMAIL_FROM_NAME ?? 'Arc Wallet',
-});
 const magicSessionStore = new MagicSessionStore();
 
 // Create Express app
@@ -108,8 +98,7 @@ app.use(healthCheck);
 // General rate limiting
 app.use(rateLimitMiddleware('general'));
 
-// Routes
-app.use(createMagicLinkRouter(config, magicLinkMailer, db, magicSessionStore));
+// Routes - OTP authentication only (Magic Link removed)
 app.use(createCircleOtpRouter(config, db, magicSessionStore));
 app.use('/api/wallet', createWalletRouter(db, config, magicSessionStore));
 app.use('/api/wallet-backup', createWalletBackupRouter(walletBackupService));

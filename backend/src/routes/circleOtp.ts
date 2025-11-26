@@ -1,17 +1,19 @@
 /**
  * Email OTP Routes
  * Uses SendGrid for email delivery, simple OTP verification
+ *
+ * IMPORTANT: User records are stored in SQLite Database (not file system)
+ * This ensures passkey registration can find the same user created during OTP verification
  */
 
 import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
 import sgMail from '@sendgrid/mail';
+import { randomUUID } from 'crypto';
 import { EnvConfig } from '../types/index.js';
-import { MagicUserStore } from '../magicLink/UserStore.js';
 import { MagicSessionStore } from '../magicLink/SessionStore.js';
 import { rateLimitMiddleware } from '../middleware/security.js';
 import { Database } from '../models/Database.js';
-import path from 'path';
 
 const SESSION_COOKIE_NAME = 'arcwallet_session';
 const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
@@ -32,9 +34,9 @@ const sanitizeEmail = (email: unknown): string | null => {
   return regex.test(trimmed) ? trimmed : null;
 };
 
-// Generate 6-digit OTP
+// Generate 6-digit OTP using cryptographically secure random
 const generateOtp = (): string => {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+  return crypto.randomInt(100000, 999999).toString();
 };
 
 // Store pending OTPs
@@ -79,7 +81,8 @@ function generateOtpEmailHtml(otpCode: string): string {
 
 export const createCircleOtpRouter = (config: EnvConfig, db: Database, sessionStore: MagicSessionStore) => {
   const router = Router();
-  const userStore = new MagicUserStore(path.join(process.cwd(), 'data'));
+  // NOTE: We use SQLite Database (db) for user storage, NOT file-based userStore
+  // This ensures passkey registration finds the same user created during OTP verification
 
   // Initialize SendGrid
   const sendgridApiKey = process.env.SENDGRID_API_KEY;
@@ -256,23 +259,53 @@ export const createCircleOtpRouter = (config: EnvConfig, db: Database, sessionSt
         });
       }
 
-      // Success - clean up and create session
+      // Success - clean up OTP
       pendingOtps.delete(otpKey);
 
-      const user = userStore.findOrCreate(email);
-      const session = sessionStore.create(user, SESSION_TTL_MS);
+      // CRITICAL: Create or find user in SQLite Database
+      // This is the SAME database that passkey registration uses
+      // Ensures email->passkey linking works correctly
+      let dbUser = await db.getUserByUsername(email);
 
-      console.log(`[OTP] Verified and session created for ${email}`);
+      if (!dbUser) {
+        // First time login - create user in SQLite
+        const userId = randomUUID();
+        dbUser = await db.createUser({
+          id: userId,
+          username: email,
+          displayName: email.split('@')[0],
+        });
+        console.log(`[OTP] Created new user in SQLite: ${email} (${userId})`);
+      } else {
+        console.log(`[OTP] Found existing user in SQLite: ${email} (${dbUser.id})`);
+      }
+
+      // Create session with user info
+      // Note: sessionStore still uses file-based session, but user is in SQLite
+      const now = new Date().toISOString();
+      const sessionUser = {
+        id: dbUser.id,
+        email,
+        createdAt: dbUser.createdAt?.toISOString?.() || now,
+        updatedAt: dbUser.updatedAt?.toISOString?.() || now,
+      };
+      const session = sessionStore.create(sessionUser, SESSION_TTL_MS);
+
+      console.log(`[OTP] Session created for ${email}, userId: ${dbUser.id}`);
 
       // Set session cookie
       const cookieOptions = COOKIE_BASE_OPTIONS(config.NODE_ENV === 'production');
       res.cookie(SESSION_COOKIE_NAME, session.id, cookieOptions);
 
+      // Return userId so frontend can link passkey to same user
       res.json({
         success: true,
         message: 'Email verified successfully',
         data: {
           email: session.email,
+          userId: dbUser.id,
+          hasWallet: !!dbUser.walletAddress,
+          walletAddress: dbUser.walletAddress || null,
         },
       });
     } catch (error) {
@@ -282,6 +315,52 @@ export const createCircleOtpRouter = (config: EnvConfig, db: Database, sessionSt
         error: 'Verification failed. Please try again.',
       });
     }
+  });
+
+  /**
+   * Get current session
+   * GET /api/session
+   */
+  router.get('/api/session', async (req: Request, res: Response) => {
+    const sessionId = (req as any).cookies?.[SESSION_COOKIE_NAME];
+    const session = sessionStore.get(sessionId);
+
+    if (!session) {
+      return res.status(401).json({ success: false, error: 'Session not found.' });
+    }
+
+    try {
+      // Get user details from database to check for wallet
+      const user = await db.getUserByUsername(session.email);
+
+      res.json({
+        success: true,
+        data: {
+          email: session.email,
+          hasWallet: !!user?.walletAddress,
+          walletAddress: user?.walletAddress || null,
+          userId: user?.id || null,
+        },
+      });
+    } catch (error) {
+      console.error('[Session] Fetch error:', error);
+      // Fallback to just email if DB fails
+      res.json({
+        success: true,
+        data: { email: session.email },
+      });
+    }
+  });
+
+  /**
+   * Logout - clear session
+   * POST /api/logout
+   */
+  router.post('/api/logout', (req: Request, res: Response) => {
+    const sessionId = (req as any).cookies?.[SESSION_COOKIE_NAME];
+    sessionStore.delete(sessionId);
+    res.clearCookie(SESSION_COOKIE_NAME, COOKIE_BASE_OPTIONS(config.NODE_ENV === 'production'));
+    res.json({ success: true });
   });
 
   return router;

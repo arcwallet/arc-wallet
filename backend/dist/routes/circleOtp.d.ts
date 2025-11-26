@@ -1,6 +1,9 @@
 /**
  * Email OTP Routes
- * Simple email-based OTP authentication using nodemailer
+ * Uses SendGrid for email delivery, simple OTP verification
+ *
+ * IMPORTANT: User records are stored in SQLite Database (not file system)
+ * This ensures passkey registration can find the same user created during OTP verification
  */
 import { EnvConfig } from '../types/index.js';
 import { MagicSessionStore } from '../magicLink/SessionStore.js';

@@ -2,8 +2,8 @@ import fs from 'fs';
 import express, { Router, Request, Response } from 'express';
 import path from 'path';
 import crypto from 'crypto';
+import { randomUUID } from 'crypto';
 import { EnvConfig } from '../types/index.js';
-import { MagicUserStore } from '../magicLink/UserStore.js';
 import { MagicSessionStore } from '../magicLink/SessionStore.js';
 import { MagicLinkService } from '../magicLink/MagicLinkService.js';
 import { rateLimitMiddleware } from '../middleware/security.js';
@@ -63,7 +63,8 @@ const renderTemplate = (title: string, body: string) => `<!doctype html>
 
 export const createMagicLinkRouter = (config: EnvConfig, mailer: MagicLinkMailer, db: Database, sessionStore: MagicSessionStore) => {
   const router = Router();
-  const userStore = new MagicUserStore(path.join(process.cwd(), 'data'));
+  // NOTE: We use SQLite Database (db) for user storage, NOT file-based userStore
+  // This ensures passkey registration finds the same user created during magic link verification
   const tokenService = new MagicLinkService(config.SESSION_SECRET);
   const baseUrl = config.MAGIC_LINK_BASE_URL || `http://localhost:${config.PORT}`;
   const staticDir = path.join(process.cwd(), 'public');
@@ -106,7 +107,26 @@ export const createMagicLinkRouter = (config: EnvConfig, mailer: MagicLinkMailer
       return res.status(400).json({ success: false, error: 'Please provide a valid email address.' });
     }
 
-    const user = userStore.findOrCreate(email);
+    // Use SQLite Database instead of file-based userStore
+    let dbUser = await db.getUserByUsername(email);
+    if (!dbUser) {
+      const userId = randomUUID();
+      dbUser = await db.createUser({
+        id: userId,
+        username: email,
+        displayName: email.split('@')[0],
+      });
+    }
+
+    // Create MagicUser-compatible object for token generation
+    const now = new Date().toISOString();
+    const user = {
+      id: dbUser.id,
+      email,
+      createdAt: dbUser.createdAt?.toISOString?.() || now,
+      updatedAt: dbUser.updatedAt?.toISOString?.() || now,
+    };
+
     const token = tokenService.generateToken(user);
     const magicUrl = `${baseUrl}?token=${token}`;
 
@@ -160,15 +180,36 @@ export const createMagicLinkRouter = (config: EnvConfig, mailer: MagicLinkMailer
     const expiresAt = new Date(payload.expiresAt);
     await db.markTokenUsed(tokenHash, expiresAt);
 
-    const user = userStore.findOrCreate(payload.email);
+    // Use SQLite Database instead of file-based userStore
+    const email = payload.email.trim().toLowerCase();
+    let dbUser = await db.getUserByUsername(email);
+    if (!dbUser) {
+      const userId = randomUUID();
+      dbUser = await db.createUser({
+        id: userId,
+        username: email,
+        displayName: email.split('@')[0],
+      });
+      console.log(`[MagicLink] Created new user in SQLite: ${email} (${userId})`);
+    } else {
+      console.log(`[MagicLink] Found existing user in SQLite: ${email} (${dbUser.id})`);
+    }
+
+    // Create MagicUser-compatible object for session
+    const now = new Date().toISOString();
+    const user = {
+      id: dbUser.id,
+      email,
+      createdAt: dbUser.createdAt?.toISOString?.() || now,
+      updatedAt: dbUser.updatedAt?.toISOString?.() || now,
+    };
+
     const session = sessionStore.create(user, SESSION_TTL_MS);
 
     console.log(`[MagicLink] Verified token for ${user.email}, creating session ${session.id}`);
 
     const cookieOptions = COOKIE_BASE_OPTIONS(config.NODE_ENV === 'production');
     res.cookie(SESSION_COOKIE_NAME, session.id, cookieOptions);
-
-    console.log(`[MagicLink] Session cookie set with options:`, cookieOptions);
 
     res.json({ success: true });
   });

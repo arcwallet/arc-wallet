@@ -143,14 +143,13 @@ export class PasskeyController {
                 throw new ApiError('Invalid or expired challenge', 400, 'INVALID_CHALLENGE');
             }
             const decodedClientData = decodeClientDataJSON(credential.response.clientDataJSON);
-            console.log('[PasskeyReg] Verifying registration response...');
-            console.log('[PasskeyReg] Expected challenge:', challengeRecord.challenge);
-            console.log('[PasskeyReg] Expected origin:', this.config.ORIGIN);
-            console.log('[PasskeyReg] Expected RP_ID:', this.config.RP_ID);
-            console.log('[PasskeyReg] Client origin:', decodedClientData.origin);
-            console.log('[PasskeyReg] Client challenge:', decodedClientData.challenge);
-            console.log('[PasskeyReg] Origin match:', this.config.ORIGIN === decodedClientData.origin);
-            console.log('[PasskeyReg] Challenge match:', challengeRecord.challenge === decodedClientData.challenge);
+            // Debug logs only in development
+            if (this.config.NODE_ENV === 'development') {
+                console.log('[PasskeyReg] Verifying registration response...');
+                console.log('[PasskeyReg] Expected origin:', this.config.ORIGIN);
+                console.log('[PasskeyReg] Client origin:', decodedClientData.origin);
+                console.log('[PasskeyReg] Origin match:', this.config.ORIGIN === decodedClientData.origin);
+            }
             // Verify registration response
             let verification;
             try {
@@ -163,13 +162,14 @@ export class PasskeyController {
                 });
             }
             catch (verifyError) {
-                console.error('[PasskeyReg] verifyRegistrationResponse threw error:', verifyError.message);
-                console.error('[PasskeyReg] Full error:', verifyError);
+                console.error('[PasskeyReg] Credential verification failed:', verifyError.message);
                 throw new ApiError(`Credential verification failed: ${verifyError.message}`, 400, 'VERIFICATION_FAILED');
             }
-            console.log('[PasskeyReg] Verification result:', verification.verified, verification.registrationInfo);
+            if (this.config.NODE_ENV === 'development') {
+                console.log('[PasskeyReg] Verification result:', verification.verified);
+            }
             if (!verification.verified) {
-                console.error('[PasskeyReg] Verification failed details:', verification);
+                console.error('[PasskeyReg] Registration verification failed');
                 throw new ApiError('Registration verification failed', 400, 'VERIFICATION_FAILED');
             }
             // Create user if not exists; otherwise use existing
@@ -192,23 +192,15 @@ export class PasskeyController {
                 // This address will be the owner of the Smart Account
                 const { deriveAddressFromCOSE } = await import('../utils/passkeyUtils.js');
                 const ownerAddress = deriveAddressFromCOSE(verification.registrationInfo.credentialPublicKey);
-                console.log('[PasskeyReg] Derived owner address from passkey:', {
-                    ownerAddress,
-                    credentialId: credentialIdB64Url,
-                    credentialIdLength: credentialIdB64Url.length,
-                    userId: user.id,
-                    existingWalletAddress: user.walletAddress
-                });
+                if (this.config.NODE_ENV === 'development') {
+                    console.log('[PasskeyReg] Derived owner address:', ownerAddress);
+                }
                 // IMPORTANT: Only set wallet address if user doesn't have one yet
                 // This prevents duplicate wallet creation when adding a new device
                 if (!user.walletAddress) {
                     await this.db.updateUser(user.id, {
                         walletAddress: ownerAddress
                     });
-                    console.log('[PasskeyReg] Set wallet address for new user:', ownerAddress);
-                }
-                else {
-                    console.log('[PasskeyReg] User already has wallet address, keeping existing:', user.walletAddress);
                 }
                 await this.db.createPasskeyCredential({
                     id: randomUUID(),
@@ -220,7 +212,6 @@ export class PasskeyController {
                     credentialBackedUp: verification.registrationInfo.credentialBackedUp,
                     transports: credential.response.transports
                 });
-                console.log('[PasskeyReg] Credential stored successfully with owner address');
             }
             // Clean up challenge
             await this.db.deleteChallenge(challengeRecord.id);
@@ -235,10 +226,9 @@ export class PasskeyController {
                     const [x, y] = COSEECDHAtoXY(verification.registrationInfo.credentialPublicKey);
                     publicKeyX = x;
                     publicKeyY = y;
-                    console.log('[PasskeyReg] Extracted public key coordinates:', { x: x.substring(0, 20) + '...', y: y.substring(0, 20) + '...' });
                 }
                 catch (e) {
-                    console.error('[PasskeyReg] Failed to extract public key coordinates:', e);
+                    console.error('[PasskeyReg] Failed to extract public key coordinates');
                 }
             }
             // Self-custodial: Return user identity info and public key for smart contract wallet
@@ -322,35 +312,13 @@ export class PasskeyController {
             if (!credential) {
                 throw new ApiError('Credential is required', 400, 'MISSING_CREDENTIAL');
             }
-            // Debug logging for credential ID
-            console.log('[PasskeyAuth] Credential received:', {
-                id: credential.id?.substring(0, 20),
-                rawId: credential.rawId?.substring(0, 20),
-                hasResponse: !!credential.response
-            });
             // Get passkey credential from database
             // Use rawId (base64url) instead of id (base64) to match database format
             const credentialId = credential.rawId || credential.id;
-            console.log('[PasskeyAuth] Looking up credential with ID:', credentialId?.substring(0, 30) + '...');
             const passkeyCredential = await this.db.getPasskeyByCredentialId(credentialId);
             if (!passkeyCredential) {
-                console.error('[PasskeyAuth] Passkey not found in database for ID:', credentialId?.substring(0, 30));
-                // List all credentials for debugging
-                const user = await this.db.getUserByUsername(credential.id); // Try to find user another way
-                if (user) {
-                    const userPasskeys = await this.db.getPasskeysByUserId(user.id);
-                    console.log('[PasskeyAuth] User has passkeys:', userPasskeys.map(p => ({
-                        id: p.credentialID.substring(0, 30),
-                        counter: p.counter
-                    })));
-                }
                 throw new ApiError('Passkey not found', 404, 'PASSKEY_NOT_FOUND');
             }
-            console.log('[PasskeyAuth] Passkey found:', {
-                credentialID: passkeyCredential.credentialID?.substring(0, 30),
-                counter: passkeyCredential.counter,
-                userId: passkeyCredential.userId
-            });
             // Get user
             const user = await this.db.getUserById(passkeyCredential.userId);
             if (!user) {
@@ -362,15 +330,6 @@ export class PasskeyController {
             if (!challenge) {
                 throw new ApiError('Invalid or expired challenge', 400, 'INVALID_CHALLENGE');
             }
-            console.log('[PasskeyAuth] Verifying authentication...');
-            // Log authenticator details for debugging
-            console.log('[PasskeyAuth] Authenticator details:', {
-                credentialID: passkeyCredential.credentialID,
-                credentialIDType: typeof passkeyCredential.credentialID,
-                credentialPublicKeyType: typeof passkeyCredential.credentialPublicKey,
-                credentialPublicKeyIsBuffer: Buffer.isBuffer(passkeyCredential.credentialPublicKey),
-                credentialPublicKeyLength: passkeyCredential.credentialPublicKey?.length
-            });
             // Verify authentication response
             const verification = await verifyAuthenticationResponse({
                 response: credential,
@@ -385,7 +344,6 @@ export class PasskeyController {
                 },
                 requireUserVerification: true
             });
-            console.log('[PasskeyAuth] Verification result:', verification.verified);
             if (!verification.verified) {
                 throw new ApiError('Authentication verification failed', 400, 'VERIFICATION_FAILED');
             }

@@ -15,12 +15,14 @@ class PushService {
         }
         else {
             // Generate new keys (Note: This means clients need to re-subscribe if server restarts without persistence)
-            console.warn('⚠️ Generating new VAPID keys. Clients may need to resubscribe.');
+            // In production, set VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY env vars
             const keys = webpush.generateVAPIDKeys();
             this.publicKey = keys.publicKey;
             this.privateKey = keys.privateKey;
-            console.log('VAPID Public Key:', this.publicKey);
-            console.log('VAPID Private Key:', this.privateKey);
+            // Never log private keys in production!
+            if (process.env.NODE_ENV === 'development') {
+                console.warn('⚠️ VAPID keys not configured. Push notifications may not persist across restarts.');
+            }
         }
         webpush.setVapidDetails('mailto:admin@arcwallet.com', this.publicKey, this.privateKey);
     }
