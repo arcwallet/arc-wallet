@@ -1,7 +1,15 @@
 import Database from 'better-sqlite3';
 import path from 'path';
+import fs from 'fs';
 
 const DB_PATH = process.env.DB_PATH || path.join(process.cwd(), 'data', 'wallet.db');
+
+// Ensure data directory exists before opening database
+const dataDir = path.dirname(DB_PATH);
+if (!fs.existsSync(dataDir)) {
+    fs.mkdirSync(dataDir, { recursive: true });
+}
+
 const db = new Database(DB_PATH);
 
 // Initialize agent tables
