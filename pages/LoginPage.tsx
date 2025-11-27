@@ -56,9 +56,8 @@ const LoginPage: React.FC = () => {
         throw new Error('Failed to verify passkey');
       }
 
-      if (finishResult.data?.sessionKey) {
-        localStorage.setItem('arc_session_key', JSON.stringify(finishResult.data.sessionKey));
-      }
+      // Session key is managed by HttpOnly cookies - no need to store in localStorage
+      // Private keys should NEVER be stored in localStorage (security risk!)
 
       await refresh();
       return true;
@@ -90,10 +89,8 @@ const LoginPage: React.FC = () => {
         throw new Error('Failed to complete passkey registration');
       }
 
-      // Store session key if provided
-      if (finishResult.data?.sessionKey) {
-        localStorage.setItem('arc_session_key', JSON.stringify(finishResult.data.sessionKey));
-      }
+      // Session key is managed by HttpOnly cookies - no need to store in localStorage
+      // Private keys should NEVER be stored in localStorage (security risk!)
 
       console.log('[LoginPage] Passkey created successfully');
       showMessage('Passkey created successfully!', 'success');
