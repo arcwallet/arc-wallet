@@ -21,11 +21,13 @@ export const setCsrfCookie = (req, res, next) => {
 // Routes that don't require CSRF validation (public endpoints)
 // OTP/Circle endpoints are exempt because email verification provides security
 // Passkey endpoints are exempt because WebAuthn provides cryptographic security
+// Agent endpoints are exempt because they use session-based auth and rate limiting
 const CSRF_EXEMPT_ROUTES = [
     '/api/send-link',
     '/api/verify',
     '/api/otp', // Simple OTP routes
     '/api/circle', // Circle OTP routes (email verification provides security)
+    '/api/agent', // Agent routes (session-based auth + rate limiting provides security)
     '/health',
     '/passkeys', // All passkey routes exempt (WebAuthn provides cryptographic security)
 ];
