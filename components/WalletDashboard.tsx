@@ -9,7 +9,7 @@ import MultiSigDashboard from './MultiSigDashboard';
 import Faucet from './Faucet';
 import SwapScreen from './SwapScreen';
 import Bridge from './Bridge';
-import AgentScreen from './AgentScreen';
+import AgentScreen, { WalletBalance } from './AgentScreen';
 import NetworkSelector from './NetworkSelector';
 // import Bridge from './Bridge';
 import { Transaction } from '../types';
@@ -566,6 +566,8 @@ const WalletDashboard: React.FC = () => {
   // State for total balance from all tokens
   const [totalBalance, setTotalBalance] = useState<string | null>(null);
   const [isLoadingTotalBalance, setIsLoadingTotalBalance] = useState(false);
+  // State for agent wallet balances
+  const [agentBalances, setAgentBalances] = useState<WalletBalance[]>([]);
 
   // Sync tokenService RPC URL with current network
   useEffect(() => {
@@ -595,12 +597,19 @@ const WalletDashboard: React.FC = () => {
         const prices = await tokenService.getTokenPrices(symbols);
 
         let total = 0;
+        const walletBalances: WalletBalance[] = [];
         for (const tb of tokenBalances) {
           const qty = parseFloat(tb.formattedBalance);
           const priceUsd = prices[tb.token.symbol]?.usd ?? (tb.token.symbol === 'USDC' ? 1.0 : 1.07);
           total += qty * priceUsd;
+          walletBalances.push({
+            token: tb.token.symbol,
+            balance: tb.balance.toString(),
+            formattedBalance: tb.formattedBalance,
+          });
         }
 
+        setAgentBalances(walletBalances);
         setTotalBalance(`$${total.toFixed(2)}`);
       } catch (error) {
         console.error('Error calculating total balance:', error);
@@ -667,7 +676,14 @@ const WalletDashboard: React.FC = () => {
       case 'Faucet':
         return <Faucet />;
       case 'Agent':
-        return <AgentScreen onExecuteIntent={handleAgentIntent} />;
+        return (
+          <AgentScreen
+            onExecuteIntent={handleAgentIntent}
+            walletAddress={address}
+            balances={agentBalances}
+            totalBalance={totalBalance || undefined}
+          />
+        );
       case 'Settings':
         return <Settings />;
       default:

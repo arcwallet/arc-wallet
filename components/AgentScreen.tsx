@@ -2,8 +2,17 @@ import React, { useState, useRef, useEffect } from 'react';
 import { SendIcon, SpinnerIcon, TrashIcon } from './Icons';
 import { agentService, AgentResponse } from '../services/agentService';
 
+export interface WalletBalance {
+    token: string;
+    balance: string;
+    formattedBalance: string;
+}
+
 interface AgentScreenProps {
     onExecuteIntent?: (intent: any) => void;
+    walletAddress?: string;
+    balances?: WalletBalance[];
+    totalBalance?: string;
 }
 
 interface Message {
@@ -14,7 +23,7 @@ interface Message {
     intent?: any;
 }
 
-const AgentScreen: React.FC<AgentScreenProps> = ({ onExecuteIntent }) => {
+const AgentScreen: React.FC<AgentScreenProps> = ({ onExecuteIntent, walletAddress, balances, totalBalance }) => {
     const [messages, setMessages] = useState<Message[]>([
         {
             id: 'welcome',
@@ -88,6 +97,33 @@ const AgentScreen: React.FC<AgentScreenProps> = ({ onExecuteIntent }) => {
         }
     };
 
+    // Generate balance response message
+    const getBalanceMessage = (token?: string): string => {
+        if (!balances || balances.length === 0) {
+            return "I couldn't fetch your wallet balances. Please make sure you're connected.";
+        }
+
+        if (token) {
+            const tokenBalance = balances.find(b => b.token.toUpperCase() === token.toUpperCase());
+            if (tokenBalance) {
+                return `Your ${tokenBalance.token} balance is ${tokenBalance.formattedBalance} ${tokenBalance.token}.`;
+            }
+            return `I couldn't find ${token} in your wallet. Available tokens: ${balances.map(b => b.token).join(', ')}`;
+        }
+
+        // Show all balances
+        const balanceList = balances
+            .filter(b => parseFloat(b.balance) > 0)
+            .map(b => `• ${b.formattedBalance} ${b.token}`)
+            .join('\n');
+
+        if (!balanceList) {
+            return `Your wallet is empty. Total balance: ${totalBalance || '$0.00'}`;
+        }
+
+        return `Here are your wallet balances:\n${balanceList}\n\nTotal Value: ${totalBalance || 'calculating...'}`;
+    };
+
     const handleSend = async () => {
         if (!input.trim()) return;
 
@@ -105,12 +141,37 @@ const AgentScreen: React.FC<AgentScreenProps> = ({ onExecuteIntent }) => {
         try {
             const response = await agentService.parseIntent(userMsg.text);
 
+            let responseMessage = response.message;
+            let responseIntent = response.intent;
+
+            // Handle CHECK_BALANCE locally with real wallet data
+            if (response.intent.type === 'CHECK_BALANCE') {
+                responseMessage = getBalanceMessage(response.intent.params.token);
+            }
+
+            // Enhance SEND response with balance info
+            if (response.intent.type === 'SEND' && balances) {
+                const token = response.intent.params.token;
+                const amount = parseFloat(response.intent.params.amount || '0');
+                const tokenBalance = balances.find(b => b.token.toUpperCase() === token?.toUpperCase());
+
+                if (tokenBalance) {
+                    const availableBalance = parseFloat(tokenBalance.formattedBalance);
+                    if (amount > availableBalance) {
+                        responseMessage = `You want to send ${amount} ${token}, but you only have ${tokenBalance.formattedBalance} ${token}. Please enter a smaller amount.`;
+                        responseIntent = { type: 'UNKNOWN', params: {} };
+                    } else if (response.intent.params.recipient) {
+                        responseMessage = `I'll help you send ${amount} ${token} to ${response.intent.params.recipient.slice(0, 6)}...${response.intent.params.recipient.slice(-4)}. You have ${tokenBalance.formattedBalance} ${token} available.`;
+                    }
+                }
+            }
+
             const agentMsg: Message = {
                 id: (Date.now() + 1).toString(),
-                text: response.message,
+                text: responseMessage,
                 sender: 'agent',
                 timestamp: new Date(),
-                intent: response.intent.type !== 'UNKNOWN' ? response.intent : undefined,
+                intent: responseIntent.type !== 'UNKNOWN' && responseIntent.type !== 'CHECK_BALANCE' ? responseIntent : undefined,
             };
 
             setMessages((prev) => [...prev, agentMsg]);
