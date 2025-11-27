@@ -1,27 +1,39 @@
 import jwt from 'jsonwebtoken';
-export const authMiddleware = (secret) => {
+/**
+ * Auth middleware that supports both:
+ * 1. Bearer JWT token in Authorization header
+ * 2. Cookie-based session (magic_session cookie)
+ */
+export const authMiddleware = (secret, sessionStore) => {
     return (req, res, next) => {
         const authHeader = req.headers.authorization;
-        if (!authHeader?.startsWith('Bearer ')) {
-            return res.status(401).json({
-                success: false,
-                error: 'Missing authorization token',
-                code: 'UNAUTHORIZED'
-            });
+        // Try Bearer token first
+        if (authHeader?.startsWith('Bearer ')) {
+            const token = authHeader.slice(7);
+            try {
+                const decoded = jwt.verify(token, secret);
+                req.user = decoded;
+                return next();
+            }
+            catch (error) {
+                // Fall through to try cookie session
+            }
         }
-        const token = authHeader.slice(7);
-        try {
-            const decoded = jwt.verify(token, secret);
-            req.user = decoded;
-            next();
+        // Try cookie-based session
+        const sessionId = req.cookies?.magic_session;
+        if (sessionId && sessionStore) {
+            const session = sessionStore.get(sessionId);
+            if (session) {
+                req.user = { id: session.userId, email: session.email };
+                return next();
+            }
         }
-        catch (error) {
-            return res.status(401).json({
-                success: false,
-                error: 'Invalid or expired token',
-                code: 'UNAUTHORIZED'
-            });
-        }
+        // No valid auth found
+        return res.status(401).json({
+            success: false,
+            error: 'Missing authorization token',
+            code: 'UNAUTHORIZED'
+        });
     };
 };
 //# sourceMappingURL=auth.js.map

@@ -1,11 +1,11 @@
 import { Router } from 'express';
 import { MultiSigController } from '../controllers/MultiSigController.js';
 import { authMiddleware } from '../middleware/auth.js';
-export function createMultiSigRoutes(db, config) {
+export function createMultiSigRoutes(db, config, sessionStore) {
     const router = Router();
     const controller = new MultiSigController(db);
-    // Apply auth middleware to all multi-sig routes
-    router.use(authMiddleware(config.JWT_SECRET));
+    // Apply auth middleware to all multi-sig routes (supports both JWT and cookie session)
+    router.use(authMiddleware(config.JWT_SECRET, sessionStore));
     const asyncHandler = (fn) => (req, res, next) => {
         fn(req, res, next, req.user?.id).catch(next);
     };

@@ -104,7 +104,7 @@ app.use(createBridgeRoutes(db, {
     SEPOLIA_RPC_URL: config.SEPOLIA_RPC_URL,
 }, magicSessionStore));
 app.use('/auth', createOAuthRouter(db, config, magicSessionStore));
-app.use('/multisig', createMultiSigRoutes(db, config));
+app.use('/multisig', createMultiSigRoutes(db, config, magicSessionStore));
 app.use('/api/paymaster', paymasterRouter);
 app.use('/api/history', createHistoryRouter());
 app.use('/api/webhooks', createWebhookRouter());

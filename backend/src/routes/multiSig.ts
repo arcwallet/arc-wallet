@@ -3,13 +3,14 @@ import { MultiSigController } from '../controllers/MultiSigController.js';
 import { Database } from '../models/Database.js';
 import { EnvConfig } from '../types/index.js';
 import { authMiddleware } from '../middleware/auth.js';
+import { MagicSessionStore } from '../magicLink/SessionStore.js';
 
-export function createMultiSigRoutes(db: Database, config: EnvConfig): Router {
+export function createMultiSigRoutes(db: Database, config: EnvConfig, sessionStore?: MagicSessionStore): Router {
   const router = Router();
   const controller = new MultiSigController(db);
 
-  // Apply auth middleware to all multi-sig routes
-  router.use(authMiddleware(config.JWT_SECRET));
+  // Apply auth middleware to all multi-sig routes (supports both JWT and cookie session)
+  router.use(authMiddleware(config.JWT_SECRET, sessionStore));
 
   const asyncHandler = (fn: (req: Request, res: Response, next: NextFunction, authUserId?: string) => Promise<void>) => 
     (req: Request, res: Response, next: NextFunction) => {
