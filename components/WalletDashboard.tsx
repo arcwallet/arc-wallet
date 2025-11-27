@@ -189,7 +189,7 @@ const DashboardHeader: React.FC<DashboardHeaderPropsWithNav> = ({ account, isRef
             <p className="text-sm font-medium text-slate-400">Privacy Mode</p>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded">Coming Soon</span>
+            <span className="text-xs font-semibold text-blue-400 bg-blue-400/10 px-2 py-0.5 rounded">Coming Soon</span>
             <button
               disabled
               className="relative inline-flex h-5 w-9 items-center rounded-full bg-slate-700 cursor-not-allowed opacity-50"

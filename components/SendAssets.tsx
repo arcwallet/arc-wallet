@@ -515,14 +515,88 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
       let kind: 'transaction' | 'userOp' = 'transaction';
 
       // PASSKEY WALLET PATH - Uses P256 signing via WebAuthn
-      // Note: Passkey wallet transfer requires ERC-4337 UserOperation building
-      // This is a complex operation that needs bundler integration
-      if (passkeyConnected && !walletPrivateKey) {
-        // For now, show a friendly message that passkey transfers are coming soon
-        // TODO: Implement full ERC-4337 UserOperation flow for passkey signing
-        setSubmitError('Passkey wallet transfers are coming soon. Please use a self-custodial wallet for now.');
-        setIsSubmitting(false);
-        return;
+      // Full ERC-4337 UserOperation flow with passkey signing
+      if (passkeyConnected && !walletPrivateKey && passkeyManager) {
+        console.log('[SEND] Using passkey wallet for transaction');
+
+        try {
+          // Get token contract address if needed
+          const tokenInfo = selectedToken;
+          let toAddress = recipient;
+          let valueWei = 0n;
+          let callData = '0x';
+
+          if (tokenInfo.symbol !== 'ETH') {
+            // ERC20 Token transfer - encode as callData
+            const { getTokenContractAddress } = await import('../config/tokens');
+            const tokenAddress = getTokenContractAddress(tokenInfo.symbol, 'testnet', 'arcTestnet');
+
+            if (!tokenAddress) {
+              throw new Error(`Token contract address not found for ${tokenInfo.symbol}`);
+            }
+
+            // Encode ERC20 transfer call
+            const { Interface, parseUnits } = await import('ethers');
+            const iface = new Interface([
+              'function transfer(address to, uint256 amount) returns (bool)'
+            ]);
+            const amountWei = parseUnits(amount, tokenInfo.decimals);
+            callData = iface.encodeFunctionData('transfer', [recipient, amountWei]);
+            toAddress = tokenAddress; // Call token contract
+            valueWei = 0n; // No native value for ERC20
+
+            console.log(`[SEND] Passkey ERC20 transfer: ${amount} ${tokenInfo.symbol} to ${recipient}`);
+            console.log(`[SEND] Token contract: ${tokenAddress}`);
+          } else {
+            // Native transfer (USDC on Arc)
+            const { parseUnits } = await import('ethers');
+            valueWei = parseUnits(amount, 6); // Arc uses USDC (6 decimals)
+            console.log(`[SEND] Passkey native transfer: ${amount} USDC to ${recipient}`);
+          }
+
+          // Execute transaction via PasskeyAccountManager
+          const result = await passkeyManager.executeTransaction(toAddress, valueWei, callData);
+
+          hash = result.hash;
+          kind = result.userOpHash ? 'userOp' : 'transaction';
+
+          console.log(`[SEND] Passkey transaction successful: ${hash}`);
+
+          // Record and continue to success handling below
+          setTxHash(hash);
+          setSubmissionKind(kind);
+
+          // Record recipient in address book
+          addressBookService.recordRecipient(recipient, amount, selectedToken.symbol);
+
+          // Add to activity
+          const activity = {
+            id: hash,
+            type: TransactionType.Sent,
+            description: `Sent ${amountNumber.toFixed(4)} ${selectedToken.symbol}`,
+            timestamp: 'Just now',
+            date: new Date(),
+            amount: -amountNumber,
+            currency: selectedToken.symbol,
+            usdValue: -amountNumber * (selectedToken.currentPrice || 1),
+            status: kind === 'userOp' ? TransactionStatus.Pending : TransactionStatus.Completed,
+            hash,
+            from: walletAddress,
+            to: recipient,
+            networkFee: 0,
+            approvals: { required: 0, list: [] },
+          };
+          addActivity(activity);
+
+          setIsSubmitting(false);
+          return;
+        } catch (passkeyError: any) {
+          console.error('[SEND] Passkey transaction failed:', passkeyError);
+          const errorMessage = passkeyError?.message || 'Passkey transaction failed';
+          setSubmitError(errorMessage);
+          setIsSubmitting(false);
+          return;
+        }
       }
 
       // PRIVATE KEY WALLET PATH - Uses traditional signing

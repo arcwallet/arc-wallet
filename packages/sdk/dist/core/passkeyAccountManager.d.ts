@@ -79,6 +79,30 @@ export declare class PasskeyAccountManager {
      * Build init code for account deployment
      */
     getInitCode(): string;
+    /**
+     * Execute a transaction via the smart account
+     * This handles the full ERC-4337 UserOperation flow:
+     * 1. Build UserOperation with callData
+     * 2. Get gas estimates
+     * 3. Sign with passkey
+     * 4. Submit to bundler/RPC
+     */
+    executeTransaction(to: string, value: bigint, data?: string): Promise<{
+        hash: string;
+        userOpHash?: string;
+    }>;
+    /**
+     * Calculate UserOperation hash for signing
+     */
+    private calculateUserOpHash;
+    /**
+     * Submit UserOperation to bundler or RPC
+     */
+    private submitUserOperation;
+    /**
+     * Wait for UserOperation to be included in a transaction
+     */
+    private waitForUserOperation;
     private extractSignatureComponents;
     private parseDERSignature;
     private toBase64Url;

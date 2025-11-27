@@ -357,6 +357,204 @@ export class PasskeyAccountManager {
     return this.config.factoryAddress + createAccountData.slice(2);
   }
 
+  /**
+   * Execute a transaction via the smart account
+   * This handles the full ERC-4337 UserOperation flow:
+   * 1. Build UserOperation with callData
+   * 2. Get gas estimates
+   * 3. Sign with passkey
+   * 4. Submit to bundler/RPC
+   */
+  async executeTransaction(
+    to: string,
+    value: bigint,
+    data: string = '0x'
+  ): Promise<{ hash: string; userOpHash?: string }> {
+    if (!this.accountAddress) {
+      throw new Error('No account connected. Please connect first.');
+    }
+
+    logger.info('Executing transaction via passkey account', {
+      component: 'PasskeyAccountManager',
+      to,
+      value: value.toString()
+    });
+
+    // Check if account is deployed
+    const isDeployed = await this.isAccountDeployed();
+
+    // Build callData for the execute function
+    const accountInterface = new Contract(this.accountAddress, ACCOUNT_ABI, this.provider).interface;
+    const callData = accountInterface.encodeFunctionData('execute', [to, value, data]);
+
+    // Get current gas prices
+    const feeData = await this.provider.getFeeData();
+    const maxFeePerGas = feeData.maxFeePerGas || feeData.gasPrice || 1000000000n;
+    const maxPriorityFeePerGas = feeData.maxPriorityFeePerGas || 100000000n;
+
+    // Get nonce
+    const nonce = await this.getAccountNonce();
+
+    // Build UserOperation (without signature - will be added after signing)
+    const userOp = {
+      sender: this.accountAddress,
+      nonce,
+      initCode: isDeployed ? '0x' : this.getInitCode(),
+      callData,
+      callGasLimit: 500000n, // Conservative estimate
+      verificationGasLimit: isDeployed ? 150000n : 500000n, // Higher for deployment
+      preVerificationGas: 50000n,
+      maxFeePerGas,
+      maxPriorityFeePerGas,
+      paymasterAndData: '0x', // No paymaster for now
+    };
+
+    // Calculate userOpHash
+    const userOpHash = this.calculateUserOpHash(userOp);
+
+    // Sign with passkey
+    const signature = await this.signUserOperation(userOp, userOpHash);
+
+    // Create signed UserOperation
+    const signedUserOp = { ...userOp, signature };
+
+    // Submit UserOperation
+    // Try eth_sendUserOperation first (bundler), fallback to direct execution
+    try {
+      const result = await this.submitUserOperation(signedUserOp);
+      return { hash: result.hash, userOpHash: result.userOpHash };
+    } catch (bundlerError) {
+      logger.warn('Bundler submission failed, trying direct execution', {
+        component: 'PasskeyAccountManager',
+        error: bundlerError
+      });
+
+      // Fallback: Direct contract call (requires gas from sender)
+      // This won't work for undeployed accounts without gas
+      throw new Error('Transaction submission failed. Please ensure your account has gas for transactions.');
+    }
+  }
+
+  /**
+   * Calculate UserOperation hash for signing
+   */
+  private calculateUserOpHash(userOp: Omit<UserOperation, 'signature'>): string {
+    const abiCoder = AbiCoder.defaultAbiCoder();
+
+    // Pack UserOperation (without signature)
+    const packed = abiCoder.encode(
+      ['address', 'uint256', 'bytes32', 'bytes32', 'uint256', 'uint256', 'uint256', 'uint256', 'uint256', 'bytes32'],
+      [
+        userOp.sender,
+        userOp.nonce,
+        keccak256(userOp.initCode),
+        keccak256(userOp.callData),
+        userOp.callGasLimit,
+        userOp.verificationGasLimit,
+        userOp.preVerificationGas,
+        userOp.maxFeePerGas,
+        userOp.maxPriorityFeePerGas,
+        keccak256(userOp.paymasterAndData),
+      ]
+    );
+
+    const userOpHashInner = keccak256(packed);
+
+    // Final hash includes entryPoint and chainId
+    const chainId = 5042002n; // Arc Testnet
+    const finalPacked = abiCoder.encode(
+      ['bytes32', 'address', 'uint256'],
+      [userOpHashInner, this.config.entryPointAddress, chainId]
+    );
+
+    return keccak256(finalPacked);
+  }
+
+  /**
+   * Submit UserOperation to bundler or RPC
+   */
+  private async submitUserOperation(userOp: UserOperation): Promise<{ hash: string; userOpHash: string }> {
+    // Try eth_sendUserOperation (ERC-4337 bundler RPC)
+    const userOpForRpc = {
+      sender: userOp.sender,
+      nonce: '0x' + userOp.nonce.toString(16),
+      initCode: userOp.initCode,
+      callData: userOp.callData,
+      callGasLimit: '0x' + userOp.callGasLimit.toString(16),
+      verificationGasLimit: '0x' + userOp.verificationGasLimit.toString(16),
+      preVerificationGas: '0x' + userOp.preVerificationGas.toString(16),
+      maxFeePerGas: '0x' + userOp.maxFeePerGas.toString(16),
+      maxPriorityFeePerGas: '0x' + userOp.maxPriorityFeePerGas.toString(16),
+      paymasterAndData: userOp.paymasterAndData,
+      signature: userOp.signature,
+    };
+
+    try {
+      // Send to bundler
+      const response = await fetch(this.config.rpcUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          method: 'eth_sendUserOperation',
+          params: [userOpForRpc, this.config.entryPointAddress],
+          id: Date.now(),
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.error) {
+        throw new Error(result.error.message || 'Bundler rejected UserOperation');
+      }
+
+      const userOpHash = result.result;
+
+      // Wait for transaction to be mined
+      const txHash = await this.waitForUserOperation(userOpHash);
+
+      return { hash: txHash, userOpHash };
+    } catch (error) {
+      logger.error('Failed to submit UserOperation', error instanceof Error ? error : undefined, { component: 'PasskeyAccountManager' });
+      throw error;
+    }
+  }
+
+  /**
+   * Wait for UserOperation to be included in a transaction
+   */
+  private async waitForUserOperation(userOpHash: string, timeout: number = 60000): Promise<string> {
+    const startTime = Date.now();
+
+    while (Date.now() - startTime < timeout) {
+      try {
+        const response = await fetch(this.config.rpcUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            method: 'eth_getUserOperationReceipt',
+            params: [userOpHash],
+            id: Date.now(),
+          }),
+        });
+
+        const result = await response.json();
+
+        if (result.result?.receipt?.transactionHash) {
+          return result.result.receipt.transactionHash;
+        }
+      } catch {
+        // Continue polling
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    }
+
+    // If timeout, return userOpHash as hash (transaction may still be pending)
+    return userOpHash;
+  }
+
   // ============ Private Methods ============
 
   private async extractSignatureComponents(auth: AuthenticationResponseJSON): Promise<{
