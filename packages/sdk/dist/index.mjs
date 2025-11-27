@@ -2625,6 +2625,23 @@ class Xe {
     return this.currentCredential;
   }
   /**
+   * Restore state from a stored credential (without WebAuthn interaction)
+   * Use this when restoring from localStorage
+   */
+  async restoreFromCredential(e) {
+    const { keccak256: t } = await import("ethers");
+    this.currentCredential = e;
+    const n = BigInt(t(new TextEncoder().encode(e.userId))), r = this.factory.getFunction("getAddress");
+    return this.accountAddress = await r(
+      BigInt(e.publicKeyX),
+      BigInt(e.publicKeyY),
+      n
+    ), o.info("Restored from credential", {
+      component: "PasskeyAccountManager",
+      address: this.accountAddress
+    }), this.accountAddress;
+  }
+  /**
    * Check if account is deployed
    */
   async isAccountDeployed() {

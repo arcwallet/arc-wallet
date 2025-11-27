@@ -320,6 +320,32 @@ export class PasskeyAccountManager {
   }
 
   /**
+   * Restore state from a stored credential (without WebAuthn interaction)
+   * Use this when restoring from localStorage
+   */
+  async restoreFromCredential(credential: PasskeyCredential): Promise<string> {
+    const { keccak256 } = await import('ethers');
+
+    this.currentCredential = credential;
+
+    // Calculate account address from credential
+    const salt = BigInt(keccak256(new TextEncoder().encode(credential.userId)));
+    const getAddressFunc = this.factory.getFunction('getAddress');
+    this.accountAddress = await getAddressFunc(
+      BigInt(credential.publicKeyX),
+      BigInt(credential.publicKeyY),
+      salt
+    );
+
+    logger.info('Restored from credential', {
+      component: 'PasskeyAccountManager',
+      address: this.accountAddress
+    });
+
+    return this.accountAddress!;
+  }
+
+  /**
    * Check if account is deployed
    */
   async isAccountDeployed(): Promise<boolean> {

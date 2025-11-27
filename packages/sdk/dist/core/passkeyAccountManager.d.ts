@@ -68,6 +68,11 @@ export declare class PasskeyAccountManager {
      */
     getCurrentCredential(): PasskeyCredential | null;
     /**
+     * Restore state from a stored credential (without WebAuthn interaction)
+     * Use this when restoring from localStorage
+     */
+    restoreFromCredential(credential: PasskeyCredential): Promise<string>;
+    /**
      * Check if account is deployed
      */
     isAccountDeployed(): Promise<boolean>;

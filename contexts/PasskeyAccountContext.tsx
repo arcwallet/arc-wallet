@@ -136,18 +136,11 @@ export const PasskeyAccountProvider: React.FC<PasskeyAccountProviderProps> = ({ 
           setCredential(storedCred);
           console.log('[PasskeyAccount] Found existing credential for current user:', storedCred);
 
-          // Restore address from stored credential using factory.getAddress
+          // Restore address from stored credential AND update manager's internal state
           if (storedCred.publicKeyX && storedCred.publicKeyY && storedCred.userId) {
             try {
-              const { keccak256 } = await import('ethers');
-              const salt = BigInt(keccak256(new TextEncoder().encode(storedCred.userId)));
-              // Note: Use getFunction() because Ethers v6 Contract has its own getAddress() method from Addressable interface
-              const getAddressFunc = manager['factory'].getFunction('getAddress');
-              const restoredAddress = await getAddressFunc(
-                BigInt(storedCred.publicKeyX),
-                BigInt(storedCred.publicKeyY),
-                salt
-              );
+              // Use restoreFromCredential to properly set manager's internal state
+              const restoredAddress = await manager.restoreFromCredential(storedCred);
               setAddress(restoredAddress);
               setIsConnected(true);
               console.log('[PasskeyAccount] Restored address from credential:', restoredAddress);
