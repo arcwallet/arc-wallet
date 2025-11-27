@@ -4,13 +4,18 @@ export default defineConfig({
   testDir: './tests/e2e',
   fullyParallel: true,
   retries: process.env.CI ? 2 : 0,
-  reporter: [['list'], ...(process.env.CI ? [['github']] : [])],
+  timeout: 30000,
+  expect: {
+    timeout: 10000,
+  },
+  reporter: process.env.CI ? [['github'], ['html', { open: 'never' }]] : [['list']],
   use: {
-    baseURL: 'http://127.0.0.1:4173',
+    baseURL: process.env.E2E_BASE_URL || 'http://127.0.0.1:4173',
     trace: 'on-first-retry',
+    screenshot: 'only-on-failure',
     viewport: { width: 1280, height: 720 },
   },
-  webServer: {
+  webServer: process.env.E2E_SKIP_SERVER ? undefined : {
     command: 'npm run dev -- --host 0.0.0.0 --port 4173',
     url: 'http://127.0.0.1:4173',
     reuseExistingServer: !process.env.CI,
@@ -22,6 +27,10 @@ export default defineConfig({
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
+    },
+    {
+      name: 'mobile',
+      use: { ...devices['iPhone 13'] },
     },
   ],
 });
