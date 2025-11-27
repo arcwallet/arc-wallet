@@ -39,7 +39,7 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
-    "@account-abstraction/contracts": "^0.8.0",
+    "@account-abstraction/contracts": "^0.7.0",
     "@arc/wallet-sdk": "file:./packages/sdk",
     "@circle-fin/adapter-viem-v2": "^1.0.1",
     "@circle-fin/bridge-kit": "^1.1.0",

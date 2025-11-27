@@ -23,12 +23,13 @@ if (fs.existsSync(envPath)) {
 /** @type {import('hardhat/config').HardhatUserConfig} */
 const config = {
   solidity: {
-    version: '0.8.20',
+    version: '0.8.23',
     settings: {
       optimizer: {
         enabled: true,
         runs: 200,
       },
+      evmVersion: 'paris',
     },
   },
   paths: {
