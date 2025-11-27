@@ -414,13 +414,20 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
 
   const isRecipientValid = recipient ? isAddress(recipient) : false;
   const hasSession = Boolean(walletAddress);
-  // IMPORTANT: Require wallet to be unlocked (have private key) to submit
-  const canSubmit = hasSession && isRecipientValid && amountNumber > 0 && amountNumber <= balance && !isSubmitting && !!walletPrivateKey;
+  // IMPORTANT: Allow submission with either private key OR passkey wallet
+  // Passkey wallet doesn't use private key - it signs via WebAuthn P256
+  const hasSigningCapability = !!walletPrivateKey || passkeyConnected;
+  const canSubmit = hasSession && isRecipientValid && amountNumber > 0 && amountNumber <= balance && !isSubmitting && hasSigningCapability;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!walletAddress || !walletPrivateKey) {
-      setSubmitError('Wallet not available. Please unlock your wallet.');
+    if (!walletAddress) {
+      setSubmitError('Wallet not available. Please connect your wallet.');
+      return;
+    }
+    // Require either private key (self-custodial) OR passkey connection
+    if (!walletPrivateKey && !passkeyConnected) {
+      setSubmitError('Please unlock your wallet or connect with passkey.');
       return;
     }
 
