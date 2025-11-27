@@ -219,6 +219,7 @@ const SmartWalletSection: React.FC = () => {
     const { address: selfCustodialAddress } = useSelfCustodialWallet();
     const address = passkeyAddress || selfCustodialAddress;
     const [copied, setCopied] = useState<string | null>(null);
+    const [isExpanded, setIsExpanded] = useState(false);
 
     const copyToClipboard = (text: string, key: string) => {
         navigator.clipboard.writeText(text);
@@ -235,83 +236,99 @@ const SmartWalletSection: React.FC = () => {
         { name: 'EntryPoint (ERC-4337)', address: ARC_TESTNET_CONTRACTS.entryPoint, description: 'Account Abstraction entry' },
     ];
 
+    const features = [
+        'Multi-device support (up to 20 keys)',
+        'WebAuthn/Passkey authentication',
+        '1-of-n signature (any key can sign)',
+        'Batch transactions',
+        'ECDSA & P256 curve support',
+        'Upgradeable (UUPS proxy)',
+    ];
+
     return (
-        <div className="flex flex-col gap-4 rounded-xl bg-gradient-to-br from-indigo-900/30 to-purple-900/20 border border-indigo-500/30 p-5 sm:p-6">
+        <div className="flex flex-col gap-4 rounded-xl bg-slate-900/60 backdrop-blur-sm border border-slate-500/50 p-5 sm:p-6">
             <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
                 <div className="flex flex-col gap-1">
                     <h3 className="text-lg font-semibold text-slate-100 flex items-center gap-2">
-                        <span className="text-xl">🔐</span> Smart Wallet (Multi-Key)
+                        <KeyIcon size={20} className="text-[#9EBBE4]" />
+                        Smart Wallet (Multi-Key)
                     </h3>
                     <p className="text-sm text-slate-400">ERC-4337 Account Abstraction with P256 passkey support</p>
                 </div>
                 <div className="flex items-center gap-2">
-                    <span className="px-3 py-1 rounded-full text-xs font-medium bg-green-500/20 text-green-400 border border-green-500/30">
+                    <span className="px-3 py-1.5 rounded-lg text-xs font-medium bg-[#9EBBE4]/10 text-[#9EBBE4] border border-[#9EBBE4]/30">
                         Arc Testnet
                     </span>
+                    <button
+                        onClick={() => setIsExpanded(!isExpanded)}
+                        className="flex h-10 items-center justify-center rounded-lg border border-slate-500/50 bg-transparent px-4 text-sm font-medium text-slate-300 hover:bg-white/5 hover:text-white hover:border-slate-400 transition-all"
+                    >
+                        {isExpanded ? 'Hide Details' : 'View Details'}
+                    </button>
                 </div>
             </div>
 
-            <div className="grid gap-3">
-                {contracts.map((contract) => (
-                    <div key={contract.name} className="flex items-center justify-between p-3 rounded-lg bg-slate-800/40 border border-slate-600/30">
-                        <div className="flex flex-col gap-0.5">
-                            <span className="text-sm font-medium text-slate-200">{contract.name}</span>
-                            <span className="text-xs text-slate-500">{contract.description}</span>
+            {/* Features Summary */}
+            <div className="rounded-lg border border-slate-600/30 bg-slate-800/30 p-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+                    {features.map((feature, index) => (
+                        <div key={index} className="flex items-center gap-2 text-slate-400">
+                            <div className="w-1.5 h-1.5 rounded-full bg-green-400 flex-shrink-0" />
+                            <span>{feature}</span>
                         </div>
-                        <div className="flex items-center gap-2">
-                            <code className="text-xs text-indigo-300 font-mono bg-indigo-900/30 px-2 py-1 rounded">
-                                {truncateAddress(contract.address)}
-                            </code>
-                            <button
-                                onClick={() => copyToClipboard(contract.address, contract.name)}
-                                className="p-1.5 rounded hover:bg-white/10 transition-colors"
-                                title="Copy address"
-                            >
-                                {copied === contract.name ? (
-                                    <span className="text-green-400 text-xs">✓</span>
-                                ) : (
-                                    <CopyIcon size={14} className="text-slate-400" />
-                                )}
-                            </button>
-                            <a
-                                href={`https://explorer.arc.network/address/${contract.address}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="p-1.5 rounded hover:bg-white/10 transition-colors text-slate-400 hover:text-slate-200"
-                                title="View on Explorer"
-                            >
-                                ↗
-                            </a>
-                        </div>
-                    </div>
-                ))}
-            </div>
-
-            <div className="mt-2 p-4 rounded-lg bg-slate-800/30 border border-slate-600/20">
-                <h4 className="text-sm font-medium text-slate-300 mb-3">Features</h4>
-                <div className="grid grid-cols-2 gap-3 text-xs">
-                    <div className="flex items-center gap-2 text-slate-400">
-                        <span className="text-green-400">✓</span> Multi-device support (up to 20 keys)
-                    </div>
-                    <div className="flex items-center gap-2 text-slate-400">
-                        <span className="text-green-400">✓</span> WebAuthn/Passkey authentication
-                    </div>
-                    <div className="flex items-center gap-2 text-slate-400">
-                        <span className="text-green-400">✓</span> 1-of-n signature (any key can sign)
-                    </div>
-                    <div className="flex items-center gap-2 text-slate-400">
-                        <span className="text-green-400">✓</span> Batch transactions
-                    </div>
-                    <div className="flex items-center gap-2 text-slate-400">
-                        <span className="text-green-400">✓</span> ECDSA & P256 curve support
-                    </div>
-                    <div className="flex items-center gap-2 text-slate-400">
-                        <span className="text-green-400">✓</span> Upgradeable (UUPS proxy)
-                    </div>
+                    ))}
                 </div>
             </div>
 
-            <p className="text-xs text-slate-500">
+            {/* Expandable Contract Details */}
+            {isExpanded && (
+                <div className="rounded-lg border border-slate-600/30 overflow-hidden">
+                    <div className="px-4 py-2 bg-slate-800/40 text-slate-400 text-sm font-medium">
+                        Deployed Contracts
+                    </div>
+                    <div className="divide-y divide-slate-600/30">
+                        {contracts.map((contract) => (
+                            <div key={contract.name} className="flex items-center justify-between p-3 hover:bg-white/5 transition-colors">
+                                <div className="flex flex-col gap-0.5">
+                                    <span className="text-sm font-medium text-slate-200">{contract.name}</span>
+                                    <span className="text-xs text-slate-500">{contract.description}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <code className="text-xs text-[#9EBBE4] font-mono bg-slate-800/60 px-2 py-1 rounded border border-slate-600/30">
+                                        {truncateAddress(contract.address)}
+                                    </code>
+                                    <button
+                                        onClick={() => copyToClipboard(contract.address, contract.name)}
+                                        className="p-1.5 rounded hover:bg-white/10 transition-colors"
+                                        title="Copy address"
+                                    >
+                                        {copied === contract.name ? (
+                                            <span className="text-green-400 text-xs font-medium">Copied</span>
+                                        ) : (
+                                            <CopyIcon size={14} className="text-slate-400" />
+                                        )}
+                                    </button>
+                                    <a
+                                        href={`https://testnet.arcscan.io/address/${contract.address}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="p-1.5 rounded hover:bg-white/10 transition-colors text-slate-400 hover:text-[#9EBBE4]"
+                                        title="View on Explorer"
+                                    >
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                                            <polyline points="15 3 21 3 21 9" />
+                                            <line x1="10" y1="14" x2="21" y2="3" />
+                                        </svg>
+                                    </a>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            <p className="text-xs text-[#A7B4C8]">
                 Smart wallets allow multiple devices to control one account. Add passkeys for biometric authentication or link external wallets.
             </p>
         </div>
