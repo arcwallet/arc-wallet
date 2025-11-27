@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { PasskeyController } from '../controllers/PasskeyController.js';
 import { rateLimitMiddleware, validateRequestBody, sanitizeInput } from '../middleware/security.js';
 import { authMiddleware } from '../middleware/auth.js';
-export function createPasskeyRoutes(db, config) {
+export function createPasskeyRoutes(db, config, sessionStore) {
     const router = Router();
     const passkeyController = new PasskeyController(db, config);
     // Apply middleware to all routes
@@ -59,7 +59,7 @@ export function createPasskeyRoutes(db, config) {
      * GET /passkeys/session-keys/:userId
      * Get active session keys for a user
      */
-    router.get('/session-keys/:userId', authMiddleware(config.JWT_SECRET), rateLimitMiddleware('general'), async (req, res, next) => {
+    router.get('/session-keys/:userId', authMiddleware(config.JWT_SECRET, sessionStore), rateLimitMiddleware('general'), async (req, res, next) => {
         try {
             const { userId } = req.params;
             // Verify user owns this data
@@ -80,7 +80,7 @@ export function createPasskeyRoutes(db, config) {
      * DELETE /passkeys/session-keys/:sessionKeyId
      * Revoke a session key
      */
-    router.delete('/session-keys/:sessionKeyId', authMiddleware(config.JWT_SECRET), rateLimitMiddleware('general'), async (req, res, next) => {
+    router.delete('/session-keys/:sessionKeyId', authMiddleware(config.JWT_SECRET, sessionStore), rateLimitMiddleware('general'), async (req, res, next) => {
         try {
             // Pass authenticated user's ID to the controller for ownership check
             await passkeyController.revokeSessionKey(req, res, req.user?.id);
@@ -90,7 +90,7 @@ export function createPasskeyRoutes(db, config) {
         }
     });
     // Devices management
-    router.get('/devices/:userId', authMiddleware(config.JWT_SECRET), rateLimitMiddleware('general'), async (req, res, next) => {
+    router.get('/devices/:userId', authMiddleware(config.JWT_SECRET, sessionStore), rateLimitMiddleware('general'), async (req, res, next) => {
         try {
             const { userId } = req.params;
             // Verify user owns this data
@@ -107,7 +107,7 @@ export function createPasskeyRoutes(db, config) {
             next(error);
         }
     });
-    router.delete('/devices/:credentialId', authMiddleware(config.JWT_SECRET), rateLimitMiddleware('general'), async (req, res, next) => {
+    router.delete('/devices/:credentialId', authMiddleware(config.JWT_SECRET, sessionStore), rateLimitMiddleware('general'), async (req, res, next) => {
         try {
             await passkeyController.deleteDevice(req, res, req.user?.id);
         }

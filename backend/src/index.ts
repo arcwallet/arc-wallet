@@ -116,7 +116,7 @@ app.use(rateLimitMiddleware('general'));
 app.use(createCircleOtpRouter(config, db, magicSessionStore));
 app.use('/api/wallet', createWalletRouter(db, config, magicSessionStore));
 app.use('/api/wallet-backup', createWalletBackupRouter(walletBackupService));
-app.use('/passkeys', createPasskeyRoutes(db, config));
+app.use('/passkeys', createPasskeyRoutes(db, config, magicSessionStore));
 app.use(createBridgeRoutes(db, {
   NODE_ENV: config.NODE_ENV,
   ARC_RPC_URL: config.ARC_RPC_URL,

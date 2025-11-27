@@ -8,8 +8,9 @@ import {
 } from '../middleware/security.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { EnvConfig } from '../types/index.js';
+import { MagicSessionStore } from '../magicLink/SessionStore.js';
 
-export function createPasskeyRoutes(db: Database, config: EnvConfig): Router {
+export function createPasskeyRoutes(db: Database, config: EnvConfig, sessionStore?: MagicSessionStore): Router {
   const router = Router();
   const passkeyController = new PasskeyController(db, config);
 
@@ -89,7 +90,7 @@ export function createPasskeyRoutes(db: Database, config: EnvConfig): Router {
    */
   router.get(
     '/session-keys/:userId',
-    authMiddleware(config.JWT_SECRET),
+    authMiddleware(config.JWT_SECRET, sessionStore),
     rateLimitMiddleware('general'),
     async (req: Request, res: Response, next: NextFunction) => {
       try {
@@ -117,7 +118,7 @@ export function createPasskeyRoutes(db: Database, config: EnvConfig): Router {
    */
   router.delete(
     '/session-keys/:sessionKeyId',
-    authMiddleware(config.JWT_SECRET),
+    authMiddleware(config.JWT_SECRET, sessionStore),
     rateLimitMiddleware('general'),
     async (req: Request, res: Response, next: NextFunction) => {
       try {
@@ -132,7 +133,7 @@ export function createPasskeyRoutes(db: Database, config: EnvConfig): Router {
   // Devices management
   router.get(
     '/devices/:userId',
-    authMiddleware(config.JWT_SECRET),
+    authMiddleware(config.JWT_SECRET, sessionStore),
     rateLimitMiddleware('general'),
     async (req, res, next) => {
       try {
@@ -156,7 +157,7 @@ export function createPasskeyRoutes(db: Database, config: EnvConfig): Router {
 
   router.delete(
     '/devices/:credentialId',
-    authMiddleware(config.JWT_SECRET),
+    authMiddleware(config.JWT_SECRET, sessionStore),
     rateLimitMiddleware('general'),
     async (req, res, next) => {
       try {
