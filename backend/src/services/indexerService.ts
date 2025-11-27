@@ -181,8 +181,8 @@ class IndexerService {
                     insertTx.run(
                         tx.hash,
                         block.number,
-                        tx.from,
-                        tx.to,
+                        tx.from.toLowerCase(),
+                        tx.to?.toLowerCase() || null,
                         tx.value.toString(),
                         tx.data,
                         tx.nonce,
@@ -198,8 +198,8 @@ class IndexerService {
                             tx.hash,
                             block.number,
                             'Transfer',
-                            tx.from,
-                            tx.to,
+                            tx.from.toLowerCase(),
+                            tx.to?.toLowerCase() || null,
                             tx.value.toString(),
                             'NATIVE', // Native token
                             null,
@@ -239,10 +239,10 @@ class IndexerService {
                             // Topic0: 0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef
                             if (log.topics[0] === '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef' && log.topics.length === 3) {
                                 try {
-                                    const from = ethers.getAddress('0x' + log.topics[1].slice(26));
-                                    const to = ethers.getAddress('0x' + log.topics[2].slice(26));
+                                    const from = ethers.getAddress('0x' + log.topics[1].slice(26)).toLowerCase();
+                                    const to = ethers.getAddress('0x' + log.topics[2].slice(26)).toLowerCase();
                                     const value = BigInt(log.data).toString();
-                                    const tokenAddress = log.address;
+                                    const tokenAddress = log.address.toLowerCase();
 
                                     insertEvent.run(
                                         tx.hash,
