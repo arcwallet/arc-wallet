@@ -12,7 +12,19 @@ export interface Quote {
   estimatedGas: string;
   priceImpact: string;
   minimumReceived: string; // After slippage
+  timestamp: number; // Quote creation time for freshness check
+  expiresAt: number; // Quote expiration time
 }
+
+// MEV Protection Constants
+const MEV_CONFIG = {
+  QUOTE_STALE_TIME: 10_000, // 10 seconds - quote becomes stale
+  QUOTE_EXPIRY_TIME: 30_000, // 30 seconds - quote expires completely
+  DEADLINE_SECONDS: 300, // 5 minutes (reduced from 20 for MEV protection)
+  MAX_SLIPPAGE: 5, // 5% max slippage to prevent sandwich attacks
+  MIN_SLIPPAGE: 0.1, // 0.1% minimum
+  HIGH_SLIPPAGE_WARNING: 2, // Warn user above 2%
+};
 
 // Uniswap V3 Router ABI (minimal)
 const UNISWAP_ROUTER_ABI = [
@@ -113,6 +125,7 @@ class SwapService {
         fee
       );
 
+      const now = Date.now();
       return {
         fromToken,
         toToken,
@@ -123,6 +136,8 @@ class SwapService {
         estimatedGas: formatUnits(estimatedGas, 18),
         priceImpact: '< 0.01%', // For stablecoins
         minimumReceived,
+        timestamp: now,
+        expiresAt: now + MEV_CONFIG.QUOTE_EXPIRY_TIME,
       };
     } catch (error) {
       console.error('Error getting quote:', error);
@@ -131,13 +146,32 @@ class SwapService {
   }
 
   /**
-   * Execute a token swap
+   * Check if quote is still fresh (not stale)
+   */
+  isQuoteFresh(quote: Quote): boolean {
+    return Date.now() - quote.timestamp < MEV_CONFIG.QUOTE_STALE_TIME;
+  }
+
+  /**
+   * Check if quote has expired
+   */
+  isQuoteExpired(quote: Quote): boolean {
+    return Date.now() > quote.expiresAt;
+  }
+
+  /**
+   * Execute a token swap with MEV protection
    */
   async executeSwap(
     quote: Quote,
     privateKey: string
   ): Promise<string> {
     try {
+      // MEV Protection: Check quote expiration
+      if (this.isQuoteExpired(quote)) {
+        throw new Error('Quote expired. Please get a fresh quote to avoid unfavorable pricing.');
+      }
+
       const wallet = new Wallet(privateKey, this.provider);
       const tokenInAddress = getTokenContractAddress(quote.fromToken.symbol, 'testnet', 'arcTestnet');
       const tokenOutAddress = getTokenContractAddress(quote.toToken.symbol, 'testnet', 'arcTestnet');
@@ -147,7 +181,17 @@ class SwapService {
       }
 
       const amountIn = parseUnits(quote.fromAmount, quote.fromToken.decimals);
-      const amountOutMinimum = parseUnits(quote.minimumReceived, quote.toToken.decimals);
+
+      // MEV Protection: Re-quote if quote is stale
+      let amountOutMinimum: bigint;
+      if (!this.isQuoteFresh(quote)) {
+        console.log('[SWAP] Quote stale, re-quoting for current price...');
+        const freshQuote = await this.getQuote(quote.fromToken, quote.toToken, quote.fromAmount);
+        amountOutMinimum = parseUnits(freshQuote.minimumReceived, quote.toToken.decimals);
+        console.log('[SWAP] Fresh minimum received:', freshQuote.minimumReceived);
+      } else {
+        amountOutMinimum = parseUnits(quote.minimumReceived, quote.toToken.decimals);
+      }
 
       // Step 1: Check and approve token if needed
       await this.ensureTokenApproval(wallet, tokenInAddress, amountIn);
@@ -155,7 +199,8 @@ class SwapService {
       // Step 2: Execute swap
       const router = new Contract(this.routerAddress, UNISWAP_ROUTER_ABI, wallet);
 
-      const deadline = Math.floor(Date.now() / 1000) + 60 * 20; // 20 minutes
+      // MEV Protection: Shorter deadline (5 min instead of 20)
+      const deadline = Math.floor(Date.now() / 1000) + MEV_CONFIG.DEADLINE_SECONDS;
       const fee = this.isStablecoinPair(quote.fromToken.symbol, quote.toToken.symbol)
         ? FEE_TIERS.LOW
         : FEE_TIERS.MEDIUM;
@@ -318,10 +363,39 @@ class SwapService {
   }
 
   /**
-   * Set slippage tolerance (in percentage, e.g., 0.5 for 0.5%)
+   * Set slippage tolerance with MEV protection limits
+   * @param slippage - Slippage in percentage (e.g., 0.5 for 0.5%)
+   * @returns Object with success status and any warnings
    */
-  setSlippageTolerance(slippage: number): void {
+  setSlippageTolerance(slippage: number): { success: boolean; warning?: string } {
+    // MEV Protection: Enforce min/max slippage
+    if (slippage < MEV_CONFIG.MIN_SLIPPAGE) {
+      this.slippageTolerance = MEV_CONFIG.MIN_SLIPPAGE;
+      return {
+        success: true,
+        warning: `Slippage increased to minimum ${MEV_CONFIG.MIN_SLIPPAGE}% to prevent failed transactions.`
+      };
+    }
+
+    if (slippage > MEV_CONFIG.MAX_SLIPPAGE) {
+      this.slippageTolerance = MEV_CONFIG.MAX_SLIPPAGE;
+      return {
+        success: true,
+        warning: `Slippage capped at ${MEV_CONFIG.MAX_SLIPPAGE}% to protect against sandwich attacks.`
+      };
+    }
+
     this.slippageTolerance = slippage;
+
+    // Warn for high slippage
+    if (slippage > MEV_CONFIG.HIGH_SLIPPAGE_WARNING) {
+      return {
+        success: true,
+        warning: `High slippage (${slippage}%) increases vulnerability to MEV attacks. Consider lowering it.`
+      };
+    }
+
+    return { success: true };
   }
 
   /**
@@ -329,6 +403,20 @@ class SwapService {
    */
   getSlippageTolerance(): number {
     return this.slippageTolerance;
+  }
+
+  /**
+   * Get MEV protection configuration
+   */
+  getMevConfig() {
+    return { ...MEV_CONFIG };
+  }
+
+  /**
+   * Check if slippage is dangerously high
+   */
+  isHighSlippage(): boolean {
+    return this.slippageTolerance > MEV_CONFIG.HIGH_SLIPPAGE_WARNING;
   }
 }
 
