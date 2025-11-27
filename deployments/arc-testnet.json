@@ -1,0 +1,12 @@
+{
+  "network": "arcTestnet",
+  "chainId": 5042002,
+  "timestamp": "2025-11-27T14:35:25.490Z",
+  "deployer": "0x773c031ab8e7030F3233BE6D8aF0F7c451d42B60",
+  "contracts": {
+    "entryPoint": "0x0000000071727De22E5E9d8BAf0edAc6f37da032",
+    "p256Verifier": "0xbc3005Af3b06528EAB8E1605C568239da3Be5E37",
+    "arcAccountFactory": "0xAAD19fd1E49ED5ecE26494c74278200966447363",
+    "arcAccountImplementation": "0xE4D8e7471F3dC9371d4A766804C1fAF1B69E37aA"
+  }
+}
