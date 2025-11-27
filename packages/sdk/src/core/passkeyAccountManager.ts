@@ -444,21 +444,73 @@ export class PasskeyAccountManager {
     // Create signed UserOperation
     const signedUserOp = { ...userOp, signature };
 
-    // Submit UserOperation
-    // Try eth_sendUserOperation first (bundler), fallback to direct execution
+    // Submit UserOperation via relay service (backend handles gas)
     try {
-      const result = await this.submitUserOperation(signedUserOp);
-      return { hash: result.hash, userOpHash: result.userOpHash };
-    } catch (bundlerError) {
-      logger.warn('Bundler submission failed, trying direct execution', {
-        component: 'PasskeyAccountManager',
-        error: bundlerError
+      const result = await this.submitViaRelay(signedUserOp);
+      return { hash: result.hash, userOpHash };
+    } catch (relayError: any) {
+      logger.error('Relay submission failed', relayError instanceof Error ? relayError : undefined, {
+        component: 'PasskeyAccountManager'
       });
 
-      // Fallback: Direct contract call (requires gas from sender)
-      // This won't work for undeployed accounts without gas
-      throw new Error('Transaction submission failed. Please ensure your account has gas for transactions.');
+      // Try bundler as fallback
+      try {
+        const result = await this.submitUserOperation(signedUserOp);
+        return { hash: result.hash, userOpHash: result.userOpHash };
+      } catch (bundlerError) {
+        logger.warn('Bundler submission also failed', {
+          component: 'PasskeyAccountManager',
+          error: bundlerError
+        });
+        throw new Error(relayError?.message || 'Transaction submission failed. Please try again.');
+      }
     }
+  }
+
+  /**
+   * Submit UserOperation via backend relay service
+   */
+  private async submitViaRelay(userOp: UserOperation): Promise<{ hash: string }> {
+    const relayUrl = `${this.config.backendUrl}/api/relay/user-operation`;
+
+    logger.info('Submitting UserOperation via relay', {
+      component: 'PasskeyAccountManager',
+      sender: userOp.sender
+    });
+
+    const response = await fetch(relayUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({
+        userOp: {
+          sender: userOp.sender,
+          nonce: '0x' + userOp.nonce.toString(16),
+          initCode: userOp.initCode,
+          callData: userOp.callData,
+          callGasLimit: '0x' + userOp.callGasLimit.toString(16),
+          verificationGasLimit: '0x' + userOp.verificationGasLimit.toString(16),
+          preVerificationGas: '0x' + userOp.preVerificationGas.toString(16),
+          maxFeePerGas: '0x' + userOp.maxFeePerGas.toString(16),
+          maxPriorityFeePerGas: '0x' + userOp.maxPriorityFeePerGas.toString(16),
+          paymasterAndData: userOp.paymasterAndData,
+          signature: userOp.signature,
+        }
+      }),
+    });
+
+    const result = await response.json();
+
+    if (!result.success) {
+      throw new Error(result.error || 'Relay failed');
+    }
+
+    logger.info('Transaction relayed successfully', {
+      component: 'PasskeyAccountManager',
+      hash: result.data.transactionHash
+    });
+
+    return { hash: result.data.transactionHash };
   }
 
   /**

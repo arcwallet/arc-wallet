@@ -1,9 +1,9 @@
 var ae = Object.defineProperty;
 var se = (a, e, t) => e in a ? ae(a, e, { enumerable: !0, configurable: !0, writable: !0, value: t }) : a[e] = t;
 var h = (a, e, t) => se(a, typeof e != "symbol" ? e + "" : e, t);
-import { Wallet as U, parseUnits as ie, Contract as E, keccak256 as m, getBytes as P, formatUnits as oe, AbiCoder as W, Interface as K, toBeHex as v, JsonRpcProvider as q } from "ethers";
-import { set as N, get as I, del as ce, clear as de } from "idb-keyval";
-function C(a) {
+import { Wallet as U, parseUnits as ie, Contract as S, keccak256 as m, getBytes as P, formatUnits as oe, AbiCoder as W, Interface as K, toBeHex as v, JsonRpcProvider as q } from "ethers";
+import { set as N, get as k, del as ce, clear as de } from "idb-keyval";
+function E(a) {
   const e = new Uint8Array(a);
   let t = "";
   for (const r of e)
@@ -194,37 +194,37 @@ async function ne(a) {
   const { id: i, rawId: c, response: l, type: d } = s;
   let u;
   typeof l.getTransports == "function" && (u = l.getTransports());
-  let f;
+  let g;
   if (typeof l.getPublicKeyAlgorithm == "function")
     try {
-      f = l.getPublicKeyAlgorithm();
+      g = l.getPublicKeyAlgorithm();
     } catch (p) {
       F("getPublicKeyAlgorithm()", p);
     }
-  let g;
+  let f;
   if (typeof l.getPublicKey == "function")
     try {
       const p = l.getPublicKey();
-      p !== null && (g = C(p));
+      p !== null && (f = E(p));
     } catch (p) {
       F("getPublicKey()", p);
     }
   let y;
   if (typeof l.getAuthenticatorData == "function")
     try {
-      y = C(l.getAuthenticatorData());
+      y = E(l.getAuthenticatorData());
     } catch (p) {
       F("getAuthenticatorData()", p);
     }
   return {
     id: i,
-    rawId: C(c),
+    rawId: E(c),
     response: {
-      attestationObject: C(l.attestationObject),
-      clientDataJSON: C(l.clientDataJSON),
+      attestationObject: E(l.attestationObject),
+      clientDataJSON: E(l.clientDataJSON),
       transports: u,
-      publicKeyAlgorithm: f,
-      publicKey: g,
+      publicKeyAlgorithm: g,
+      publicKey: f,
       authenticatorData: y
     },
     type: d,
@@ -286,7 +286,7 @@ function fe({ error: a, options: e }) {
   }
   return a;
 }
-async function B(a) {
+async function L(a) {
   var y, w;
   !a.optionsJSON && a.challenge && (console.warn("startAuthentication() was not called correctly. It will try to continue with the provided options, but this call should be refactored to use the expected call structure instead. See https://simplewebauthn.dev/docs/packages/browser#typeerror-cannot-read-properties-of-undefined-reading-challenge for more information."), a = { optionsJSON: a });
   const { optionsJSON: e, useBrowserAutofill: t = !1, verifyBrowserAutofillInput: n = !0 } = a;
@@ -315,18 +315,18 @@ async function B(a) {
   }
   if (!c)
     throw new Error("Authentication was not completed");
-  const { id: l, rawId: d, response: u, type: f } = c;
-  let g;
-  return u.userHandle && (g = C(u.userHandle)), {
+  const { id: l, rawId: d, response: u, type: g } = c;
+  let f;
+  return u.userHandle && (f = E(u.userHandle)), {
     id: l,
-    rawId: C(d),
+    rawId: E(d),
     response: {
-      authenticatorData: C(u.authenticatorData),
-      clientDataJSON: C(u.clientDataJSON),
-      signature: C(u.signature),
-      userHandle: g
+      authenticatorData: E(u.authenticatorData),
+      clientDataJSON: E(u.clientDataJSON),
+      signature: E(u.signature),
+      userHandle: f
     },
-    type: f,
+    type: g,
     clientExtensionResults: c.getClientExtensionResults(),
     authenticatorAttachment: te(c.authenticatorAttachment)
   };
@@ -616,32 +616,32 @@ class De {
         component: "WebAuthn",
         challenge: ((r = u.challenge) == null ? void 0 : r.substring(0, 20)) + "..."
       });
-      const f = await ne({ optionsJSON: u });
+      const g = await ne({ optionsJSON: u });
       o.debug("Credential created successfully", {
         component: "WebAuthn",
-        credentialId: f.id.substring(0, 20) + "..."
+        credentialId: g.id.substring(0, 20) + "..."
       });
-      const g = await fetch(`${this.backendUrl}/passkeys/register/finish`, {
+      const f = await fetch(`${this.backendUrl}/passkeys/register/finish`, {
         method: "POST",
         headers: this.getHeaders(),
         credentials: "include",
         body: JSON.stringify({
           username: e,
           // Backend expects 'username' not 'userId'
-          credential: f
+          credential: g
         })
       });
-      if (!g.ok) {
-        const w = await g.json().catch(() => ({})), p = w.error || w.message || "Failed to verify credential";
+      if (!f.ok) {
+        const w = await f.json().catch(() => ({})), p = w.error || w.message || "Failed to verify credential";
         throw console.error("[WebAuthn] Credential verification failed:", w), new Error(p);
       }
-      const y = await g.json();
+      const y = await f.json();
       return o.info("Passkey registered successfully", {
         component: "WebAuthn",
-        credentialId: f.id.substring(0, 20) + "..."
+        credentialId: g.id.substring(0, 20) + "..."
       }), {
-        id: f.id,
-        publicKey: y.publicKey || f.id,
+        id: g.id,
+        publicKey: y.publicKey || g.id,
         // Backend should return the actual public key
         userId: e,
         // Include userId as required by PasskeyCredential interface
@@ -682,7 +682,7 @@ class De {
         component: "WebAuthn",
         challenge: ((n = i.challenge) == null ? void 0 : n.substring(0, 20)) + "..."
       });
-      const c = await B({ optionsJSON: i });
+      const c = await L({ optionsJSON: i });
       o.debug("Authentication response received", {
         component: "WebAuthn",
         credentialId: c.id.substring(0, 20) + "..."
@@ -786,7 +786,7 @@ class ve {
    */
   async getKey(e, t) {
     try {
-      const n = await I(`wallet_key_${e}`);
+      const n = await k(`wallet_key_${e}`);
       return n ? await this.decrypt(n, t) : null;
     } catch (n) {
       return o.error("Failed to retrieve key", n instanceof Error ? n : void 0, { component: "SecureStorage" }), null;
@@ -840,7 +840,7 @@ class ve {
    * Get key data (supports both legacy and new formats)
    */
   async getKeyData(e) {
-    return await I(`wallet:${e}`);
+    return await k(`wallet:${e}`);
   }
   /**
    * Store metadata
@@ -852,14 +852,14 @@ class ve {
    * Get wallet metadata
    */
   async getMetadata(e) {
-    const t = await I(`wallet:${e}:metadata`);
-    return t || await I(`wallet_meta_${e}`);
+    const t = await k(`wallet:${e}:metadata`);
+    return t || await k(`wallet_meta_${e}`);
   }
   /**
    * Check if key exists
    */
   async hasKey(e) {
-    return await I(`wallet_key_${e}`) !== void 0;
+    return await k(`wallet_key_${e}`) !== void 0;
   }
 }
 const Pe = new Uint8Array([
@@ -1042,7 +1042,7 @@ class Te {
     return new TextDecoder().decode(i);
   }
 }
-class Ie {
+class ke {
   constructor(e, t) {
     h(this, "webauthn");
     h(this, "storage");
@@ -1260,7 +1260,7 @@ class Ie {
     return [];
   }
 }
-const ke = {
+const Ie = {
   // Token Messenger contract addresses by chain ID
   tokenMessengerAddresses: {
     // TESTNETS
@@ -1345,7 +1345,7 @@ const ke = {
     // Polygon
   },
   attestationServiceUrl: "https://iris-api.circle.com"
-}, Oe = [
+}, xe = [
   {
     inputs: [
       {
@@ -1605,10 +1605,10 @@ const ke = {
     // Planned support
   }
 };
-function xe(a) {
+function Re(a) {
   return $[a];
 }
-function Re(a) {
+function Oe(a) {
   var e;
   return ((e = $[a]) == null ? void 0 : e.cctpSupported) ?? !1;
 }
@@ -1617,15 +1617,15 @@ function je(a) {
   return ((e = $[a]) == null ? void 0 : e.nativeUSDC) ?? !1;
 }
 const J = "0x0000000000000000000000000000000000000000", z = /^0x\.\.\.$/;
-function L(a, e) {
+function B(a, e) {
   var i, c, l;
   const t = {
     isValid: !0,
     errors: [],
     warnings: []
   };
-  if (!Re(e)) {
-    const d = xe(e), u = d ? d.name : `Chain ID ${e}`;
+  if (!Oe(e)) {
+    const d = Re(e), u = d ? d.name : `Chain ID ${e}`;
     return t.errors.push(`${u} does not support Circle CCTP`), t.isValid = !1, t;
   }
   const n = (i = a.tokenMessengerAddresses) == null ? void 0 : i[e], r = (c = a.usdcAddresses) == null ? void 0 : c[e], s = (l = a.domainIds) == null ? void 0 : l[e];
@@ -1650,7 +1650,7 @@ function L(a, e) {
   }), t;
 }
 function Je(a) {
-  const e = L(a, 412346);
+  const e = B(a, 412346);
   return e.isValid && e.warnings.length === 0;
 }
 function Y(a) {
@@ -1677,13 +1677,13 @@ class Me {
   constructor(e, t) {
     h(this, "config");
     h(this, "provider");
-    this.provider = e, this.config = { ...ke, ...t };
+    this.provider = e, this.config = { ...Ie, ...t };
   }
   /**
    * Transfer USDC cross-chain using CCTP
    */
   async transferUSDC(e, t) {
-    const { amount: n, destinationAddress: r, destinationChainId: s } = t, i = await e.provider.getNetwork().then((d) => Number(d.chainId)), c = L(this.config, i);
+    const { amount: n, destinationAddress: r, destinationChainId: s } = t, i = await e.provider.getNetwork().then((d) => Number(d.chainId)), c = B(this.config, i);
     if (!c.isValid) {
       const d = Y(i);
       throw o.error("CCTP configuration invalid for source chain", void 0, {
@@ -1692,7 +1692,7 @@ class Me {
         errors: c.errors
       }), new Error(d);
     }
-    const l = L(this.config, s);
+    const l = B(this.config, s);
     if (!l.isValid) {
       const d = Y(s);
       throw o.error("CCTP configuration invalid for destination chain", void 0, {
@@ -1707,37 +1707,37 @@ class Me {
         to: s,
         amount: n
       });
-      const d = this.config.tokenMessengerAddresses[i], u = this.config.usdcAddresses[i], f = this.config.domainIds[s];
-      if (!d || !u || f === void 0)
+      const d = this.config.tokenMessengerAddresses[i], u = this.config.usdcAddresses[i], g = this.config.domainIds[s];
+      if (!d || !u || g === void 0)
         throw new Error(`CCTP not supported for chain ${i}`);
-      const g = ie(n, 6), y = new E(u, j, e);
-      await y.allowance(e.address, d) < g && (console.log("[CCTP] Approving USDC..."), await (await y.approve(
+      const f = ie(n, 6), y = new S(u, j, e);
+      await y.allowance(e.address, d) < f && (console.log("[CCTP] Approving USDC..."), await (await y.approve(
         d,
-        g
+        f
       )).wait(), console.log("[CCTP] USDC approved"));
       const p = this.addressToBytes32(r);
       console.log("[CCTP] Calling depositForBurn...");
-      const D = await (await new E(
+      const D = await (await new S(
         d,
-        Oe,
+        xe,
         e
       ).depositForBurn(
-        g,
         f,
+        g,
         p,
         u
       )).wait();
       console.log("[CCTP] Burn transaction confirmed:", D.hash);
-      const V = this.extractMessageHash(D), k = {
+      const V = this.extractMessageHash(D), I = {
         sourceTxHash: D.hash,
         messageHash: V,
         status: "pending"
       };
-      return this.pollForAttestation(V).then((O) => {
-        k.attestation = O, k.status = "attested", console.log("[CCTP] Attestation received");
-      }).catch((O) => {
-        console.error("[CCTP] Attestation failed:", O), k.status = "failed";
-      }), k;
+      return this.pollForAttestation(V).then((x) => {
+        I.attestation = x, I.status = "attested", console.log("[CCTP] Attestation received");
+      }).catch((x) => {
+        console.error("[CCTP] Attestation failed:", x), I.status = "failed";
+      }), I;
     } catch (d) {
       throw console.error("[CCTP] Transfer failed:", d), new Error(`CCTP transfer failed: ${d.message}`);
     }
@@ -1800,7 +1800,7 @@ class Me {
     const n = t || Number((await this.provider.getNetwork()).chainId), r = this.config.usdcAddresses[n];
     if (!r)
       throw new Error(`USDC not supported on chain ${n}`);
-    const i = await new E(r, j, this.provider).balanceOf(e);
+    const i = await new S(r, j, this.provider).balanceOf(e);
     return oe(i, 6);
   }
 }
@@ -1846,7 +1846,7 @@ class Ke {
     }
   }
 }
-const x = new W(), R = [
+const R = new W(), O = [
   "function execute(address dest, uint256 value, bytes calldata func)",
   "function executeBatch(address[] calldata dest, uint256[] calldata value, bytes[] calldata func)",
   "function getNonce() view returns (uint256)"
@@ -1869,13 +1869,13 @@ class Ne {
    */
   getAccountAddress(e) {
     const t = m(P(e)), n = m(
-      x.encode(
+      R.encode(
         ["address", "address"],
         [this.config.accountImplementation, e]
       )
     );
     return "0x" + m(
-      x.encode(
+      R.encode(
         ["bytes1", "address", "bytes32", "bytes32"],
         ["0xff", this.config.factoryAddress, t, n]
       )
@@ -1891,16 +1891,16 @@ class Ne {
    * Build UserOperation for single transaction
    */
   async buildUserOperation(e, t) {
-    var g;
+    var f;
     const n = this.accountAddress || this.getAccountAddress(e.address);
     this.accountAddress = n;
-    const r = await this.isDeployed(n), i = new K(R).encodeFunctionData("execute", [
+    const r = await this.isDeployed(n), i = new K(O).encodeFunctionData("execute", [
       t.to,
       BigInt(t.value || "0"),
       t.data || "0x"
     ]);
     let c = 0n;
-    r && (c = await new E(n, R, this.provider).getNonce());
+    r && (c = await new S(n, O, this.provider).getNonce());
     const l = r ? "0x" : this.buildInitCode(e.address), d = await this.provider.getFeeData(), u = {
       sender: n,
       nonce: c,
@@ -1915,31 +1915,31 @@ class Ne {
       paymasterAndData: "0x",
       signature: "0x"
     };
-    if (t.sponsored && ((g = this.paymasterConfig) != null && g.enabled)) {
+    if (t.sponsored && ((f = this.paymasterConfig) != null && f.enabled)) {
       const y = await this.getPaymasterData(u);
       y && (u.paymasterAndData = y.paymasterAndData, y.callGasLimit && (u.callGasLimit = y.callGasLimit), y.verificationGasLimit && (u.verificationGasLimit = y.verificationGasLimit), y.preVerificationGas && (u.preVerificationGas = y.preVerificationGas));
     }
-    const f = await this.signUserOperation(e, u);
-    return u.signature = f, u;
+    const g = await this.signUserOperation(e, u);
+    return u.signature = g, u;
   }
   /**
    * Build UserOperation for batch transactions
    */
   async buildBatchUserOperation(e, t, n = !1) {
-    var S;
+    var C;
     const r = this.accountAddress || this.getAccountAddress(e.address);
     this.accountAddress = r;
-    const s = await this.isDeployed(r), i = new K(R), c = t.map((b) => b.to), l = t.map((b) => BigInt(b.value || "0")), d = t.map((b) => b.data || "0x"), u = i.encodeFunctionData("executeBatch", [
+    const s = await this.isDeployed(r), i = new K(O), c = t.map((b) => b.to), l = t.map((b) => BigInt(b.value || "0")), d = t.map((b) => b.data || "0x"), u = i.encodeFunctionData("executeBatch", [
       c,
       l,
       d
     ]);
-    let f = 0n;
-    s && (f = await new E(r, R, this.provider).getNonce());
-    const g = s ? "0x" : this.buildInitCode(e.address), y = await this.provider.getFeeData(), w = {
+    let g = 0n;
+    s && (g = await new S(r, O, this.provider).getNonce());
+    const f = s ? "0x" : this.buildInitCode(e.address), y = await this.provider.getFeeData(), w = {
       sender: r,
-      nonce: f,
-      initCode: g,
+      nonce: g,
+      initCode: f,
       callData: u,
       callGasLimit: 150000n * BigInt(t.length),
       // Scale with batch size
@@ -1950,7 +1950,7 @@ class Ne {
       paymasterAndData: "0x",
       signature: "0x"
     };
-    if (n && ((S = this.paymasterConfig) != null && S.enabled)) {
+    if (n && ((C = this.paymasterConfig) != null && C.enabled)) {
       const b = await this.getPaymasterData(w);
       b && (w.paymasterAndData = b.paymasterAndData);
     }
@@ -2010,7 +2010,7 @@ class Ne {
     var s;
     const t = this.packUserOp(e), n = m(t), r = ((s = this.provider._network) == null ? void 0 : s.chainId) || 1n;
     return m(
-      x.encode(
+      R.encode(
         ["bytes32", "address", "uint256"],
         [n, this.config.entryPoint, r]
       )
@@ -2020,7 +2020,7 @@ class Ne {
    * Pack UserOperation for hashing
    */
   packUserOp(e) {
-    return x.encode(
+    return R.encode(
       [
         "address",
         "uint256",
@@ -2103,7 +2103,7 @@ class Ne {
    * Create Circle-compatible smart account (MSCA)
    */
   async createCircleMSCA(e, t) {
-    const n = "0x0000000000000000000000000000000000000000", r = new E(
+    const n = "0x0000000000000000000000000000000000000000", r = new S(
       n,
       ["function createAccount(address owner, uint256 salt) returns (address)"],
       t
@@ -2140,7 +2140,7 @@ class ze {
       rpId: e.rpId,
       rpName: e.appName,
       backendUrl: e.backendUrl
-    }), this.storage = new ve(), this.keyManager = new Ie(this.webauthn, this.storage), this.provider = new q(e.rpcUrl), this.cctpManager = new Me(this.provider, e.cctp), this.accountType = e.accountType || "eoa", this.accountType === "smart-account" && (this.smartAccountManager = new Ne(
+    }), this.storage = new ve(), this.keyManager = new ke(this.webauthn, this.storage), this.provider = new q(e.rpcUrl), this.cctpManager = new Me(this.provider, e.cctp), this.accountType = e.accountType || "eoa", this.accountType === "smart-account" && (this.smartAccountManager = new Ne(
       this.provider,
       e.smartAccount,
       e.paymaster
@@ -2497,13 +2497,13 @@ class Xe {
     h(this, "config");
     h(this, "currentCredential", null);
     h(this, "accountAddress", null);
-    this.config = e, this.provider = new q(e.rpcUrl), this.factory = new E(e.factoryAddress, Ge, this.provider);
+    this.config = e, this.provider = new q(e.rpcUrl), this.factory = new S(e.factoryAddress, Ge, this.provider);
   }
   /**
    * Create new passkey and get account address
    */
   async createAccount(e, t) {
-    var S, b;
+    var C, b;
     o.info("Creating passkey account", { component: "PasskeyAccountManager", userId: e });
     const n = await fetch(`${this.config.backendUrl}/passkeys/register/start`, {
       method: "POST",
@@ -2513,7 +2513,7 @@ class Xe {
     });
     if (!n.ok)
       throw new Error("Failed to get registration options");
-    const r = await n.json(), s = ((S = r.data) == null ? void 0 : S.options) || r, i = await ne({ optionsJSON: s }), c = await fetch(`${this.config.backendUrl}/passkeys/register/finish`, {
+    const r = await n.json(), s = ((C = r.data) == null ? void 0 : C.options) || r, i = await ne({ optionsJSON: s }), c = await fetch(`${this.config.backendUrl}/passkeys/register/finish`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
@@ -2524,24 +2524,24 @@ class Xe {
     const d = (b = (await c.json()).data) == null ? void 0 : b.publicKey;
     if (!(d != null && d.x) || !(d != null && d.y))
       throw new Error("Server did not return public key coordinates");
-    const { x: u, y: f } = d, g = {
+    const { x: u, y: g } = d, f = {
       credentialId: i.id,
       publicKeyX: u,
-      publicKeyY: f,
+      publicKeyY: g,
       userId: e
-    }, y = BigInt(m(new TextEncoder().encode(e))), p = await this.factory.getFunction("getAddress")(BigInt(u), BigInt(f), y);
-    return this.currentCredential = g, this.accountAddress = p, this.storeCredential(g), o.info("Passkey account created", {
+    }, y = BigInt(m(new TextEncoder().encode(e))), p = await this.factory.getFunction("getAddress")(BigInt(u), BigInt(g), y);
+    return this.currentCredential = f, this.accountAddress = p, this.storeCredential(f), o.info("Passkey account created", {
       component: "PasskeyAccountManager",
       address: p,
       credentialId: i.id.substring(0, 20) + "..."
-    }), { address: p, credential: g };
+    }), { address: p, credential: f };
   }
   /**
    * Connect with existing passkey
    * @param username Optional username/email to find specific credentials
    */
   async connect(e) {
-    var g, y, w, p, S, b;
+    var f, y, w, p, C, b;
     o.info("Connecting with existing passkey", { component: "PasskeyAccountManager", username: e });
     const t = await fetch(`${this.config.backendUrl}/passkeys/auth/start`, {
       method: "POST",
@@ -2551,7 +2551,7 @@ class Xe {
     });
     if (!t.ok)
       throw new Error("Failed to get authentication options");
-    const n = await t.json(), r = ((g = n.data) == null ? void 0 : g.options) || n, s = await B({ optionsJSON: r }), i = await fetch(`${this.config.backendUrl}/passkeys/auth/finish`, {
+    const n = await t.json(), r = ((f = n.data) == null ? void 0 : f.options) || n, s = await L({ optionsJSON: r }), i = await fetch(`${this.config.backendUrl}/passkeys/auth/finish`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
@@ -2559,7 +2559,7 @@ class Xe {
     });
     if (!i.ok)
       throw new Error("Failed to verify authentication");
-    const c = await i.json(), l = (y = c.data) == null ? void 0 : y.publicKey, d = ((p = (w = c.data) == null ? void 0 : w.user) == null ? void 0 : p.username) || ((b = (S = c.data) == null ? void 0 : S.user) == null ? void 0 : b.id);
+    const c = await i.json(), l = (y = c.data) == null ? void 0 : y.publicKey, d = ((p = (w = c.data) == null ? void 0 : w.user) == null ? void 0 : p.username) || ((b = (C = c.data) == null ? void 0 : C.user) == null ? void 0 : b.id);
     if (!(l != null && l.x) || !(l != null && l.y)) {
       const D = this.loadCredential(s.id);
       if (!D)
@@ -2574,8 +2574,8 @@ class Xe {
       };
       this.currentCredential = D, this.storeCredential(D);
     }
-    const u = BigInt(m(new TextEncoder().encode(this.currentCredential.userId))), f = this.factory.getFunction("getAddress");
-    return this.accountAddress = await f(
+    const u = BigInt(m(new TextEncoder().encode(this.currentCredential.userId))), g = this.factory.getFunction("getAddress");
+    return this.accountAddress = await g(
       BigInt(this.currentCredential.publicKeyX),
       BigInt(this.currentCredential.publicKeyY),
       u
@@ -2606,9 +2606,9 @@ class Xe {
       throw new Error("Failed to get signing options");
     const r = await n.json(), s = ((p = r.data) == null ? void 0 : p.options) || r;
     s.challenge = this.toBase64Url(t);
-    const i = await B({ optionsJSON: s }), { r: c, s: l, authenticatorData: d, clientDataJSON: u, challengeIndex: f, typeIndex: g } = await this.extractSignatureComponents(i), w = W.defaultAbiCoder().encode(
+    const i = await L({ optionsJSON: s }), { r: c, s: l, authenticatorData: d, clientDataJSON: u, challengeIndex: g, typeIndex: f } = await this.extractSignatureComponents(i), w = W.defaultAbiCoder().encode(
       ["bytes", "string", "uint256", "uint256", "uint256", "uint256"],
-      [d, u, f, g, c, l]
+      [d, u, g, f, c, l]
     );
     return o.info("UserOperation signed", { component: "PasskeyAccountManager" }), w;
   }
@@ -2652,7 +2652,7 @@ class Xe {
    */
   async getAccountNonce() {
     if (!this.accountAddress) throw new Error("No account connected");
-    return await this.isAccountDeployed() ? await new E(this.accountAddress, X, this.provider).getUserOpNonce() : 0n;
+    return await this.isAccountDeployed() ? await new S(this.accountAddress, X, this.provider).getUserOpNonce() : 0n;
   }
   /**
    * Build init code for account deployment
@@ -2682,7 +2682,7 @@ class Xe {
       to: e,
       value: t.toString()
     });
-    const r = await this.isAccountDeployed(), i = new E(this.accountAddress, X, this.provider).interface.encodeFunctionData("execute", [e, t, n]), c = await this.provider.getFeeData(), l = c.maxFeePerGas || c.gasPrice || 1000000000n, d = c.maxPriorityFeePerGas || 100000000n, u = await this.getAccountNonce(), f = {
+    const r = await this.isAccountDeployed(), i = new S(this.accountAddress, X, this.provider).interface.encodeFunctionData("execute", [e, t, n]), c = await this.provider.getFeeData(), l = c.maxFeePerGas || c.gasPrice || 1000000000n, d = c.maxPriorityFeePerGas || 100000000n, u = await this.getAccountNonce(), g = {
       sender: this.accountAddress,
       nonce: u,
       initCode: r ? "0x" : this.getInitCode(),
@@ -2696,16 +2696,59 @@ class Xe {
       maxPriorityFeePerGas: d,
       paymasterAndData: "0x"
       // No paymaster for now
-    }, g = this.calculateUserOpHash(f), y = await this.signUserOperation(f, g), w = { ...f, signature: y };
+    }, f = this.calculateUserOpHash(g), y = await this.signUserOperation(g, f), w = { ...g, signature: y };
     try {
-      const p = await this.submitUserOperation(w);
-      return { hash: p.hash, userOpHash: p.userOpHash };
+      return { hash: (await this.submitViaRelay(w)).hash, userOpHash: f };
     } catch (p) {
-      throw o.warn("Bundler submission failed, trying direct execution", {
-        component: "PasskeyAccountManager",
-        error: p
-      }), new Error("Transaction submission failed. Please ensure your account has gas for transactions.");
+      o.error("Relay submission failed", p instanceof Error ? p : void 0, {
+        component: "PasskeyAccountManager"
+      });
+      try {
+        const C = await this.submitUserOperation(w);
+        return { hash: C.hash, userOpHash: C.userOpHash };
+      } catch (C) {
+        throw o.warn("Bundler submission also failed", {
+          component: "PasskeyAccountManager",
+          error: C
+        }), new Error((p == null ? void 0 : p.message) || "Transaction submission failed. Please try again.");
+      }
     }
+  }
+  /**
+   * Submit UserOperation via backend relay service
+   */
+  async submitViaRelay(e) {
+    const t = `${this.config.backendUrl}/api/relay/user-operation`;
+    o.info("Submitting UserOperation via relay", {
+      component: "PasskeyAccountManager",
+      sender: e.sender
+    });
+    const r = await (await fetch(t, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({
+        userOp: {
+          sender: e.sender,
+          nonce: "0x" + e.nonce.toString(16),
+          initCode: e.initCode,
+          callData: e.callData,
+          callGasLimit: "0x" + e.callGasLimit.toString(16),
+          verificationGasLimit: "0x" + e.verificationGasLimit.toString(16),
+          preVerificationGas: "0x" + e.preVerificationGas.toString(16),
+          maxFeePerGas: "0x" + e.maxFeePerGas.toString(16),
+          maxPriorityFeePerGas: "0x" + e.maxPriorityFeePerGas.toString(16),
+          paymasterAndData: e.paymasterAndData,
+          signature: e.signature
+        }
+      })
+    })).json();
+    if (!r.success)
+      throw new Error(r.error || "Relay failed");
+    return o.info("Transaction relayed successfully", {
+      component: "PasskeyAccountManager",
+      hash: r.data.transactionHash
+    }), { hash: r.data.transactionHash };
   }
   /**
    * Calculate UserOperation hash for signing
@@ -2836,7 +2879,7 @@ class Xe {
 const We = "0x00000000";
 async function qe(a, e) {
   try {
-    return await e.getCode(a) === "0x" ? !1 : await new E(a, [
+    return await e.getCode(a) === "0x" ? !1 : await new S(a, [
       "function supportsInterface(bytes4) view returns (bool)"
     ], e).supportsInterface(We);
   } catch {
@@ -2850,8 +2893,8 @@ export {
   Ye as CircleApiClient,
   Ke as CirclePaymasterClient,
   Ue as DEFAULT_AA_CONFIG,
-  ke as DEFAULT_CCTP_CONFIG,
-  Ie as KeyManager,
+  Ie as DEFAULT_CCTP_CONFIG,
+  ke as KeyManager,
   ge as LogLevel,
   T as PASSKEY_DIAGNOSTIC_MESSAGES,
   Xe as PasskeyAccountManager,
@@ -2864,17 +2907,17 @@ export {
   Ce as checkPlatformAuthenticatorSupport,
   $e as createLogger,
   Y as getCCTPConfigErrorMessage,
-  xe as getCircleNetwork,
+  Re as getCircleNetwork,
   be as getDeviceRiskLevel,
   Se as getDiagnosticErrorMessage,
   me as getPasskeyDiagnosticMode,
   Je as isArcNetworkConfigured,
-  Re as isCCTPSupported,
+  Oe as isCCTPSupported,
   qe as isCircleMSCA,
   Ae as isHighRiskDevice,
   je as isNativeUSDC,
   o as logger,
   Ee as runPasskeyDiagnostic,
-  L as validateCCTPConfig
+  B as validateCCTPConfig
 };
 //# sourceMappingURL=index.mjs.map

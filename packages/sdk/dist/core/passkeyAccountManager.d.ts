@@ -97,6 +97,10 @@ export declare class PasskeyAccountManager {
         userOpHash?: string;
     }>;
     /**
+     * Submit UserOperation via backend relay service
+     */
+    private submitViaRelay;
+    /**
      * Calculate UserOperation hash for signing
      */
     private calculateUserOpHash;
