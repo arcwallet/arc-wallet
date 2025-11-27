@@ -31,13 +31,28 @@ export class Database {
     if (!this.encryptionKey) {
       console.warn('⚠️ WARNING: DB_ENCRYPTION_KEY not set. Private keys will be stored unencrypted!');
     }
-    // Ensure directory exists
+
+    // Ensure directory exists with fallback
     const dir = path.dirname(dbPath);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
+    let actualDbPath = dbPath;
+
+    try {
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+    } catch (error) {
+      console.warn(`⚠️ Cannot create directory ${dir}, falling back to project data directory`);
+      const fallbackPath = path.join(process.cwd(), 'data', 'wallet.db');
+      const fallbackDir = path.dirname(fallbackPath);
+      if (!fs.existsSync(fallbackDir)) {
+        fs.mkdirSync(fallbackDir, { recursive: true });
+      }
+      actualDbPath = fallbackPath;
     }
 
-    this.db = new sqlite3.Database(dbPath);
+    console.log(`📁 Main database path: ${actualDbPath}`);
+
+    this.db = new sqlite3.Database(actualDbPath);
     this.ready = this.initialize();
   }
 
