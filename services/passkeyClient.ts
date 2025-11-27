@@ -37,7 +37,10 @@ async function postJSON<T>(path: string, body: unknown): Promise<ApiResponse<T>>
 
 async function getJSON<T>(path: string): Promise<ApiResponse<T>> {
   const base = API_BASE.endsWith('/') ? API_BASE.slice(0, -1) : API_BASE;
-  const response = await fetch(`${base}${path}`, { method: 'GET' });
+  const response = await fetch(`${base}${path}`, {
+    method: 'GET',
+    credentials: 'include',
+  });
   const text = await response.text();
   if (!response.ok) {
     throw new PasskeyClientError(text || response.statusText, response.status);
@@ -47,7 +50,10 @@ async function getJSON<T>(path: string): Promise<ApiResponse<T>> {
 
 async function deleteJSON<T>(path: string): Promise<ApiResponse<T>> {
   const base = API_BASE.endsWith('/') ? API_BASE.slice(0, -1) : API_BASE;
-  const response = await fetch(`${base}${path}`, { method: 'DELETE' });
+  const response = await fetch(`${base}${path}`, {
+    method: 'DELETE',
+    credentials: 'include',
+  });
   const text = await response.text();
   if (!response.ok) {
     throw new PasskeyClientError(text || response.statusText, response.status);
