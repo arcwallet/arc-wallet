@@ -29,8 +29,13 @@ declare class IndexerService {
     private poll;
     /**
      * Get the last indexed block number from DB
+     * If no blocks indexed yet, start from recent blocks (not from 0)
      */
     private getLastIndexedBlock;
+    /**
+     * Get starting block - either last indexed or recent if fresh start
+     */
+    private getStartingBlock;
     /**
      * Process a single block
      */

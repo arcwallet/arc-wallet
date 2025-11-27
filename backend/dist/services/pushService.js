@@ -1,28 +1,43 @@
 import webpush from 'web-push';
 import { v4 as uuidv4 } from 'uuid';
 import db from '../db/indexer.js';
+// Clean VAPID key - remove quotes, whitespace, and validate
+function cleanVapidKey(key) {
+    if (!key)
+        return undefined;
+    // Remove quotes, whitespace, newlines
+    const cleaned = key.trim().replace(/^["']|["']$/g, '').trim();
+    // VAPID keys should be URL-safe Base64 (no =, +, /)
+    // Valid chars: A-Z, a-z, 0-9, -, _
+    if (!/^[A-Za-z0-9_-]+$/.test(cleaned)) {
+        console.error('❌ Invalid VAPID key format. Must be URL-safe Base64.');
+        return undefined;
+    }
+    return cleaned;
+}
 class PushService {
     publicKey;
     privateKey;
     constructor() {
-        // In a real app, these should be loaded from env vars or generated once and stored
-        // For this demo, we'll generate them if missing, but they won't persist across restarts unless we save them
-        // Ideally: process.env.VAPID_PUBLIC_KEY, process.env.VAPID_PRIVATE_KEY
-        // Check if keys exist in env
-        if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
-            this.publicKey = process.env.VAPID_PUBLIC_KEY;
-            this.privateKey = process.env.VAPID_PRIVATE_KEY;
+        // Clean and validate env vars
+        const envPublicKey = cleanVapidKey(process.env.VAPID_PUBLIC_KEY);
+        const envPrivateKey = cleanVapidKey(process.env.VAPID_PRIVATE_KEY);
+        // Check if keys exist in env and are valid
+        if (envPublicKey && envPrivateKey) {
+            this.publicKey = envPublicKey;
+            this.privateKey = envPrivateKey;
+            console.log('✅ VAPID keys loaded from environment');
         }
         else {
             // Generate new keys (Note: This means clients need to re-subscribe if server restarts without persistence)
             // In production, set VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY env vars
+            console.warn('⚠️ VAPID keys not configured or invalid. Generating new keys...');
             const keys = webpush.generateVAPIDKeys();
             this.publicKey = keys.publicKey;
             this.privateKey = keys.privateKey;
-            // Never log private keys in production!
-            if (process.env.NODE_ENV === 'development') {
-                console.warn('⚠️ VAPID keys not configured. Push notifications may not persist across restarts.');
-            }
+            console.log('📌 Generated VAPID_PUBLIC_KEY:', this.publicKey);
+            console.log('📌 Generated VAPID_PRIVATE_KEY:', this.privateKey);
+            console.warn('⚠️ Save these to Render environment variables for persistence!');
         }
         webpush.setVapidDetails('mailto:admin@arcwallet.com', this.publicKey, this.privateKey);
     }

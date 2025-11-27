@@ -1,12 +1,32 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
-const DB_PATH = path.join(process.cwd(), 'data', 'indexer.db');
-// Ensure data directory exists
-const dataDir = path.dirname(DB_PATH);
-if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir, { recursive: true });
+// Determine database path with fallback
+function getDatabasePath() {
+    const envPath = process.env.INDEXER_DB_PATH;
+    const defaultPath = path.join(process.cwd(), 'data', 'indexer.db');
+    // If INDEXER_DB_PATH is set, try to use it
+    if (envPath) {
+        const envDir = path.dirname(envPath);
+        try {
+            if (!fs.existsSync(envDir)) {
+                fs.mkdirSync(envDir, { recursive: true });
+            }
+            return envPath;
+        }
+        catch (error) {
+            console.warn(`⚠️ Cannot create directory ${envDir}, falling back to project data directory`);
+        }
+    }
+    // Fallback: use project's data directory
+    const defaultDir = path.dirname(defaultPath);
+    if (!fs.existsSync(defaultDir)) {
+        fs.mkdirSync(defaultDir, { recursive: true });
+    }
+    return defaultPath;
 }
+const DB_PATH = getDatabasePath();
+console.log(`📁 Indexer database path: ${DB_PATH}`);
 const db = new Database(DB_PATH);
 // Enable WAL mode for better concurrency
 db.pragma('journal_mode = WAL');

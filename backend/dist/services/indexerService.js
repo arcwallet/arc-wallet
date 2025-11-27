@@ -12,10 +12,10 @@ class IndexerService {
     isRunning = false;
     pollingInterval = null;
     currentPollingDelay;
-    BASE_POLLING_DELAY = 30000; // 30 seconds (was 2s - too aggressive)
-    MAX_POLLING_DELAY = 300000; // 5 minutes max backoff
-    BLOCK_BATCH_SIZE = 2; // Process max 2 blocks per cycle (was 5)
-    BLOCK_DELAY = 1000; // 1s delay between blocks (was 200ms)
+    BASE_POLLING_DELAY = 10000; // 10 seconds
+    MAX_POLLING_DELAY = 120000; // 2 minutes max backoff
+    BLOCK_BATCH_SIZE = 10; // Process max 10 blocks per cycle
+    BLOCK_DELAY = 500; // 0.5s delay between blocks
     rateLimitHits = 0;
     tokenMetadataService;
     constructor(database) {
@@ -53,7 +53,7 @@ class IndexerService {
             return;
         try {
             const latestBlock = await this.provider.getBlockNumber();
-            const lastIndexedBlock = this.getLastIndexedBlock();
+            const lastIndexedBlock = await this.getStartingBlock();
             if (latestBlock > lastIndexedBlock) {
                 // Calculate how many blocks to process (max BLOCK_BATCH_SIZE)
                 const blocksToProcess = Math.min(latestBlock - lastIndexedBlock, this.BLOCK_BATCH_SIZE);
@@ -92,11 +92,36 @@ class IndexerService {
     }
     /**
      * Get the last indexed block number from DB
+     * If no blocks indexed yet, start from recent blocks (not from 0)
      */
     getLastIndexedBlock() {
         const stmt = db.prepare('SELECT MAX(number) as lastBlock FROM blocks');
         const result = stmt.get();
-        return result.lastBlock || 0;
+        // If no blocks indexed, return -1 to trigger smart start
+        if (!result.lastBlock) {
+            return -1; // Signal to start from recent blocks
+        }
+        return result.lastBlock;
+    }
+    /**
+     * Get starting block - either last indexed or recent if fresh start
+     */
+    async getStartingBlock() {
+        const lastIndexed = this.getLastIndexedBlock();
+        if (lastIndexed === -1) {
+            // Fresh start: begin from recent blocks (last 1000)
+            try {
+                const latestBlock = await this.provider.getBlockNumber();
+                const startFrom = Math.max(0, latestBlock - 1000);
+                console.log(`🚀 Fresh start: Beginning indexer from block ${startFrom} (latest: ${latestBlock})`);
+                return startFrom;
+            }
+            catch (error) {
+                console.error('Failed to get latest block, starting from 0:', error);
+                return 0;
+            }
+        }
+        return lastIndexed;
     }
     /**
      * Process a single block
@@ -142,10 +167,10 @@ class IndexerService {
                 for (const tx of block.prefetchedTransactions) {
                     const receipt = receiptMap.get(tx.hash);
                     const status = receipt ? receipt.status : 0; // 0 = failed, 1 = success
-                    insertTx.run(tx.hash, block.number, tx.from, tx.to, tx.value.toString(), tx.data, tx.nonce, tx.gasLimit.toString(), tx.gasPrice?.toString() || '0', block.timestamp, status);
+                    insertTx.run(tx.hash, block.number, tx.from.toLowerCase(), tx.to?.toLowerCase() || null, tx.value.toString(), tx.data, tx.nonce, tx.gasLimit.toString(), tx.gasPrice?.toString() || '0', block.timestamp, status);
                     // Detect Native Transfers
                     if (tx.value > 0 && status === 1) {
-                        insertEvent.run(tx.hash, block.number, 'Transfer', tx.from, tx.to, tx.value.toString(), 'NATIVE', // Native token
+                        insertEvent.run(tx.hash, block.number, 'Transfer', tx.from.toLowerCase(), tx.to?.toLowerCase() || null, tx.value.toString(), 'NATIVE', // Native token
                         null, block.timestamp);
                         // Trigger Webhooks
                         const payload = {
@@ -177,10 +202,10 @@ class IndexerService {
                             // Topic0: 0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef
                             if (log.topics[0] === '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef' && log.topics.length === 3) {
                                 try {
-                                    const from = ethers.getAddress('0x' + log.topics[1].slice(26));
-                                    const to = ethers.getAddress('0x' + log.topics[2].slice(26));
+                                    const from = ethers.getAddress('0x' + log.topics[1].slice(26)).toLowerCase();
+                                    const to = ethers.getAddress('0x' + log.topics[2].slice(26)).toLowerCase();
                                     const value = BigInt(log.data).toString();
-                                    const tokenAddress = log.address;
+                                    const tokenAddress = log.address.toLowerCase();
                                     insertEvent.run(tx.hash, block.number, 'Transfer', from, to, value, tokenAddress, // ERC20 Token Address
                                     null, block.timestamp);
                                     // Trigger Webhooks for ERC20

@@ -14,10 +14,10 @@ class IndexerService {
     private isRunning: boolean = false;
     private pollingInterval: NodeJS.Timeout | null = null;
     private currentPollingDelay: number;
-    private readonly BASE_POLLING_DELAY = 30000; // 30 seconds (was 2s - too aggressive)
-    private readonly MAX_POLLING_DELAY = 300000; // 5 minutes max backoff
-    private readonly BLOCK_BATCH_SIZE = 2; // Process max 2 blocks per cycle (was 5)
-    private readonly BLOCK_DELAY = 1000; // 1s delay between blocks (was 200ms)
+    private readonly BASE_POLLING_DELAY = 10000; // 10 seconds
+    private readonly MAX_POLLING_DELAY = 120000; // 2 minutes max backoff
+    private readonly BLOCK_BATCH_SIZE = 10; // Process max 10 blocks per cycle
+    private readonly BLOCK_DELAY = 500; // 0.5s delay between blocks
     private rateLimitHits: number = 0;
     private tokenMetadataService: TokenMetadataService;
 
@@ -58,7 +58,7 @@ class IndexerService {
 
         try {
             const latestBlock = await this.provider.getBlockNumber();
-            const lastIndexedBlock = this.getLastIndexedBlock();
+            const lastIndexedBlock = await this.getStartingBlock();
 
             if (latestBlock > lastIndexedBlock) {
                 // Calculate how many blocks to process (max BLOCK_BATCH_SIZE)
@@ -110,11 +110,39 @@ class IndexerService {
 
     /**
      * Get the last indexed block number from DB
+     * If no blocks indexed yet, start from recent blocks (not from 0)
      */
     private getLastIndexedBlock(): number {
         const stmt = db.prepare('SELECT MAX(number) as lastBlock FROM blocks');
         const result = stmt.get() as { lastBlock: number };
-        return result.lastBlock || 0;
+
+        // If no blocks indexed, return -1 to trigger smart start
+        if (!result.lastBlock) {
+            return -1; // Signal to start from recent blocks
+        }
+        return result.lastBlock;
+    }
+
+    /**
+     * Get starting block - either last indexed or recent if fresh start
+     */
+    private async getStartingBlock(): Promise<number> {
+        const lastIndexed = this.getLastIndexedBlock();
+
+        if (lastIndexed === -1) {
+            // Fresh start: begin from recent blocks (last 1000)
+            try {
+                const latestBlock = await this.provider.getBlockNumber();
+                const startFrom = Math.max(0, latestBlock - 1000);
+                console.log(`🚀 Fresh start: Beginning indexer from block ${startFrom} (latest: ${latestBlock})`);
+                return startFrom;
+            } catch (error) {
+                console.error('Failed to get latest block, starting from 0:', error);
+                return 0;
+            }
+        }
+
+        return lastIndexed;
     }
 
     /**
