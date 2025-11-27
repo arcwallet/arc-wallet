@@ -117,7 +117,7 @@ export function useArcAccount(
   ): Promise<string> => {
     if (!factoryContract) throw new Error('Provider not connected');
 
-    const address = await factoryContract.getAddress(keyHash, keyType, deviceName, salt);
+    const address = await (factoryContract as any).getAddress(keyHash, keyType, deviceName, salt);
     return address;
   }, [factoryContract]);
 
@@ -138,7 +138,7 @@ export function useArcAccount(
       const tx = await factoryWithSigner.createAccount(keyHash, keyType, deviceName, salt);
       await tx.wait();
 
-      const address = await factoryContract.getAddress(keyHash, keyType, deviceName, salt);
+      const address = await (factoryContract as any).getAddress(keyHash, keyType, deviceName, salt);
 
       setState(prev => ({
         ...prev,

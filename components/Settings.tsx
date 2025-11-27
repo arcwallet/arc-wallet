@@ -10,6 +10,8 @@ import { WalletIcon, CopyIcon, AddIcon, LaptopIcon, PhoneIcon, ChevronDownIcon, 
 import WebhookManager from './WebhookManager';
 import NotificationManager from './NotificationManager';
 
+import { ARC_TESTNET_CONTRACTS, KEY_TYPE } from '../config/contracts';
+
 const SecuritySection: React.FC = () => {
     const { address: passkeyAddress } = usePasskeyAccount();
     const { userId, address: selfCustodialAddress } = useSelfCustodialWallet();
@@ -211,6 +213,111 @@ const OrganizationRolesSection: React.FC = () => {
 
 
 
+// Smart Wallet Section - Shows ArcAccount contract info
+const SmartWalletSection: React.FC = () => {
+    const { address: passkeyAddress } = usePasskeyAccount();
+    const { address: selfCustodialAddress } = useSelfCustodialWallet();
+    const address = passkeyAddress || selfCustodialAddress;
+    const [copied, setCopied] = useState<string | null>(null);
+
+    const copyToClipboard = (text: string, key: string) => {
+        navigator.clipboard.writeText(text);
+        setCopied(key);
+        setTimeout(() => setCopied(null), 2000);
+    };
+
+    const truncateAddress = (addr: string) => `${addr.slice(0, 10)}...${addr.slice(-8)}`;
+
+    const contracts = [
+        { name: 'ArcAccount Factory', address: ARC_TESTNET_CONTRACTS.arcAccountFactory, description: 'Creates new smart wallets' },
+        { name: 'ArcAccount Implementation', address: ARC_TESTNET_CONTRACTS.arcAccountImplementation, description: 'Multi-key wallet logic' },
+        { name: 'P256 Verifier', address: ARC_TESTNET_CONTRACTS.p256Verifier, description: 'WebAuthn signature verification' },
+        { name: 'EntryPoint (ERC-4337)', address: ARC_TESTNET_CONTRACTS.entryPoint, description: 'Account Abstraction entry' },
+    ];
+
+    return (
+        <div className="flex flex-col gap-4 rounded-xl bg-gradient-to-br from-indigo-900/30 to-purple-900/20 border border-indigo-500/30 p-5 sm:p-6">
+            <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
+                <div className="flex flex-col gap-1">
+                    <h3 className="text-lg font-semibold text-slate-100 flex items-center gap-2">
+                        <span className="text-xl">🔐</span> Smart Wallet (Multi-Key)
+                    </h3>
+                    <p className="text-sm text-slate-400">ERC-4337 Account Abstraction with P256 passkey support</p>
+                </div>
+                <div className="flex items-center gap-2">
+                    <span className="px-3 py-1 rounded-full text-xs font-medium bg-green-500/20 text-green-400 border border-green-500/30">
+                        Arc Testnet
+                    </span>
+                </div>
+            </div>
+
+            <div className="grid gap-3">
+                {contracts.map((contract) => (
+                    <div key={contract.name} className="flex items-center justify-between p-3 rounded-lg bg-slate-800/40 border border-slate-600/30">
+                        <div className="flex flex-col gap-0.5">
+                            <span className="text-sm font-medium text-slate-200">{contract.name}</span>
+                            <span className="text-xs text-slate-500">{contract.description}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <code className="text-xs text-indigo-300 font-mono bg-indigo-900/30 px-2 py-1 rounded">
+                                {truncateAddress(contract.address)}
+                            </code>
+                            <button
+                                onClick={() => copyToClipboard(contract.address, contract.name)}
+                                className="p-1.5 rounded hover:bg-white/10 transition-colors"
+                                title="Copy address"
+                            >
+                                {copied === contract.name ? (
+                                    <span className="text-green-400 text-xs">✓</span>
+                                ) : (
+                                    <CopyIcon size={14} className="text-slate-400" />
+                                )}
+                            </button>
+                            <a
+                                href={`https://explorer.arc.network/address/${contract.address}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="p-1.5 rounded hover:bg-white/10 transition-colors text-slate-400 hover:text-slate-200"
+                                title="View on Explorer"
+                            >
+                                ↗
+                            </a>
+                        </div>
+                    </div>
+                ))}
+            </div>
+
+            <div className="mt-2 p-4 rounded-lg bg-slate-800/30 border border-slate-600/20">
+                <h4 className="text-sm font-medium text-slate-300 mb-3">Features</h4>
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                    <div className="flex items-center gap-2 text-slate-400">
+                        <span className="text-green-400">✓</span> Multi-device support (up to 20 keys)
+                    </div>
+                    <div className="flex items-center gap-2 text-slate-400">
+                        <span className="text-green-400">✓</span> WebAuthn/Passkey authentication
+                    </div>
+                    <div className="flex items-center gap-2 text-slate-400">
+                        <span className="text-green-400">✓</span> 1-of-n signature (any key can sign)
+                    </div>
+                    <div className="flex items-center gap-2 text-slate-400">
+                        <span className="text-green-400">✓</span> Batch transactions
+                    </div>
+                    <div className="flex items-center gap-2 text-slate-400">
+                        <span className="text-green-400">✓</span> ECDSA & P256 curve support
+                    </div>
+                    <div className="flex items-center gap-2 text-slate-400">
+                        <span className="text-green-400">✓</span> Upgradeable (UUPS proxy)
+                    </div>
+                </div>
+            </div>
+
+            <p className="text-xs text-slate-500">
+                Smart wallets allow multiple devices to control one account. Add passkeys for biometric authentication or link external wallets.
+            </p>
+        </div>
+    );
+};
+
 const SessionInfoSection: React.FC = () => {
     const { email, logout: sessionLogout } = useSession();
     const { logout: walletLogout } = useWallet();
@@ -260,6 +367,9 @@ const Settings: React.FC = () => {
                 {/* Settings Sections */}
                 <div className="flex flex-col gap-8">
                     <SecuritySection />
+
+                    <SmartWalletSection />
+
                     <NetworkSection />
 
                     <OrganizationRolesSection />

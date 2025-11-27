@@ -23,7 +23,7 @@ const DeviceManagement: React.FC<DeviceManagementProps> = ({
 }) => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [newDeviceName, setNewDeviceName] = useState('');
-  const [selectedKeyType, setSelectedKeyType] = useState(KEY_TYPE.WEBAUTHN);
+  const [selectedKeyType, setSelectedKeyType] = useState<number>(KEY_TYPE.WEBAUTHN);
   const [removing, setRemoving] = useState<string | null>(null);
 
   const handleAddDevice = async () => {
