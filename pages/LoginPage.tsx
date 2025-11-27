@@ -185,9 +185,28 @@ const LoginPage: React.FC = () => {
 
       showMessage('Email verified successfully!', 'success');
 
-      // Don't create passkey here - WalletSetup will handle it
-      // This prevents duplicate passkey creation on every OTP login
-      console.log('[LoginPage] OTP verified, proceeding to wallet setup...');
+      // Check if user has a passkey - if so, require passkey auth as 2FA
+      const checkResult = await passkeyClient.checkUserPasskeys(email);
+
+      if (checkResult.success && checkResult.data?.hasPasskey) {
+        // User has passkey - require passkey authentication as second factor
+        console.log('[LoginPage] User has passkey, requiring passkey auth...');
+        showMessage('Please authenticate with your passkey...', 'info');
+        setStep('passkey');
+
+        const authSuccess = await handlePasskeyAuth(email);
+        if (!authSuccess) {
+          showMessage('Passkey authentication failed. Please try again.', 'error');
+          setStep('email');
+          setOtpCode('');
+          return;
+        }
+        // Passkey auth successful - session is now active
+        return;
+      }
+
+      // No passkey yet - proceed to wallet setup where they can create one
+      console.log('[LoginPage] No passkey yet, proceeding to wallet setup...');
 
       // Refresh session after OTP verification
       await refresh();
