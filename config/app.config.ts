@@ -75,6 +75,9 @@ export const TX_EXPLORER_URL = `${EXPLORER_BASE_URL}/tx/`;
 export const ADDRESS_EXPLORER_URL = `${EXPLORER_BASE_URL}/address/`;
 export const BLOCK_EXPLORER_URL = `${EXPLORER_BASE_URL}/block/`;
 
+// Blockscout API (for transaction history - instant results!)
+export const BLOCKSCOUT_API_URL = `${EXPLORER_BASE_URL}/api/v2`;
+
 // External Services
 export const CIRCLE_FAUCET_URL = 'https://faucet.circle.com/';
 

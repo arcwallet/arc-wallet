@@ -2,7 +2,7 @@ import { formatEther, formatUnits, Interface } from 'ethers';
 import { getProvider } from './transactionService';
 import type { Transaction } from '../types';
 import { TransactionStatus, TransactionType } from '../types';
-import { API_ENDPOINTS } from '../config/app.config';
+import { API_ENDPOINTS, BLOCKSCOUT_API_URL } from '../config/app.config';
 import { SUPPORTED_TOKENS, getTokenByAddress } from '../config/tokens';
 
 const provider = getProvider();
@@ -57,40 +57,110 @@ function formatRelativeTime(timestampMs: number): string {
 
 /**
  * Activity Service
- * Fetches transaction history from the indexer backend
+ * Fetches transaction history from Blockscout API (instant results!)
  */
 
 const fetchActivityHistory = async (address: string, limit: number = 50): Promise<any[]> => {
   try {
     const normalizedAddress = address.toLowerCase();
-    const response = await fetch(API_ENDPOINTS.history(normalizedAddress, limit));
+
+    // Use Blockscout API for instant transaction history
+    const blockscoutUrl = `${BLOCKSCOUT_API_URL}/addresses/${normalizedAddress}/transactions`;
+    console.log('[Activity] Fetching from Blockscout:', blockscoutUrl);
+
+    const response = await fetch(blockscoutUrl, {
+      headers: { 'Accept': 'application/json' }
+    });
 
     if (response.status === 429) {
       throw new RateLimitError('Rate limit exceeded');
     }
 
     if (!response.ok) {
-      console.warn('Indexer history not available, falling back to RPC');
-      return await fetchFromRPC(normalizedAddress, limit);
+      console.warn('[Activity] Blockscout API error, falling back to indexer');
+      return await fetchFromIndexer(normalizedAddress, limit);
     }
 
     const json = await response.json();
-    if (!json.success) {
-      console.warn('Indexer returned error, falling back to RPC');
-      return await fetchFromRPC(normalizedAddress, limit);
+
+    if (!json.items || json.items.length === 0) {
+      console.log('[Activity] No transactions found in Blockscout');
+      return [];
     }
 
-    // If indexer returns empty, try RPC fallback
-    if (!json.data || json.data.length === 0) {
-      console.log('[Activity] No data from indexer, trying RPC fallback');
-      return await fetchFromRPC(normalizedAddress, limit);
-    }
+    // Transform Blockscout response to our format
+    const transactions = json.items.slice(0, limit).map((tx: any) => ({
+      hash: tx.hash,
+      block_number: tx.block_number,
+      from_address: tx.from?.hash?.toLowerCase() || '',
+      to_address: tx.to?.hash?.toLowerCase() || null,
+      value: tx.value || '0',
+      timestamp: Math.floor(new Date(tx.timestamp).getTime() / 1000),
+      status: tx.status === 'ok' ? 1 : 0,
+      token_address: null, // Native transfer
+      method: tx.method,
+      fee: tx.fee?.value || '0'
+    }));
+
+    console.log(`[Activity] Fetched ${transactions.length} transactions from Blockscout`);
+    return transactions;
+  } catch (error) {
+    console.error('Error fetching from Blockscout:', error);
+    // Fallback to our indexer
+    return await fetchFromIndexer(address.toLowerCase(), limit);
+  }
+};
+
+/**
+ * Fetch ERC20 token transfers from Blockscout
+ */
+const fetchTokenTransfers = async (address: string, limit: number = 50): Promise<any[]> => {
+  try {
+    const normalizedAddress = address.toLowerCase();
+    const blockscoutUrl = `${BLOCKSCOUT_API_URL}/addresses/${normalizedAddress}/token-transfers`;
+
+    const response = await fetch(blockscoutUrl, {
+      headers: { 'Accept': 'application/json' }
+    });
+
+    if (!response.ok) return [];
+
+    const json = await response.json();
+    if (!json.items || json.items.length === 0) return [];
+
+    return json.items.slice(0, limit).map((transfer: any) => ({
+      hash: transfer.tx_hash,
+      block_number: transfer.block_number,
+      from_address: transfer.from?.hash?.toLowerCase() || '',
+      to_address: transfer.to?.hash?.toLowerCase() || null,
+      value: transfer.total?.value || '0',
+      timestamp: Math.floor(new Date(transfer.timestamp).getTime() / 1000),
+      status: 1, // Token transfers are always successful if they're in logs
+      token_address: transfer.token?.address?.toLowerCase() || null,
+      token_symbol: transfer.token?.symbol || 'TOKEN',
+      token_decimals: transfer.token?.decimals || 18
+    }));
+  } catch (error) {
+    console.error('Error fetching token transfers:', error);
+    return [];
+  }
+};
+
+/**
+ * Fallback: Fetch from our backend indexer
+ */
+const fetchFromIndexer = async (address: string, limit: number = 50): Promise<any[]> => {
+  try {
+    const response = await fetch(API_ENDPOINTS.history(address, limit));
+    if (!response.ok) return [];
+
+    const json = await response.json();
+    if (!json.success || !json.data) return [];
 
     return json.data;
   } catch (error) {
-    console.error('Error fetching activity history from indexer:', error);
-    // Fallback to direct RPC query
-    return await fetchFromRPC(address.toLowerCase(), limit);
+    console.error('Error fetching from indexer:', error);
+    return [];
   }
 };
 
@@ -156,15 +226,28 @@ export async function fetchRecentTransactions(
 
   try {
     const limit = options.maxTransactions ?? 50;
-    const data = await fetchActivityHistory(normalizedAddress, limit);
-    return data.map((tx: any) => {
-      const isSent = tx.from_address.toLowerCase() === normalizedAddress;
+
+    // Fetch both native transactions and token transfers in parallel
+    const [nativeTransactions, tokenTransfers] = await Promise.all([
+      fetchActivityHistory(normalizedAddress, limit),
+      fetchTokenTransfers(normalizedAddress, limit)
+    ]);
+
+    // Combine and sort by timestamp (most recent first)
+    const allTransactions = [...nativeTransactions, ...tokenTransfers]
+      .sort((a, b) => b.timestamp - a.timestamp)
+      .slice(0, limit);
+
+    console.log(`[Activity] Combined ${nativeTransactions.length} native + ${tokenTransfers.length} token = ${allTransactions.length} total`);
+
+    return allTransactions.map((tx: any) => {
+      const isSent = tx.from_address?.toLowerCase() === normalizedAddress;
 
       // Determine decimals and symbol
-      let decimals = 18;
-      let symbol = 'ARC';
+      let decimals = tx.token_decimals || 18;
+      let symbol = tx.token_symbol || 'USDC'; // Arc native is USDC
 
-      if (tx.token_address) {
+      if (tx.token_address && !tx.token_symbol) {
         const token = getTokenByAddress(tx.token_address);
         if (token) {
           decimals = token.decimals;
@@ -172,7 +255,7 @@ export async function fetchRecentTransactions(
         }
       }
 
-      const amount = parseFloat(formatUnits(tx.value, decimals));
+      const amount = parseFloat(formatUnits(tx.value || '0', decimals));
 
       return {
         id: tx.hash,
