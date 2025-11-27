@@ -30,11 +30,24 @@ export interface TokenPrices {
 
 class TokenService {
   private rpcProvider: JsonRpcProvider;
+  private currentRpcUrl: string;
   private cachedPrices: TokenPrices = {};
   private pricesCacheExpiry = 5 * 60 * 1000; // 5 minutes
 
   constructor(rpcUrl: string) {
+    this.currentRpcUrl = rpcUrl;
     this.rpcProvider = new JsonRpcProvider(rpcUrl);
+  }
+
+  /**
+   * Update RPC provider for network switching
+   */
+  setRpcUrl(rpcUrl: string): void {
+    if (this.currentRpcUrl !== rpcUrl) {
+      this.currentRpcUrl = rpcUrl;
+      this.rpcProvider = new JsonRpcProvider(rpcUrl);
+      console.log('[TokenService] RPC URL updated:', rpcUrl);
+    }
   }
 
   /**
@@ -48,19 +61,25 @@ class TokenService {
   ): Promise<TokenBalance | null> {
     const token = getTokenInfo(tokenSymbol);
     if (!token) {
-      console.warn(`Token ${tokenSymbol} not found in supported tokens`);
+      console.warn(`[TokenService] Token ${tokenSymbol} not found in supported tokens`);
       return null;
     }
 
     try {
       const contractAddress = getTokenContractAddress(tokenSymbol, network, chain);
+      console.log(`[TokenService] ${tokenSymbol} contract address:`, contractAddress, 'network:', network, 'chain:', chain);
+
       if (!contractAddress) {
-        console.warn(`Contract address not found for ${tokenSymbol} on ${network}/${chain}`);
+        console.warn(`[TokenService] Contract address not found for ${tokenSymbol} on ${network}/${chain}`);
         return null;
       }
 
+      console.log(`[TokenService] Fetching ${tokenSymbol} balance for ${walletAddress} from contract ${contractAddress}`);
+
       const contract = new Contract(contractAddress, ERC20_ABI, this.rpcProvider);
       const balance = await contract.balanceOf(walletAddress);
+
+      console.log(`[TokenService] ${tokenSymbol} raw balance:`, balance.toString());
 
       const formattedBalance = formatUnits(balance, token.decimals);
 
@@ -76,7 +95,7 @@ class TokenService {
         usdValue,
       };
     } catch (error) {
-      console.error(`Error fetching balance for ${tokenSymbol}:`, error);
+      console.error(`[TokenService] Error fetching balance for ${tokenSymbol}:`, error);
       return null;
     }
   }
@@ -89,18 +108,35 @@ class TokenService {
     network: 'mainnet' | 'testnet' = 'testnet',
     chain: 'arcTestnet' | 'sepolia' = 'arcTestnet'
   ): Promise<TokenBalance[]> {
+    console.log('[TokenService] getAllTokenBalances called:', { walletAddress, network, chain, rpcUrl: this.currentRpcUrl });
+
     const supportedTokens = Object.keys(SUPPORTED_TOKENS);
+    console.log('[TokenService] Supported tokens:', supportedTokens);
+
     const balancePromises = supportedTokens.map(symbol =>
       this.getTokenBalance(symbol, walletAddress, network, chain)
     );
 
     const results = await Promise.allSettled(balancePromises);
 
-    return results
+    // Log each result for debugging
+    results.forEach((result, index) => {
+      const symbol = supportedTokens[index];
+      if (result.status === 'fulfilled') {
+        console.log(`[TokenService] ${symbol} balance:`, result.value);
+      } else {
+        console.error(`[TokenService] ${symbol} failed:`, result.reason);
+      }
+    });
+
+    const balances = results
       .filter((result): result is PromiseFulfilledResult<TokenBalance> =>
         result.status === 'fulfilled' && result.value !== null
       )
       .map(result => result.value);
+
+    console.log('[TokenService] Final balances:', balances);
+    return balances;
   }
 
   /**

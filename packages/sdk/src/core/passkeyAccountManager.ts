@@ -153,8 +153,10 @@ export class PasskeyAccountManager {
     };
 
     // 5. Get counterfactual account address
+    // Note: Use getFunction() because Ethers v6 Contract has its own getAddress() method from Addressable interface
     const salt = BigInt(keccak256(new TextEncoder().encode(userId)));
-    const accountAddress = await this.factory.getAddress(BigInt(x), BigInt(y), salt);
+    const getAddressFunc = this.factory.getFunction('getAddress');
+    const accountAddress = await getAddressFunc(BigInt(x), BigInt(y), salt);
 
     this.currentCredential = passkeyCredential;
     this.accountAddress = accountAddress;
@@ -236,8 +238,10 @@ export class PasskeyAccountManager {
     }
 
     // 5. Get account address
+    // Note: Use getFunction() because Ethers v6 Contract has its own getAddress() method from Addressable interface
     const salt = BigInt(keccak256(new TextEncoder().encode(this.currentCredential.userId)));
-    this.accountAddress = await this.factory.getAddress(
+    const getAddressFunc = this.factory.getFunction('getAddress');
+    this.accountAddress = await getAddressFunc(
       BigInt(this.currentCredential.publicKeyX),
       BigInt(this.currentCredential.publicKeyY),
       salt
@@ -248,7 +252,7 @@ export class PasskeyAccountManager {
       address: this.accountAddress
     });
 
-    return { address: this.accountAddress, credential: this.currentCredential };
+    return { address: this.accountAddress!, credential: this.currentCredential! };
   }
 
   /**

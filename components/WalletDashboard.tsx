@@ -343,46 +343,44 @@ const AssetsTable: React.FC<AssetsTableProps> = ({ balanceDisplay, isLoading }) 
   const { address: selfCustodialAddress } = useSelfCustodialWallet();
   const { sessionKey } = useWallet();
   const walletAddress = passkeyAddress || selfCustodialAddress || sessionKey?.address;
+  const { currentNetwork } = useNetwork();
 
   const [activeTab, setActiveTab] = useState<'tokens'>('tokens');
   const [tokenBalances, setTokenBalances] = useState<TokenBalance[]>([]);
   const [isLoadingTokens, setIsLoadingTokens] = useState(false);
   const [prices, setPrices] = useState<TokenPrices>({});
 
+  // Sync tokenService RPC URL with current network
+  useEffect(() => {
+    tokenService.setRpcUrl(currentNetwork.rpcUrls.default);
+  }, [currentNetwork]);
+
   // Fetch all token balances
   useEffect(() => {
     const fetchTokenBalances = async () => {
-      const addresses: string[] = [];
-      if (walletAddress) addresses.push(walletAddress);
-      if (addresses.length === 0) {
+      if (!walletAddress) {
         setTokenBalances([]);
         return;
       }
 
+      // Determine chain key based on network ID
+      const chainKey = currentNetwork.id === 'arc-testnet' ? 'arcTestnet' :
+                       currentNetwork.id === 'sepolia' ? 'sepolia' :
+                       currentNetwork.id === 'base-sepolia' ? 'baseSepolia' :
+                       currentNetwork.id === 'avalanche-fuji' ? 'avalancheFuji' :
+                       'arcTestnet';
+      const networkType = currentNetwork.testnet ? 'testnet' : 'mainnet';
+
+      console.log('[AssetsTable] Fetching token balances:', { walletAddress, chainKey, networkType, network: currentNetwork.id });
+
       setIsLoadingTokens(true);
       try {
-        // Fetch per address then merge by token symbol (sum balances)
-        const resultsPerAddress = await Promise.all(
-          addresses.map((addr) => tokenService.getAllTokenBalances(addr, 'testnet', 'arcTestnet'))
-        );
+        // Fetch token balances for wallet address
+        const tokenResults = await tokenService.getAllTokenBalances(walletAddress, networkType, chainKey as any);
+        console.log('[AssetsTable] Token balances fetched:', tokenResults);
 
-        const merged = new Map<string, { token: TokenInfo; qty: number }>();
-        for (const list of resultsPerAddress) {
-          for (const tb of list) {
-            const prev = merged.get(tb.token.symbol) ?? { token: tb.token, qty: 0 };
-            const qty = Number.parseFloat(tb.formattedBalance);
-            merged.set(tb.token.symbol, { token: tb.token, qty: prev.qty + (Number.isFinite(qty) ? qty : 0) });
-          }
-        }
-
-        const mergedBalances: TokenBalance[] = Array.from(merged.values()).map(({ token, qty }) => ({
-          token,
-          balance: 0n,
-          formattedBalance: qty.toString(),
-          usdValue: undefined,
-        }));
-
-        setTokenBalances(mergedBalances);
+        // Set the fetched balances directly
+        setTokenBalances(tokenResults);
         const symbols = getAllSupportedTokens().map(t => t.symbol);
         const latestPrices = await tokenService.getTokenPrices(symbols);
         setPrices(latestPrices);
@@ -399,7 +397,7 @@ const AssetsTable: React.FC<AssetsTableProps> = ({ balanceDisplay, isLoading }) 
     // Refresh every 30 seconds
     const interval = setInterval(fetchTokenBalances, 30000);
     return () => clearInterval(interval);
-  }, [walletAddress]);
+  }, [walletAddress, currentNetwork]);
 
   const rows = useMemo(() => {
 
@@ -558,6 +556,7 @@ const WalletDashboard: React.FC = () => {
   const { address: selfCustodialAddress } = useSelfCustodialWallet();
   const { address: legacyAddress, sessionKey } = useWallet();
   const address = passkeyAddress || selfCustodialAddress || legacyAddress;
+  const { currentNetwork } = useNetwork();
 
   const { snapshot, formattedBalance, isLoading: isAccountLoading, error: accountError, refresh, lastUpdated } = useArcAccount();
 
@@ -568,6 +567,11 @@ const WalletDashboard: React.FC = () => {
   const [totalBalance, setTotalBalance] = useState<string | null>(null);
   const [isLoadingTotalBalance, setIsLoadingTotalBalance] = useState(false);
 
+  // Sync tokenService RPC URL with current network
+  useEffect(() => {
+    tokenService.setRpcUrl(currentNetwork.rpcUrls.default);
+  }, [currentNetwork]);
+
   // Calculate total balance from all tokens
   useEffect(() => {
     const calculateTotalBalance = async () => {
@@ -576,9 +580,17 @@ const WalletDashboard: React.FC = () => {
         return;
       }
 
+      // Determine chain key based on network ID
+      const chainKey = currentNetwork.id === 'arc-testnet' ? 'arcTestnet' :
+                       currentNetwork.id === 'sepolia' ? 'sepolia' :
+                       currentNetwork.id === 'base-sepolia' ? 'baseSepolia' :
+                       currentNetwork.id === 'avalanche-fuji' ? 'avalancheFuji' :
+                       'arcTestnet';
+      const networkType = currentNetwork.testnet ? 'testnet' : 'mainnet';
+
       setIsLoadingTotalBalance(true);
       try {
-        const tokenBalances = await tokenService.getAllTokenBalances(address, 'testnet', 'arcTestnet');
+        const tokenBalances = await tokenService.getAllTokenBalances(address, networkType, chainKey as any);
         const symbols = getAllSupportedTokens().map(t => t.symbol);
         const prices = await tokenService.getTokenPrices(symbols);
 
@@ -603,7 +615,7 @@ const WalletDashboard: React.FC = () => {
     // Refresh every 30 seconds
     const interval = setInterval(calculateTotalBalance, 30000);
     return () => clearInterval(interval);
-  }, [address, formattedBalance]);
+  }, [address, formattedBalance, currentNetwork]);
 
   const selectedTransaction = useMemo(() => transactions.find((tx) => tx.id === selectedTransactionId) ?? null, [transactions, selectedTransactionId]);
 

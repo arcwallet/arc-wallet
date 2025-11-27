@@ -90,50 +90,89 @@ export const PasskeyAccountProvider: React.FC<PasskeyAccountProviderProps> = ({ 
   const [address, setAddress] = useState<string | null>(null);
   const [credential, setCredential] = useState<PasskeyAccountCredential | null>(null);
 
-  // Initialize manager on mount and restore address from localStorage
+  // Initialize manager on mount
   useEffect(() => {
-    const initAndRestore = async () => {
-      try {
-        const mgr = initializeManager();
-        setManager(mgr);
-        console.log('[PasskeyAccount] Manager initialized');
+    const mgr = initializeManager();
+    setManager(mgr);
+    console.log('[PasskeyAccount] Manager initialized');
+  }, []);
 
-        // Check for existing credential in localStorage
-        const storedCredentialId = localStorage.getItem('arcwallet:passkey:current');
-        if (storedCredentialId) {
-          const storedCredStr = localStorage.getItem(`arcwallet:passkey:${storedCredentialId}`);
-          if (storedCredStr) {
-            const storedCred = JSON.parse(storedCredStr);
-            setHasAccount(true);
-            setCredential(storedCred);
-            console.log('[PasskeyAccount] Found existing credential:', storedCred);
+  // Restore credential from localStorage when currentEmail changes
+  // IMPORTANT: Only restore if the stored credential belongs to current user
+  useEffect(() => {
+    const restoreCredential = async () => {
+      if (!manager || !currentEmail) {
+        // No email = not logged in, clear passkey state
+        if (!currentEmail) {
+          setIsConnected(false);
+          setHasAccount(false);
+          setAddress(null);
+          setCredential(null);
+        }
+        return;
+      }
 
-            // Restore address from stored credential using factory.getAddress
-            if (storedCred.publicKeyX && storedCred.publicKeyY && storedCred.userId) {
-              try {
-                const { keccak256 } = await import('ethers');
-                const salt = BigInt(keccak256(new TextEncoder().encode(storedCred.userId)));
-                const restoredAddress = await mgr['factory'].getAddress(
-                  BigInt(storedCred.publicKeyX),
-                  BigInt(storedCred.publicKeyY),
-                  salt
-                );
-                setAddress(restoredAddress);
-                setIsConnected(true);
-                console.log('[PasskeyAccount] Restored address from credential:', restoredAddress);
-              } catch (err) {
-                console.error('[PasskeyAccount] Failed to restore address:', err);
-              }
+      console.log('[PasskeyAccount] Checking stored credential for:', currentEmail);
+
+      // Check for existing credential in localStorage
+      const storedCredentialId = localStorage.getItem('arcwallet:passkey:current');
+      if (storedCredentialId) {
+        const storedCredStr = localStorage.getItem(`arcwallet:passkey:${storedCredentialId}`);
+        if (storedCredStr) {
+          const storedCred = JSON.parse(storedCredStr);
+
+          // CRITICAL: Check if stored credential belongs to current user
+          if (storedCred.userId !== currentEmail) {
+            console.log('[PasskeyAccount] Stored credential belongs to different user:', storedCred.userId, '!= ', currentEmail);
+            // Clear state - this user doesn't have a passkey yet
+            setIsConnected(false);
+            setHasAccount(false);
+            setAddress(null);
+            setCredential(null);
+            return;
+          }
+
+          setHasAccount(true);
+          setCredential(storedCred);
+          console.log('[PasskeyAccount] Found existing credential for current user:', storedCred);
+
+          // Restore address from stored credential using factory.getAddress
+          if (storedCred.publicKeyX && storedCred.publicKeyY && storedCred.userId) {
+            try {
+              const { keccak256 } = await import('ethers');
+              const salt = BigInt(keccak256(new TextEncoder().encode(storedCred.userId)));
+              // Note: Use getFunction() because Ethers v6 Contract has its own getAddress() method from Addressable interface
+              const getAddressFunc = manager['factory'].getFunction('getAddress');
+              const restoredAddress = await getAddressFunc(
+                BigInt(storedCred.publicKeyX),
+                BigInt(storedCred.publicKeyY),
+                salt
+              );
+              setAddress(restoredAddress);
+              setIsConnected(true);
+              console.log('[PasskeyAccount] Restored address from credential:', restoredAddress);
+            } catch (err) {
+              console.error('[PasskeyAccount] Failed to restore address:', err);
             }
           }
+        } else {
+          // No stored credential for this user
+          setIsConnected(false);
+          setHasAccount(false);
+          setAddress(null);
+          setCredential(null);
         }
-      } catch (error) {
-        console.error('[PasskeyAccount] Failed to initialize manager:', error);
+      } else {
+        // No stored credential at all
+        setIsConnected(false);
+        setHasAccount(false);
+        setAddress(null);
+        setCredential(null);
       }
     };
 
-    initAndRestore();
-  }, []);
+    restoreCredential();
+  }, [manager, currentEmail]);
 
   // Create new account with passkey
   const createAccount = useCallback(async (): Promise<{ address: string }> => {

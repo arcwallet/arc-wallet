@@ -4,12 +4,12 @@ import { WaveBackground } from '../components/WaveBackground';
 import arcLogo from '../assets/arclogo.png';
 import { Footer } from '../components/Footer';
 import { passkeyClient } from '../services/passkeyClient';
-import { createAuthenticationCredential } from '../utils/webauthn';
+import { createAuthenticationCredential, createRegistrationCredential } from '../utils/webauthn';
 import OtpInput from '../components/OtpInput';
 
 const API_BASE = ((import.meta as any).env.VITE_PASSKEY_API_URL || 'https://arcwallet-backend.onrender.com').replace(/\/$/, '');
 
-type LoginStep = 'email' | 'otp' | 'passkey' | 'verifying';
+type LoginStep = 'email' | 'otp' | 'passkey' | 'verifying' | 'creating_passkey';
 
 const LoginPage: React.FC = () => {
   const { refresh } = useSession();
@@ -64,6 +64,48 @@ const LoginPage: React.FC = () => {
       return true;
     } catch (error) {
       console.error('[LoginPage] Passkey auth failed:', error);
+      return false;
+    }
+  };
+
+  // Create passkey for user after OTP verification
+  const handleCreatePasskey = async (userEmail: string): Promise<boolean> => {
+    try {
+      console.log('[LoginPage] Creating passkey for:', userEmail);
+      setStep('creating_passkey');
+      showMessage('Creating your secure passkey...', 'info');
+
+      // Start passkey registration
+      const startResult = await passkeyClient.beginRegistration(userEmail, userEmail.split('@')[0]);
+      if (!startResult.success || !startResult.data?.options) {
+        throw new Error('Failed to start passkey registration');
+      }
+
+      // Create the passkey
+      const credential = await createRegistrationCredential(startResult.data.options);
+
+      // Finish registration
+      const finishResult = await passkeyClient.finishRegistration(userEmail, credential);
+      if (!finishResult.success) {
+        throw new Error('Failed to complete passkey registration');
+      }
+
+      // Store session key if provided
+      if (finishResult.data?.sessionKey) {
+        localStorage.setItem('arc_session_key', JSON.stringify(finishResult.data.sessionKey));
+      }
+
+      console.log('[LoginPage] Passkey created successfully');
+      showMessage('Passkey created successfully!', 'success');
+      return true;
+    } catch (error: any) {
+      console.error('[LoginPage] Passkey creation failed:', error);
+      // User might have cancelled - that's OK, they can still login
+      if (error.name === 'AbortError' || error.message?.includes('cancelled')) {
+        showMessage('Passkey creation cancelled. You can create one later.', 'info');
+        return false;
+      }
+      showMessage(error.message || 'Failed to create passkey', 'error');
       return false;
     }
   };
@@ -145,6 +187,18 @@ const LoginPage: React.FC = () => {
       }
 
       showMessage('Email verified successfully!', 'success');
+
+      // Check if user already has a passkey
+      const checkResult = await passkeyClient.checkUserPasskeys(email);
+      console.log('[LoginPage] User passkey check:', checkResult);
+
+      if (!checkResult.success || !checkResult.data?.hasPasskey) {
+        // User doesn't have a passkey - create one
+        console.log('[LoginPage] User has no passkey, creating one...');
+        await handleCreatePasskey(email);
+      }
+
+      // Refresh session after everything is done
       await refresh();
 
     } catch (error) {
@@ -319,6 +373,22 @@ const LoginPage: React.FC = () => {
     </div>
   );
 
+  const renderCreatingPasskeyStep = () => (
+    <div className="flex flex-col items-center gap-6">
+      <div className="w-16 h-16 rounded-full bg-green-500/20 flex items-center justify-center animate-pulse">
+        <svg className="w-8 h-8 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4" />
+        </svg>
+      </div>
+      <div className="text-center">
+        <p className="text-white font-medium mb-2">Creating your secure passkey</p>
+        <p className="text-slate-400 text-sm">
+          Follow your device's prompt to create a passkey for secure, password-free login.
+        </p>
+      </div>
+    </div>
+  );
+
   return (
     <div className="fixed inset-0 w-full h-full flex flex-col items-center justify-center overflow-hidden bg-transparent">
       {/* Background Pattern */}
@@ -334,13 +404,14 @@ const LoginPage: React.FC = () => {
       {/* Login Container */}
       <div className="relative z-20 w-full max-w-md px-4 animate-in fade-in zoom-in duration-700">
         <h1 className="text-5xl font-light text-center mb-12 text-slate-100 tracking-tight drop-shadow-lg">
-          {step === 'otp' || step === 'verifying' ? 'Verify email' : 'Sign in'}
+          {step === 'otp' || step === 'verifying' ? 'Verify email' : step === 'creating_passkey' ? 'Setup passkey' : 'Sign in'}
         </h1>
 
         {step === 'email' && renderEmailStep()}
         {step === 'otp' && renderOtpStep()}
         {step === 'passkey' && renderPasskeyStep()}
         {step === 'verifying' && renderVerifyingStep()}
+        {step === 'creating_passkey' && renderCreatingPasskeyStep()}
 
         {/* Status Messages (not for OTP step - handled by OtpInput) */}
         {message && step !== 'otp' && step !== 'verifying' && (
