@@ -159,4 +159,21 @@ export declare function hasSqlInjection(input: string): boolean;
  * Validate and sanitize file path
  */
 export declare function sanitizePath(path: string): string | null;
+/**
+ * Validate redirect URL to prevent open redirect attacks
+ * Based on security patterns from SendApp
+ */
+export declare function validateRedirectUrl(redirectUri: string | undefined | null, defaultPath?: string): string;
+/**
+ * Validate webhook URL to prevent SSRF attacks
+ */
+export declare function validateWebhookUrl(url: string | undefined | null): boolean;
+/**
+ * URL schema for Zod validation
+ */
+export declare const urlSchema: z.ZodString;
+/**
+ * Webhook URL schema
+ */
+export declare const webhookUrlSchema: z.ZodString;
 //# sourceMappingURL=validation.d.ts.map

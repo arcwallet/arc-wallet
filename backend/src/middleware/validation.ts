@@ -406,3 +406,114 @@ export function sanitizePath(path: string): string | null {
 
   return sanitized;
 }
+
+// ============================================
+// URL VALIDATION (Inspired by SendApp)
+// ============================================
+
+// Allowed origins for redirects
+const ALLOWED_ORIGINS = [
+  'https://app.arcwallet.network',
+  'https://arcwallet.network',
+  'http://localhost:5173',
+  'http://localhost:3000',
+];
+
+/**
+ * Validate redirect URL to prevent open redirect attacks
+ * Based on security patterns from SendApp
+ */
+export function validateRedirectUrl(redirectUri: string | undefined | null, defaultPath = '/'): string {
+  if (!redirectUri || typeof redirectUri !== 'string') {
+    return defaultPath;
+  }
+
+  try {
+    const decodedUri = decodeURIComponent(redirectUri);
+
+    // Allow relative paths (must start with / but not //)
+    if (decodedUri.startsWith('/') && !decodedUri.startsWith('//')) {
+      return decodedUri;
+    }
+
+    // Check absolute URLs against allowed origins
+    if (decodedUri.startsWith('http://') || decodedUri.startsWith('https://')) {
+      const url = new URL(decodedUri);
+      if (ALLOWED_ORIGINS.includes(url.origin)) {
+        return url.pathname + url.search + url.hash;
+      }
+      console.warn(`[Security] Blocked redirect to unauthorized origin: ${url.origin}`);
+    }
+
+  } catch (error) {
+    console.warn(`[Security] Invalid redirect URI: ${redirectUri}`);
+  }
+
+  return defaultPath;
+}
+
+/**
+ * Validate webhook URL to prevent SSRF attacks
+ */
+export function validateWebhookUrl(url: string | undefined | null): boolean {
+  if (!url || typeof url !== 'string') {
+    return false;
+  }
+
+  try {
+    const parsed = new URL(url);
+
+    // Only allow HTTPS in production
+    if (process.env.NODE_ENV === 'production' && parsed.protocol !== 'https:') {
+      return false;
+    }
+
+    // Block localhost and private IPs
+    const hostname = parsed.hostname.toLowerCase();
+    const blockedPatterns = [
+      'localhost', '127.0.0.1', '0.0.0.0', '::1',
+      '10.', '172.16.', '172.17.', '172.18.', '172.19.',
+      '172.20.', '172.21.', '172.22.', '172.23.',
+      '172.24.', '172.25.', '172.26.', '172.27.',
+      '172.28.', '172.29.', '172.30.', '172.31.',
+      '192.168.', '169.254.', 'metadata.google', '169.254.169.254',
+    ];
+
+    for (const pattern of blockedPatterns) {
+      if (hostname.includes(pattern)) {
+        console.warn(`[Security] Blocked webhook URL with internal hostname: ${hostname}`);
+        return false;
+      }
+    }
+
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * URL schema for Zod validation
+ */
+export const urlSchema = z
+  .string()
+  .url('Invalid URL format')
+  .refine(
+    (val) => {
+      try {
+        const url = new URL(val);
+        return ['http:', 'https:'].includes(url.protocol);
+      } catch {
+        return false;
+      }
+    },
+    'URL must use HTTP or HTTPS protocol'
+  );
+
+/**
+ * Webhook URL schema
+ */
+export const webhookUrlSchema = z
+  .string()
+  .url('Invalid webhook URL')
+  .refine(validateWebhookUrl, 'Invalid or blocked webhook URL');
