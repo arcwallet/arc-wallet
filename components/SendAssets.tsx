@@ -514,6 +514,22 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
       let hash: string;
       let kind: 'transaction' | 'userOp' = 'transaction';
 
+      // PASSKEY WALLET PATH - Uses P256 signing via WebAuthn
+      // Note: Passkey wallet transfer requires ERC-4337 UserOperation building
+      // This is a complex operation that needs bundler integration
+      if (passkeyConnected && !walletPrivateKey) {
+        // For now, show a friendly message that passkey transfers are coming soon
+        // TODO: Implement full ERC-4337 UserOperation flow for passkey signing
+        setSubmitError('Passkey wallet transfers are coming soon. Please use a self-custodial wallet for now.');
+        setIsSubmitting(false);
+        return;
+      }
+
+      // PRIVATE KEY WALLET PATH - Uses traditional signing
+      if (!walletPrivateKey) {
+        throw new Error('No signing method available. Please connect a wallet.');
+      }
+
       if (isBatchMode) {
         // Prepare batch transactions
         const transactions = batchTransactions.map(tx => ({
