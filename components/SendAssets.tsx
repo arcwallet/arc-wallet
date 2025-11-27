@@ -1,5 +1,5 @@
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { isAddress, parseUnits } from 'ethers';
 import { useArcAccount } from '../contexts/ArcAccountContext';
 import { useWallet } from '../contexts/WalletContext';
@@ -26,7 +26,7 @@ import {
   getSmartAccountAddress,
 } from '../services/executionRouter';
 import { TransactionStatus, TransactionType } from '../types';
-import { ExpandIcon, ContactIcon, LockIcon } from './Icons';
+import { ExpandIcon, ContactIcon, LockIcon, StarIcon, UserCircleIcon, ClockIcon, PlusIcon, SearchIcon, CloseIcon } from './Icons';
 import { getAllSupportedTokens, TokenInfo, formatTokenAmount } from '../config/tokens';
 import { tokenService } from '../services/tokenService';
 import { paymasterClient } from '../services/paymasterClient';
@@ -34,6 +34,7 @@ import { gasStationClient } from '../services/gasStationClient';
 import { GasSponsorshipIndicator, GasFeeBadge } from './GasSponsorshipIndicator';
 import { BatchTransfer } from './BatchTransfer';
 import { TX_EXPLORER_URL } from '../config/app.config';
+import { addressBookService, Contact } from '../services/addressBookService';
 
 
 interface SendAssetsProps {
@@ -113,6 +114,39 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
   const [useSmartAccount, setUseSmartAccount] = useState(false);
   const [smartAccountAvailable, setSmartAccountAvailable] = useState(false);
   const [smartAccountAddress, setSmartAccountAddress] = useState<string | null>(null);
+
+  // Address Book State
+  const [showAddressBook, setShowAddressBook] = useState(false);
+  const [addressBookSearch, setAddressBookSearch] = useState('');
+  const [showSaveContact, setShowSaveContact] = useState(false);
+  const [newContactName, setNewContactName] = useState('');
+  const [newContactLabel, setNewContactLabel] = useState('');
+  const addressBookRef = useRef<HTMLDivElement>(null);
+
+  // Get combined contacts and recent recipients
+  const addressBookList = useMemo(() => {
+    const list = addressBookService.getCombinedList();
+    if (!addressBookSearch.trim()) return list;
+    const query = addressBookSearch.toLowerCase();
+    return list.filter(
+      item => item.address.toLowerCase().includes(query) ||
+              item.name?.toLowerCase().includes(query) ||
+              item.label?.toLowerCase().includes(query)
+    );
+  }, [addressBookSearch, showAddressBook]);
+
+  // Close address book when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (addressBookRef.current && !addressBookRef.current.contains(event.target as Node)) {
+        setShowAddressBook(false);
+      }
+    };
+    if (showAddressBook) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showAddressBook]);
 
 
   const balance = useMemo(() => {
@@ -590,6 +624,9 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
 
       setTxHash(hash);
 
+      // Record recipient in address book (for recent recipients)
+      addressBookService.recordRecipient(recipient, amount, selectedToken.symbol);
+
       if (submissionKind === 'transaction') {
         const activity = {
           id: hash,
@@ -726,20 +763,204 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
             </button>
           </div>
         </label>
-        <label className="flex flex-col w-full">
-          <p className="text-sm font-medium leading-normal pb-2 text-text-secondary">Send To</p>
+        <div className="flex flex-col w-full relative" ref={addressBookRef}>
+          <div className="flex items-center justify-between pb-2">
+            <p className="text-sm font-medium leading-normal text-text-secondary">Send To</p>
+            {recipient && isAddress(recipient) && !addressBookService.getContactByAddress(recipient) && (
+              <button
+                type="button"
+                onClick={() => setShowSaveContact(true)}
+                className="text-xs text-primary hover:text-primary/80 flex items-center gap-1 transition-colors"
+              >
+                <PlusIcon size={12} />
+                Save Contact
+              </button>
+            )}
+          </div>
           <div className="flex w-full flex-1 items-stretch rounded-lg">
             <input
               className="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded-l-lg text-white focus:outline-none focus:ring-1 focus:ring-blue-400 border border-slate-500/50 bg-slate-900/60 backdrop-blur-sm h-14 placeholder:text-slate-400 p-3.5 pr-2 text-base font-normal leading-normal transition-all"
-              placeholder="Enter recipient wallet address"
+              placeholder="Enter address or select contact"
               value={recipient}
               onChange={(e) => setRecipient(e.target.value)}
+              onFocus={() => setShowAddressBook(true)}
             />
-            <div className="text-slate-400 flex items-center justify-center rounded-r-lg border border-l-0 border-slate-500/50 bg-slate-900/60 backdrop-blur-sm px-3.5">
+            <button
+              type="button"
+              onClick={() => setShowAddressBook(!showAddressBook)}
+              className="text-slate-400 hover:text-white flex items-center justify-center rounded-r-lg border border-l-0 border-slate-500/50 bg-slate-900/60 hover:bg-slate-800/60 backdrop-blur-sm px-3.5 transition-colors"
+            >
               <ContactIcon size={20} />
-            </div>
+            </button>
           </div>
-        </label>
+
+          {/* Address Book Dropdown */}
+          {showAddressBook && (
+            <div className="absolute top-full left-0 right-0 mt-2 z-50 rounded-lg border border-slate-500/50 bg-slate-900/95 backdrop-blur-md shadow-xl max-h-80 overflow-hidden">
+              {/* Search */}
+              <div className="p-3 border-b border-slate-700/50">
+                <div className="relative">
+                  <SearchIcon size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Search contacts..."
+                    value={addressBookSearch}
+                    onChange={(e) => setAddressBookSearch(e.target.value)}
+                    className="w-full bg-slate-800/60 border border-slate-600/50 rounded-lg pl-9 pr-3 py-2 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-blue-400"
+                  />
+                </div>
+              </div>
+
+              {/* List */}
+              <div className="overflow-y-auto max-h-56">
+                {addressBookList.length > 0 ? (
+                  addressBookList.map((item, index) => (
+                    <button
+                      key={item.address + index}
+                      type="button"
+                      onClick={() => {
+                        setRecipient(item.address);
+                        setShowAddressBook(false);
+                        setAddressBookSearch('');
+                      }}
+                      className="w-full flex items-center gap-3 p-3 hover:bg-slate-800/60 transition-colors text-left border-b border-slate-700/30 last:border-b-0"
+                    >
+                      <div className="flex-shrink-0">
+                        {item.isContact ? (
+                          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+                            <span className="text-white text-sm font-semibold">
+                              {item.name?.charAt(0).toUpperCase() || '?'}
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="w-9 h-9 rounded-full bg-slate-700 flex items-center justify-center">
+                            <ClockIcon size={16} className="text-slate-400" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium text-white truncate">
+                            {item.name || `${item.address.slice(0, 8)}...${item.address.slice(-6)}`}
+                          </span>
+                          {item.isFavorite && (
+                            <StarIcon size={12} filled className="text-yellow-400 flex-shrink-0" />
+                          )}
+                          {item.label && (
+                            <span className="text-xs bg-slate-700 text-slate-300 px-1.5 py-0.5 rounded">
+                              {item.label}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-slate-400 truncate font-mono">
+                          {item.address.slice(0, 10)}...{item.address.slice(-8)}
+                        </p>
+                      </div>
+                      {!item.isContact && item.count && (
+                        <span className="text-xs text-slate-500 flex-shrink-0">
+                          {item.count}x
+                        </span>
+                      )}
+                    </button>
+                  ))
+                ) : (
+                  <div className="p-6 text-center">
+                    <UserCircleIcon size={32} className="mx-auto text-slate-600 mb-2" />
+                    <p className="text-sm text-slate-400">
+                      {addressBookSearch ? 'No matching contacts' : 'No contacts yet'}
+                    </p>
+                    <p className="text-xs text-slate-500 mt-1">
+                      {addressBookSearch ? 'Try a different search' : 'Send to an address to add it to recents'}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Save Contact Modal */}
+          {showSaveContact && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+              <div className="bg-slate-900 border border-slate-700 rounded-xl p-6 w-full max-w-sm mx-4 shadow-2xl">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-white">Save Contact</h3>
+                  <button
+                    onClick={() => {
+                      setShowSaveContact(false);
+                      setNewContactName('');
+                      setNewContactLabel('');
+                    }}
+                    className="text-slate-400 hover:text-white transition-colors"
+                  >
+                    <CloseIcon size={20} />
+                  </button>
+                </div>
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-sm text-slate-400 block mb-1">Address</label>
+                    <p className="text-sm text-white font-mono bg-slate-800 p-2 rounded truncate">
+                      {recipient}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="text-sm text-slate-400 block mb-1">Name *</label>
+                    <input
+                      type="text"
+                      value={newContactName}
+                      onChange={(e) => setNewContactName(e.target.value)}
+                      placeholder="e.g., Alice, Binance, etc."
+                      className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-white placeholder:text-slate-500 focus:outline-none focus:border-blue-400"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm text-slate-400 block mb-1">Label (optional)</label>
+                    <input
+                      type="text"
+                      value={newContactLabel}
+                      onChange={(e) => setNewContactLabel(e.target.value)}
+                      placeholder="e.g., Work, Exchange, Friend"
+                      className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-white placeholder:text-slate-500 focus:outline-none focus:border-blue-400"
+                    />
+                  </div>
+                  <div className="flex gap-3 pt-2">
+                    <button
+                      onClick={() => {
+                        setShowSaveContact(false);
+                        setNewContactName('');
+                        setNewContactLabel('');
+                      }}
+                      className="flex-1 px-4 py-2 border border-slate-600 rounded-lg text-slate-300 hover:bg-slate-800 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (newContactName.trim() && recipient) {
+                          try {
+                            addressBookService.addContact({
+                              address: recipient,
+                              name: newContactName.trim(),
+                              label: newContactLabel.trim() || undefined,
+                            });
+                            setShowSaveContact(false);
+                            setNewContactName('');
+                            setNewContactLabel('');
+                          } catch (e: any) {
+                            alert(e.message);
+                          }
+                        }
+                      }}
+                      disabled={!newContactName.trim()}
+                      className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-700 disabled:text-slate-500 rounded-lg text-white font-medium transition-colors"
+                    >
+                      Save
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
         <div className="mt-2 rounded-lg border border-slate-500/50 bg-slate-900/60 backdrop-blur-sm p-4">
           <h3 className="text-sm font-medium text-text-secondary mb-3">Transaction Summary</h3>
 
