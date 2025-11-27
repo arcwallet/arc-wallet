@@ -253,6 +253,36 @@ export function createPasskeyRoutes(db: Database, config: EnvConfig): Router {
   );
 
   /**
+   * POST /passkeys/admin/reset-user
+   * Admin endpoint to reset user passkeys (bypasses rate limit)
+   * Requires ADMIN_SECRET in request body
+   */
+  router.post(
+    '/admin/reset-user',
+    validateRequestBody(['email', 'adminSecret']),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const { adminSecret } = req.body;
+        const expectedSecret = process.env.ADMIN_SECRET || 'arc-admin-2024-secret';
+
+        if (adminSecret !== expectedSecret) {
+          return res.status(403).json({
+            success: false,
+            error: 'Invalid admin secret',
+            code: 'UNAUTHORIZED'
+          });
+        }
+
+        // Set confirmReset to true for admin requests
+        req.body.confirmReset = true;
+        await passkeyController.resetUserPasskeys(req, res);
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
+
+  /**
    * GET /passkeys/health
    * Health check for passkey service
    */
