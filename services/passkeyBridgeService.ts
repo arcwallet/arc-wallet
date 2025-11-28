@@ -24,12 +24,12 @@ const ARC_TESTNET_CONFIG = {
   domain: 26,
 };
 
-// Sepolia CCTP Configuration
+// Sepolia CCTP V2 Configuration (same addresses as Arc - Circle uses deterministic deployment)
 const SEPOLIA_CONFIG = {
   chainId: 11155111,
   rpcUrl: 'https://ethereum-sepolia-rpc.publicnode.com',
-  tokenMessenger: '0x9f3B8679c73C2Fef8b59B4f3444d4e156fb70AA5',
-  messageTransmitter: '0x7865fAfC2db2093669d92c0F33AeEF291086BEFD',
+  tokenMessenger: '0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA', // TokenMessengerV2
+  messageTransmitter: '0xE737e5cEBEEBa77EFE34D4aa090756590b1CE275', // MessageTransmitterV2
   usdc: '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238',
   domain: 0,
 };
@@ -37,12 +37,13 @@ const SEPOLIA_CONFIG = {
 // Circle Attestation API
 const ATTESTATION_API = 'https://iris-api-sandbox.circle.com';
 
-// ABIs for CCTP contracts
-const TOKEN_MESSENGER_ABI = [
-  'function depositForBurn(uint256 amount, uint32 destinationDomain, bytes32 mintRecipient, address burnToken) returns (uint64 nonce)',
+// ABIs for CCTP V2 contracts (Arc Testnet and Sepolia both use V2)
+const TOKEN_MESSENGER_V2_ABI = [
+  // V2 depositForBurn has 7 parameters (3 more than V1)
+  'function depositForBurn(uint256 amount, uint32 destinationDomain, bytes32 mintRecipient, address burnToken, bytes32 destinationCaller, uint256 maxFee, uint32 minFinalityThreshold) external returns (uint64 nonce)',
 ];
 
-const MESSAGE_TRANSMITTER_ABI = [
+const MESSAGE_TRANSMITTER_V2_ABI = [
   'function receiveMessage(bytes message, bytes attestation) returns (bool success)',
 ];
 
@@ -159,20 +160,31 @@ export async function bridgeUsdcWithPasskey(params: PasskeyBridgeParams): Promis
       onProgress?.({ type: 'approving-usdc', txHash: approveResult.hash });
     }
 
-    // Step 3: Call depositForBurn on TokenMessenger
+    // Step 3: Call depositForBurn on TokenMessengerV2
     console.log('[PasskeyBridge] Burning USDC...');
     onProgress?.({ type: 'burning-usdc' });
 
-    const tokenMessengerInterface = new Interface(TOKEN_MESSENGER_ABI);
+    const tokenMessengerInterface = new Interface(TOKEN_MESSENGER_V2_ABI);
 
     // Convert recipient address to bytes32 (left-padded)
     const mintRecipient = addressToBytes32(recipient);
+
+    // CCTP V2 new parameters:
+    // - destinationCaller: bytes32(0) allows anyone to call receiveMessage on destination
+    // - maxFee: 0 for no fee (can be calculated as feeRate * amount in basis points)
+    // - minFinalityThreshold: 1000 or less for Fast Transfer mode
+    const destinationCaller = '0x0000000000000000000000000000000000000000000000000000000000000000';
+    const maxFee = 0n;
+    const minFinalityThreshold = 1000; // Fast Transfer mode
 
     const depositForBurnData = tokenMessengerInterface.encodeFunctionData('depositForBurn', [
       amountWei,
       destConfig.domain,
       mintRecipient,
       sourceConfig.usdc,
+      destinationCaller,
+      maxFee,
+      minFinalityThreshold,
     ]);
 
     // Execute depositForBurn via PasskeyAccount (UserOperation)
@@ -207,7 +219,7 @@ export async function bridgeUsdcWithPasskey(params: PasskeyBridgeParams): Promis
       console.log('[PasskeyBridge] Completing on Arc Testnet...');
       onProgress?.({ type: 'minting-usdc' });
 
-      const messageTransmitterInterface = new Interface(MESSAGE_TRANSMITTER_ABI);
+      const messageTransmitterInterface = new Interface(MESSAGE_TRANSMITTER_V2_ABI);
       const receiveMessageData = messageTransmitterInterface.encodeFunctionData('receiveMessage', [
         message,
         attestation,
