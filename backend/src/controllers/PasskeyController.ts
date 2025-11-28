@@ -84,10 +84,21 @@ export class PasskeyController {
 
       let options;
       if (existingUser) {
-        // Existing user: allow registration (multiple devices or recovery)
-        // Note: We allow multiple passkeys per user for multi-device support
+        // Check if user already has a passkey
         const userPasskeys = await this.db.getPasskeysByUserId(existingUser.id);
 
+        // CRITICAL: Prevent creating new passkey if user already has one
+        // Each passkey generates a different wallet address, so allowing multiple
+        // passkeys would cause users to lose access to their funds
+        if (userPasskeys.length > 0) {
+          throw new ApiError(
+            'You already have a passkey registered. Creating a new passkey would generate a new wallet address and you would lose access to your existing funds. Use your existing passkey to login.',
+            400,
+            'PASSKEY_ALREADY_EXISTS'
+          );
+        }
+
+        // User exists but has no passkey - allow registration
         options = await generateRegistrationOptions({
           rpName: this.config.RP_NAME,
           rpID: this.config.RP_ID,
@@ -100,11 +111,6 @@ export class PasskeyController {
             userVerification: 'required',
             authenticatorAttachment: 'platform'
           },
-          // Exclude existing credentials to prevent duplicate device registration
-          excludeCredentials: userPasskeys.map(passkey => ({
-            id: passkey.credentialID,
-            type: 'public-key' as const,
-          })),
           supportedAlgorithmIDs: [-7, -257]
         });
 

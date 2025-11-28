@@ -125,15 +125,17 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
         setError('Passkey authentication is not available. Please check your device settings.');
       } else if (errorMessage.includes('failed to fetch') || errorMessage.includes('network')) {
         setError('Connection error. Please check your internet and try again.');
-      } else if (errorMessage.includes('passkey already exists') || errorMessage.includes('already registered')) {
+      } else if (errorMessage.includes('passkey already exists') || errorMessage.includes('already registered') || errorMessage.includes('already have a passkey')) {
         // Passkey exists - try to connect instead
-        setStatusMessage('Passkey found. Connecting...');
+        // This is a security measure: each passkey generates a different wallet address
+        // Allowing multiple passkeys would cause users to lose access to their funds
+        setStatusMessage('Passkey found for this email. Connecting to your existing wallet...');
         try {
           await connect();
           onComplete();
           return;
         } catch (connectErr) {
-          setError('Could not connect with existing passkey. Please try again.');
+          setError('Could not connect with existing passkey. Please use the same device/browser where you created your passkey.');
         }
       } else if (errorMessage.includes('credential not found')) {
         setError('Passkey not found. Please create a new wallet.');
