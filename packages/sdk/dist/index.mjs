@@ -2688,10 +2688,10 @@ class Xe {
       initCode: r ? "0x" : this.getInitCode(),
       callData: i,
       callGasLimit: 500000n,
-      // Conservative estimate
-      verificationGasLimit: r ? 150000n : 500000n,
-      // Higher for deployment
-      preVerificationGas: 50000n,
+      // Conservative estimate for actual execution
+      verificationGasLimit: r ? 200000n : 1500000n,
+      // Much higher for deployment (initCode needs ~1.4M)
+      preVerificationGas: 60000n,
       maxFeePerGas: d,
       maxPriorityFeePerGas: l,
       paymasterAndData: "0x"

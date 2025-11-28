@@ -423,14 +423,15 @@ export class PasskeyAccountManager {
     const nonce = await this.getAccountNonce();
 
     // Build UserOperation (without signature - will be added after signing)
+    // Note: Account deployment requires ~1.4M gas for initCode execution
     const userOp = {
       sender: this.accountAddress,
       nonce,
       initCode: isDeployed ? '0x' : this.getInitCode(),
       callData,
-      callGasLimit: 500000n, // Conservative estimate
-      verificationGasLimit: isDeployed ? 150000n : 500000n, // Higher for deployment
-      preVerificationGas: 50000n,
+      callGasLimit: 500000n, // Conservative estimate for actual execution
+      verificationGasLimit: isDeployed ? 200000n : 1500000n, // Much higher for deployment (initCode needs ~1.4M)
+      preVerificationGas: 60000n,
       maxFeePerGas,
       maxPriorityFeePerGas,
       paymasterAndData: '0x', // No paymaster for now
