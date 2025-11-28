@@ -5,24 +5,71 @@ import { pushService } from './pushService.js';
 import { TokenMetadataService } from './tokenMetadataService.js';
 /**
  * Indexer Service
- * Listens to the blockchain and indexes transactions/events to a local SQLite database.
+ * Listens to the blockchain and indexes transactions/events ONLY for registered wallet addresses.
+ * This is a targeted indexer - it doesn't process all network activity, only what matters to users.
  */
 class IndexerService {
     provider;
+    database;
     isRunning = false;
     pollingInterval = null;
     currentPollingDelay;
-    BASE_POLLING_DELAY = 10000; // 10 seconds
-    MAX_POLLING_DELAY = 120000; // 2 minutes max backoff
-    BLOCK_BATCH_SIZE = 10; // Process max 10 blocks per cycle
-    BLOCK_DELAY = 500; // 0.5s delay between blocks
+    BASE_POLLING_DELAY = 15000; // 15 seconds (more conservative)
+    MAX_POLLING_DELAY = 300000; // 5 minutes max backoff
+    BLOCK_BATCH_SIZE = 5; // Process max 5 blocks per cycle (reduced)
+    BLOCK_DELAY = 1000; // 1s delay between blocks (increased)
+    REQUEST_DELAY = 200; // 200ms between RPC requests
     rateLimitHits = 0;
     tokenMetadataService;
+    watchedAddresses = new Set();
+    lastAddressRefresh = 0;
+    ADDRESS_REFRESH_INTERVAL = 60000; // Refresh addresses every minute
     constructor(database) {
         const rpcUrl = process.env.ARC_RPC_URL || 'http://localhost:8545';
         this.provider = new ethers.JsonRpcProvider(rpcUrl);
+        this.database = database;
         this.tokenMetadataService = new TokenMetadataService(this.provider, database);
         this.currentPollingDelay = this.BASE_POLLING_DELAY;
+    }
+    /**
+     * Refresh the list of watched addresses from the database
+     */
+    async refreshWatchedAddresses() {
+        const now = Date.now();
+        if (now - this.lastAddressRefresh < this.ADDRESS_REFRESH_INTERVAL && this.watchedAddresses.size > 0) {
+            return; // Skip refresh if not enough time has passed
+        }
+        try {
+            // Get all users with wallet addresses from the database
+            const query = 'SELECT wallet_address FROM users WHERE wallet_address IS NOT NULL';
+            const rows = await new Promise((resolve, reject) => {
+                this.database.db.all(query, [], (err, rows) => {
+                    if (err)
+                        reject(err);
+                    else
+                        resolve(rows || []);
+                });
+            });
+            this.watchedAddresses.clear();
+            for (const row of rows) {
+                if (row.wallet_address) {
+                    this.watchedAddresses.add(row.wallet_address.toLowerCase());
+                }
+            }
+            this.lastAddressRefresh = now;
+            console.log(`📋 Indexer watching ${this.watchedAddresses.size} registered wallet addresses`);
+        }
+        catch (error) {
+            console.error('Failed to refresh watched addresses:', error);
+        }
+    }
+    /**
+     * Check if an address should be watched (is registered user)
+     */
+    isWatchedAddress(address) {
+        if (!address)
+            return false;
+        return this.watchedAddresses.has(address.toLowerCase());
     }
     /**
      * Start the indexer
@@ -52,18 +99,27 @@ class IndexerService {
         if (!this.isRunning)
             return;
         try {
+            // Refresh watched addresses before processing
+            await this.refreshWatchedAddresses();
+            // If no addresses to watch, skip processing
+            if (this.watchedAddresses.size === 0) {
+                console.log('⏸️ No registered wallets to watch, skipping block processing');
+                this.pollingInterval = setTimeout(() => this.poll(), this.currentPollingDelay);
+                return;
+            }
             const latestBlock = await this.provider.getBlockNumber();
+            await this.delay(this.REQUEST_DELAY); // Rate limit protection
             const lastIndexedBlock = await this.getStartingBlock();
             if (latestBlock > lastIndexedBlock) {
                 // Calculate how many blocks to process (max BLOCK_BATCH_SIZE)
                 const blocksToProcess = Math.min(latestBlock - lastIndexedBlock, this.BLOCK_BATCH_SIZE);
-                console.log(`📦 Processing ${blocksToProcess} blocks (${lastIndexedBlock + 1} to ${lastIndexedBlock + blocksToProcess})`);
+                console.log(`📦 Processing ${blocksToProcess} blocks (${lastIndexedBlock + 1} to ${lastIndexedBlock + blocksToProcess}) for ${this.watchedAddresses.size} wallets`);
                 // Process blocks sequentially with delay
                 for (let i = lastIndexedBlock + 1; i <= lastIndexedBlock + blocksToProcess; i++) {
                     await this.processBlock(i);
                     // Add delay between blocks to avoid rate limiting
                     if (i < lastIndexedBlock + blocksToProcess) {
-                        await new Promise(resolve => setTimeout(resolve, this.BLOCK_DELAY));
+                        await this.delay(this.BLOCK_DELAY);
                     }
                 }
                 // Successful processing - reset backoff
@@ -73,11 +129,13 @@ class IndexerService {
         }
         catch (error) {
             const errorMessage = error?.message || error?.toString() || '';
-            // Check for rate limit errors
+            // Check for rate limit errors (including QuickNode specific error)
             if (errorMessage.includes('rate limit') ||
+                errorMessage.includes('request limit reached') ||
                 errorMessage.includes('daily request limit') ||
                 errorMessage.includes('429') ||
-                errorMessage.includes('Too Many Requests')) {
+                errorMessage.includes('Too Many Requests') ||
+                errorMessage.includes('-32007')) {
                 this.rateLimitHits++;
                 // Exponential backoff: double the delay each time, up to max
                 this.currentPollingDelay = Math.min(this.BASE_POLLING_DELAY * Math.pow(2, this.rateLimitHits), this.MAX_POLLING_DELAY);
@@ -89,6 +147,12 @@ class IndexerService {
         }
         // Schedule next poll with current delay
         this.pollingInterval = setTimeout(() => this.poll(), this.currentPollingDelay);
+    }
+    /**
+     * Helper to add delay between operations
+     */
+    delay(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
     }
     /**
      * Get the last indexed block number from DB
@@ -124,13 +188,14 @@ class IndexerService {
         return lastIndexed;
     }
     /**
-     * Process a single block
+     * Process a single block - ONLY for watched addresses
      */
     async processBlock(blockNumber) {
         try {
             const block = await this.provider.getBlock(blockNumber, true); // true to include transactions
             if (!block)
                 return;
+            await this.delay(this.REQUEST_DELAY); // Rate limit protection
             const insertBlock = db.prepare(`
         INSERT OR IGNORE INTO blocks (number, hash, parent_hash, timestamp, processed_at)
         VALUES (?, ?, ?, ?, ?)
@@ -145,69 +210,95 @@ class IndexerService {
           transaction_hash, block_number, event_type, from_address, to_address, amount, token_address, data, timestamp
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
-            // Fetch receipts in smaller batches to avoid rate limiting
-            const RECEIPT_BATCH_SIZE = 10;
+            // Filter transactions that involve watched addresses
+            const relevantTxs = block.prefetchedTransactions.filter(tx => {
+                const fromWatched = this.isWatchedAddress(tx.from);
+                const toWatched = tx.to ? this.isWatchedAddress(tx.to) : false;
+                return fromWatched || toWatched;
+            });
+            // If no relevant transactions, just record the block and skip
+            if (relevantTxs.length === 0) {
+                db.prepare(`
+                    INSERT OR IGNORE INTO blocks (number, hash, parent_hash, timestamp, processed_at)
+                    VALUES (?, ?, ?, ?, ?)
+                `).run(block.number, block.hash, block.parentHash, block.timestamp, Date.now());
+                return;
+            }
+            console.log(`🔍 Found ${relevantTxs.length} relevant transactions in block ${blockNumber}`);
+            // Fetch receipts ONLY for relevant transactions (with rate limiting)
             const receiptMap = new Map();
-            for (let i = 0; i < block.prefetchedTransactions.length; i += RECEIPT_BATCH_SIZE) {
-                const batch = block.prefetchedTransactions.slice(i, i + RECEIPT_BATCH_SIZE);
-                const batchReceipts = await Promise.all(batch.map(tx => this.provider.getTransactionReceipt(tx.hash)));
-                batchReceipts.forEach((r, idx) => {
-                    if (r)
-                        receiptMap.set(r.hash, r);
-                });
-                // Small delay between batches
-                if (i + RECEIPT_BATCH_SIZE < block.prefetchedTransactions.length) {
-                    await new Promise(resolve => setTimeout(resolve, 100));
+            for (const tx of relevantTxs) {
+                try {
+                    await this.delay(this.REQUEST_DELAY); // Rate limit between each request
+                    const receipt = await this.provider.getTransactionReceipt(tx.hash);
+                    if (receipt)
+                        receiptMap.set(receipt.hash, receipt);
+                }
+                catch (error) {
+                    // If rate limited, stop and let the poll loop handle backoff
+                    if (error?.message?.includes('rate limit') || error?.message?.includes('-32007')) {
+                        throw error;
+                    }
+                    console.error(`Failed to get receipt for ${tx.hash}:`, error);
                 }
             }
             db.transaction(() => {
                 // Insert Block
                 insertBlock.run(block.number, block.hash, block.parentHash, block.timestamp, Date.now());
-                // Process Transactions
-                for (const tx of block.prefetchedTransactions) {
+                // Process only relevant transactions
+                for (const tx of relevantTxs) {
                     const receipt = receiptMap.get(tx.hash);
                     const status = receipt ? receipt.status : 0; // 0 = failed, 1 = success
                     insertTx.run(tx.hash, block.number, tx.from.toLowerCase(), tx.to?.toLowerCase() || null, tx.value.toString(), tx.data, tx.nonce, tx.gasLimit.toString(), tx.gasPrice?.toString() || '0', block.timestamp, status);
-                    // Detect Native Transfers
+                    // Detect Native Transfers (only if involves watched address)
                     if (tx.value > 0 && status === 1) {
-                        insertEvent.run(tx.hash, block.number, 'Transfer', tx.from.toLowerCase(), tx.to?.toLowerCase() || null, tx.value.toString(), 'NATIVE', // Native token
-                        null, block.timestamp);
-                        // Trigger Webhooks
-                        const payload = {
-                            type: 'Transfer',
-                            hash: tx.hash,
-                            from: tx.from,
-                            to: tx.to,
-                            value: tx.value.toString(),
-                            token: 'NATIVE',
-                            timestamp: block.timestamp
-                        };
-                        // Notify sender and receiver
-                        webhookService.trigger(tx.from, 'Transfer', payload);
-                        if (tx.to) {
-                            webhookService.trigger(tx.to, 'Transfer', payload);
-                            // Trigger Push Notifications
-                            const amount = parseFloat(ethers.formatEther(tx.value));
-                            pushService.sendNotification(tx.to, {
-                                title: 'Incoming Transfer',
-                                body: `You received ${amount} ARC from ${tx.from.slice(0, 6)}...${tx.from.slice(-4)}`,
-                                icon: '/icon-192x192.png'
-                            });
+                        const fromWatched = this.isWatchedAddress(tx.from);
+                        const toWatched = tx.to ? this.isWatchedAddress(tx.to) : false;
+                        if (fromWatched || toWatched) {
+                            insertEvent.run(tx.hash, block.number, 'Transfer', tx.from.toLowerCase(), tx.to?.toLowerCase() || null, tx.value.toString(), 'NATIVE', // Native token
+                            null, block.timestamp);
+                            // Trigger Webhooks only for watched addresses
+                            const payload = {
+                                type: 'Transfer',
+                                hash: tx.hash,
+                                from: tx.from,
+                                to: tx.to,
+                                value: tx.value.toString(),
+                                token: 'NATIVE',
+                                timestamp: block.timestamp
+                            };
+                            if (fromWatched)
+                                webhookService.trigger(tx.from, 'Transfer', payload);
+                            if (toWatched && tx.to) {
+                                webhookService.trigger(tx.to, 'Transfer', payload);
+                                // Push notification for incoming transfer
+                                const amount = parseFloat(ethers.formatEther(tx.value));
+                                pushService.sendNotification(tx.to, {
+                                    title: 'Incoming Transfer',
+                                    body: `You received ${amount} ARC from ${tx.from.slice(0, 6)}...${tx.from.slice(-4)}`,
+                                    icon: '/icon-192x192.png'
+                                });
+                                console.log(`📨 Native notification sent: ${amount} ARC to ${tx.to.slice(0, 6)}...`);
+                            }
                         }
                     }
-                    // Parse ERC20 Transfers from logs
+                    // Parse ERC20 Transfers from logs - ONLY for watched addresses
                     if (receipt && status === 1) {
                         for (const log of receipt.logs) {
                             // Transfer(address from, address to, uint256 value)
-                            // Topic0: 0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef
                             if (log.topics[0] === '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef' && log.topics.length === 3) {
                                 try {
                                     const from = ethers.getAddress('0x' + log.topics[1].slice(26)).toLowerCase();
                                     const to = ethers.getAddress('0x' + log.topics[2].slice(26)).toLowerCase();
+                                    // CRITICAL: Only process if from or to is a watched address
+                                    const fromWatched = this.isWatchedAddress(from);
+                                    const toWatched = this.isWatchedAddress(to);
+                                    if (!fromWatched && !toWatched) {
+                                        continue; // Skip this ERC20 transfer - not for our users
+                                    }
                                     const value = BigInt(log.data).toString();
                                     const tokenAddress = log.address.toLowerCase();
-                                    insertEvent.run(tx.hash, block.number, 'Transfer', from, to, value, tokenAddress, // ERC20 Token Address
-                                    null, block.timestamp);
+                                    insertEvent.run(tx.hash, block.number, 'Transfer', from, to, value, tokenAddress, null, block.timestamp);
                                     // Trigger Webhooks for ERC20
                                     const payload = {
                                         type: 'Transfer',
@@ -218,45 +309,40 @@ class IndexerService {
                                         token: tokenAddress,
                                         timestamp: block.timestamp
                                     };
-                                    webhookService.trigger(from, 'Transfer', payload);
-                                    webhookService.trigger(to, 'Transfer', payload);
-                                    // Trigger Push Notifications for ERC20 with formatted amounts (async)
-                                    (async () => {
-                                        try {
-                                            const metadata = await this.tokenMetadataService.getTokenMetadata(tokenAddress);
-                                            const formattedAmount = metadata
-                                                ? this.tokenMetadataService.formatTokenAmount(value, metadata.decimals)
-                                                : value;
-                                            const tokenSymbol = metadata?.symbol || 'tokens';
-                                            const tokenName = metadata?.name || 'Unknown Token';
-                                            pushService.sendNotification(to, {
-                                                title: 'Incoming Token Transfer',
-                                                body: `You received ${formattedAmount} ${tokenSymbol} from ${from.slice(0, 6)}...${from.slice(-4)}`,
-                                                icon: '/icon-192x192.png',
-                                                data: {
-                                                    type: 'erc20_transfer',
-                                                    from,
-                                                    to,
-                                                    value: formattedAmount,
-                                                    rawValue: value,
-                                                    tokenAddress,
-                                                    tokenSymbol,
-                                                    tokenName,
-                                                    txHash: tx.hash
-                                                }
-                                            });
-                                            console.log(`📨 ERC20 notification sent: ${formattedAmount} ${tokenSymbol} to ${to.slice(0, 6)}...`);
-                                        }
-                                        catch (notifError) {
-                                            console.error('Error sending ERC20 notification:', notifError);
-                                            // Fallback to basic notification
-                                            pushService.sendNotification(to, {
-                                                title: 'Incoming Token Transfer',
-                                                body: `You received tokens from ${from.slice(0, 6)}...${from.slice(-4)}`,
-                                                icon: '/icon-192x192.png'
-                                            });
-                                        }
-                                    })();
+                                    if (fromWatched)
+                                        webhookService.trigger(from, 'Transfer', payload);
+                                    if (toWatched)
+                                        webhookService.trigger(to, 'Transfer', payload);
+                                    // Push Notification for ERC20 (async, only for receiver if watched)
+                                    if (toWatched) {
+                                        (async () => {
+                                            try {
+                                                const metadata = await this.tokenMetadataService.getTokenMetadata(tokenAddress);
+                                                const formattedAmount = metadata
+                                                    ? this.tokenMetadataService.formatTokenAmount(value, metadata.decimals)
+                                                    : value;
+                                                const tokenSymbol = metadata?.symbol || 'tokens';
+                                                pushService.sendNotification(to, {
+                                                    title: 'Incoming Token Transfer',
+                                                    body: `You received ${formattedAmount} ${tokenSymbol} from ${from.slice(0, 6)}...${from.slice(-4)}`,
+                                                    icon: '/icon-192x192.png',
+                                                    data: {
+                                                        type: 'erc20_transfer',
+                                                        from,
+                                                        to,
+                                                        value: formattedAmount,
+                                                        tokenAddress,
+                                                        tokenSymbol,
+                                                        txHash: tx.hash
+                                                    }
+                                                });
+                                                console.log(`📨 ERC20 notification sent: ${formattedAmount} ${tokenSymbol} to ${to.slice(0, 6)}...`);
+                                            }
+                                            catch (notifError) {
+                                                console.error('Error sending ERC20 notification:', notifError);
+                                            }
+                                        })();
+                                    }
                                 }
                                 catch (e) {
                                     console.error('Error parsing ERC20 log:', e);
@@ -269,6 +355,7 @@ class IndexerService {
         }
         catch (error) {
             console.error(`Failed to process block ${blockNumber}:`, error);
+            throw error; // Re-throw to let poll() handle backoff
         }
     }
     /**
