@@ -451,16 +451,13 @@ export class PasskeyAccountManager {
       return { hash: result.hash, userOpHash: result.userOpHash };
     } catch (bundlerError: any) {
       logger.error('Bundler submission failed', bundlerError instanceof Error ? bundlerError : undefined, {
-        component: 'PasskeyAccountManager'
+        component: 'PasskeyAccountManager',
+        error: bundlerError?.message || 'Unknown error'
       });
 
-      // Arc Testnet doesn't support bundlers yet
-      // For now, passkey wallets can only be used for authentication
-      // Transactions require a self-custodial wallet or session key
-      throw new Error(
-        'Arc Testnet does not support ERC-4337 bundlers yet. ' +
-        'Please use a self-custodial wallet for transactions.'
-      );
+      // Re-throw the actual error from bundler for better debugging
+      const errorMessage = bundlerError?.message || 'Bundler submission failed';
+      throw new Error(`Transaction failed: ${errorMessage}`);
     }
   }
 
