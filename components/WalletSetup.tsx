@@ -31,7 +31,7 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
     isConnecting,
   } = usePasskeyAccount();
 
-  const { currentEmail } = useSession();
+  const { currentEmail, walletAddress: existingWalletAddress, hasWallet: hasExistingWallet } = useSession();
   const [error, setError] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string>('Waiting for verified email...');
   const [isCreating, setIsCreating] = useState(false);
@@ -39,6 +39,9 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
 
   // State to track if user has passkey on server
   const [hasServerPasskey, setHasServerPasskey] = useState<boolean | null>(null);
+
+  // Detect legacy wallet migration scenario
+  const hasLegacyWallet = hasExistingWallet && existingWalletAddress && !hasServerPasskey;
 
   // Check server for existing passkey on mount
   useEffect(() => {
@@ -143,13 +146,20 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
   }, [createAccount, connect, onComplete, currentEmail]);
 
   // Auto-start wallet access when email is verified
+  // Skip auto-start if user has legacy wallet without passkey (show warning first)
   useEffect(() => {
     if (!autoStarted && !isCreating && currentEmail && hasServerPasskey !== null) {
+      // Don't auto-start for legacy wallet users - let them see the warning
+      if (hasExistingWallet && existingWalletAddress && hasServerPasskey === false) {
+        setAutoStarted(true);
+        setStatusMessage('Please review the migration notice below.');
+        return;
+      }
       setAutoStarted(true);
       setStatusMessage(`Preparing wallet for ${currentEmail}...`);
       void handleWalletAccess(true);
     }
-  }, [autoStarted, isCreating, handleWalletAccess, currentEmail, hasServerPasskey]);
+  }, [autoStarted, isCreating, handleWalletAccess, currentEmail, hasServerPasskey, hasExistingWallet, existingWalletAddress]);
 
   return (
     <div className="fixed inset-0 w-full h-full flex flex-col items-center justify-center overflow-hidden bg-transparent">
@@ -188,6 +198,26 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
                 {currentEmail ?? 'Verifying...'}
               </p>
             </div>
+
+            {/* Legacy wallet migration warning */}
+            {hasLegacyWallet && hasServerPasskey === false && (
+              <div className="p-4 rounded-lg backdrop-blur-sm border bg-amber-900/20 border-amber-500/50 text-amber-200 text-sm">
+                <div className="flex items-start gap-3">
+                  <svg className="w-5 h-5 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  <div>
+                    <p className="font-medium mb-1">Existing Wallet Detected</p>
+                    <p className="text-xs text-amber-300/80 mb-2">
+                      You have an existing wallet at <span className="font-mono">{existingWalletAddress?.slice(0, 8)}...{existingWalletAddress?.slice(-6)}</span>
+                    </p>
+                    <p className="text-xs text-amber-300/80">
+                      Creating a new passkey will generate a <strong>new wallet address</strong>. If you have funds in your old wallet, please transfer them after setup.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {error && (
               <div className="p-3 rounded-lg backdrop-blur-sm border bg-red-900/20 border-red-500/50 text-red-200 text-center text-sm">
