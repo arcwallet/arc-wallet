@@ -1,16 +1,18 @@
 import React, { useMemo, useState } from 'react';
-import { motion } from 'framer-motion';
 import { usePasskeyAccount } from '../contexts/PasskeyAccountContext';
 import { useSelfCustodialWallet } from '../contexts/SelfCustodialWalletContext';
-import { useWallet } from '../contexts/WalletContext';
 import { useActivity } from '../contexts/ActivityContext';
 import { TransactionStatus, TransactionType } from '../types';
 import { SpinnerIcon } from './Icons';
 import { getAllSupportedTokens, TokenInfo } from '../config/tokens';
-import { startBridge, pollBridgeStatus } from '../services/bridgeApiClient';
-import type { BridgeApiResponse } from '../services/bridgeApiClient';
-
-type BridgeDirection = 'arc-to-sepolia' | 'sepolia-to-arc';
+import {
+  bridgeUsdcWithPasskey,
+  getUsdcBalance,
+  estimateBridgeTime,
+  type BridgeDirection,
+  type BridgeProgressStep,
+} from '../services/passkeyBridgeService';
+import { TX_EXPLORER_URL } from '../config/app.config';
 
 const DIRECTIONS: { id: BridgeDirection; label: string; description: string }[] = [
   {
@@ -25,33 +27,56 @@ const DIRECTIONS: { id: BridgeDirection; label: string; description: string }[] 
   },
 ];
 
-const PRIMARY_TOKEN_DECIMALS = 6;
-
 const Bridge: React.FC = () => {
-  const { address: passkeyAddress } = usePasskeyAccount();
-  const { address: selfCustodialAddress, userId } = useSelfCustodialWallet();
+  const {
+    address: passkeyAddress,
+    isConnected: passkeyConnected,
+    manager: passkeyManager,
+  } = usePasskeyAccount();
+  const { address: selfCustodialAddress } = useSelfCustodialWallet();
   const address = passkeyAddress || selfCustodialAddress;
-  const { loginWithPasskey } = useWallet();
   const { addActivity } = useActivity();
-  const [needsReauth, setNeedsReauth] = useState(false);
 
   const [direction, setDirection] = useState<BridgeDirection>('arc-to-sepolia');
-  // Only USDC is supported for bridge between Arc Testnet and Sepolia
-  const [selectedToken, setSelectedToken] = useState<TokenInfo>(getAllSupportedTokens().find(t => t.symbol === 'USDC') || getAllSupportedTokens()[0]);
+  const [selectedToken] = useState<TokenInfo>(
+    getAllSupportedTokens().find(t => t.symbol === 'USDC') || getAllSupportedTokens()[0]
+  );
   const [amount, setAmount] = useState('');
   const [amountError, setAmountError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
   const [statusVariant, setStatusVariant] = useState<'info' | 'error' | 'success'>('info');
   const [progressItem, setProgressItem] = useState<string>('');
-  const [currentTransactionId, setCurrentTransactionId] = useState<number | null>(null);
+  const [sourceTxHash, setSourceTxHash] = useState<string | null>(null);
+  const [destTxHash, setDestTxHash] = useState<string | null>(null);
+  const [balance, setBalance] = useState<string | null>(null);
+  const [isLoadingBalance, setIsLoadingBalance] = useState(false);
+
+  // Fetch balance when direction or address changes
+  React.useEffect(() => {
+    const fetchBalance = async () => {
+      if (!address) return;
+
+      setIsLoadingBalance(true);
+      try {
+        const chain = direction === 'arc-to-sepolia' ? 'arc' : 'sepolia';
+        const bal = await getUsdcBalance(address, chain);
+        setBalance(bal);
+      } catch (error) {
+        console.error('Failed to fetch balance:', error);
+        setBalance(null);
+      } finally {
+        setIsLoadingBalance(false);
+      }
+    };
+
+    fetchBalance();
+  }, [address, direction]);
 
   const normalizeAmount = (raw: string): string | null => {
     if (raw == null) return null;
     let s = String(raw).trim();
-    // remove whitespace/underscore thousand separators
     s = s.replace(/[\s_]/g, '');
-    // if there's no dot, treat comma as decimal separator; otherwise commas are thousands
     if (s.includes(',') && !s.includes('.')) {
       s = s.replace(/,/g, '.');
     } else {
@@ -62,27 +87,70 @@ const Bridge: React.FC = () => {
     if (s.endsWith('.')) s = s + '0';
     const num = Number(s);
     if (!Number.isFinite(num) || num <= 0) return null;
-    // Clamp to 6 decimals max for display; BridgeKit will accept decimal string
     const [int, frac = ''] = s.split('.');
     const clamped = frac.length > 6 ? `${int}.${frac.slice(0, 6)}` : s;
-    // return with 2 decimals to be safe for BridgeKit
     return Number(clamped).toFixed(2);
   };
 
   const canSubmit = useMemo(() => {
-    if (!address || !userId || isSubmitting) {
+    // For PasskeyAccount - check if connected and manager available
+    if (!passkeyConnected || !passkeyManager) {
       return false;
     }
+    if (isSubmitting) return false;
+
     const normalized = normalizeAmount(amount);
     if (!normalized) return false;
     const numeric = Number(normalized);
     return Number.isFinite(numeric) && numeric > 0;
-  }, [address, userId, amount, isSubmitting]);
+  }, [passkeyConnected, passkeyManager, amount, isSubmitting]);
+
+  const handleProgressUpdate = (step: BridgeProgressStep) => {
+    switch (step.type) {
+      case 'checking-balance':
+        setProgressItem('Checking USDC balance...');
+        break;
+      case 'approving-usdc':
+        setProgressItem(step.txHash
+          ? `USDC approved! Tx: ${step.txHash.slice(0, 10)}...`
+          : 'Approving USDC (sign with passkey)...'
+        );
+        break;
+      case 'burning-usdc':
+        setProgressItem(step.txHash
+          ? `USDC burned! Tx: ${step.txHash.slice(0, 10)}...`
+          : 'Burning USDC on source chain (sign with passkey)...'
+        );
+        if (step.txHash) setSourceTxHash(step.txHash);
+        break;
+      case 'waiting-attestation':
+        setProgressItem(`Waiting for Circle attestation (10-20 min)...`);
+        break;
+      case 'attestation-received':
+        setProgressItem('Attestation received from Circle!');
+        break;
+      case 'minting-usdc':
+        setProgressItem(step.txHash
+          ? `USDC minted! Tx: ${step.txHash.slice(0, 10)}...`
+          : 'Minting USDC on destination (sign with passkey)...'
+        );
+        if (step.txHash) setDestTxHash(step.txHash);
+        break;
+      case 'completed':
+        setProgressItem('Bridge completed successfully!');
+        if (step.sourceTxHash) setSourceTxHash(step.sourceTxHash);
+        if (step.destinationTxHash) setDestTxHash(step.destinationTxHash);
+        break;
+      case 'error':
+        setProgressItem(`Error: ${step.message}`);
+        break;
+    }
+  };
 
   const handleBridge = async () => {
-    if (!address || !userId) {
+    if (!passkeyConnected || !passkeyManager) {
       setStatusVariant('error');
-      setStatusMessage('Session not found. Please sign in with your passkey.');
+      setStatusMessage('Please connect your passkey wallet first.');
       return;
     }
 
@@ -95,173 +163,122 @@ const Bridge: React.FC = () => {
     }
     setAmountError(null);
 
+    // Check balance
+    if (balance && Number(normalized) > Number(balance)) {
+      setStatusVariant('error');
+      setStatusMessage(`Insufficient balance. You have ${balance} USDC.`);
+      return;
+    }
+
     setIsSubmitting(true);
     setStatusVariant('info');
-    setStatusMessage('Initiating bridge transaction with backend...');
-    setProgressItem('Sending request to backend');
-    setCurrentTransactionId(null);
+    setStatusMessage('Starting bridge transaction...');
+    setProgressItem('');
+    setSourceTxHash(null);
+    setDestTxHash(null);
 
     try {
-      // Step 1: Start bridge via backend
-      const startResponse = await startBridge({
-        userId,
-        sessionKeyAddress: address,
+      const result = await bridgeUsdcWithPasskey({
+        passkeyManager,
         amount: normalized,
         direction,
-        token: 'USDC',
+        onProgress: handleProgressUpdate,
       });
 
-      if (!startResponse.success || !startResponse.data) {
-        const error = new Error(startResponse.error || 'Failed to start bridge transaction') as any;
-        error.code = startResponse.code;
-        throw error;
-      }
+      if (result.success) {
+        setStatusVariant('success');
+        setStatusMessage('Bridge completed successfully!');
 
-      const transactionId = startResponse.data.transactionId;
-      setCurrentTransactionId(transactionId);
-      setProgressItem('Bridge transaction started. Monitoring progress...');
+        const amountNumber = Number(normalized);
+        const now = new Date();
 
-      // Step 2: Poll for status updates
-      const finalStatus = await pollBridgeStatus(
-        transactionId,
-        (status, data) => {
-
-          switch (status) {
-            case 'pending':
-              setProgressItem('Bridge transaction pending...');
-              break;
-            case 'burn_complete':
-              setProgressItem(`${selectedToken.symbol} burned on source chain`);
-              break;
-            case 'attestation_fetched':
-              setProgressItem('Attestation received from Circle');
-              break;
-            case 'mint_complete':
-              setProgressItem(`${selectedToken.symbol} minted on destination chain`);
-              break;
-            case 'completed':
-              setProgressItem('Bridge completed!');
-              break;
-            case 'failed':
-              setProgressItem(data?.errorMessage || 'Bridge failed');
-              break;
-            default:
-              setProgressItem(`Status: ${status}`);
-          }
-        },
-        60, // 60 attempts
-        5000 // 5 seconds interval
-      );
-
-      if (!finalStatus.success || !finalStatus.data) {
-        throw new Error(finalStatus.error || 'Bridge status check failed');
-      }
-
-      if (finalStatus.data.status === 'failed') {
-        throw new Error(finalStatus.data.errorMessage || 'Bridge transaction failed on backend');
-      }
-
-      // Success!
-      const sourceTxHash = finalStatus.data.sourceTxHash;
-      const destinationTxHash = finalStatus.data.destinationTxHash;
-
-      setStatusVariant('success');
-      setStatusMessage('Bridge completed successfully. Activity list has been updated.');
-      setProgressItem('');
-
-      const amountNumber = Number(amount);
-      const now = new Date();
-
-      // Add to activity feed - use Bridge type so ActivityContext doesn't poll these cross-chain transactions
-      if (direction === 'arc-to-sepolia' && sourceTxHash) {
-        addActivity({
-          id: sourceTxHash,
-          type: TransactionType.Bridge,
-          description: `Bridge ${selectedToken.symbol} from Arc to Sepolia`,
-          timestamp: 'Just now',
-          date: now,
-          amount: -amountNumber,
-          currency: selectedToken.symbol,
-          usdValue: selectedToken.symbol === 'USDC' ? -amountNumber : -amountNumber * 1.07,
-          status: TransactionStatus.Completed,
-          hash: sourceTxHash,
-          from: address,
-          to: 'Sepolia Bridge',
-          networkFee: 0,
-          approvals: { required: 0, list: [] },
-        });
-      }
-
-      if (direction === 'sepolia-to-arc' && destinationTxHash) {
-        addActivity({
-          id: destinationTxHash,
-          type: TransactionType.Bridge,
-          description: `Bridge ${selectedToken.symbol} from Sepolia to Arc`,
-          timestamp: 'Just now',
-          date: now,
-          amount: amountNumber,
-          currency: selectedToken.symbol,
-          usdValue: selectedToken.symbol === 'USDC' ? amountNumber : amountNumber * 1.07,
-          status: TransactionStatus.Completed,
-          hash: destinationTxHash,
-          from: 'Sepolia Bridge',
-          to: address,
-          networkFee: 0,
-          approvals: { required: 0, list: [] },
-        });
+        // Add to activity feed
+        if (result.sourceTxHash) {
+          addActivity({
+            id: result.sourceTxHash,
+            type: TransactionType.Bridge,
+            description: direction === 'arc-to-sepolia'
+              ? `Bridge ${selectedToken.symbol} from Arc to Sepolia`
+              : `Bridge ${selectedToken.symbol} from Sepolia to Arc`,
+            timestamp: 'Just now',
+            date: now,
+            amount: direction === 'arc-to-sepolia' ? -amountNumber : amountNumber,
+            currency: selectedToken.symbol,
+            usdValue: amountNumber,
+            status: TransactionStatus.Completed,
+            hash: result.sourceTxHash,
+            from: address || '',
+            to: direction === 'arc-to-sepolia' ? 'Sepolia' : 'Arc Testnet',
+            networkFee: 0,
+            approvals: { required: 0, list: [] },
+          });
+        }
+      } else {
+        throw new Error(result.error || 'Bridge failed');
       }
     } catch (error: any) {
-      const message = typeof error?.message === 'string' ? error.message : 'Bridge transaction failed';
-      const errorCode = error?.code;
-
-      // Check if we need to re-authenticate
-      if (errorCode === 'SESSION_KEY_NOT_FOUND' ||
-        errorCode === 'SESSION_KEY_EXPIRED' ||
-        errorCode === 'SESSION_KEY_USER_MISMATCH' ||
-        message.includes('Session key') ||
-        message.includes('re-authenticate')) {
-        setNeedsReauth(true);
-      }
-
+      const message = error?.message || 'Bridge transaction failed';
       setStatusVariant('error');
       setStatusMessage(message);
       setProgressItem('');
-
       console.error('Bridge failed:', error);
     } finally {
       setIsSubmitting(false);
-      setCurrentTransactionId(null);
     }
   };
 
-  const directionDetails = useMemo(() => DIRECTIONS.find((item) => item.id === direction), [direction]);
-
-  const handleReauthenticate = async () => {
-    try {
-      setStatusVariant('info');
-      setStatusMessage('Re-authenticating with passkey...');
-      await loginWithPasskey();
-      setNeedsReauth(false);
-      setStatusVariant('success');
-      setStatusMessage('Re-authentication successful! You can now try the bridge operation again.');
-    } catch (error) {
-      console.error('Re-authentication failed:', error);
-      setStatusVariant('error');
-      setStatusMessage('Re-authentication failed. Please try logging in again.');
-    }
-  };
+  const directionDetails = useMemo(
+    () => DIRECTIONS.find((item) => item.id === direction),
+    [direction]
+  );
 
   return (
     <div className="w-full max-w-3xl mx-auto px-6 py-10 space-y-10">
-
       <div className="mb-8 text-center">
-        <h2 className="text-white text-4xl font-black leading-tight tracking-[-0.03em]">Bridge USDC</h2>
+        <h2 className="text-white text-4xl font-black leading-tight tracking-[-0.03em]">
+          Bridge USDC
+        </h2>
         <p className="text-slate-400 text-base mt-2">
-          Transfer USDC between <span className="text-blue-400 font-semibold">Arc Testnet</span> and <span className="text-blue-400 font-semibold">Ethereum Sepolia</span> using Circle CCTP.
+          Transfer USDC between{' '}
+          <span className="text-blue-400 font-semibold">Arc Testnet</span> and{' '}
+          <span className="text-blue-400 font-semibold">Ethereum Sepolia</span> using Circle CCTP.
+        </p>
+        <p className="text-slate-500 text-sm mt-1">
+          Estimated time: {estimateBridgeTime(direction)}
         </p>
       </div>
 
+      {/* Passkey Wallet Status */}
+      {!passkeyConnected && (
+        <div className="rounded-xl border border-yellow-500/30 bg-yellow-500/10 p-4 text-center">
+          <p className="text-yellow-400 font-medium">Passkey Wallet Required</p>
+          <p className="text-yellow-300/70 text-sm mt-1">
+            Please connect your passkey wallet to use the bridge.
+          </p>
+        </div>
+      )}
+
+      {passkeyConnected && (
+        <div className="rounded-xl border border-green-500/30 bg-green-500/10 p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-green-400 font-medium">Passkey Wallet Connected</p>
+              <p className="text-green-300/70 text-sm font-mono">
+                {passkeyAddress?.slice(0, 10)}...{passkeyAddress?.slice(-8)}
+              </p>
+            </div>
+            <div className="text-right">
+              <p className="text-slate-400 text-sm">Balance on {direction === 'arc-to-sepolia' ? 'Arc' : 'Sepolia'}</p>
+              <p className="text-white font-semibold">
+                {isLoadingBalance ? 'Loading...' : balance ? `${balance} USDC` : '-'}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="grid gap-6">
+        {/* Direction Selection */}
         <div className="rounded-xl border border-slate-500/50 bg-slate-900/60 backdrop-blur-sm p-6 space-y-4">
           <p className="text-sm font-medium text-slate-400">Bridge Direction</p>
           <div className="grid sm:grid-cols-2 gap-3">
@@ -270,10 +287,12 @@ const Bridge: React.FC = () => {
                 key={option.id}
                 type="button"
                 onClick={() => setDirection(option.id)}
-                className={`rounded-xl border px-4 py-4 text-left transition-all ${option.id === direction
-                  ? 'border-blue-400 bg-blue-400/10 text-blue-400 shadow-[0_0_15px_rgba(96,165,250,0.2)]'
-                  : 'border-slate-500/30 bg-transparent text-slate-300 hover:border-blue-400/50 hover:bg-blue-400/5'
-                  }`}
+                disabled={isSubmitting}
+                className={`rounded-xl border px-4 py-4 text-left transition-all ${
+                  option.id === direction
+                    ? 'border-blue-400 bg-blue-400/10 text-blue-400 shadow-[0_0_15px_rgba(96,165,250,0.2)]'
+                    : 'border-slate-500/30 bg-transparent text-slate-300 hover:border-blue-400/50 hover:bg-blue-400/5'
+                } disabled:opacity-50`}
               >
                 <p className="text-base font-semibold">{option.label}</p>
                 <p className="text-xs text-slate-400 mt-1">{option.description}</p>
@@ -282,17 +301,14 @@ const Bridge: React.FC = () => {
           </div>
         </div>
 
+        {/* Token & Amount */}
         <div className="rounded-xl border border-slate-500/50 bg-slate-900/60 backdrop-blur-sm p-6 space-y-4">
           <div className="space-y-4">
             <div>
               <label className="text-sm font-medium text-slate-400">Token</label>
               <div className="mt-1 w-full rounded-lg border border-slate-500/30 bg-slate-900/40 px-4 py-3 text-slate-100 flex items-center gap-3">
                 <div className="flex items-center gap-3">
-                  <img
-                    src="/icons/usdc.svg"
-                    alt="USDC"
-                    className="w-10 h-10"
-                  />
+                  <img src="/icons/usdc.svg" alt="USDC" className="w-10 h-10" />
                   <div>
                     <p className="font-semibold text-base">USDC</p>
                     <p className="text-xs text-slate-400">USD Coin</p>
@@ -302,55 +318,106 @@ const Bridge: React.FC = () => {
                   Arc Testnet ↔ Sepolia
                 </div>
               </div>
-              <p className="text-xs text-slate-400 mt-2">
-                Only USDC is supported for bridge between Arc Testnet and Ethereum Sepolia
-              </p>
             </div>
+
             <label className="flex flex-col gap-2">
-              <span className="text-sm font-medium text-slate-400">Amount ({selectedToken.symbol})</span>
+              <div className="flex justify-between">
+                <span className="text-sm font-medium text-slate-400">
+                  Amount ({selectedToken.symbol})
+                </span>
+                {balance && (
+                  <button
+                    type="button"
+                    onClick={() => setAmount(balance)}
+                    className="text-xs text-blue-400 hover:text-blue-300"
+                  >
+                    Max: {balance}
+                  </button>
+                )}
+              </div>
               <input
                 type="text"
                 inputMode="decimal"
                 value={amount}
                 onChange={(event) => setAmount(event.target.value)}
-                className="form-input h-12 rounded-lg border border-slate-500/50 bg-slate-900/40 px-4 text-white focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400 transition-all placeholder:text-slate-500"
+                disabled={isSubmitting}
+                className="form-input h-12 rounded-lg border border-slate-500/50 bg-slate-900/40 px-4 text-white focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400 transition-all placeholder:text-slate-500 disabled:opacity-50"
                 placeholder="e.g. 1.5 or 1,5"
               />
-              {amountError && <span className="text-xs text-accent-orange">{amountError}</span>}
+              {amountError && (
+                <span className="text-xs text-accent-orange">{amountError}</span>
+              )}
             </label>
-            <p className="text-xs text-slate-400">
-              Ensure your session key controls {selectedToken.symbol} on the selected source chain. Bridging uses the same private key across Sepolia and Arc.
-            </p>
+
+            <div className="rounded-lg bg-blue-500/10 border border-blue-500/30 p-3">
+              <p className="text-xs text-blue-300">
+                Bridge uses your PasskeyAccount smart wallet. You'll be prompted to sign with your passkey for each step (approve + burn).
+              </p>
+            </div>
           </div>
         </div>
 
+        {/* Submit Button */}
         <button
           onClick={handleBridge}
           disabled={!canSubmit}
           className="flex items-center justify-center gap-2 h-14 rounded-lg bg-slate-200 hover:bg-white text-slate-900 text-lg font-semibold transition-all shadow-[0_0_20px_rgba(255,255,255,0.1)] hover:shadow-[0_0_30px_rgba(255,255,255,0.2)] disabled:cursor-not-allowed disabled:opacity-50"
         >
           {isSubmitting && <SpinnerIcon size={20} />}
-          <span>{isSubmitting ? `Bridging ${selectedToken.symbol}…` : `Bridge ${selectedToken.symbol} ${directionDetails?.label ?? ''}`}</span>
+          <span>
+            {isSubmitting
+              ? `Bridging ${selectedToken.symbol}…`
+              : `Bridge ${selectedToken.symbol} ${directionDetails?.label ?? ''}`}
+          </span>
         </button>
 
+        {/* Status Messages */}
         {statusMessage && (
           <div
-            className={`rounded-lg border px-4 py-3 text-sm text-left ${statusVariant === 'error'
-              ? 'border-red-400/50 bg-red-500/10 text-red-200'
-              : statusVariant === 'success'
+            className={`rounded-lg border px-4 py-3 text-sm text-left ${
+              statusVariant === 'error'
+                ? 'border-red-400/50 bg-red-500/10 text-red-200'
+                : statusVariant === 'success'
                 ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-200'
                 : 'border-white/10 bg-white/5 text-text-secondary'
-              }`}
+            }`}
           >
             {statusMessage}
-            {progressItem && <div className="mt-1 text-xs text-text-secondary">{progressItem}</div>}
-            {needsReauth && (
-              <button
-                onClick={handleReauthenticate}
-                className="mt-3 w-full rounded-lg bg-primary text-primary-text py-2 px-4 text-sm font-semibold hover:opacity-90 transition-opacity"
-              >
-                Re-authenticate with Passkey
-              </button>
+            {progressItem && (
+              <div className="mt-1 text-xs text-text-secondary">{progressItem}</div>
+            )}
+          </div>
+        )}
+
+        {/* Transaction Links */}
+        {(sourceTxHash || destTxHash) && (
+          <div className="rounded-lg border border-slate-500/30 bg-slate-900/40 p-4 space-y-2">
+            <p className="text-sm font-medium text-slate-400">Transaction Links</p>
+            {sourceTxHash && (
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-slate-500">Source (Burn):</span>
+                <a
+                  href={`${TX_EXPLORER_URL}${sourceTxHash}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-xs text-blue-400 hover:text-blue-300 font-mono"
+                >
+                  {sourceTxHash.slice(0, 10)}...{sourceTxHash.slice(-8)} ↗
+                </a>
+              </div>
+            )}
+            {destTxHash && (
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-slate-500">Destination (Mint):</span>
+                <a
+                  href={`https://sepolia.etherscan.io/tx/${destTxHash}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-xs text-blue-400 hover:text-blue-300 font-mono"
+                >
+                  {destTxHash.slice(0, 10)}...{destTxHash.slice(-8)} ↗
+                </a>
+              </div>
             )}
           </div>
         )}

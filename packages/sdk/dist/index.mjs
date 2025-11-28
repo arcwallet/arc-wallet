@@ -1282,11 +1282,9 @@ const Ie = {
     42161: "0x19330d10D9Cc8751218eaf51E8885D058642E08A",
     // Arbitrum One
     // Base and Polygon TokenMessenger addresses TBD
-    // ⚠️ CONFIGURATION REQUIRED
-    // Arc Network TokenMessenger address must be obtained from Arc Network team
-    // Current value is a placeholder and will cause transactions to fail
-    412346: "0x0000000000000000000000000000000000000000"
-    // Arc Testnet - PLACEHOLDER
+    // Arc Testnet CCTP contracts (official addresses from docs.arc.network)
+    5042002: "0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA"
+    // Arc Testnet TokenMessenger
   },
   // USDC contract addresses by chain ID
   usdcAddresses: {
@@ -1312,11 +1310,9 @@ const Ie = {
     // Base Mainnet
     43114: "0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E",
     // Avalanche C-Chain
-    // ⚠️ CONFIGURATION REQUIRED
-    // Arc Network USDC address must be obtained from Arc Network team
-    // Current value is a placeholder and will cause transactions to fail
-    412346: "0x0000000000000000000000000000000000000000"
-    // Arc Testnet - PLACEHOLDER
+    // Arc Testnet USDC (native token address from docs.arc.network)
+    5042002: "0x3600000000000000000000000000000000000000"
+    // Arc Testnet USDC (Native)
   },
   domainIds: {
     // TESTNETS
@@ -1328,8 +1324,8 @@ const Ie = {
     // Optimism Sepolia
     84532: 6,
     // Base Sepolia
-    412346: 7,
-    // Arc Testnet - NEEDS VERIFICATION
+    5042002: 26,
+    // Arc Testnet (official domain from docs.arc.network)
     // MAINNETS
     1: 0,
     // Ethereum
