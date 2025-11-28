@@ -274,18 +274,24 @@ const Bridge: React.FC = () => {
                 {passkeyAddress?.slice(0, 10)}...{passkeyAddress?.slice(-8)}
               </p>
             </div>
-            <div className="flex gap-6">
-              <div className="text-right">
-                <p className="text-slate-400 text-xs">Arc Testnet</p>
-                <p className={`font-semibold ${direction === 'arc-to-sepolia' ? 'text-blue-400' : 'text-white'}`}>
-                  {isLoadingBalance ? '...' : arcBalance ? `${arcBalance} USDC` : '0 USDC'}
-                </p>
+            <div className="flex gap-4">
+              <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${direction === 'arc-to-sepolia' ? 'bg-blue-500/10 border border-blue-500/30' : 'bg-slate-800/50'}`}>
+                <img src="/arcwalletlogo.png" alt="Arc" className="w-5 h-5 rounded-full" />
+                <div className="text-right">
+                  <p className="text-slate-400 text-[10px]">Arc</p>
+                  <p className={`font-semibold text-sm ${direction === 'arc-to-sepolia' ? 'text-blue-400' : 'text-white'}`}>
+                    {isLoadingBalance ? '...' : arcBalance ? `${arcBalance}` : '0'} USDC
+                  </p>
+                </div>
               </div>
-              <div className="text-right">
-                <p className="text-slate-400 text-xs">Sepolia</p>
-                <p className={`font-semibold ${direction === 'sepolia-to-arc' ? 'text-blue-400' : 'text-white'}`}>
-                  {isLoadingBalance ? '...' : sepoliaBalance ? `${sepoliaBalance} USDC` : '0 USDC'}
-                </p>
+              <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${direction === 'sepolia-to-arc' ? 'bg-blue-500/10 border border-blue-500/30' : 'bg-slate-800/50'}`}>
+                <img src="/networks/ethereum.svg" alt="Ethereum" className="w-5 h-5" />
+                <div className="text-right">
+                  <p className="text-slate-400 text-[10px]">Sepolia</p>
+                  <p className={`font-semibold text-sm ${direction === 'sepolia-to-arc' ? 'text-blue-400' : 'text-white'}`}>
+                    {isLoadingBalance ? '...' : sepoliaBalance ? `${sepoliaBalance}` : '0'} USDC
+                  </p>
+                </div>
               </div>
             </div>
           </div>
