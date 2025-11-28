@@ -10,6 +10,7 @@ export interface PasskeyAccountConfig {
     factoryAddress: string;
     entryPointAddress: string;
     rpcUrl: string;
+    bundlerUrl?: string;
     backendUrl: string;
     rpId: string;
     rpName: string;
@@ -101,7 +102,7 @@ export declare class PasskeyAccountManager {
      */
     private calculateUserOpHash;
     /**
-     * Submit UserOperation to bundler or RPC
+     * Submit UserOperation to Pimlico bundler
      */
     private submitUserOperation;
     /**

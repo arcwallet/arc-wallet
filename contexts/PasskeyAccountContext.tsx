@@ -53,7 +53,7 @@ const PasskeyAccountContext = createContext<PasskeyAccountContextValue | undefin
 const PASSKEY_FACTORY_ADDRESS = (import.meta as any).env.VITE_PASSKEY_FACTORY_ADDRESS || '0x9AE89FbF3C32F976Db2A668d5a5c7B00032BD14a';
 const ENTRY_POINT_ADDRESS = '0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789';
 
-// Initialize PasskeyAccountManager
+// Initialize PasskeyAccountManager with Pimlico bundler
 const initializeManager = (): PasskeyAccountManager => {
   const backendUrl = typeof window !== 'undefined'
     ? ((import.meta as any).env.VITE_PASSKEY_API_URL || 'https://arcwallet-backend.onrender.com')
@@ -61,12 +61,28 @@ const initializeManager = (): PasskeyAccountManager => {
 
   const rpId = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
 
-  console.log('[PasskeyAccount] Initializing manager:', { backendUrl, rpId, factory: PASSKEY_FACTORY_ADDRESS });
+  // Get Pimlico API key for bundler
+  const pimlicoApiKey = typeof window !== 'undefined'
+    ? (import.meta as any).env.VITE_PIMLICO_API_KEY || ''
+    : '';
+
+  // Pimlico bundler URL for Arc Testnet (chain ID: 5042002)
+  const bundlerUrl = pimlicoApiKey
+    ? `https://api.pimlico.io/v2/5042002/rpc?apikey=${pimlicoApiKey}`
+    : undefined;
+
+  console.log('[PasskeyAccount] Initializing manager:', {
+    backendUrl,
+    rpId,
+    factory: PASSKEY_FACTORY_ADDRESS,
+    bundler: bundlerUrl ? 'Pimlico (Arc Testnet)' : 'Not configured',
+  });
 
   const config: PasskeyAccountConfig = {
     factoryAddress: PASSKEY_FACTORY_ADDRESS,
     entryPointAddress: ENTRY_POINT_ADDRESS,
     rpcUrl: 'https://rpc.testnet.arc.network',
+    bundlerUrl, // Pimlico bundler for UserOperation submission
     backendUrl,
     rpId,
     rpName: 'Arc Wallet',

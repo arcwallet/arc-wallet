@@ -53,6 +53,7 @@ export interface PasskeyAccountConfig {
   factoryAddress: string;
   entryPointAddress: string;
   rpcUrl: string;
+  bundlerUrl?: string; // Pimlico bundler URL (optional, falls back to rpcUrl)
   backendUrl: string;
   rpId: string;
   rpName: string;
@@ -499,10 +500,13 @@ export class PasskeyAccountManager {
   }
 
   /**
-   * Submit UserOperation to bundler or RPC
+   * Submit UserOperation to Pimlico bundler
    */
   private async submitUserOperation(userOp: UserOperation): Promise<{ hash: string; userOpHash: string }> {
-    // Try eth_sendUserOperation (ERC-4337 bundler RPC)
+    // Use bundlerUrl if provided, otherwise fall back to rpcUrl
+    const bundlerUrl = this.config.bundlerUrl || this.config.rpcUrl;
+
+    // Format UserOperation for JSON-RPC
     const userOpForRpc = {
       sender: userOp.sender,
       nonce: '0x' + userOp.nonce.toString(16),
@@ -517,9 +521,15 @@ export class PasskeyAccountManager {
       signature: userOp.signature,
     };
 
+    logger.info('Submitting UserOperation to bundler', {
+      component: 'PasskeyAccountManager',
+      bundlerUrl: bundlerUrl.replace(/apikey=.*/, 'apikey=***'),
+      sender: userOp.sender,
+    });
+
     try {
-      // Send to bundler
-      const response = await fetch(this.config.rpcUrl, {
+      // Send to Pimlico bundler
+      const response = await fetch(bundlerUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -533,17 +543,27 @@ export class PasskeyAccountManager {
       const result = await response.json();
 
       if (result.error) {
+        logger.error('Bundler rejected UserOperation', undefined, {
+          component: 'PasskeyAccountManager',
+          error: result.error,
+        });
         throw new Error(result.error.message || 'Bundler rejected UserOperation');
       }
 
       const userOpHash = result.result;
+      logger.info('UserOperation submitted successfully', {
+        component: 'PasskeyAccountManager',
+        userOpHash,
+      });
 
       // Wait for transaction to be mined
-      const txHash = await this.waitForUserOperation(userOpHash);
+      const txHash = await this.waitForUserOperation(userOpHash, bundlerUrl);
 
       return { hash: txHash, userOpHash };
     } catch (error) {
-      logger.error('Failed to submit UserOperation', error instanceof Error ? error : undefined, { component: 'PasskeyAccountManager' });
+      logger.error('Failed to submit UserOperation', error instanceof Error ? error : undefined, {
+        component: 'PasskeyAccountManager',
+      });
       throw error;
     }
   }
@@ -551,12 +571,13 @@ export class PasskeyAccountManager {
   /**
    * Wait for UserOperation to be included in a transaction
    */
-  private async waitForUserOperation(userOpHash: string, timeout: number = 60000): Promise<string> {
+  private async waitForUserOperation(userOpHash: string, bundlerUrl?: string, timeout: number = 60000): Promise<string> {
+    const url = bundlerUrl || this.config.bundlerUrl || this.config.rpcUrl;
     const startTime = Date.now();
 
     while (Date.now() - startTime < timeout) {
       try {
-        const response = await fetch(this.config.rpcUrl, {
+        const response = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -570,6 +591,10 @@ export class PasskeyAccountManager {
         const result = await response.json();
 
         if (result.result?.receipt?.transactionHash) {
+          logger.info('UserOperation confirmed', {
+            component: 'PasskeyAccountManager',
+            txHash: result.result.receipt.transactionHash,
+          });
           return result.result.receipt.transactionHash;
         }
       } catch {

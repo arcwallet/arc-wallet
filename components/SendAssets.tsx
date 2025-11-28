@@ -514,16 +514,84 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
       let hash: string;
       let kind: 'transaction' | 'userOp' = 'transaction';
 
-      // PASSKEY WALLET - Cannot send directly (Arc doesn't support ERC-4337 bundlers yet)
-      // Passkey is used for authentication only, transactions need self-custodial wallet
-      if (passkeyConnected && !walletPrivateKey) {
-        console.log('[SEND] Passkey wallet detected but no private key - need self-custodial wallet');
-        setSubmitError(
-          'To send transactions, please create a self-custodial wallet. ' +
-          'Passkey is used for secure login only.'
-        );
-        setIsSubmitting(false);
-        return;
+      // PASSKEY WALLET - Use Pimlico bundler for ERC-4337 UserOperations
+      if (passkeyConnected && passkeyManager && !walletPrivateKey) {
+        console.log('[SEND] Passkey wallet detected - using Pimlico bundler');
+
+        try {
+          const { parseUnits: parseUnitsEthers, Interface } = await import('ethers');
+
+          // Prepare transaction data
+          let to: string;
+          let value: string;
+          let data: string = '0x';
+
+          if (selectedToken.symbol !== 'ETH') {
+            // ERC20 transfer
+            const { getTokenContractAddress } = await import('../config/tokens');
+            const tokenAddress = getTokenContractAddress(selectedToken.symbol, 'testnet', 'arcTestnet');
+            if (!tokenAddress) {
+              throw new Error(`Token contract address not found for ${selectedToken.symbol}`);
+            }
+
+            const iface = new Interface(['function transfer(address to, uint256 amount) returns (bool)']);
+            const amountWei = parseUnitsEthers(amount, selectedToken.decimals);
+            data = iface.encodeFunctionData('transfer', [recipient, amountWei]);
+            to = tokenAddress;
+            value = '0';
+          } else {
+            // Native transfer
+            to = recipient;
+            value = parseUnitsEthers(amount, selectedToken.decimals).toString();
+          }
+
+          console.log('[SEND] Executing via PasskeyAccount + Pimlico:', { to, value, data: data.slice(0, 20) + '...' });
+
+          // Execute transaction via passkey manager (uses Pimlico bundler)
+          const result = await passkeyManager.executeTransaction({
+            to,
+            value: BigInt(value),
+            data,
+          });
+
+          hash = result.hash || result.userOpHash || '';
+          kind = result.userOpHash ? 'userOp' : 'transaction';
+
+          console.log('[SEND] Passkey transaction submitted:', { hash, kind });
+
+          setTxHash(hash);
+          setSubmissionKind(kind);
+
+          // Record recipient in address book
+          addressBookService.recordRecipient(recipient, amount, selectedToken.symbol);
+
+          // Add to activity
+          const activity = {
+            id: hash,
+            type: TransactionType.Sent,
+            description: `Sent ${amountNumber.toFixed(4)} ${selectedToken.symbol}`,
+            timestamp: 'Just now',
+            date: new Date(),
+            amount: -amountNumber,
+            currency: selectedToken.symbol,
+            usdValue: -amountNumber * (selectedToken.currentPrice || 1),
+            status: kind === 'userOp' ? TransactionStatus.Pending : TransactionStatus.Completed,
+            hash,
+            from: walletAddress!,
+            to: recipient,
+            networkFee: 0,
+            approvals: { required: 0, list: [] },
+          };
+          addActivity(activity);
+
+          setIsSubmitting(false);
+          return;
+        } catch (passkeyError: any) {
+          console.error('[SEND] Passkey transaction failed:', passkeyError);
+          setSubmitError(passkeyError.message || 'Passkey transaction failed');
+          setIsSubmitting(false);
+          return;
+        }
       }
 
       // PRIVATE KEY WALLET PATH - Uses traditional signing

@@ -1,12 +1,13 @@
 /**
  * Wallet Setup Component - Smart Contract Passkey Edition
  *
- * NEW ARCHITECTURE:
+ * ARCHITECTURE:
  * - Passkey (P256) IS the signing key - NO private key stored
  * - Smart contract verifies P256 signatures on-chain
+ * - Pimlico bundler submits UserOperations to Arc Testnet
  * - Same passkey = Same wallet address (even after clearing storage)
  *
- * NO PASSWORDS - NO SEED PHRASES - NO PRIVATE KEYS
+ * Arc Testnet + Pimlico = Full ERC-4337 Support!
  */
 
 import React, { useCallback, useEffect, useState } from 'react';
@@ -22,7 +23,8 @@ interface WalletSetupProps {
 }
 
 const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
-  // Use PasskeyAccount (Smart Contract) instead of SelfCustodialWallet (EOA)
+  // Use PasskeyAccount (Smart Contract with P256 signing)
+  // Pimlico bundler handles UserOperation submission
   const {
     createAccount,
     connect,

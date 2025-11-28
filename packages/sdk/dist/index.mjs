@@ -2,7 +2,7 @@ var ae = Object.defineProperty;
 var se = (a, e, t) => e in a ? ae(a, e, { enumerable: !0, configurable: !0, writable: !0, value: t }) : a[e] = t;
 var h = (a, e, t) => se(a, typeof e != "symbol" ? e + "" : e, t);
 import { Wallet as U, parseUnits as ie, Contract as E, keccak256 as m, getBytes as P, formatUnits as oe, AbiCoder as W, Interface as K, toBeHex as v, JsonRpcProvider as q } from "ethers";
-import { set as N, get as I, del as ce, clear as de } from "idb-keyval";
+import { set as N, get as k, del as ce, clear as de } from "idb-keyval";
 function C(a) {
   const e = new Uint8Array(a);
   let t = "";
@@ -786,7 +786,7 @@ class ve {
    */
   async getKey(e, t) {
     try {
-      const n = await I(`wallet_key_${e}`);
+      const n = await k(`wallet_key_${e}`);
       return n ? await this.decrypt(n, t) : null;
     } catch (n) {
       return o.error("Failed to retrieve key", n instanceof Error ? n : void 0, { component: "SecureStorage" }), null;
@@ -840,7 +840,7 @@ class ve {
    * Get key data (supports both legacy and new formats)
    */
   async getKeyData(e) {
-    return await I(`wallet:${e}`);
+    return await k(`wallet:${e}`);
   }
   /**
    * Store metadata
@@ -852,14 +852,14 @@ class ve {
    * Get wallet metadata
    */
   async getMetadata(e) {
-    const t = await I(`wallet:${e}:metadata`);
-    return t || await I(`wallet_meta_${e}`);
+    const t = await k(`wallet:${e}:metadata`);
+    return t || await k(`wallet_meta_${e}`);
   }
   /**
    * Check if key exists
    */
   async hasKey(e) {
-    return await I(`wallet_key_${e}`) !== void 0;
+    return await k(`wallet_key_${e}`) !== void 0;
   }
 }
 const Pe = new Uint8Array([
@@ -1042,7 +1042,7 @@ class Te {
     return new TextDecoder().decode(i);
   }
 }
-class Ie {
+class ke {
   constructor(e, t) {
     h(this, "webauthn");
     h(this, "storage");
@@ -1260,7 +1260,7 @@ class Ie {
     return [];
   }
 }
-const ke = {
+const Ie = {
   // Token Messenger contract addresses by chain ID
   tokenMessengerAddresses: {
     // TESTNETS
@@ -1677,7 +1677,7 @@ class Me {
   constructor(e, t) {
     h(this, "config");
     h(this, "provider");
-    this.provider = e, this.config = { ...ke, ...t };
+    this.provider = e, this.config = { ...Ie, ...t };
   }
   /**
    * Transfer USDC cross-chain using CCTP
@@ -1728,16 +1728,16 @@ class Me {
         u
       )).wait();
       console.log("[CCTP] Burn transaction confirmed:", D.hash);
-      const V = this.extractMessageHash(D), k = {
+      const V = this.extractMessageHash(D), I = {
         sourceTxHash: D.hash,
         messageHash: V,
         status: "pending"
       };
       return this.pollForAttestation(V).then((O) => {
-        k.attestation = O, k.status = "attested", console.log("[CCTP] Attestation received");
+        I.attestation = O, I.status = "attested", console.log("[CCTP] Attestation received");
       }).catch((O) => {
-        console.error("[CCTP] Attestation failed:", O), k.status = "failed";
-      }), k;
+        console.error("[CCTP] Attestation failed:", O), I.status = "failed";
+      }), I;
     } catch (d) {
       throw console.error("[CCTP] Transfer failed:", d), new Error(`CCTP transfer failed: ${d.message}`);
     }
@@ -2140,7 +2140,7 @@ class ze {
       rpId: e.rpId,
       rpName: e.appName,
       backendUrl: e.backendUrl
-    }), this.storage = new ve(), this.keyManager = new Ie(this.webauthn, this.storage), this.provider = new q(e.rpcUrl), this.cctpManager = new Me(this.provider, e.cctp), this.accountType = e.accountType || "eoa", this.accountType === "smart-account" && (this.smartAccountManager = new Ne(
+    }), this.storage = new ve(), this.keyManager = new ke(this.webauthn, this.storage), this.provider = new q(e.rpcUrl), this.cctpManager = new Me(this.provider, e.cctp), this.accountType = e.accountType || "eoa", this.accountType === "smart-account" && (this.smartAccountManager = new Ne(
       this.provider,
       e.smartAccount,
       e.paymaster
@@ -2733,10 +2733,10 @@ class Xe {
     return m(i);
   }
   /**
-   * Submit UserOperation to bundler or RPC
+   * Submit UserOperation to Pimlico bundler
    */
   async submitUserOperation(e) {
-    const t = {
+    const t = this.config.bundlerUrl || this.config.rpcUrl, n = {
       sender: e.sender,
       nonce: "0x" + e.nonce.toString(16),
       initCode: e.initCode,
@@ -2749,34 +2749,47 @@ class Xe {
       paymasterAndData: e.paymasterAndData,
       signature: e.signature
     };
+    o.info("Submitting UserOperation to bundler", {
+      component: "PasskeyAccountManager",
+      bundlerUrl: t.replace(/apikey=.*/, "apikey=***"),
+      sender: e.sender
+    });
     try {
-      const r = await (await fetch(this.config.rpcUrl, {
+      const s = await (await fetch(t, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           jsonrpc: "2.0",
           method: "eth_sendUserOperation",
-          params: [t, this.config.entryPointAddress],
+          params: [n, this.config.entryPointAddress],
           id: Date.now()
         })
       })).json();
-      if (r.error)
-        throw new Error(r.error.message || "Bundler rejected UserOperation");
-      const s = r.result;
-      return { hash: await this.waitForUserOperation(s), userOpHash: s };
-    } catch (n) {
-      throw o.error("Failed to submit UserOperation", n instanceof Error ? n : void 0, { component: "PasskeyAccountManager" }), n;
+      if (s.error)
+        throw o.error("Bundler rejected UserOperation", void 0, {
+          component: "PasskeyAccountManager",
+          error: s.error
+        }), new Error(s.error.message || "Bundler rejected UserOperation");
+      const i = s.result;
+      return o.info("UserOperation submitted successfully", {
+        component: "PasskeyAccountManager",
+        userOpHash: i
+      }), { hash: await this.waitForUserOperation(i, t), userOpHash: i };
+    } catch (r) {
+      throw o.error("Failed to submit UserOperation", r instanceof Error ? r : void 0, {
+        component: "PasskeyAccountManager"
+      }), r;
     }
   }
   /**
    * Wait for UserOperation to be included in a transaction
    */
-  async waitForUserOperation(e, t = 6e4) {
-    var r, s;
-    const n = Date.now();
-    for (; Date.now() - n < t; ) {
+  async waitForUserOperation(e, t, n = 6e4) {
+    var i, c;
+    const r = t || this.config.bundlerUrl || this.config.rpcUrl, s = Date.now();
+    for (; Date.now() - s < n; ) {
       try {
-        const c = await (await fetch(this.config.rpcUrl, {
+        const d = await (await fetch(r, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -2786,11 +2799,14 @@ class Xe {
             id: Date.now()
           })
         })).json();
-        if ((s = (r = c.result) == null ? void 0 : r.receipt) != null && s.transactionHash)
-          return c.result.receipt.transactionHash;
+        if ((c = (i = d.result) == null ? void 0 : i.receipt) != null && c.transactionHash)
+          return o.info("UserOperation confirmed", {
+            component: "PasskeyAccountManager",
+            txHash: d.result.receipt.transactionHash
+          }), d.result.receipt.transactionHash;
       } catch {
       }
-      await new Promise((i) => setTimeout(i, 2e3));
+      await new Promise((l) => setTimeout(l, 2e3));
     }
     return e;
   }
@@ -2851,8 +2867,8 @@ export {
   Ye as CircleApiClient,
   Ke as CirclePaymasterClient,
   Ue as DEFAULT_AA_CONFIG,
-  ke as DEFAULT_CCTP_CONFIG,
-  Ie as KeyManager,
+  Ie as DEFAULT_CCTP_CONFIG,
+  ke as KeyManager,
   ge as LogLevel,
   T as PASSKEY_DIAGNOSTIC_MESSAGES,
   Xe as PasskeyAccountManager,

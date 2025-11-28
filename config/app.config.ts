@@ -50,14 +50,17 @@ export const ARC_GAS_CONFIG = {
     usesNativeGas: true,
 } as const;
 
-// Legacy Pimlico Config - DISABLED (Pimlico doesn't support Arc Testnet)
-// Keeping for reference if Arc adds bundler support later
+// Pimlico ERC-4337 Config - Arc Testnet IS SUPPORTED!
+// https://docs.pimlico.io/guides/supported-chains (chain slug: arc-testnet)
 export const PIMLICO_CONFIG = {
-    apiKey: '', // Not used
-    bundlerUrl: '', // Arc doesn't use external bundlers
-    paymasterUrl: '', // Arc uses native USDC gas
+    apiKey: getEnv('VITE_PIMLICO_API_KEY', ''),
+    // Pimlico bundler URL for Arc Testnet (chain ID: 5042002)
+    bundlerUrl: `https://api.pimlico.io/v2/5042002/rpc?apikey=${getEnv('VITE_PIMLICO_API_KEY', '')}`,
+    // Pimlico paymaster URL (same endpoint, different methods)
+    paymasterUrl: `https://api.pimlico.io/v2/5042002/rpc?apikey=${getEnv('VITE_PIMLICO_API_KEY', '')}`,
     entryPoint: ENTRY_POINT,
-    enabled: false, // DISABLED - Arc has native USDC gas
+    // Enable if API key is provided
+    enabled: !!getEnv('VITE_PIMLICO_API_KEY', ''),
 } as const;
 
 // Gas Sponsorship Configuration (Legacy - Arc uses native USDC gas)
