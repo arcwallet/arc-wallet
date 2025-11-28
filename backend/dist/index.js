@@ -16,8 +16,10 @@ import paymasterRouter from './routes/paymaster.js';
 import { createHistoryRouter } from './routes/history.js';
 import { createWebhookRouter } from './routes/webhooks.js';
 import { createGasStationRouter } from './routes/gasStation.js';
+import { createBundlerRouter } from './routes/bundler.js';
 import { WalletBackupService } from './services/walletBackupService.js';
 import { IndexerService } from './services/indexerService.js';
+import { getBundlerService } from './services/bundlerService.js';
 import { webhookService } from './services/webhookService.js';
 import { initIndexerDB } from './db/indexer.js';
 import { MagicSessionStore } from './magicLink/SessionStore.js';
@@ -109,6 +111,7 @@ app.use('/api/paymaster', paymasterRouter);
 app.use('/api/history', createHistoryRouter());
 app.use('/api/webhooks', createWebhookRouter());
 app.use('/api/gas-station', createGasStationRouter());
+app.use('/api/bundler', createBundlerRouter());
 app.use('/api/agent', agentRouter);
 // Initialize indexer database
 console.log('🔧 Initializing indexer database...');
@@ -127,6 +130,21 @@ else {
     console.log('⏸️ Indexer service disabled (INDEXER_ENABLED=false)');
 }
 webhookService.start();
+// Initialize and start bundler service (optional - can be disabled via env)
+const BUNDLER_ENABLED = process.env.BUNDLER_ENABLED === 'true';
+if (BUNDLER_ENABLED && process.env.BUNDLER_PRIVATE_KEY) {
+    console.log('🚀 Starting bundler service...');
+    try {
+        const bundlerService = getBundlerService();
+        bundlerService.start();
+    }
+    catch (error) {
+        console.error('❌ Failed to start bundler service:', error.message);
+    }
+}
+else {
+    console.log('⏸️ Bundler service disabled (BUNDLER_ENABLED=false or no private key)');
+}
 // Root endpoint
 app.get('/', (req, res) => {
     res.json({

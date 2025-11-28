@@ -53,7 +53,7 @@ const PasskeyAccountContext = createContext<PasskeyAccountContextValue | undefin
 const PASSKEY_FACTORY_ADDRESS = (import.meta as any).env.VITE_PASSKEY_FACTORY_ADDRESS || '0x9AE89FbF3C32F976Db2A668d5a5c7B00032BD14a';
 const ENTRY_POINT_ADDRESS = '0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789';
 
-// Initialize PasskeyAccountManager with Pimlico bundler
+// Initialize PasskeyAccountManager with bundler (own bundler preferred, Pimlico as fallback)
 const initializeManager = (): PasskeyAccountManager => {
   const backendUrl = typeof window !== 'undefined'
     ? ((import.meta as any).env.VITE_PASSKEY_API_URL || 'https://arcwallet-backend.onrender.com')
@@ -61,21 +61,35 @@ const initializeManager = (): PasskeyAccountManager => {
 
   const rpId = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
 
-  // Get Pimlico API key for bundler
-  const pimlicoApiKey = typeof window !== 'undefined'
-    ? (import.meta as any).env.VITE_PIMLICO_API_KEY || ''
-    : '';
+  // Determine bundler URL - prefer our own bundler, fallback to Pimlico
+  let bundlerUrl: string | undefined;
+  let bundlerType = 'Not configured';
 
-  // Pimlico bundler URL for Arc Testnet (chain ID: 5042002)
-  const bundlerUrl = pimlicoApiKey
-    ? `https://api.pimlico.io/v2/5042002/rpc?apikey=${pimlicoApiKey}`
-    : undefined;
+  // Option 1: Use our own bundler (same backend URL)
+  const useOwnBundler = typeof window !== 'undefined'
+    ? (import.meta as any).env.VITE_USE_OWN_BUNDLER === 'true'
+    : false;
+
+  if (useOwnBundler) {
+    bundlerUrl = `${backendUrl}/api/bundler/rpc`;
+    bundlerType = 'Arc Bundler (Own)';
+  } else {
+    // Option 2: Pimlico bundler as fallback
+    const pimlicoApiKey = typeof window !== 'undefined'
+      ? (import.meta as any).env.VITE_PIMLICO_API_KEY || ''
+      : '';
+
+    if (pimlicoApiKey) {
+      bundlerUrl = `https://api.pimlico.io/v2/5042002/rpc?apikey=${pimlicoApiKey}`;
+      bundlerType = 'Pimlico (Arc Testnet)';
+    }
+  }
 
   console.log('[PasskeyAccount] Initializing manager:', {
     backendUrl,
     rpId,
     factory: PASSKEY_FACTORY_ADDRESS,
-    bundler: bundlerUrl ? 'Pimlico (Arc Testnet)' : 'Not configured',
+    bundler: bundlerType,
   });
 
   const config: PasskeyAccountConfig = {
