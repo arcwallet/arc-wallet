@@ -272,8 +272,8 @@ function addressToBytes32(address: string): string {
 async function waitForAttestationV2(
   txHash: string,
   sourceDomain: number,
-  maxRetries = 60,
-  interval = 10000 // 10 seconds
+  maxRetries = 120,
+  interval = 3000 // 3 seconds (faster polling since V2 attestation is usually quick)
 ): Promise<{ attestation: string; message: string }> {
 
   for (let i = 0; i < maxRetries; i++) {

@@ -14,7 +14,7 @@ import {
 } from '../services/passkeyBridgeService';
 import { TX_EXPLORER_URL } from '../config/app.config';
 
-const DIRECTIONS: { id: BridgeDirection; label: string; description: string }[] = [
+const DIRECTIONS: { id: BridgeDirection; label: string; description: string; disabled?: boolean }[] = [
   {
     id: 'arc-to-sepolia',
     label: 'Arc → Sepolia',
@@ -23,7 +23,8 @@ const DIRECTIONS: { id: BridgeDirection; label: string; description: string }[] 
   {
     id: 'sepolia-to-arc',
     label: 'Sepolia → Arc',
-    description: 'Bridge USDC from Sepolia into Arc',
+    description: 'Coming soon (requires wallet on Sepolia)',
+    disabled: true,
   },
 ];
 
@@ -49,29 +50,35 @@ const Bridge: React.FC = () => {
   const [progressItem, setProgressItem] = useState<string>('');
   const [sourceTxHash, setSourceTxHash] = useState<string | null>(null);
   const [destTxHash, setDestTxHash] = useState<string | null>(null);
-  const [balance, setBalance] = useState<string | null>(null);
+  const [arcBalance, setArcBalance] = useState<string | null>(null);
+  const [sepoliaBalance, setSepoliaBalance] = useState<string | null>(null);
   const [isLoadingBalance, setIsLoadingBalance] = useState(false);
 
-  // Fetch balance when direction or address changes
+  // Fetch balances on both chains
   React.useEffect(() => {
-    const fetchBalance = async () => {
+    const fetchBalances = async () => {
       if (!address) return;
 
       setIsLoadingBalance(true);
       try {
-        const chain = direction === 'arc-to-sepolia' ? 'arc' : 'sepolia';
-        const bal = await getUsdcBalance(address, chain);
-        setBalance(bal);
+        const [arcBal, sepoliaBal] = await Promise.all([
+          getUsdcBalance(address, 'arc'),
+          getUsdcBalance(address, 'sepolia'),
+        ]);
+        setArcBalance(arcBal);
+        setSepoliaBalance(sepoliaBal);
       } catch (error) {
-        console.error('Failed to fetch balance:', error);
-        setBalance(null);
+        console.error('Failed to fetch balances:', error);
       } finally {
         setIsLoadingBalance(false);
       }
     };
 
-    fetchBalance();
-  }, [address, direction]);
+    fetchBalances();
+  }, [address]);
+
+  // Get source chain balance based on direction
+  const sourceBalance = direction === 'arc-to-sepolia' ? arcBalance : sepoliaBalance;
 
   const normalizeAmount = (raw: string): string | null => {
     if (raw == null) return null;
@@ -164,9 +171,9 @@ const Bridge: React.FC = () => {
     setAmountError(null);
 
     // Check balance
-    if (balance && Number(normalized) > Number(balance)) {
+    if (sourceBalance && Number(normalized) > Number(sourceBalance)) {
       setStatusVariant('error');
-      setStatusMessage(`Insufficient balance. You have ${balance} USDC.`);
+      setStatusMessage(`Insufficient balance. You have ${sourceBalance} USDC on ${direction === 'arc-to-sepolia' ? 'Arc' : 'Sepolia'}.`);
       return;
     }
 
@@ -267,11 +274,19 @@ const Bridge: React.FC = () => {
                 {passkeyAddress?.slice(0, 10)}...{passkeyAddress?.slice(-8)}
               </p>
             </div>
-            <div className="text-right">
-              <p className="text-slate-400 text-sm">Balance on {direction === 'arc-to-sepolia' ? 'Arc' : 'Sepolia'}</p>
-              <p className="text-white font-semibold">
-                {isLoadingBalance ? 'Loading...' : balance ? `${balance} USDC` : '-'}
-              </p>
+            <div className="flex gap-6">
+              <div className="text-right">
+                <p className="text-slate-400 text-xs">Arc Testnet</p>
+                <p className={`font-semibold ${direction === 'arc-to-sepolia' ? 'text-blue-400' : 'text-white'}`}>
+                  {isLoadingBalance ? '...' : arcBalance ? `${arcBalance} USDC` : '0 USDC'}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-slate-400 text-xs">Sepolia</p>
+                <p className={`font-semibold ${direction === 'sepolia-to-arc' ? 'text-blue-400' : 'text-white'}`}>
+                  {isLoadingBalance ? '...' : sepoliaBalance ? `${sepoliaBalance} USDC` : '0 USDC'}
+                </p>
+              </div>
             </div>
           </div>
         </div>
@@ -286,10 +301,12 @@ const Bridge: React.FC = () => {
               <button
                 key={option.id}
                 type="button"
-                onClick={() => setDirection(option.id)}
-                disabled={isSubmitting}
+                onClick={() => !option.disabled && setDirection(option.id)}
+                disabled={isSubmitting || option.disabled}
                 className={`rounded-xl border px-4 py-4 text-left transition-all ${
-                  option.id === direction
+                  option.disabled
+                    ? 'border-slate-600/30 bg-slate-800/30 text-slate-500 cursor-not-allowed opacity-60'
+                    : option.id === direction
                     ? 'border-blue-400 bg-blue-400/10 text-blue-400 shadow-[0_0_15px_rgba(96,165,250,0.2)]'
                     : 'border-slate-500/30 bg-transparent text-slate-300 hover:border-blue-400/50 hover:bg-blue-400/5'
                 } disabled:opacity-50`}
@@ -325,13 +342,13 @@ const Bridge: React.FC = () => {
                 <span className="text-sm font-medium text-slate-400">
                   Amount ({selectedToken.symbol})
                 </span>
-                {balance && (
+                {sourceBalance && (
                   <button
                     type="button"
-                    onClick={() => setAmount(balance)}
+                    onClick={() => setAmount(sourceBalance)}
                     className="text-xs text-blue-400 hover:text-blue-300"
                   >
-                    Max: {balance}
+                    Max: {sourceBalance}
                   </button>
                 )}
               </div>
