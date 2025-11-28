@@ -50,7 +50,7 @@ export interface PasskeyAccountContextValue {
 const PasskeyAccountContext = createContext<PasskeyAccountContextValue | undefined>(undefined);
 
 // Factory and contract addresses
-const PASSKEY_FACTORY_ADDRESS = (import.meta as any).env.VITE_PASSKEY_FACTORY_ADDRESS || '0x9AE89FbF3C32F976Db2A668d5a5c7B00032BD14a';
+const PASSKEY_FACTORY_ADDRESS = (import.meta as any).env.VITE_PASSKEY_FACTORY_ADDRESS || '0x4C16f269dE57B846309a8Eb3591ddb394aBba488';
 const ENTRY_POINT_ADDRESS = '0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789';
 
 // Initialize PasskeyAccountManager with bundler (own bundler preferred, Pimlico as fallback)

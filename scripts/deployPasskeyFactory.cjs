@@ -1,7 +1,7 @@
 /**
  * Deploy PasskeyAccountFactory to Arc Testnet
  *
- * Usage: npx hardhat run scripts/deployPasskeyFactory.cjs --network arcTestnet
+ * Usage: npx hardhat run scripts/deployPasskeyFactory.cjs --network arcTestnet --config hardhat.config.cjs
  */
 
 const { ethers } = require('hardhat');
@@ -36,7 +36,7 @@ async function main() {
   console.log('EntryPoint:', ENTRY_POINT);
   console.log('P256 Verifier:', p256Verifier);
   console.log('\nAdd this to your config:');
-  console.log(`PASSKEY_FACTORY_ADDRESS=${factoryAddress}`);
+  console.log('PASSKEY_FACTORY_ADDRESS=' + factoryAddress);
 }
 
 main()

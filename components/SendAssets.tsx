@@ -551,8 +551,9 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
           // SDK expects: executeTransaction(to: string, value: bigint, data: string)
           const result = await passkeyManager.executeTransaction(to, BigInt(value), data);
 
-          hash = result.hash || result.userOpHash || '';
-          kind = result.userOpHash ? 'userOp' : 'transaction';
+          // SDK returns { hash: txHash, userOpHash } - use hash (real tx) for explorer
+          hash = result.hash || '';
+          kind = 'transaction'; // Always show as transaction since we have the real tx hash
 
           console.log('[SEND] Passkey transaction submitted:', { hash, kind });
 
@@ -562,7 +563,7 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
           // Record recipient in address book
           addressBookService.recordRecipient(recipient, amount, selectedToken.symbol);
 
-          // Add to activity
+          // Add to activity - SDK waits for tx confirmation so status is Completed
           const activity = {
             id: hash,
             type: TransactionType.Sent,
@@ -572,7 +573,7 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
             amount: -amountNumber,
             currency: selectedToken.symbol,
             usdValue: -amountNumber * (selectedToken.currentPrice || 1),
-            status: kind === 'userOp' ? TransactionStatus.Pending : TransactionStatus.Completed,
+            status: TransactionStatus.Completed,
             hash,
             from: walletAddress!,
             to: recipient,
@@ -1119,18 +1120,25 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
         )}
         {submitError && <p className="text-sm text-accent-orange text-center">{submitError}</p>}
         {txHash && (
-          submissionKind === 'transaction' ? (
-            <p className="text-sm text-primary text-center">
-              Transaction submitted:{' '}
-              <a className="underline" href={`${TX_EXPLORER_URL}${txHash}`} target="_blank" rel="noreferrer">
-                View on ArcScan
-              </a>
+          <div className="text-sm text-primary text-center">
+            <p className="mb-2">
+              {submissionKind === 'transaction' ? 'Transaction' : 'User operation'} submitted!
             </p>
-          ) : (
-            <p className="text-sm text-primary text-center">
-              User operation submitted: <span className="font-mono">{txHash}</span>
-            </p>
-          )
+            <a
+              className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 hover:bg-primary/20 rounded-lg border border-primary/30 transition-colors"
+              href={`${TX_EXPLORER_URL}${txHash}`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              <span className="font-mono text-xs">{txHash.slice(0, 10)}...{txHash.slice(-8)}</span>
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                <polyline points="15 3 21 3 21 9"></polyline>
+                <line x1="10" y1="14" x2="21" y2="3"></line>
+              </svg>
+              View on ArcScan
+            </a>
+          </div>
         )}
         <div className="mt-6">
           <button

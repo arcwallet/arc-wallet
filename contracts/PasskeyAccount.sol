@@ -4,9 +4,36 @@ pragma solidity ^0.8.20;
 import {IEntryPoint} from "./IEntryPoint.sol";
 
 /**
- * @title P256 Verifier Interface
- * @dev Interface for Daimo's P256 verifier deployed at 0xc2b78104907F722DABAc4C69f826a522B2754De4
+ * @title P256 Verifier Library
+ * @dev Wrapper for P256 verifier at 0xc2b78104907F722DABAc4C69f826a522B2754De4
+ * The verifier uses EIP-7212 style fallback: message || r || s || x || y (160 bytes)
+ * Returns 0x01 for valid, 0x00 for invalid
  */
+library P256Verifier {
+    address constant VERIFIER = 0xc2b78104907F722DABAc4C69f826a522B2754De4;
+
+    function verifySignature(
+        bytes32 message,
+        uint256 r,
+        uint256 s,
+        uint256 x,
+        uint256 y
+    ) internal view returns (bool) {
+        // EIP-7212 precompile-style call: message || r || s || x || y
+        bytes memory data = abi.encodePacked(message, r, s, x, y);
+
+        (bool success, bytes memory result) = VERIFIER.staticcall(data);
+
+        if (!success || result.length < 32) {
+            return false;
+        }
+
+        // Check if result is 0x01 (valid)
+        return abi.decode(result, (uint256)) == 1;
+    }
+}
+
+// Legacy interface for compatibility (not used by current verifier)
 interface IP256Verifier {
     function verifySignature(
         bytes32 message,
@@ -37,8 +64,7 @@ library WebAuthn {
         bytes memory challenge,
         WebAuthnAuth memory auth,
         uint256 x,
-        uint256 y,
-        IP256Verifier verifier
+        uint256 y
     ) internal view returns (bool) {
         // 1. Verify type field in clientDataJSON
         bytes memory expectedType = '"type":"webauthn.get"';
@@ -61,8 +87,8 @@ library WebAuthn {
         bytes32 clientDataHash = sha256(clientDataBytes);
         bytes32 message = sha256(abi.encodePacked(auth.authenticatorData, clientDataHash));
 
-        // 4. Verify P256 signature
-        return verifier.verifySignature(message, auth.r, auth.s, x, y);
+        // 4. Verify P256 signature using the library
+        return P256Verifier.verifySignature(message, auth.r, auth.s, x, y);
     }
 
     function slice(bytes memory data, uint256 start, uint256 length) internal pure returns (bytes memory) {
@@ -122,9 +148,6 @@ contract PasskeyAccount {
 
     event Executed(address indexed target, uint256 value, bytes data);
     event OwnerChanged(uint256 indexed newX, uint256 indexed newY);
-
-    // Daimo P256 Verifier (deployed on many chains)
-    IP256Verifier public constant P256_VERIFIER = IP256Verifier(0xc2b78104907F722DABAc4C69f826a522B2754De4);
 
     IEntryPoint public immutable entryPoint;
 
@@ -235,7 +258,7 @@ contract PasskeyAccount {
             s: s
         });
 
-        return WebAuthn.verify(abi.encodePacked(challenge), auth, ownerX, ownerY, P256_VERIFIER);
+        return WebAuthn.verify(abi.encodePacked(challenge), auth, ownerX, ownerY);
     }
 
     /**
@@ -243,7 +266,7 @@ contract PasskeyAccount {
      * @notice For testing or simple use cases
      */
     function verifyP256Signature(bytes32 message, uint256 r, uint256 s) external view returns (bool) {
-        return P256_VERIFIER.verifySignature(message, r, s, ownerX, ownerY);
+        return P256Verifier.verifySignature(message, r, s, ownerX, ownerY);
     }
 
     receive() external payable {}
