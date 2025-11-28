@@ -228,13 +228,15 @@ export const PasskeyAccountProvider: React.FC<PasskeyAccountProviderProps> = ({ 
   // Connect with existing passkey
   const connect = useCallback(async (): Promise<{ address: string }> => {
     if (!manager) throw new Error('Manager not initialized');
+    if (!currentEmail) throw new Error('Email required. Please login first.');
 
     setIsConnecting(true);
     try {
       console.log('[PasskeyAccount] Connecting with existing passkey...', { email: currentEmail });
 
       // Pass email to find user's specific passkeys
-      const result = await manager.connect(currentEmail || undefined);
+      // This ensures we only allow the user's registered passkeys
+      const result = await manager.connect(currentEmail);
 
       setAddress(result.address);
       setCredential(result.credential);
@@ -250,7 +252,7 @@ export const PasskeyAccountProvider: React.FC<PasskeyAccountProviderProps> = ({ 
     } finally {
       setIsConnecting(false);
     }
-  }, [manager]);
+  }, [manager, currentEmail]);
 
   // Disconnect (just clear local state, passkey remains)
   const disconnect = useCallback(() => {
