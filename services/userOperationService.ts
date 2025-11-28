@@ -43,8 +43,12 @@ interface SendUserOperationParams {
   }[];
 }
 
-const DEFAULT_VERIFICATION_GAS_LIMIT = 200_000n;
-const DEFAULT_PRE_VERIFICATION_GAS = 50_000n;
+// Gas limits for smart account operations
+// CRITICAL: Must be high enough for account deployment + execution
+// Previous bug: 200K was causing AA23 errors for undeployed wallets
+const DEFAULT_CALL_GAS_LIMIT = 2_000_000n;        // 2M for deployment + transfer
+const DEFAULT_VERIFICATION_GAS_LIMIT = 5_000_000n; // 5M for initCode + signature verification
+const DEFAULT_PRE_VERIFICATION_GAS = 100_000n;     // 100K for pre-verification
 
 const hashBytes = (value: string) => keccak256(value === '0x' ? new Uint8Array() : value);
 
@@ -128,10 +132,19 @@ export async function sendSmartAccountUserOperation(
     throw new Error('Invalid parameters: Provide either transactions array or to/amount');
   }
 
-  const initCode = '0x'; // Account assumed deployedunt.getUserOpNonce();
+  // Check if account is deployed - if not, we need initCode
+  const accountCode = await provider.getCode(params.smartAccountAddress);
+  const isDeployed = accountCode !== '0x';
+  const initCode = '0x'; // TODO: Add initCode support for undeployed accounts when using this service
+
+  if (!isDeployed) {
+    console.warn('[UserOperationService] Account not deployed! This service currently only supports deployed accounts.');
+    console.warn('[UserOperationService] For undeployed accounts, use PasskeyAccountManager or ERC4337Service.');
+  }
+
   const { maxFeePerGas, maxPriorityFeePerGas } = await getFeeSettings(provider);
 
-  let callGasLimit = DEFAULT_VERIFICATION_GAS_LIMIT;
+  let callGasLimit = DEFAULT_CALL_GAS_LIMIT;
   try {
     // Adjust gas estimation based on execution type
     if (params.transactions && params.transactions.length > 0) {

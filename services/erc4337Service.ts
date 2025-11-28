@@ -222,29 +222,58 @@ class ERC4337Service {
         }
 
         // Build base UserOperation
+        // CRITICAL: Gas limits must be HIGH for undeployed wallets:
+        // - Account deployment via initCode costs ~1.4M gas
+        // - P256/Passkey signature verification costs ~300K gas
+        // - Actual transaction execution costs ~100K+ gas
+        // Previous bug: 200K callGasLimit caused AA23 errors
         const userOp = {
             sender: smartAccountAddress,
             nonce: toBeHex(nonce),
             initCode,
             callData,
-            callGasLimit: toBeHex(200000n),
-            verificationGasLimit: toBeHex(isDeployed ? 150000n : 500000n),
-            preVerificationGas: toBeHex(50000n),
+            // For undeployed wallets: deployment + transfer needs ~2M callGas
+            callGasLimit: toBeHex(isDeployed ? 500000n : 2000000n),
+            // Verification includes initCode execution + signature verification
+            // EntryPoint reserves ~10% of verification gas for other ops
+            verificationGasLimit: toBeHex(isDeployed ? 300000n : 5000000n),
+            preVerificationGas: toBeHex(100000n),
             maxFeePerGas,
             maxPriorityFeePerGas,
             paymasterAndData: '0x',
             signature: '0x',
         };
 
-        // Estimate gas
+        console.log('[ERC4337] Initial gas limits:', {
+            callGasLimit: isDeployed ? '500K' : '2M',
+            verificationGasLimit: isDeployed ? '300K' : '5M',
+            preVerificationGas: '100K',
+            isDeployed
+        });
+
+        // Estimate gas from bundler (with buffer)
         try {
             const gasEstimate = await pimlicoClient.estimateUserOperationGas(userOp);
-            userOp.callGasLimit = gasEstimate.callGasLimit;
-            userOp.verificationGasLimit = gasEstimate.verificationGasLimit;
-            userOp.preVerificationGas = gasEstimate.preVerificationGas;
-            console.log('[ERC4337] Gas estimate:', gasEstimate);
+
+            // Apply 20% buffer to estimated gas for safety
+            const addBuffer = (hexValue: string, bufferPercent: number = 20) => {
+                const value = BigInt(hexValue);
+                const buffered = value * BigInt(100 + bufferPercent) / 100n;
+                return toBeHex(buffered);
+            };
+
+            userOp.callGasLimit = addBuffer(gasEstimate.callGasLimit);
+            userOp.verificationGasLimit = addBuffer(gasEstimate.verificationGasLimit);
+            userOp.preVerificationGas = addBuffer(gasEstimate.preVerificationGas);
+
+            console.log('[ERC4337] Gas estimate from bundler (with 20% buffer):', {
+                callGasLimit: userOp.callGasLimit,
+                verificationGasLimit: userOp.verificationGasLimit,
+                preVerificationGas: userOp.preVerificationGas
+            });
         } catch (error) {
-            console.warn('[ERC4337] Gas estimation failed, using defaults:', error);
+            console.warn('[ERC4337] Gas estimation failed, using high defaults:', error);
+            // Keep the high defaults we set above
         }
 
         // Get paymaster sponsorship if requested
