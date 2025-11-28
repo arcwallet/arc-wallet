@@ -548,11 +548,8 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
           console.log('[SEND] Executing via PasskeyAccount + Pimlico:', { to, value, data: data.slice(0, 20) + '...' });
 
           // Execute transaction via passkey manager (uses Pimlico bundler)
-          const result = await passkeyManager.executeTransaction({
-            to,
-            value: BigInt(value),
-            data,
-          });
+          // SDK expects: executeTransaction(to: string, value: bigint, data: string)
+          const result = await passkeyManager.executeTransaction(to, BigInt(value), data);
 
           hash = result.hash || result.userOpHash || '';
           kind = result.userOpHash ? 'userOp' : 'transaction';
