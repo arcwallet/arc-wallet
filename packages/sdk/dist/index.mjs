@@ -191,28 +191,28 @@ async function ne(a) {
   }
   if (!s)
     throw new Error("Registration was not completed");
-  const { id: i, rawId: c, response: l, type: d } = s;
+  const { id: i, rawId: c, response: d, type: l } = s;
   let u;
-  typeof l.getTransports == "function" && (u = l.getTransports());
+  typeof d.getTransports == "function" && (u = d.getTransports());
   let f;
-  if (typeof l.getPublicKeyAlgorithm == "function")
+  if (typeof d.getPublicKeyAlgorithm == "function")
     try {
-      f = l.getPublicKeyAlgorithm();
+      f = d.getPublicKeyAlgorithm();
     } catch (h) {
       F("getPublicKeyAlgorithm()", h);
     }
   let g;
-  if (typeof l.getPublicKey == "function")
+  if (typeof d.getPublicKey == "function")
     try {
-      const h = l.getPublicKey();
+      const h = d.getPublicKey();
       h !== null && (g = E(h));
     } catch (h) {
       F("getPublicKey()", h);
     }
   let y;
-  if (typeof l.getAuthenticatorData == "function")
+  if (typeof d.getAuthenticatorData == "function")
     try {
-      y = E(l.getAuthenticatorData());
+      y = E(d.getAuthenticatorData());
     } catch (h) {
       F("getAuthenticatorData()", h);
     }
@@ -220,14 +220,14 @@ async function ne(a) {
     id: i,
     rawId: E(c),
     response: {
-      attestationObject: E(l.attestationObject),
-      clientDataJSON: E(l.clientDataJSON),
+      attestationObject: E(d.attestationObject),
+      clientDataJSON: E(d.clientDataJSON),
       transports: u,
       publicKeyAlgorithm: f,
       publicKey: g,
       authenticatorData: y
     },
-    type: d,
+    type: l,
     clientExtensionResults: s.getClientExtensionResults(),
     authenticatorAttachment: te(s.authenticatorAttachment)
   };
@@ -315,11 +315,11 @@ async function B(a) {
   }
   if (!c)
     throw new Error("Authentication was not completed");
-  const { id: l, rawId: d, response: u, type: f } = c;
+  const { id: d, rawId: l, response: u, type: f } = c;
   let g;
   return u.userHandle && (g = E(u.userHandle)), {
-    id: l,
-    rawId: E(d),
+    id: d,
+    rawId: E(l),
     response: {
       authenticatorData: E(u.authenticatorData),
       clientDataJSON: E(u.clientDataJSON),
@@ -598,7 +598,7 @@ class De {
         platformSupport: i.platformSupport,
         message: c
       });
-      const l = await fetch(`${this.backendUrl}/passkeys/register/start`, {
+      const d = await fetch(`${this.backendUrl}/passkeys/register/start`, {
         method: "POST",
         headers: this.getHeaders(),
         credentials: "include",
@@ -609,9 +609,9 @@ class De {
           // Backend expects 'displayName' (friendly name)
         })
       });
-      if (!l.ok)
+      if (!d.ok)
         throw new Error("Failed to get registration options");
-      const d = await l.json(), u = ((n = d.data) == null ? void 0 : n.options) || d;
+      const l = await d.json(), u = ((n = l.data) == null ? void 0 : n.options) || l;
       o.debug("Received registration options from backend", {
         component: "WebAuthn",
         challenge: ((r = u.challenge) == null ? void 0 : r.substring(0, 20)) + "..."
@@ -687,7 +687,7 @@ class De {
         component: "WebAuthn",
         credentialId: c.id.substring(0, 20) + "..."
       });
-      const l = await fetch(`${this.backendUrl}/passkeys/auth/finish`, {
+      const d = await fetch(`${this.backendUrl}/passkeys/auth/finish`, {
         method: "POST",
         headers: this.getHeaders(),
         credentials: "include",
@@ -695,18 +695,18 @@ class De {
           credential: c
         })
       });
-      if (!l.ok) {
-        const u = await l.json().catch(() => ({}));
+      if (!d.ok) {
+        const u = await d.json().catch(() => ({}));
         throw new Error(u.message || "Failed to verify authentication");
       }
-      const d = await l.json();
+      const l = await d.json();
       return o.info("Authentication successful", {
         component: "WebAuthn",
         credentialId: c.id.substring(0, 20) + "..."
       }), {
         success: !0,
         credentialId: c.id,
-        userId: d.userId
+        userId: l.userId
         // Authenticator data is handled by backend
       };
     } catch (r) {
@@ -1061,10 +1061,10 @@ class ke {
       await this.webCrypto.generateMasterKey(n.id), o.info("WebCrypto master key derived (non-extractable, deterministic)", { component: "KeyManager" });
       const r = U.createRandom(), s = r.privateKey, i = r.address;
       o.info("Wallet created", { component: "KeyManager", address: i });
-      const { encrypted: c, iv: l } = await this.webCrypto.encrypt(s);
+      const { encrypted: c, iv: d } = await this.webCrypto.encrypt(s);
       return await this.storage.storeWebCryptoData(n.id, {
         encrypted: Array.from(c),
-        iv: Array.from(l),
+        iv: Array.from(d),
         address: i,
         keyType: "webcrypto-master"
         // Mark as WebCrypto protected
@@ -1101,14 +1101,14 @@ class ke {
       let i;
       if (s.keyType === "webcrypto-master") {
         console.log("[KeyManager] Deriving WebCrypto master key for decryption"), await this.webCrypto.generateMasterKey(n);
-        const l = new Uint8Array(s.encrypted), d = new Uint8Array(s.iv);
-        i = await this.webCrypto.decrypt(l, d);
+        const d = new Uint8Array(s.encrypted), l = new Uint8Array(s.iv);
+        i = await this.webCrypto.decrypt(d, l);
       } else {
         console.log("[KeyManager] Using legacy decryption method");
-        const l = new Uint8Array(r.salt || []), d = await this.storage.deriveEncryptionKey(
+        const d = new Uint8Array(r.salt || []), l = await this.storage.deriveEncryptionKey(
           n,
-          l
-        ), u = await this.storage.getKey(n, d);
+          d
+        ), u = await this.storage.getKey(n, l);
         if (!u)
           throw new Error("Failed to decrypt private key");
         i = u;
@@ -1618,17 +1618,17 @@ function je(a) {
 }
 const J = "0x0000000000000000000000000000000000000000", z = /^0x\.\.\.$/;
 function L(a, e) {
-  var i, c, l;
+  var i, c, d;
   const t = {
     isValid: !0,
     errors: [],
     warnings: []
   };
   if (!Re(e)) {
-    const d = xe(e), u = d ? d.name : `Chain ID ${e}`;
+    const l = xe(e), u = l ? l.name : `Chain ID ${e}`;
     return t.errors.push(`${u} does not support Circle CCTP`), t.isValid = !1, t;
   }
-  const n = (i = a.tokenMessengerAddresses) == null ? void 0 : i[e], r = (c = a.usdcAddresses) == null ? void 0 : c[e], s = (l = a.domainIds) == null ? void 0 : l[e];
+  const n = (i = a.tokenMessengerAddresses) == null ? void 0 : i[e], r = (c = a.usdcAddresses) == null ? void 0 : c[e], s = (d = a.domainIds) == null ? void 0 : d[e];
   return n || (t.errors.push(
     `TokenMessenger address not configured for chain ID ${e}`
   ), t.isValid = !1), r || (t.errors.push(`USDC address not configured for chain ID ${e}`), t.isValid = !1), s === void 0 && (t.errors.push(`Domain ID not configured for chain ID ${e}`), t.isValid = !1), e === 412346 && ((n === J || z.test(n || "")) && (t.warnings.push(
@@ -1637,13 +1637,13 @@ function L(a, e) {
     "⚠️  Arc Network USDC address is a PLACEHOLDER. Cross-chain transfers will FAIL. Please obtain the correct address from the Arc Network team."
   ), t.isValid = !1), s === 7 && t.warnings.push(
     "ℹ️  Arc Network domain ID (7) should be verified with Circle team. Incorrect domain ID will cause transfer failures."
-  )), t.warnings.length > 0 && t.warnings.forEach((d) => {
-    o.warn(d, {
+  )), t.warnings.length > 0 && t.warnings.forEach((l) => {
+    o.warn(l, {
       component: "CCTPValidator",
       chainId: e
     });
-  }), t.errors.length > 0 && t.errors.forEach((d) => {
-    o.error(d, void 0, {
+  }), t.errors.length > 0 && t.errors.forEach((l) => {
+    o.error(l, void 0, {
       component: "CCTPValidator",
       chainId: e
     });
@@ -1683,23 +1683,23 @@ class Me {
    * Transfer USDC cross-chain using CCTP
    */
   async transferUSDC(e, t) {
-    const { amount: n, destinationAddress: r, destinationChainId: s } = t, i = await e.provider.getNetwork().then((d) => Number(d.chainId)), c = L(this.config, i);
+    const { amount: n, destinationAddress: r, destinationChainId: s } = t, i = await e.provider.getNetwork().then((l) => Number(l.chainId)), c = L(this.config, i);
     if (!c.isValid) {
-      const d = Y(i);
+      const l = Y(i);
       throw o.error("CCTP configuration invalid for source chain", void 0, {
         component: "CCTPManager",
         chainId: i,
         errors: c.errors
-      }), new Error(d);
+      }), new Error(l);
     }
-    const l = L(this.config, s);
-    if (!l.isValid) {
-      const d = Y(s);
+    const d = L(this.config, s);
+    if (!d.isValid) {
+      const l = Y(s);
       throw o.error("CCTP configuration invalid for destination chain", void 0, {
         component: "CCTPManager",
         chainId: s,
-        errors: l.errors
-      }), new Error(d);
+        errors: d.errors
+      }), new Error(l);
     }
     try {
       console.log("[CCTP] Starting cross-chain USDC transfer:", {
@@ -1707,18 +1707,18 @@ class Me {
         to: s,
         amount: n
       });
-      const d = this.config.tokenMessengerAddresses[i], u = this.config.usdcAddresses[i], f = this.config.domainIds[s];
-      if (!d || !u || f === void 0)
+      const l = this.config.tokenMessengerAddresses[i], u = this.config.usdcAddresses[i], f = this.config.domainIds[s];
+      if (!l || !u || f === void 0)
         throw new Error(`CCTP not supported for chain ${i}`);
       const g = ie(n, 6), y = new S(u, j, e);
-      await y.allowance(e.address, d) < g && (console.log("[CCTP] Approving USDC..."), await (await y.approve(
-        d,
+      await y.allowance(e.address, l) < g && (console.log("[CCTP] Approving USDC..."), await (await y.approve(
+        l,
         g
       )).wait(), console.log("[CCTP] USDC approved"));
       const h = this.addressToBytes32(r);
       console.log("[CCTP] Calling depositForBurn...");
       const D = await (await new S(
-        d,
+        l,
         Oe,
         e
       ).depositForBurn(
@@ -1738,8 +1738,8 @@ class Me {
       }).catch((O) => {
         console.error("[CCTP] Attestation failed:", O), I.status = "failed";
       }), I;
-    } catch (d) {
-      throw console.error("[CCTP] Transfer failed:", d), new Error(`CCTP transfer failed: ${d.message}`);
+    } catch (l) {
+      throw console.error("[CCTP] Transfer failed:", l), new Error(`CCTP transfer failed: ${l.message}`);
     }
   }
   /**
@@ -1901,17 +1901,17 @@ class Ne {
     ]);
     let c = 0n;
     r && (c = await new S(n, R, this.provider).getNonce());
-    const l = r ? "0x" : this.buildInitCode(e.address), d = await this.provider.getFeeData(), u = {
+    const d = r ? "0x" : this.buildInitCode(e.address), l = await this.provider.getFeeData(), u = {
       sender: n,
       nonce: c,
-      initCode: l,
+      initCode: d,
       callData: i,
       callGasLimit: 100000n,
       // Estimate
       verificationGasLimit: 200000n,
       preVerificationGas: 50000n,
-      maxFeePerGas: d.maxFeePerGas || 0n,
-      maxPriorityFeePerGas: d.maxPriorityFeePerGas || 0n,
+      maxFeePerGas: l.maxFeePerGas || 0n,
+      maxPriorityFeePerGas: l.maxPriorityFeePerGas || 0n,
       paymasterAndData: "0x",
       signature: "0x"
     };
@@ -1929,10 +1929,10 @@ class Ne {
     var C;
     const r = this.accountAddress || this.getAccountAddress(e.address);
     this.accountAddress = r;
-    const s = await this.isDeployed(r), i = new K(R), c = t.map((b) => b.to), l = t.map((b) => BigInt(b.value || "0")), d = t.map((b) => b.data || "0x"), u = i.encodeFunctionData("executeBatch", [
+    const s = await this.isDeployed(r), i = new K(R), c = t.map((b) => b.to), d = t.map((b) => BigInt(b.value || "0")), l = t.map((b) => b.data || "0x"), u = i.encodeFunctionData("executeBatch", [
       c,
-      l,
-      d
+      d,
+      l
     ]);
     let f = 0n;
     s && (f = await new S(r, R, this.provider).getNonce());
@@ -2521,10 +2521,10 @@ class Xe {
     });
     if (!c.ok)
       throw new Error("Failed to verify credential");
-    const d = (b = (await c.json()).data) == null ? void 0 : b.publicKey;
-    if (!(d != null && d.x) || !(d != null && d.y))
+    const l = (b = (await c.json()).data) == null ? void 0 : b.publicKey;
+    if (!(l != null && l.x) || !(l != null && l.y))
       throw new Error("Server did not return public key coordinates");
-    const { x: u, y: f } = d, g = {
+    const { x: u, y: f } = l, g = {
       credentialId: i.id,
       publicKeyX: u,
       publicKeyY: f,
@@ -2559,8 +2559,8 @@ class Xe {
     });
     if (!i.ok)
       throw new Error("Failed to verify authentication");
-    const c = await i.json(), l = (y = c.data) == null ? void 0 : y.publicKey, d = ((h = (w = c.data) == null ? void 0 : w.user) == null ? void 0 : h.username) || ((b = (C = c.data) == null ? void 0 : C.user) == null ? void 0 : b.id);
-    if (!(l != null && l.x) || !(l != null && l.y)) {
+    const c = await i.json(), d = (y = c.data) == null ? void 0 : y.publicKey, l = ((h = (w = c.data) == null ? void 0 : w.user) == null ? void 0 : h.username) || ((b = (C = c.data) == null ? void 0 : C.user) == null ? void 0 : b.id);
+    if (!(d != null && d.x) || !(d != null && d.y)) {
       const D = this.loadCredential(s.id);
       if (!D)
         throw new Error("Credential not found. Server did not return public key coordinates.");
@@ -2568,9 +2568,9 @@ class Xe {
     } else {
       const D = {
         credentialId: s.id,
-        publicKeyX: l.x,
-        publicKeyY: l.y,
-        userId: d
+        publicKeyX: d.x,
+        publicKeyY: d.y,
+        userId: l
       };
       this.currentCredential = D, this.storeCredential(D);
     }
@@ -2606,9 +2606,9 @@ class Xe {
       throw new Error("Failed to get signing options");
     const r = await n.json(), s = ((h = r.data) == null ? void 0 : h.options) || r;
     s.challenge = this.toBase64Url(t);
-    const i = await B({ optionsJSON: s }), { r: c, s: l, authenticatorData: d, clientDataJSON: u, challengeIndex: f, typeIndex: g } = await this.extractSignatureComponents(i), w = W.defaultAbiCoder().encode(
+    const i = await B({ optionsJSON: s }), { r: c, s: d, authenticatorData: l, clientDataJSON: u, challengeIndex: f, typeIndex: g } = await this.extractSignatureComponents(i), w = W.defaultAbiCoder().encode(
       ["bytes", "string", "uint256", "uint256", "uint256", "uint256"],
-      [d, u, f, g, c, l]
+      [l, u, f, g, c, d]
     );
     return o.info("UserOperation signed", { component: "PasskeyAccountManager" }), w;
   }
@@ -2682,7 +2682,7 @@ class Xe {
       to: e,
       value: t.toString()
     });
-    const r = await this.isAccountDeployed(), i = new S(this.accountAddress, X, this.provider).interface.encodeFunctionData("execute", [e, t, n]), c = await this.provider.getFeeData(), l = c.maxFeePerGas || c.gasPrice || 1000000000n, d = c.maxPriorityFeePerGas || 100000000n, u = await this.getAccountNonce(), f = {
+    const r = await this.isAccountDeployed(), i = new S(this.accountAddress, X, this.provider).interface.encodeFunctionData("execute", [e, t, n]), c = await this.provider.getFeeData(), d = c.maxFeePerGas || c.gasPrice || 1000000000n, l = c.maxPriorityFeePerGas || 100000000n, u = await this.getAccountNonce(), f = {
       sender: this.accountAddress,
       nonce: u,
       initCode: r ? "0x" : this.getInitCode(),
@@ -2692,8 +2692,8 @@ class Xe {
       verificationGasLimit: r ? 150000n : 500000n,
       // Higher for deployment
       preVerificationGas: 50000n,
-      maxFeePerGas: l,
-      maxPriorityFeePerGas: d,
+      maxFeePerGas: d,
+      maxPriorityFeePerGas: l,
       paymasterAndData: "0x"
       // No paymaster for now
     }, g = this.calculateUserOpHash(f), y = await this.signUserOperation(f, g), w = { ...f, signature: y };
@@ -2766,11 +2766,15 @@ class Xe {
           id: Date.now()
         })
       })).json();
-      if (s.error)
+      if (s.error) {
+        const d = s.error.data ? `${s.error.message}: ${s.error.data}` : s.error.message;
         throw o.error("Bundler rejected UserOperation", void 0, {
           component: "PasskeyAccountManager",
-          error: s.error
-        }), new Error(s.error.message || "Bundler rejected UserOperation");
+          error: s.error,
+          errorCode: s.error.code,
+          errorData: s.error.data
+        }), new Error(d || "Bundler rejected UserOperation");
+      }
       const i = s.result;
       return o.info("UserOperation submitted successfully", {
         component: "PasskeyAccountManager",
@@ -2790,7 +2794,7 @@ class Xe {
     const r = t || this.config.bundlerUrl || this.config.rpcUrl, s = Date.now();
     for (; Date.now() - s < n; ) {
       try {
-        const d = await (await fetch(r, {
+        const l = await (await fetch(r, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -2800,23 +2804,23 @@ class Xe {
             id: Date.now()
           })
         })).json();
-        if ((c = (i = d.result) == null ? void 0 : i.receipt) != null && c.transactionHash)
+        if ((c = (i = l.result) == null ? void 0 : i.receipt) != null && c.transactionHash)
           return o.info("UserOperation confirmed", {
             component: "PasskeyAccountManager",
-            txHash: d.result.receipt.transactionHash
-          }), d.result.receipt.transactionHash;
+            txHash: l.result.receipt.transactionHash
+          }), l.result.receipt.transactionHash;
       } catch {
       }
-      await new Promise((l) => setTimeout(l, 2e3));
+      await new Promise((d) => setTimeout(d, 2e3));
     }
     return e;
   }
   // ============ Private Methods ============
   async extractSignatureComponents(e) {
-    const t = "0x" + G(this.fromBase64Url(e.response.authenticatorData)), n = _e(this.fromBase64Url(e.response.clientDataJSON)), r = n.indexOf('"challenge"'), s = n.indexOf('"type"'), i = this.fromBase64Url(e.response.signature), { r: c, s: l } = this.parseDERSignature(i);
+    const t = "0x" + G(this.fromBase64Url(e.response.authenticatorData)), n = _e(this.fromBase64Url(e.response.clientDataJSON)), r = n.indexOf('"challenge"'), s = n.indexOf('"type"'), i = this.fromBase64Url(e.response.signature), { r: c, s: d } = this.parseDERSignature(i);
     return {
       r: BigInt("0x" + G(c)),
-      s: BigInt("0x" + G(l)),
+      s: BigInt("0x" + G(d)),
       authenticatorData: t,
       clientDataJSON: n,
       challengeIndex: r,
@@ -2829,8 +2833,8 @@ class Xe {
     if (t++, e[t++] !== 2) throw new Error("Invalid DER signature");
     const n = e[t++], r = e.slice(t, t + n);
     if (t += n, e[t++] !== 2) throw new Error("Invalid DER signature");
-    const s = e[t++], i = e.slice(t, t + s), c = r[0] === 0 ? r.slice(1) : r, l = i[0] === 0 ? i.slice(1) : i, d = new Uint8Array(32), u = new Uint8Array(32);
-    return d.set(c, 32 - c.length), u.set(l, 32 - l.length), { r: d, s: u };
+    const s = e[t++], i = e.slice(t, t + s), c = r[0] === 0 ? r.slice(1) : r, d = i[0] === 0 ? i.slice(1) : i, l = new Uint8Array(32), u = new Uint8Array(32);
+    return l.set(c, 32 - c.length), u.set(d, 32 - d.length), { r: l, s: u };
   }
   toBase64Url(e) {
     const t = Fe(e);

@@ -540,11 +540,16 @@ export class PasskeyAccountManager {
       const result = await response.json();
 
       if (result.error) {
+        const errorDetail = result.error.data
+          ? `${result.error.message}: ${result.error.data}`
+          : result.error.message;
         logger.error('Bundler rejected UserOperation', undefined, {
           component: 'PasskeyAccountManager',
           error: result.error,
+          errorCode: result.error.code,
+          errorData: result.error.data,
         });
-        throw new Error(result.error.message || 'Bundler rejected UserOperation');
+        throw new Error(errorDetail || 'Bundler rejected UserOperation');
       }
 
       const userOpHash = result.result;
