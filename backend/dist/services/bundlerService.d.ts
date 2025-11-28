@@ -82,6 +82,11 @@ export declare class BundlerService {
      */
     private validateUserOperation;
     /**
+     * Validate token transfer has sufficient balance
+     * Parses callData to detect ERC20 transfers and checks sender balance
+     */
+    private validateTokenTransfer;
+    /**
      * Calculate required prefund for UserOperation
      */
     private calculateRequiredPrefund;

@@ -11,6 +11,13 @@
  * 4. Returns userOpHash for tracking
  */
 import { ethers } from 'ethers';
+// ERC20 ABI for balance checks
+const ERC20_ABI = [
+    'function balanceOf(address account) external view returns (uint256)',
+    'function transfer(address to, uint256 amount) external returns (bool)',
+];
+// Arc USDC contract address
+const ARC_USDC_ADDRESS = '0x3600000000000000000000000000000000000000';
 // EntryPoint v0.6 ABI (minimal required functions)
 const ENTRY_POINT_ABI = [
     'function handleOps(tuple(address sender, uint256 nonce, bytes initCode, bytes callData, uint256 callGasLimit, uint256 verificationGasLimit, uint256 preVerificationGas, uint256 maxFeePerGas, uint256 maxPriorityFeePerGas, bytes paymasterAndData, bytes signature)[] ops, address payable beneficiary) external',
@@ -341,7 +348,60 @@ export class BundlerService {
                 }
             }
         }
+        // Check if this is a token transfer and validate balance
+        await this.validateTokenTransfer(userOp);
         console.log('✅ UserOperation validated');
+    }
+    /**
+     * Validate token transfer has sufficient balance
+     * Parses callData to detect ERC20 transfers and checks sender balance
+     */
+    async validateTokenTransfer(userOp) {
+        try {
+            const callData = userOp.callData;
+            if (!callData || callData === '0x' || callData.length < 10) {
+                return;
+            }
+            // Smart wallet execute function selector: 0xb61d27f6 (execute(address,uint256,bytes))
+            const executeSelector = '0xb61d27f6';
+            if (!callData.toLowerCase().startsWith(executeSelector)) {
+                return;
+            }
+            // Decode execute(address target, uint256 value, bytes data)
+            const executeData = '0x' + callData.slice(10);
+            const decoded = ethers.AbiCoder.defaultAbiCoder().decode(['address', 'uint256', 'bytes'], executeData);
+            const target = decoded[0];
+            const innerCallData = decoded[2];
+            // Check if target is USDC
+            if (target.toLowerCase() !== ARC_USDC_ADDRESS.toLowerCase()) {
+                return;
+            }
+            // Check if inner call is transfer(address,uint256) - selector 0xa9059cbb
+            const transferSelector = '0xa9059cbb';
+            if (!innerCallData.toLowerCase().startsWith(transferSelector)) {
+                return;
+            }
+            // Decode transfer(address to, uint256 amount)
+            const transferData = '0x' + innerCallData.slice(10);
+            const transferDecoded = ethers.AbiCoder.defaultAbiCoder().decode(['address', 'uint256'], transferData);
+            const transferAmount = transferDecoded[1];
+            // Check sender's USDC balance
+            const usdc = new ethers.Contract(ARC_USDC_ADDRESS, ERC20_ABI, this.provider);
+            const senderBalance = await usdc.balanceOf(userOp.sender);
+            if (senderBalance < transferAmount) {
+                const formattedBalance = Number(senderBalance) / 1e6;
+                const formattedAmount = Number(transferAmount) / 1e6;
+                throw new Error(`Insufficient USDC balance: wallet has ${formattedBalance.toFixed(2)} USDC but trying to send ${formattedAmount.toFixed(2)} USDC`);
+            }
+            console.log(`✅ Token transfer validated: ${Number(transferAmount) / 1e6} USDC (balance: ${Number(senderBalance) / 1e6} USDC)`);
+        }
+        catch (error) {
+            if (error.message?.includes('Insufficient USDC')) {
+                throw error;
+            }
+            // Log but don't throw for other decode errors - let EntryPoint handle
+            console.warn('⚠️ Could not validate token transfer:', error.message);
+        }
     }
     /**
      * Calculate required prefund for UserOperation
