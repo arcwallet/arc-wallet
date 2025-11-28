@@ -16,11 +16,11 @@ class IndexerService {
     private isRunning: boolean = false;
     private pollingInterval: NodeJS.Timeout | null = null;
     private currentPollingDelay: number;
-    private readonly BASE_POLLING_DELAY = 15000; // 15 seconds (more conservative)
-    private readonly MAX_POLLING_DELAY = 300000; // 5 minutes max backoff
-    private readonly BLOCK_BATCH_SIZE = 5; // Process max 5 blocks per cycle (reduced)
-    private readonly BLOCK_DELAY = 1000; // 1s delay between blocks (increased)
-    private readonly REQUEST_DELAY = 200; // 200ms between RPC requests
+    private readonly BASE_POLLING_DELAY = 30000; // 30 seconds (very conservative for free tier)
+    private readonly MAX_POLLING_DELAY = 600000; // 10 minutes max backoff
+    private readonly BLOCK_BATCH_SIZE = 3; // Process max 3 blocks per cycle (very reduced)
+    private readonly BLOCK_DELAY = 2000; // 2s delay between blocks
+    private readonly REQUEST_DELAY = 500; // 500ms between RPC requests (stay under 2 req/sec)
     private rateLimitHits: number = 0;
     private tokenMetadataService: TokenMetadataService;
     private watchedAddresses: Set<string> = new Set();

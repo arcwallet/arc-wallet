@@ -14,11 +14,11 @@ class IndexerService {
     isRunning = false;
     pollingInterval = null;
     currentPollingDelay;
-    BASE_POLLING_DELAY = 15000; // 15 seconds (more conservative)
-    MAX_POLLING_DELAY = 300000; // 5 minutes max backoff
-    BLOCK_BATCH_SIZE = 5; // Process max 5 blocks per cycle (reduced)
-    BLOCK_DELAY = 1000; // 1s delay between blocks (increased)
-    REQUEST_DELAY = 200; // 200ms between RPC requests
+    BASE_POLLING_DELAY = 30000; // 30 seconds (very conservative for free tier)
+    MAX_POLLING_DELAY = 600000; // 10 minutes max backoff
+    BLOCK_BATCH_SIZE = 3; // Process max 3 blocks per cycle (very reduced)
+    BLOCK_DELAY = 2000; // 2s delay between blocks
+    REQUEST_DELAY = 500; // 500ms between RPC requests (stay under 2 req/sec)
     rateLimitHits = 0;
     tokenMetadataService;
     watchedAddresses = new Set();
