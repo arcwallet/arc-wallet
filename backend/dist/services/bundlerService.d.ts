@@ -84,6 +84,11 @@ export declare class BundlerService {
     /**
      * Validate token transfer has sufficient balance
      * Parses callData to detect ERC20 transfers and checks sender balance
+     *
+     * NOTE: For undeployed wallets (with initCode), we skip validation because:
+     * 1. The wallet address is a counterfactual address (not yet deployed)
+     * 2. Funds may be pre-deposited to the counterfactual address
+     * 3. The EntryPoint will handle the actual validation during execution
      */
     private validateTokenTransfer;
     /**

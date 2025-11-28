@@ -422,18 +422,63 @@ export class PasskeyAccountManager {
     // Get nonce
     const nonce = await this.getAccountNonce();
 
+    // Get gas estimates from bundler (if available) or use defaults
+    // Account deployment + P256 verification requires significant gas
+    const initCode = isDeployed ? '0x' : this.getInitCode();
+    let gasEstimates = {
+      preVerificationGas: 100000n,
+      // Deployment needs ~1.4M for initCode + ~300K for P256 verify
+      // EntryPoint reserves ~10%, so we need more buffer
+      verificationGasLimit: isDeployed ? 500000n : 3000000n,
+      // callGasLimit is for the actual execution AFTER verification
+      // For deployment + transfer, we need enough for both
+      callGasLimit: isDeployed ? 500000n : 1000000n,
+    };
+
+    // Try to get better estimates from bundler
+    try {
+      const bundlerUrl = this.config.bundlerUrl || this.config.rpcUrl;
+      const estimateResponse = await fetch(bundlerUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          method: 'eth_estimateUserOperationGas',
+          params: [{
+            sender: this.accountAddress,
+            nonce: '0x' + nonce.toString(16),
+            initCode,
+            callData,
+            paymasterAndData: '0x',
+          }, this.config.entryPointAddress],
+          id: Date.now(),
+        }),
+      });
+      const estimateResult = await estimateResponse.json();
+      if (estimateResult.result) {
+        gasEstimates = {
+          preVerificationGas: BigInt(estimateResult.result.preVerificationGas),
+          verificationGasLimit: BigInt(estimateResult.result.verificationGasLimit),
+          callGasLimit: BigInt(estimateResult.result.callGasLimit),
+        };
+        logger.info('Got gas estimates from bundler', {
+          component: 'PasskeyAccountManager',
+          estimates: estimateResult.result,
+        });
+      }
+    } catch (e) {
+      logger.warn('Could not get gas estimates from bundler, using defaults', {
+        component: 'PasskeyAccountManager',
+      });
+    }
+
     // Build UserOperation (without signature - will be added after signing)
-    // Note: Account deployment requires ~1.4M gas for initCode execution
-    // EntryPoint reserves ~10% of verificationGasLimit for other operations
-    // So we need verificationGasLimit > 1.4M / 0.9 ≈ 1.56M, using 2M for safety
     const userOp = {
       sender: this.accountAddress,
       nonce,
-      initCode: isDeployed ? '0x' : this.getInitCode(),
+      initCode,
       callData,
-      callGasLimit: 500000n, // Conservative estimate for actual execution
-      verificationGasLimit: isDeployed ? 300000n : 2000000n, // 2M for deployment (initCode + P256 verify needs ~1.5M+)
-      preVerificationGas: 60000n,
+      ...gasEstimates,
       maxFeePerGas,
       maxPriorityFeePerGas,
       paymasterAndData: '0x', // No paymaster for now

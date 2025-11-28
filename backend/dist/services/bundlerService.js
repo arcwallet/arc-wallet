@@ -192,19 +192,27 @@ export class BundlerService {
     async estimateUserOperationGas(userOp, entryPointAddr) {
         // Default gas estimates for Arc Testnet
         // These are conservative estimates that should work for most operations
-        const preVerificationGas = 60000n;
+        const preVerificationGas = 100000n; // Increased for complex operations
         // verificationGasLimit needs to be VERY high for:
         // 1. P256 signature verification (expensive on-chain)
         // 2. Account deployment via initCode (needs ~1.4M gas)
         // EntryPoint reserves ~10% for other operations, so we need ~1.4M/0.9 ≈ 1.6M minimum
         const hasInitCode = userOp.initCode && userOp.initCode !== '0x';
-        const verificationGasLimit = hasInitCode ? 2000000n : 500000n;
+        const verificationGasLimit = hasInitCode ? 3000000n : 500000n; // Increased to 3M for deployment
         // Estimate callGasLimit based on callData
-        let callGasLimit = 500000n; // Higher base for account abstraction
-        if (userOp.callData && userOp.callData.length > 2) {
-            // Rough estimate: base + data length
-            callGasLimit = 500000n + BigInt(userOp.callData.length) * 16n;
+        // For deployment + transfer operations, we need MUCH more gas
+        // AA23 error often means callGasLimit is too low
+        let callGasLimit = 500000n; // Base for account abstraction
+        if (hasInitCode) {
+            // First transaction includes deployment, needs more callGas
+            // The actual transfer happens AFTER deployment within the same UserOp
+            callGasLimit = 1000000n; // 1M for deployment + transfer
         }
+        if (userOp.callData && userOp.callData.length > 2) {
+            // Add extra gas based on data length
+            callGasLimit += BigInt(userOp.callData.length) * 16n;
+        }
+        console.log(`📊 Gas estimation: preVerification=${preVerificationGas}, verification=${verificationGasLimit}, call=${callGasLimit}, hasInitCode=${hasInitCode}`);
         return {
             preVerificationGas: preVerificationGas.toString(),
             verificationGasLimit: verificationGasLimit.toString(),
@@ -355,9 +363,21 @@ export class BundlerService {
     /**
      * Validate token transfer has sufficient balance
      * Parses callData to detect ERC20 transfers and checks sender balance
+     *
+     * NOTE: For undeployed wallets (with initCode), we skip validation because:
+     * 1. The wallet address is a counterfactual address (not yet deployed)
+     * 2. Funds may be pre-deposited to the counterfactual address
+     * 3. The EntryPoint will handle the actual validation during execution
      */
     async validateTokenTransfer(userOp) {
         try {
+            // Skip validation for undeployed wallets (first transaction with deployment)
+            // The wallet will be deployed first, then the transfer will execute
+            const hasInitCode = userOp.initCode && userOp.initCode !== '0x' && userOp.initCode.length > 2;
+            if (hasInitCode) {
+                console.log('⏭️ Skipping token balance validation for undeployed wallet (initCode present)');
+                return;
+            }
             const callData = userOp.callData;
             if (!callData || callData === '0x' || callData.length < 10) {
                 return;
