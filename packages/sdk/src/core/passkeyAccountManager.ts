@@ -574,9 +574,11 @@ export class PasskeyAccountManager {
   /**
    * Wait for UserOperation to be included in a transaction
    */
-  private async waitForUserOperation(userOpHash: string, bundlerUrl?: string, timeout: number = 60000): Promise<string> {
+  private async waitForUserOperation(userOpHash: string, bundlerUrl?: string, timeout: number = 120000): Promise<string> {
     const url = bundlerUrl || this.config.bundlerUrl || this.config.rpcUrl;
     const startTime = Date.now();
+    let pollInterval = 5000; // Start with 5 seconds
+    const maxPollInterval = 15000; // Max 15 seconds between polls
 
     while (Date.now() - startTime < timeout) {
       try {
@@ -591,6 +593,17 @@ export class PasskeyAccountManager {
           }),
         });
 
+        // Handle rate limiting with exponential backoff
+        if (response.status === 429) {
+          pollInterval = Math.min(pollInterval * 1.5, maxPollInterval);
+          logger.warn('Rate limited, backing off', {
+            component: 'PasskeyAccountManager',
+            nextPollIn: pollInterval,
+          });
+          await new Promise(resolve => setTimeout(resolve, pollInterval));
+          continue;
+        }
+
         const result = await response.json();
 
         if (result.result?.receipt?.transactionHash) {
@@ -604,10 +617,14 @@ export class PasskeyAccountManager {
         // Continue polling
       }
 
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await new Promise(resolve => setTimeout(resolve, pollInterval));
     }
 
     // If timeout, return userOpHash as hash (transaction may still be pending)
+    logger.warn('UserOperation polling timeout, returning userOpHash', {
+      component: 'PasskeyAccountManager',
+      userOpHash,
+    });
     return userOpHash;
   }
 
