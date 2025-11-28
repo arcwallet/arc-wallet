@@ -424,13 +424,15 @@ export class PasskeyAccountManager {
 
     // Build UserOperation (without signature - will be added after signing)
     // Note: Account deployment requires ~1.4M gas for initCode execution
+    // EntryPoint reserves ~10% of verificationGasLimit for other operations
+    // So we need verificationGasLimit > 1.4M / 0.9 ≈ 1.56M, using 2M for safety
     const userOp = {
       sender: this.accountAddress,
       nonce,
       initCode: isDeployed ? '0x' : this.getInitCode(),
       callData,
       callGasLimit: 500000n, // Conservative estimate for actual execution
-      verificationGasLimit: isDeployed ? 200000n : 1500000n, // Much higher for deployment (initCode needs ~1.4M)
+      verificationGasLimit: isDeployed ? 300000n : 2000000n, // 2M for deployment (initCode + P256 verify needs ~1.5M+)
       preVerificationGas: 60000n,
       maxFeePerGas,
       maxPriorityFeePerGas,

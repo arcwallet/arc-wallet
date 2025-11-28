@@ -35,6 +35,7 @@ const CSRF_EXEMPT_ROUTES = [
   '/api/circle',        // Circle OTP routes (email verification provides security)
   '/api/agent',         // Agent routes (session-based auth + rate limiting provides security)
   '/api/bundler',       // ERC-4337 bundler JSON-RPC (standard bundler interface, no cookies needed)
+  '/api/gas-station',   // Gas station routes (used internally by bundler for sponsoring transactions)
   '/health',
   '/passkeys',          // All passkey routes exempt (WebAuthn provides cryptographic security)
 ];

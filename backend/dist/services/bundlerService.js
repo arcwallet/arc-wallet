@@ -185,17 +185,18 @@ export class BundlerService {
     async estimateUserOperationGas(userOp, entryPointAddr) {
         // Default gas estimates for Arc Testnet
         // These are conservative estimates that should work for most operations
-        const preVerificationGas = 50000n;
-        const verificationGasLimit = 500000n; // High for P256 signature verification
+        const preVerificationGas = 60000n;
+        // verificationGasLimit needs to be VERY high for:
+        // 1. P256 signature verification (expensive on-chain)
+        // 2. Account deployment via initCode (needs ~1.4M gas)
+        // EntryPoint reserves ~10% for other operations, so we need ~1.4M/0.9 ≈ 1.6M minimum
+        const hasInitCode = userOp.initCode && userOp.initCode !== '0x';
+        const verificationGasLimit = hasInitCode ? 2000000n : 500000n;
         // Estimate callGasLimit based on callData
-        let callGasLimit = 100000n;
+        let callGasLimit = 500000n; // Higher base for account abstraction
         if (userOp.callData && userOp.callData.length > 2) {
             // Rough estimate: base + data length
-            callGasLimit = 100000n + BigInt(userOp.callData.length) * 16n;
-        }
-        // If initCode is present, add deployment gas
-        if (userOp.initCode && userOp.initCode !== '0x') {
-            callGasLimit += 500000n; // Account deployment
+            callGasLimit = 500000n + BigInt(userOp.callData.length) * 16n;
         }
         return {
             preVerificationGas: preVerificationGas.toString(),
@@ -278,12 +279,21 @@ export class BundlerService {
             // Try to parse revert reason
             if (error.data) {
                 try {
-                    const iface = new ethers.Interface(ENTRY_POINT_ABI);
-                    const decoded = iface.parseError(error.data);
-                    console.error('Revert reason:', decoded);
+                    // Try to decode AA error codes from the revert data
+                    const errorData = error.data;
+                    if (errorData.startsWith('0x220266b6')) {
+                        // FailedOp(uint256 opIndex, string reason)
+                        const decoded = ethers.AbiCoder.defaultAbiCoder().decode(['uint256', 'string'], '0x' + errorData.slice(10));
+                        console.error('Revert reason:', `FailedOp at index ${decoded[0]}: ${decoded[1]}`);
+                    }
+                    else {
+                        const iface = new ethers.Interface(ENTRY_POINT_ABI);
+                        const decoded = iface.parseError(errorData);
+                        console.error('Revert reason:', decoded);
+                    }
                 }
-                catch {
-                    // Couldn't decode
+                catch (decodeErr) {
+                    console.error('Could not decode revert reason:', error.data);
                 }
             }
         }

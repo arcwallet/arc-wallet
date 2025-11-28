@@ -2689,8 +2689,8 @@ class Xe {
       callData: i,
       callGasLimit: 500000n,
       // Conservative estimate for actual execution
-      verificationGasLimit: r ? 200000n : 1500000n,
-      // Much higher for deployment (initCode needs ~1.4M)
+      verificationGasLimit: r ? 300000n : 2000000n,
+      // 2M for deployment (initCode + P256 verify needs ~1.5M+)
       preVerificationGas: 60000n,
       maxFeePerGas: d,
       maxPriorityFeePerGas: l,
