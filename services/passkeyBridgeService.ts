@@ -197,15 +197,11 @@ export async function bridgeUsdcWithPasskey(params: PasskeyBridgeParams): Promis
     console.log('[PasskeyBridge] USDC burned:', burnResult.hash);
     onProgress?.({ type: 'burning-usdc', txHash: burnResult.hash });
 
-    // Step 4: Extract message hash from burn transaction
-    const messageHash = await extractMessageHash(burnResult.hash, sourceConfig.rpcUrl);
-    console.log('[PasskeyBridge] Message hash:', messageHash);
-
-    // Step 5: Wait for attestation from Circle
+    // Step 4: Wait for attestation from Circle (V2 API uses txHash instead of messageHash)
     console.log('[PasskeyBridge] Waiting for attestation...');
-    onProgress?.({ type: 'waiting-attestation', messageHash });
+    onProgress?.({ type: 'waiting-attestation', messageHash: burnResult.hash });
 
-    const { attestation, message } = await waitForAttestation(messageHash);
+    const { attestation, message } = await waitForAttestationV2(burnResult.hash, sourceConfig.domain);
     console.log('[PasskeyBridge] Attestation received');
     onProgress?.({ type: 'attestation-received', attestation });
 
@@ -238,7 +234,6 @@ export async function bridgeUsdcWithPasskey(params: PasskeyBridgeParams): Promis
         success: true,
         sourceTxHash: burnResult.hash,
         destinationTxHash: mintResult.hash,
-        messageHash,
       };
     }
 
@@ -248,7 +243,6 @@ export async function bridgeUsdcWithPasskey(params: PasskeyBridgeParams): Promis
     return {
       success: true,
       sourceTxHash: burnResult.hash,
-      messageHash,
       // destinationTxHash will be completed on Sepolia
     };
 
@@ -272,55 +266,34 @@ function addressToBytes32(address: string): string {
 }
 
 /**
- * Extract message hash from burn transaction logs
+ * Wait for Circle attestation service to provide attestation (CCTP V2 API)
+ * V2 uses /v2/messages/{domain}?transactionHash={txHash} instead of /attestations/{messageHash}
  */
-async function extractMessageHash(txHash: string, rpcUrl: string): Promise<string> {
-  const provider = new JsonRpcProvider(rpcUrl);
-  const receipt = await provider.getTransactionReceipt(txHash);
-
-  if (!receipt) {
-    throw new Error('Transaction receipt not found');
-  }
-
-  // Look for MessageSent event
-  // Event signature: MessageSent(bytes message)
-  const MESSAGE_SENT_TOPIC = '0x8c5261668696ce22758910d05bab8f186d6eb247ceac2af2e82c7dc17669b036';
-
-  const messageSentLog = receipt.logs.find(log => log.topics[0] === MESSAGE_SENT_TOPIC);
-
-  if (!messageSentLog) {
-    throw new Error('MessageSent event not found in transaction');
-  }
-
-  // The message is in the data field
-  // We need to hash it to get the message hash for attestation lookup
-  const { keccak256 } = await import('ethers');
-  const messageHash = keccak256(messageSentLog.data);
-
-  return messageHash;
-}
-
-/**
- * Wait for Circle attestation service to provide attestation
- */
-async function waitForAttestation(
-  messageHash: string,
+async function waitForAttestationV2(
+  txHash: string,
+  sourceDomain: number,
   maxRetries = 60,
   interval = 10000 // 10 seconds
 ): Promise<{ attestation: string; message: string }> {
 
   for (let i = 0; i < maxRetries; i++) {
     try {
-      const response = await fetch(`${ATTESTATION_API}/attestations/${messageHash}`);
+      const response = await fetch(
+        `${ATTESTATION_API}/v2/messages/${sourceDomain}?transactionHash=${txHash}`
+      );
 
       if (response.ok) {
         const data = await response.json();
 
-        if (data.status === 'complete' && data.attestation) {
-          return {
-            attestation: data.attestation,
-            message: data.message,
-          };
+        // V2 returns { messages: [...] } array
+        if (data.messages && data.messages.length > 0) {
+          const msg = data.messages[0];
+          if (msg.status === 'complete' && msg.attestation) {
+            return {
+              attestation: msg.attestation,
+              message: msg.message,
+            };
+          }
         }
       }
     } catch (error) {
