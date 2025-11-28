@@ -444,73 +444,23 @@ export class PasskeyAccountManager {
     // Create signed UserOperation
     const signedUserOp = { ...userOp, signature };
 
-    // Submit UserOperation via relay service (backend handles gas)
+    // Try to submit via bundler (eth_sendUserOperation)
     try {
-      const result = await this.submitViaRelay(signedUserOp);
-      return { hash: result.hash, userOpHash };
-    } catch (relayError: any) {
-      logger.error('Relay submission failed', relayError instanceof Error ? relayError : undefined, {
+      const result = await this.submitUserOperation(signedUserOp);
+      return { hash: result.hash, userOpHash: result.userOpHash };
+    } catch (bundlerError: any) {
+      logger.error('Bundler submission failed', bundlerError instanceof Error ? bundlerError : undefined, {
         component: 'PasskeyAccountManager'
       });
 
-      // Try bundler as fallback
-      try {
-        const result = await this.submitUserOperation(signedUserOp);
-        return { hash: result.hash, userOpHash: result.userOpHash };
-      } catch (bundlerError) {
-        logger.warn('Bundler submission also failed', {
-          component: 'PasskeyAccountManager',
-          error: bundlerError
-        });
-        throw new Error(relayError?.message || 'Transaction submission failed. Please try again.');
-      }
+      // Arc Testnet doesn't support bundlers yet
+      // For now, passkey wallets can only be used for authentication
+      // Transactions require a self-custodial wallet or session key
+      throw new Error(
+        'Arc Testnet does not support ERC-4337 bundlers yet. ' +
+        'Please use a self-custodial wallet for transactions.'
+      );
     }
-  }
-
-  /**
-   * Submit UserOperation via backend relay service
-   */
-  private async submitViaRelay(userOp: UserOperation): Promise<{ hash: string }> {
-    const relayUrl = `${this.config.backendUrl}/api/relay/user-operation`;
-
-    logger.info('Submitting UserOperation via relay', {
-      component: 'PasskeyAccountManager',
-      sender: userOp.sender
-    });
-
-    const response = await fetch(relayUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({
-        userOp: {
-          sender: userOp.sender,
-          nonce: '0x' + userOp.nonce.toString(16),
-          initCode: userOp.initCode,
-          callData: userOp.callData,
-          callGasLimit: '0x' + userOp.callGasLimit.toString(16),
-          verificationGasLimit: '0x' + userOp.verificationGasLimit.toString(16),
-          preVerificationGas: '0x' + userOp.preVerificationGas.toString(16),
-          maxFeePerGas: '0x' + userOp.maxFeePerGas.toString(16),
-          maxPriorityFeePerGas: '0x' + userOp.maxPriorityFeePerGas.toString(16),
-          paymasterAndData: userOp.paymasterAndData,
-          signature: userOp.signature,
-        }
-      }),
-    });
-
-    const result = await response.json();
-
-    if (!result.success) {
-      throw new Error(result.error || 'Relay failed');
-    }
-
-    logger.info('Transaction relayed successfully', {
-      component: 'PasskeyAccountManager',
-      hash: result.data.transactionHash
-    });
-
-    return { hash: result.data.transactionHash };
   }
 
   /**

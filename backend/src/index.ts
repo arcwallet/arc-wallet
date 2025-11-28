@@ -17,7 +17,6 @@ import paymasterRouter from './routes/paymaster.js';
 import { createHistoryRouter } from './routes/history.js';
 import { createWebhookRouter } from './routes/webhooks.js';
 import { createGasStationRouter } from './routes/gasStation.js';
-import { createRelayRoutes } from './routes/relay.js';
 import { WalletBackupService } from './services/walletBackupService.js';
 import { IndexerService } from './services/indexerService.js';
 import { webhookService } from './services/webhookService.js';
@@ -129,7 +128,6 @@ app.use('/api/paymaster', paymasterRouter);
 app.use('/api/history', createHistoryRouter());
 app.use('/api/webhooks', createWebhookRouter());
 app.use('/api/gas-station', createGasStationRouter());
-app.use('/api/relay', createRelayRoutes());
 app.use('/api/agent', agentRouter);
 
 // Initialize indexer database
