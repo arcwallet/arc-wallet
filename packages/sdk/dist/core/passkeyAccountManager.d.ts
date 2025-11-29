@@ -51,7 +51,7 @@ export declare class PasskeyAccountManager {
     }>;
     /**
      * Connect with existing passkey
-     * @param username Optional username/email - NOT sent to server to enable discoverable credentials
+     * @param username Optional username/email to find specific credentials
      */
     connect(username?: string): Promise<{
         address: string;

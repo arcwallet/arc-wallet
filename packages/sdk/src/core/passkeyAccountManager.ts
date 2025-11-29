@@ -177,20 +177,34 @@ export class PasskeyAccountManager {
 
   /**
    * Connect with existing passkey
-   * @param username Optional username/email - NOT sent to server to enable discoverable credentials
+   * @param username Optional username/email to find specific credentials
    */
   async connect(username?: string): Promise<{ address: string; credential: PasskeyCredential }> {
     logger.info('Connecting with existing passkey', { component: 'PasskeyAccountManager', username });
 
+    // Check if we have a stored credential ID in localStorage
+    // This helps when passkey wasn't created as "discoverable" (resident key)
+    const storedCredentialId = localStorage.getItem('arcwallet:passkey:current');
+
     // 1. Get authentication options from backend
-    // IMPORTANT: Do NOT send username - this makes allowCredentials empty
-    // Empty allowCredentials = WebAuthn shows ALL passkeys on device (discoverable credentials)
-    // This allows users to connect even if server doesn't have their passkey record
+    // If we have a stored credential, send it to get specific allowCredentials
+    // Otherwise send username if provided, or empty for discoverable credentials
+    const requestBody: { username?: string; credentialId?: string } = {};
+    if (storedCredentialId) {
+      requestBody.credentialId = storedCredentialId;
+      logger.info('Using stored credential ID for authentication', {
+        component: 'PasskeyAccountManager',
+        credentialId: storedCredentialId.substring(0, 20) + '...'
+      });
+    } else if (username) {
+      requestBody.username = username;
+    }
+
     const optionsResponse = await fetch(`${this.config.backendUrl}/passkeys/auth/start`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({}), // Empty body - don't send username
+      body: JSON.stringify(requestBody),
     });
 
     if (!optionsResponse.ok) {
