@@ -231,32 +231,35 @@ export class PasskeyAccountManager {
     // 2. Authenticate with WebAuthn
     const credential: AuthenticationResponseJSON = await startAuthentication({ optionsJSON: options });
 
-    // 3. Verify with backend
-    const verifyResponse = await fetch(`${this.config.backendUrl}/passkeys/auth/finish`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ credential }),
-    });
+    // 3. Try to verify with backend, but fallback to localStorage if server doesn't have credential
+    let verifyData: any = null;
+    try {
+      const verifyResponse = await fetch(`${this.config.backendUrl}/passkeys/auth/finish`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ credential }),
+      });
 
-    if (!verifyResponse.ok) {
-      throw new Error('Failed to verify authentication');
+      if (verifyResponse.ok) {
+        verifyData = await verifyResponse.json();
+      } else {
+        logger.warn('Backend verification failed, will try localStorage fallback', {
+          component: 'PasskeyAccountManager',
+          status: verifyResponse.status
+        });
+      }
+    } catch (e) {
+      logger.warn('Backend verification request failed, will try localStorage fallback', {
+        component: 'PasskeyAccountManager'
+      });
     }
 
-    const verifyData = await verifyResponse.json();
+    // 4. Get public key - prefer backend response, fallback to localStorage
+    const publicKey = verifyData?.data?.publicKey;
+    const userId = verifyData?.data?.user?.username || verifyData?.data?.user?.id;
 
-    // 4. Get public key from backend response (allows reconnection even without local storage)
-    const publicKey = verifyData.data?.publicKey;
-    const userId = verifyData.data?.user?.username || verifyData.data?.user?.id;
-
-    if (!publicKey?.x || !publicKey?.y) {
-      // Fallback to local storage
-      const storedCredential = this.loadCredential(credential.id);
-      if (!storedCredential) {
-        throw new Error('Credential not found. Server did not return public key coordinates.');
-      }
-      this.currentCredential = storedCredential;
-    } else {
+    if (publicKey?.x && publicKey?.y) {
       // Use public key from backend
       const passkeyCredential: PasskeyCredential = {
         credentialId: credential.id,
@@ -267,6 +270,17 @@ export class PasskeyAccountManager {
       this.currentCredential = passkeyCredential;
       // Update local storage with fresh data from backend
       this.storeCredential(passkeyCredential);
+    } else {
+      // Fallback to local storage - this allows recovery when server doesn't have credential
+      const storedCredential = this.loadCredential(credential.id);
+      if (!storedCredential) {
+        throw new Error('Credential not found in server or localStorage. Please create a new passkey.');
+      }
+      logger.info('Using localStorage credential (server did not have it)', {
+        component: 'PasskeyAccountManager',
+        credentialId: credential.id.substring(0, 20) + '...'
+      });
+      this.currentCredential = storedCredential;
     }
 
     // 5. Get account address
