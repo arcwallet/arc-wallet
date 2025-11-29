@@ -177,18 +177,20 @@ export class PasskeyAccountManager {
 
   /**
    * Connect with existing passkey
-   * @param username Optional username/email to find specific credentials
+   * @param username Optional username/email - NOT sent to server to enable discoverable credentials
    */
   async connect(username?: string): Promise<{ address: string; credential: PasskeyCredential }> {
     logger.info('Connecting with existing passkey', { component: 'PasskeyAccountManager', username });
 
     // 1. Get authentication options from backend
-    // Send username if provided to get user's specific credentials
+    // IMPORTANT: Do NOT send username - this makes allowCredentials empty
+    // Empty allowCredentials = WebAuthn shows ALL passkeys on device (discoverable credentials)
+    // This allows users to connect even if server doesn't have their passkey record
     const optionsResponse = await fetch(`${this.config.backendUrl}/passkeys/auth/start`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ username }),
+      body: JSON.stringify({}), // Empty body - don't send username
     });
 
     if (!optionsResponse.ok) {

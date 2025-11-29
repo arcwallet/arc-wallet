@@ -74,37 +74,46 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
     setIsCreating(true);
 
     try {
-      // Check if user already has a passkey on the server
-      const serverCheck = await passkeyClient.checkUserPasskeys(currentEmail);
-      const userHasServerPasskey = serverCheck.data?.hasPasskey ?? false;
+      // NEW APPROACH: Always try connect() first!
+      // WebAuthn credentials are stored on the DEVICE, not just on server
+      // If user has a passkey on this device, WebAuthn will find it
+      console.log('[WalletSetup] Attempting to connect with existing passkey first...');
+      setStatusMessage(`Looking for existing passkey for ${currentEmail}...`);
 
-      console.log('[WalletSetup] Smart Contract Wallet access check:', {
-        hasServerPasskey: userHasServerPasskey,
-        email: currentEmail
-      });
-
-      if (userHasServerPasskey) {
-        // User has passkey on server - connect with existing passkey
-        // Smart Contract: Same passkey = Same address (no recovery needed!)
-        console.log('[WalletSetup] Connecting with existing passkey...');
-        setStatusMessage(`Authenticating ${currentEmail} with passkey...`);
-
+      try {
+        // Try to connect with existing passkey on device
         const result = await connect();
-
         console.log('[WalletSetup] Connected to Smart Contract Wallet:', result.address);
         setStatusMessage('Connected successfully. Loading dashboard...');
-      } else {
-        // New user - create smart contract wallet with new passkey
-        console.log('[WalletSetup] Creating new Smart Contract Wallet...');
-        setStatusMessage(`Creating wallet for ${currentEmail}...`);
+        onComplete();
+        return;
+      } catch (connectErr: any) {
+        const connectError = connectErr.message?.toLowerCase() || '';
+        console.log('[WalletSetup] Connect attempt failed:', connectError);
 
-        const result = await createAccount();
+        // If user cancelled or dismissed, don't create new - let them try again
+        if (connectError.includes('cancelled') || connectError.includes('canceled') ||
+            connectError.includes('user refused') || connectError.includes('timed out') ||
+            connectError.includes('not allowed')) {
+          throw connectErr; // Re-throw to handle in outer catch
+        }
 
-        console.log('[WalletSetup] Smart Contract Wallet created:', result.address);
-        setStatusMessage('Wallet created successfully. Loading dashboard...');
+        // If no credential found on device, fall back to creating new
+        if (connectError.includes('no credential') || connectError.includes('not found') ||
+            connectError.includes('no passkey') || connectError.includes('could not find')) {
+          console.log('[WalletSetup] No existing passkey found on device, creating new...');
+          setStatusMessage(`Creating new wallet for ${currentEmail}...`);
+
+          const result = await createAccount();
+          console.log('[WalletSetup] Smart Contract Wallet created:', result.address);
+          setStatusMessage('Wallet created successfully. Loading dashboard...');
+          onComplete();
+          return;
+        }
+
+        // For other errors, re-throw
+        throw connectErr;
       }
-
-      onComplete();
     } catch (err: any) {
       console.error('[WalletSetup] Wallet access failed:', err);
 

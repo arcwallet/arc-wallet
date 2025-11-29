@@ -2534,7 +2534,7 @@ class Xe {
   }
   /**
    * Connect with existing passkey
-   * @param username Optional username/email to find specific credentials
+   * @param username Optional username/email - NOT sent to server to enable discoverable credentials
    */
   async connect(e) {
     var f, p, w, g, E, m;
@@ -2543,7 +2543,8 @@ class Xe {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body: JSON.stringify({ username: e })
+      body: JSON.stringify({})
+      // Empty body - don't send username
     });
     if (!t.ok)
       throw new Error("Failed to get authentication options");
