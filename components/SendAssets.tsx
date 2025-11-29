@@ -514,9 +514,9 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
       let hash: string;
       let kind: 'transaction' | 'userOp' = 'transaction';
 
-      // PASSKEY WALLET - Use Pimlico bundler for ERC-4337 UserOperations
+      // PASSKEY WALLET - Use ERC-4337 bundler for UserOperations
       if (passkeyConnected && passkeyManager && !walletPrivateKey) {
-        console.log('[SEND] Passkey wallet detected - using Pimlico bundler');
+        console.log('[SEND] Passkey wallet detected - using ERC-4337 bundler');
 
         try {
           const { parseUnits: parseUnitsEthers, Interface } = await import('ethers');
@@ -545,9 +545,9 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
             value = parseUnitsEthers(amount, selectedToken.decimals).toString();
           }
 
-          console.log('[SEND] Executing via PasskeyAccount + Pimlico:', { to, value, data: data.slice(0, 20) + '...' });
+          console.log('[SEND] Executing via PasskeyAccount:', { to, value, data: data.slice(0, 20) + '...' });
 
-          // Execute transaction via passkey manager (uses Pimlico bundler)
+          // Execute transaction via passkey manager (uses ERC-4337 bundler)
           // SDK expects: executeTransaction(to: string, value: bigint, data: string)
           const result = await passkeyManager.executeTransaction(to, BigInt(value), data);
 
@@ -611,7 +611,7 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
           const result = await executeBatchViaSmartAccount({
             privateKey: walletPrivateKey,
             transactions,
-            sponsored: true // Use Pimlico paymaster for gasless
+            sponsored: true // Use paymaster for gasless
           });
           hash = result.hash;
           kind = result.kind;
@@ -661,14 +661,14 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
             const transferData = iface.encodeFunctionData('transfer', [recipient, amountWei]);
 
             console.log(`[SEND] Amount (wei): ${amountWei.toString()}`);
-            console.log(`[SEND] Executing via ERC-4337 with Pimlico bundler`);
+            console.log(`[SEND] Executing via ERC-4337 bundler`);
 
             const result = await executeViaSmartAccount({
               privateKey: walletPrivateKey,
               to: tokenAddress, // Call token contract
               amount: '0', // No native value for ERC20
               data: transferData,
-              sponsored: true // Pimlico paymaster
+              sponsored: true // Paymaster for gasless
             });
             hash = result.hash;
             kind = result.kind;
@@ -696,7 +696,7 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
               privateKey: walletPrivateKey,
               to: recipient,
               amount: amountWei,
-              sponsored: true // Pimlico paymaster
+              sponsored: true // Paymaster for gasless
             });
             hash = result.hash;
             kind = result.kind;
@@ -807,7 +807,7 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
             </div>
             {useSmartAccount && (
               <p className="text-xs text-green-400 mt-2">
-                ✓ Transactions will be sponsored by Pimlico Paymaster
+                ✓ Gasless transactions enabled
               </p>
             )}
           </div>
