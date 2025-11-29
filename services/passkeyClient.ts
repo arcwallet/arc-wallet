@@ -24,6 +24,7 @@ async function postJSON<T>(path: string, body: unknown): Promise<ApiResponse<T>>
     headers: {
       'Content-Type': 'application/json',
     },
+    credentials: 'include', // CRITICAL: Send session cookies with requests
     body: JSON.stringify(body),
   });
 

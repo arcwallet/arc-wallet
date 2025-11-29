@@ -12,6 +12,7 @@ import {
 import { randomUUID } from 'crypto';
 import { Database } from '../models/Database.js';
 import { SessionKeyManager } from '../utils/SessionKeyManager.js';
+import { MagicSessionStore } from '../magicLink/SessionStore.js';
 import {
   ApiError,
   RegistrationStartRequest,
@@ -21,6 +22,18 @@ import {
   EnvConfig,
   SessionKey
 } from '../types/index.js';
+
+// Session cookie configuration (same as circleOtp.ts)
+const SESSION_COOKIE_NAME = 'arcwallet_session';
+const SESSION_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+const COOKIE_BASE_OPTIONS = (isProd: boolean) => ({
+  httpOnly: true,
+  secure: isProd,
+  sameSite: isProd ? 'none' as const : 'lax' as const,
+  maxAge: SESSION_TTL_MS,
+  path: '/',
+});
 
 const normalizeUsername = (value: string) => value.trim().toLowerCase();
 
@@ -57,11 +70,13 @@ export class PasskeyController {
   private db: Database;
   private sessionKeyManager: SessionKeyManager;
   private config: EnvConfig;
+  private sessionStore?: MagicSessionStore;
 
-  constructor(db: Database, config: EnvConfig) {
+  constructor(db: Database, config: EnvConfig, sessionStore?: MagicSessionStore) {
     this.db = db;
     this.sessionKeyManager = new SessionKeyManager(db);
     this.config = config;
+    this.sessionStore = sessionStore;
   }
 
   /**
@@ -452,6 +467,24 @@ export class PasskeyController {
         } catch (e) {
           console.error('[PasskeyAuth] Failed to extract public key coordinates:', e);
         }
+      }
+
+      // CRITICAL: Create session and set cookie for passkey authentication
+      // This enables the /api/session endpoint to recognize the authenticated user
+      if (this.sessionStore) {
+        const now = new Date().toISOString();
+        const sessionUser = {
+          id: user.id,
+          email: user.username, // username is the email
+          hasWallet: false, // Will be updated after wallet connection
+          walletAddress: null,
+          createdAt: now,
+          updatedAt: now,
+        };
+        const session = this.sessionStore.create(sessionUser, SESSION_TTL_MS);
+        const cookieOptions = COOKIE_BASE_OPTIONS(this.config.NODE_ENV === 'production');
+        res.cookie(SESSION_COOKIE_NAME, session.id, cookieOptions);
+        console.log('[PasskeyAuth] Session cookie created for:', user.username);
       }
 
       // Self-custodial: Return user identity info and public key for smart contract wallet

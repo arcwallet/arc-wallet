@@ -1,11 +1,13 @@
 import { Request, Response } from 'express';
 import { Database } from '../models/Database.js';
+import { MagicSessionStore } from '../magicLink/SessionStore.js';
 import { EnvConfig } from '../types/index.js';
 export declare class PasskeyController {
     private db;
     private sessionKeyManager;
     private config;
-    constructor(db: Database, config: EnvConfig);
+    private sessionStore?;
+    constructor(db: Database, config: EnvConfig, sessionStore?: MagicSessionStore);
     /**
      * Start passkey registration
      */

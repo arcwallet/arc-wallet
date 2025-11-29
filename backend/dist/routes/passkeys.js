@@ -4,7 +4,7 @@ import { rateLimitMiddleware, validateRequestBody, sanitizeInput } from '../midd
 import { authMiddleware } from '../middleware/auth.js';
 export function createPasskeyRoutes(db, config, sessionStore) {
     const router = Router();
-    const passkeyController = new PasskeyController(db, config);
+    const passkeyController = new PasskeyController(db, config, sessionStore);
     // Apply middleware to all routes
     router.use(sanitizeInput);
     /**

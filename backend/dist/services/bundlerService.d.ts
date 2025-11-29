@@ -116,6 +116,11 @@ export declare class BundlerService {
      */
     private extractPaymaster;
     /**
+     * Analyze WebAuthn/Passkey signature for debugging
+     * Expected format: abi.encode(bytes authenticatorData, string clientDataJSON, uint256 challengeIndex, uint256 typeIndex, uint256 r, uint256 s)
+     */
+    private analyzeSignature;
+    /**
      * Clean up expired mempool entries
      */
     private cleanupMempool;

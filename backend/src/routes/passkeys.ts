@@ -12,7 +12,7 @@ import { MagicSessionStore } from '../magicLink/SessionStore.js';
 
 export function createPasskeyRoutes(db: Database, config: EnvConfig, sessionStore?: MagicSessionStore): Router {
   const router = Router();
-  const passkeyController = new PasskeyController(db, config);
+  const passkeyController = new PasskeyController(db, config, sessionStore);
 
   // Apply middleware to all routes
   router.use(sanitizeInput);
