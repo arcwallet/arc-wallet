@@ -1,40 +1,19 @@
 
 import React, { useEffect, useMemo, useState, useRef } from 'react';
-import { isAddress, parseUnits } from 'ethers';
+import { isAddress, parseUnits, Interface } from 'ethers';
 import { useArcAccount } from '../contexts/ArcAccountContext';
-import { useWallet } from '../contexts/WalletContext';
-import { useSelfCustodialWallet } from '../contexts/SelfCustodialWalletContext';
 import { usePasskeyAccount } from '../contexts/PasskeyAccountContext';
-
 import { useActivity } from '../contexts/ActivityContext';
 import { usePrivacy } from '../contexts/PrivacyContext';
-import { preparePrivateTransaction, PrivateTransactionData } from '../services/teeService';
+import { preparePrivateTransaction } from '../services/teeService';
 import { formatUSDCAmount } from '../utils/format';
-import {
-  estimateNativeTransfer,
-  estimateSmartAccountExecute,
-  estimateSmartAccountBatchExecute,
-  estimateERC20Transfer,
-} from '../services/transactionService';
-import {
-  executeNativeTransfer,
-  executeSmartAccountTransferWithFallback,
-  executeERC20Transfer,
-  executeViaSmartAccount,
-  executeBatchViaSmartAccount,
-  isERC4337Available,
-  getSmartAccountAddress,
-} from '../services/executionRouter';
 import { TransactionStatus, TransactionType } from '../types';
 import { ExpandIcon, ContactIcon, LockIcon, StarIcon, UserCircleIcon, ClockIcon, PlusIcon, SearchIcon, CloseIcon } from './Icons';
-import { getAllSupportedTokens, TokenInfo, formatTokenAmount } from '../config/tokens';
+import { getAllSupportedTokens, TokenInfo, formatTokenAmount, getTokenContractAddress } from '../config/tokens';
 import { tokenService } from '../services/tokenService';
-import { paymasterClient } from '../services/paymasterClient';
-import { gasStationClient } from '../services/gasStationClient';
 import { GasSponsorshipIndicator, GasFeeBadge } from './GasSponsorshipIndicator';
-import { BatchTransfer } from './BatchTransfer';
 import { TX_EXPLORER_URL } from '../config/app.config';
-import { addressBookService, Contact } from '../services/addressBookService';
+import { addressBookService } from '../services/addressBookService';
 
 
 interface SendAssetsProps {
@@ -44,42 +23,29 @@ interface SendAssetsProps {
 }
 
 const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialRecipient = '', initialToken }) => {
-  const { snapshot, isLoading } = useArcAccount();
-  // IMPORTANT: Use ONLY self-custodial wallet for transactions
-  // This ensures private keys NEVER leave the device
-  const { address: selfCustodialAddress, getPrivateKey } = useSelfCustodialWallet();
+  const { isLoading } = useArcAccount();
 
-  // Passkey-native account (P256 signing, no private key stored)
+  // PasskeyAccount - Smart Wallet with P256 signing (NO private key)
   const {
     isConnected: passkeyConnected,
     address: passkeyAddress,
-    signUserOperation,
-    connect: connectPasskey,
-    createAccount: createPasskeyAccount,
-    hasAccount: hasPasskeyAccount,
-    isConnecting: passkeyConnecting,
     manager: passkeyManager,
   } = usePasskeyAccount();
 
-  const { sessionKey } = useWallet();
   const { addActivity } = useActivity();
-  const { isPrivacyMode, fheKeypair } = usePrivacy();
+  const { isPrivacyMode } = usePrivacy();
 
-  // Priority: Passkey wallet > Self-custodial > Session key (for address display)
-  const walletAddress = passkeyAddress || selfCustodialAddress || sessionKey?.address;
+  // Only PasskeyAccount address - single wallet system
+  const walletAddress = passkeyAddress;
 
-  // Private key MUST come from SDK only (never from server session key)
-  const walletPrivateKey = getPrivateKey();
-  // DEBUG: Log wallet info
+  // Debug log
   useEffect(() => {
-    console.log('[SEND DEBUG] Wallet Info:', {
-      selfCustodialAddress,
+    console.log('[SEND] Wallet Info:', {
       passkeyAddress,
-      sessionKeyAddress: sessionKey?.address,
-      walletAddress,
-      hasPrivateKey: !!walletPrivateKey,
+      passkeyConnected,
+      hasManager: !!passkeyManager,
     });
-  }, [selfCustodialAddress, passkeyAddress, sessionKey, walletAddress, walletPrivateKey]);
+  }, [passkeyAddress, passkeyConnected, passkeyManager]);
   const [amount, setAmount] = useState(initialAmount);
   const [recipient, setRecipient] = useState(initialRecipient);
   const [selectedToken, setSelectedToken] = useState<TokenInfo>(() => {
@@ -97,23 +63,8 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
   const [submissionKind, setSubmissionKind] = useState<'transaction' | 'userOp'>('transaction');
   const [feeEstimate, setFeeEstimate] = useState<bigint | null>(null);
   const [isEstimating, setIsEstimating] = useState(false);
-  const [encryptedAmountPreview, setEncryptedAmountPreview] = useState<string | null>(null);
-  const [isGasSponsored, setIsGasSponsored] = useState(false);
-  const [checkingSponsorship, setCheckingSponsorship] = useState(false);
-  const [gasEligibility, setGasEligibility] = useState<{
-    eligible: boolean;
-    balance: string;
-    message: string;
-  } | null>(null);
-
-  // Batch Mode State
-  const [isBatchMode, setIsBatchMode] = useState(false);
-  const [batchTransactions, setBatchTransactions] = useState<{ to: string; amount: string; data?: string }[]>([]);
-
-  // Smart Account Mode (ERC-4337)
-  const [useSmartAccount, setUseSmartAccount] = useState(false);
-  const [smartAccountAvailable, setSmartAccountAvailable] = useState(false);
-  const [smartAccountAddress, setSmartAccountAddress] = useState<string | null>(null);
+  // PasskeyAccount is always gasless via bundler
+  const isGasSponsored = true;
 
   // Address Book State
   const [showAddressBook, setShowAddressBook] = useState(false);
@@ -208,60 +159,7 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
     fetchTokenBalance();
   }, [selectedToken, walletAddress]);
 
-  // Check gas sponsorship eligibility when wallet address changes
-  useEffect(() => {
-    const checkGasEligibility = async () => {
-      if (!walletAddress) {
-        setGasEligibility(null);
-        return;
-      }
-
-      try {
-        const result = await gasStationClient.shouldShowGasSponsorship(walletAddress);
-        setGasEligibility({
-          eligible: result.eligible,
-          balance: result.balance,
-          message: result.message,
-        });
-        // If eligible, mark as sponsored for UI purposes
-        if (result.eligible) {
-          setIsGasSponsored(true);
-        }
-      } catch (error) {
-        console.error('Error checking gas eligibility:', error);
-        setGasEligibility(null);
-      }
-    };
-
-    checkGasEligibility();
-  }, [walletAddress]);
-
-  // Check ERC-4337 Smart Account availability
-  useEffect(() => {
-    const checkSmartAccount = async () => {
-      if (!walletAddress) {
-        setSmartAccountAvailable(false);
-        setSmartAccountAddress(null);
-        return;
-      }
-
-      try {
-        const available = await isERC4337Available();
-        setSmartAccountAvailable(available);
-
-        if (available) {
-          const saAddress = await getSmartAccountAddress(walletAddress);
-          setSmartAccountAddress(saAddress);
-          console.log('[ERC-4337] Smart Account address:', saAddress);
-        }
-      } catch (error) {
-        console.error('Error checking ERC-4337 availability:', error);
-        setSmartAccountAvailable(false);
-      }
-    };
-
-    checkSmartAccount();
-  }, [walletAddress]);
+  // PasskeyAccount is always a Smart Account - no need to check availability
 
   // On mount or address change: auto-select the token that has non-zero balance on Arc Testnet
   useEffect(() => {
@@ -288,220 +186,61 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
     void chooseTokenWithBalance();
   }, [walletAddress]);
   const amountNumber = parseFloat(amount) || 0;
-  const feeDisplay = feeEstimate ? formatUSDCAmount(feeEstimate).display : isEstimating ? 'Estimating…' : '-';
-  const feeNumber = feeEstimate ? Number(feeEstimate) / 1e18 : 0;
-  const total = amountNumber > 0 ? amountNumber + feeNumber : 0;
-
-  // Use Smart Account if available and enabled
-  const usingSmartAccount = useSmartAccount && smartAccountAvailable;
-
-  // Estimate fees
-  useEffect(() => {
-    const estimateFees = async () => {
-      if (!walletAddress || !walletPrivateKey) return;
-
-      // Skip estimation if inputs are invalid
-      if (isBatchMode) {
-        if (batchTransactions.length === 0 || !batchTransactions.every(tx => isAddress(tx.to) && parseFloat(tx.amount) > 0)) {
-          setFeeEstimate(null);
-          return;
-        }
-      } else {
-        if (!isAddress(recipient) || !amount || parseFloat(amount) <= 0) {
-          setFeeEstimate(null);
-          return;
-        }
-      }
-
-      setIsEstimating(true);
-      setCheckingSponsorship(true);
-      try {
-        // Check paymaster eligibility (only for smart accounts)
-        if (usingSmartAccount) {
-          const canSponsor = await paymasterClient.canSponsor(walletAddress, '0');
-          setIsGasSponsored(canSponsor);
-        } else {
-          setIsGasSponsored(false);
-        }
-
-        // Estimate gas
-        let estimate: bigint;
-        if (isBatchMode) {
-          const batchEst = await estimateSmartAccountBatchExecute({
-            sessionPrivateKey: walletPrivateKey,
-            smartAccountAddress: walletAddress,
-            transactions: batchTransactions.map(t => ({
-              to: t.to,
-              value: parseUnits(t.amount, selectedToken.decimals),
-              data: t.data || '0x'
-            }))
-          });
-          estimate = batchEst.gasLimit;
-        } else {
-          // For ERC20 tokens
-          if (selectedToken.symbol !== 'ETH') {
-            if (usingSmartAccount) {
-              // Smart Account gas estimation
-              const est = await estimateSmartAccountExecute({
-                sessionPrivateKey: walletPrivateKey,
-                smartAccountAddress: walletAddress,
-                to: recipient,
-                amount: '0', // No native value for token transfer
-                data: '0x' // Data will be encoded during actual transfer
-              });
-              estimate = est.gasLimit;
-            } else {
-              // EOA ERC20 transfer gas estimation
-              const { getTokenContractAddress } = await import('../config/tokens');
-              const tokenAddress = getTokenContractAddress(selectedToken.symbol, 'testnet', 'arcTestnet');
-              console.log('[SEND DEBUG] Gas estimation params:', {
-                from: walletAddress,
-                tokenAddress,
-                to: recipient,
-                amount,
-                decimals: selectedToken.decimals,
-                tokenSymbol: selectedToken.symbol
-              });
-              if (tokenAddress) {
-                const est = await estimateERC20Transfer({
-                  from: walletAddress,
-                  tokenAddress,
-                  to: recipient,
-                  amount,
-                  decimals: selectedToken.decimals
-                });
-                console.log('[SEND DEBUG] Gas estimation result:', est);
-                estimate = est.totalFeeWei;
-              } else {
-                console.warn('[SEND DEBUG] No token address found for', selectedToken.symbol);
-                estimate = 0n;
-              }
-            }
-          } else {
-            // Native ETH transfer
-            if (usingSmartAccount) {
-              const est = await estimateSmartAccountExecute({
-                sessionPrivateKey: walletPrivateKey,
-                smartAccountAddress: walletAddress,
-                to: recipient,
-                amount: amount,
-                data: '0x'
-              });
-              estimate = est.gasLimit;
-            } else {
-              const est = await estimateNativeTransfer({
-                from: walletAddress,
-                to: recipient,
-                amount: amount
-              });
-              estimate = est.totalFeeWei;
-            }
-          }
-        }
-        setFeeEstimate(estimate);
-      } catch (error) {
-        console.warn('Fee estimation failed', error);
-      } finally {
-        setIsEstimating(false);
-        setCheckingSponsorship(false);
-      }
-    };
-
-    const timer = setTimeout(estimateFees, 500);
-    return () => clearTimeout(timer);
-  }, [recipient, amount, walletAddress, isBatchMode, batchTransactions, walletPrivateKey]);
+  // PasskeyAccount transactions are gasless - no fee needed
+  const feeDisplay = 'Sponsored';
+  const total = amountNumber;
 
 
   const isRecipientValid = recipient ? isAddress(recipient) : false;
-  const hasSession = Boolean(walletAddress);
-  // IMPORTANT: Allow submission with either private key OR passkey wallet
-  // Passkey wallet doesn't use private key - it signs via WebAuthn P256
-  const hasSigningCapability = !!walletPrivateKey || passkeyConnected;
-  const canSubmit = hasSession && isRecipientValid && amountNumber > 0 && amountNumber <= balance && !isSubmitting && hasSigningCapability;
+  // PasskeyAccount - only need wallet connected
+  const canSubmit = passkeyConnected && passkeyManager && isRecipientValid && amountNumber > 0 && amountNumber <= balance && !isSubmitting;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!walletAddress) {
-      setSubmitError('Wallet not available. Please connect your wallet.');
-      return;
-    }
-    // Require either private key (self-custodial) OR passkey connection
-    if (!walletPrivateKey && !passkeyConnected) {
-      setSubmitError('Please unlock your wallet or connect with passkey.');
-      return;
-    }
 
     // Validation
-    if (isBatchMode) {
-      if (batchTransactions.some(tx => !isAddress(tx.to) || !tx.amount || parseFloat(tx.amount) <= 0)) {
-        setSubmitError('Invalid batch transactions: ensure all recipients are valid and amounts are greater than zero.');
-        return;
-      }
-      const totalBatchAmount = batchTransactions.reduce((acc, tx) => acc + parseFloat(tx.amount), 0);
-      if (totalBatchAmount > balance) {
-        setSubmitError('Total batch amount exceeds available balance.');
-        return;
-      }
-    } else {
-      if (!isRecipientValid) {
-        setSubmitError('Recipient address is not valid.');
-        return;
-      }
-      if (amountNumber <= 0) {
-        setSubmitError('Enter an amount greater than zero.');
-        return;
-      }
-      if (amountNumber > balance) {
-        setSubmitError('Amount exceeds available balance.');
-        return;
-      }
+    if (!passkeyConnected || !passkeyManager) {
+      setSubmitError('Please connect your passkey wallet.');
+      return;
+    }
+    if (!walletAddress) {
+      setSubmitError('Wallet address not available.');
+      return;
+    }
+    if (!isRecipientValid) {
+      setSubmitError('Recipient address is not valid.');
+      return;
+    }
+    if (amountNumber <= 0) {
+      setSubmitError('Enter an amount greater than zero.');
+      return;
+    }
+    if (amountNumber > balance) {
+      setSubmitError('Amount exceeds available balance.');
+      return;
     }
 
     setIsSubmitting(true);
     setSubmitError(null);
     setTxHash(null);
+
     try {
-      // NOTE: Passkey verification is done during wallet unlock (SDK's unlockWallet)
-      // No need for server-side verification since private key is client-side only
-      console.log('[SEND] Proceeding with transaction - wallet already unlocked via passkey');
-
-
-      // Auto-sponsor gas if needed (Phase 1 Gas Station)
-      try {
-        console.log('[SEND] Checking gas sponsorship eligibility...');
-        const sponsorResult = await gasStationClient.autoSponsor(walletAddress);
-        if (sponsorResult.sponsored) {
-          console.log(`[SEND] Gas sponsored: ${sponsorResult.amount} USDC, tx: ${sponsorResult.txHash}`);
-        } else {
-          console.log(`[SEND] Gas sponsorship not needed: ${sponsorResult.reason}`);
-        }
-      } catch (gasError) {
-        // Gas sponsorship is optional, continue with transaction
-        console.warn('[SEND] Gas sponsorship check failed, continuing:', gasError);
-      }
+      console.log('[SEND] Executing via PasskeyAccount Smart Wallet');
 
       // TEE Privacy Logic (Simulation Mode)
       if (isPrivacyMode) {
         try {
           const amountWei = parseUnits(amount, selectedToken.decimals);
+          const contractAddress = selectedToken.symbol !== 'ETH'
+            ? getTokenContractAddress(selectedToken.symbol, 'testnet', 'arcTestnet')
+            : '0x0000000000000000000000000000000000000000';
 
-          // Get token contract address if applicable
-          const contractAddress = selectedToken.symbol !== 'ETH' ?
-            (await import('../config/tokens')).getTokenContractAddress(selectedToken.symbol, 'testnet', 'arcTestnet') :
-            '0x0000000000000000000000000000000000000000';
-
-          // Prepare private transaction using TEE simulation
           const privateData = await preparePrivateTransaction(
             amountWei,
             recipient,
             contractAddress || undefined
           );
-
           console.log('[TEE] Private Transaction (Simulation):', privateData);
-          console.log('Encrypted Amount:', privateData.encryptedAmount);
-          console.log('Proof:', privateData.proof);
-          console.log('Method:', privateData.metadata?.method);
-
         } catch (teeError) {
           console.error('TEE Privacy preparation failed:', teeError);
           setSubmitError('Privacy Mode preparation failed. Please try again.');
@@ -510,270 +249,68 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
         }
       }
 
+      // Prepare transaction data
+      let to: string;
+      let value: string;
+      let data: string = '0x';
 
-      let hash: string;
-      let kind: 'transaction' | 'userOp' = 'transaction';
-
-      // PASSKEY WALLET - Use ERC-4337 bundler for UserOperations
-      if (passkeyConnected && passkeyManager && !walletPrivateKey) {
-        console.log('[SEND] Passkey wallet detected - using ERC-4337 bundler');
-
-        try {
-          const { parseUnits: parseUnitsEthers, Interface } = await import('ethers');
-
-          // Prepare transaction data
-          let to: string;
-          let value: string;
-          let data: string = '0x';
-
-          if (selectedToken.symbol !== 'ETH') {
-            // ERC20 transfer
-            const { getTokenContractAddress } = await import('../config/tokens');
-            const tokenAddress = getTokenContractAddress(selectedToken.symbol, 'testnet', 'arcTestnet');
-            if (!tokenAddress) {
-              throw new Error(`Token contract address not found for ${selectedToken.symbol}`);
-            }
-
-            const iface = new Interface(['function transfer(address to, uint256 amount) returns (bool)']);
-            const amountWei = parseUnitsEthers(amount, selectedToken.decimals);
-            data = iface.encodeFunctionData('transfer', [recipient, amountWei]);
-            to = tokenAddress;
-            value = '0';
-          } else {
-            // Native transfer
-            to = recipient;
-            value = parseUnitsEthers(amount, selectedToken.decimals).toString();
-          }
-
-          console.log('[SEND] Executing via PasskeyAccount:', { to, value, data: data.slice(0, 20) + '...' });
-
-          // Execute transaction via passkey manager (uses ERC-4337 bundler)
-          // SDK expects: executeTransaction(to: string, value: bigint, data: string)
-          const result = await passkeyManager.executeTransaction(to, BigInt(value), data);
-
-          // SDK returns { hash: txHash, userOpHash } - use hash (real tx) for explorer
-          hash = result.hash || '';
-          kind = 'transaction'; // Always show as transaction since we have the real tx hash
-
-          console.log('[SEND] Passkey transaction submitted:', { hash, kind });
-
-          setTxHash(hash);
-          setSubmissionKind(kind);
-
-          // Record recipient in address book
-          addressBookService.recordRecipient(recipient, amount, selectedToken.symbol);
-
-          // Add to activity - SDK waits for tx confirmation so status is Completed
-          const activity = {
-            id: hash,
-            type: TransactionType.Sent,
-            description: `Sent ${amountNumber.toFixed(4)} ${selectedToken.symbol}`,
-            timestamp: 'Just now',
-            date: new Date(),
-            amount: -amountNumber,
-            currency: selectedToken.symbol,
-            usdValue: -amountNumber * (selectedToken.currentPrice || 1),
-            status: TransactionStatus.Completed,
-            hash,
-            from: walletAddress!,
-            to: recipient,
-            networkFee: 0,
-            approvals: { required: 0, list: [] },
-          };
-          addActivity(activity);
-
-          setIsSubmitting(false);
-          return;
-        } catch (passkeyError: any) {
-          console.error('[SEND] Passkey transaction failed:', passkeyError);
-          setSubmitError(passkeyError.message || 'Passkey transaction failed');
-          setIsSubmitting(false);
-          return;
+      if (selectedToken.symbol !== 'ETH') {
+        // ERC20 transfer
+        const tokenAddress = getTokenContractAddress(selectedToken.symbol, 'testnet', 'arcTestnet');
+        if (!tokenAddress) {
+          throw new Error(`Token contract address not found for ${selectedToken.symbol}`);
         }
-      }
 
-      // PRIVATE KEY WALLET PATH - Uses traditional signing
-      if (!walletPrivateKey) {
-        throw new Error('No signing method available. Please connect a wallet.');
-      }
-
-      if (isBatchMode) {
-        // Prepare batch transactions
-        const transactions = batchTransactions.map(tx => ({
-          to: tx.to,
-          value: tx.amount,
-          data: tx.data || '0x'
-        }));
-
-        if (usingSmartAccount) {
-          // ERC-4337 Smart Account batch execution
-          console.log('[SEND] Executing batch via ERC-4337 Smart Account');
-          const result = await executeBatchViaSmartAccount({
-            privateKey: walletPrivateKey,
-            transactions,
-            sponsored: true // Use paymaster for gasless
-          });
-          hash = result.hash;
-          kind = result.kind;
-        } else {
-          // Legacy Smart Account batch execution
-          const legacyTransactions = batchTransactions.map(tx => ({
-            to: tx.to,
-            value: parseUnits(tx.amount, selectedToken.decimals),
-            data: tx.data || '0x'
-          }));
-
-          const result = await executeSmartAccountTransferWithFallback({
-            smartAccountAddress: walletAddress,
-            sessionPrivateKey: walletPrivateKey,
-            to: '0x0000000000000000000000000000000000000000',
-            amount: '0',
-            transactions: legacyTransactions
-          });
-          hash = result.hash;
-          kind = result.kind;
-        }
+        const iface = new Interface(['function transfer(address to, uint256 amount) returns (bool)']);
+        const amountWei = parseUnits(amount, selectedToken.decimals);
+        data = iface.encodeFunctionData('transfer', [recipient, amountWei]);
+        to = tokenAddress;
+        value = '0';
       } else {
-        // Single transfer
-        const tokenInfo = selectedToken;
-
-        // Check if we're transferring a token (not native currency)
-        if (tokenInfo.symbol !== 'ETH') {
-          // Get token contract address
-          const { getTokenContractAddress } = await import('../config/tokens');
-          const tokenAddress = getTokenContractAddress(tokenInfo.symbol, 'testnet', 'arcTestnet');
-
-          if (!tokenAddress) {
-            throw new Error(`Token contract address not found for ${tokenInfo.symbol}`);
-          }
-
-          console.log(`[SEND] Transferring ${amount} ${tokenInfo.symbol} to ${recipient}`);
-          console.log(`[SEND] Token contract: ${tokenAddress}`);
-          console.log(`[SEND] Using Smart Account (ERC-4337): ${usingSmartAccount}`);
-
-          if (usingSmartAccount) {
-            // ERC-4337 Smart Account: Encode ERC20 transfer as calldata
-            const { Interface, parseUnits } = await import('ethers');
-            const iface = new Interface([
-              'function transfer(address to, uint256 amount) returns (bool)'
-            ]);
-            const amountWei = parseUnits(amount, tokenInfo.decimals);
-            const transferData = iface.encodeFunctionData('transfer', [recipient, amountWei]);
-
-            console.log(`[SEND] Amount (wei): ${amountWei.toString()}`);
-            console.log(`[SEND] Executing via ERC-4337 bundler`);
-
-            const result = await executeViaSmartAccount({
-              privateKey: walletPrivateKey,
-              to: tokenAddress, // Call token contract
-              amount: '0', // No native value for ERC20
-              data: transferData,
-              sponsored: true // Paymaster for gasless
-            });
-            hash = result.hash;
-            kind = result.kind;
-          } else {
-            // EOA: Direct ERC20 transfer
-            const result = await executeERC20Transfer({
-              privateKey: walletPrivateKey,
-              tokenAddress,
-              to: recipient,
-              amount,
-              decimals: tokenInfo.decimals
-            });
-            hash = result.hash;
-            kind = result.kind;
-          }
-        } else {
-          // Native ETH/USDC transfer
-          if (usingSmartAccount) {
-            // ERC-4337 Smart Account native transfer
-            console.log(`[SEND] Native transfer via ERC-4337 Smart Account`);
-            const { parseUnits } = await import('ethers');
-            const amountWei = parseUnits(amount, 6).toString(); // Arc uses USDC (6 decimals)
-
-            const result = await executeViaSmartAccount({
-              privateKey: walletPrivateKey,
-              to: recipient,
-              amount: amountWei,
-              sponsored: true // Paymaster for gasless
-            });
-            hash = result.hash;
-            kind = result.kind;
-          } else {
-            const result = await executeNativeTransfer({
-              sessionPrivateKey: walletPrivateKey,
-              to: recipient,
-              amount: amount
-            });
-            hash = result.hash;
-            kind = result.kind;
-          }
-        }
+        // Native transfer
+        to = recipient;
+        value = parseUnits(amount, selectedToken.decimals).toString();
       }
+
+      console.log('[SEND] Executing via PasskeyAccount:', { to, value, data: data.slice(0, 20) + '...' });
+
+      // Execute transaction via passkey manager (uses ERC-4337 bundler)
+      const result = await passkeyManager.executeTransaction(to, BigInt(value), data);
+      const hash = result.hash || '';
+
+      console.log('[SEND] Transaction submitted:', hash);
 
       setTxHash(hash);
+      setSubmissionKind('transaction');
 
-      // Record recipient in address book (for recent recipients)
+      // Record recipient in address book
       addressBookService.recordRecipient(recipient, amount, selectedToken.symbol);
 
-      if (submissionKind === 'transaction') {
-        const activity = {
-          id: hash,
-          type: TransactionType.Sent,
-          description: `Sent ${amountNumber.toFixed(4)} ${selectedToken.symbol}`,
-          timestamp: 'Just now',
-          date: new Date(),
-          amount: -amountNumber,
-          currency: selectedToken.symbol,
-          usdValue: -amountNumber * (selectedToken.currentPrice || 1),
-          status: TransactionStatus.Completed,
-          hash,
-          from: walletAddress,
-          to: recipient,
-          networkFee: 0,
-          approvals: {
-            required: 0,
-            list: [],
-          },
-        };
-        addActivity(activity);
-      } else {
-        const activity = {
-          id: hash,
-          type: TransactionType.Sent,
-          description: `User operation submitted(${hash.slice(0, 10)}…)`,
-          timestamp: 'Just now',
-          date: new Date(),
-          amount: -amountNumber,
-          currency: selectedToken.symbol,
-          usdValue: -amountNumber * (selectedToken.currentPrice || 1),
-          status: TransactionStatus.Pending,
-          hash,
-          from: walletAddress,
-          to: recipient,
-          networkFee: 0,
-          approvals: {
-            required: 0,
-            list: [],
-          },
-        };
-        addActivity(activity);
-      }
+      // Add to activity
+      addActivity({
+        id: hash,
+        type: TransactionType.Sent,
+        description: `Sent ${amountNumber.toFixed(4)} ${selectedToken.symbol}`,
+        timestamp: 'Just now',
+        date: new Date(),
+        amount: -amountNumber,
+        currency: selectedToken.symbol,
+        usdValue: -amountNumber * (selectedToken.currentPrice || 1),
+        status: TransactionStatus.Completed,
+        hash,
+        from: walletAddress,
+        to: recipient,
+        networkFee: 0,
+        approvals: { required: 0, list: [] },
+      });
     } catch (error: any) {
+      console.error('[SEND] Transaction failed:', error);
       const message = typeof error?.message === 'string' ? error.message : 'Transaction failed';
-      if (message.toLowerCase().includes('blocklist')) {
-        setSubmitError('Transfer blocked: the sender or recipient is blocklisted.');
-      } else if (message.includes('request limit') || error?.code === -32007) {
-        setSubmitError('RPC rate limit reached. Please wait a few seconds or upgrade your RPC plan.');
-      } else {
-        setSubmitError(message);
-      }
+      setSubmitError(message);
     } finally {
       setIsSubmitting(false);
     }
   };
-
 
   return (
     <div className="w-full max-w-md mx-auto">
@@ -782,34 +319,16 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
         <p className="text-text-secondary text-base font-normal leading-normal mt-3">Initiate a secure transfer of your digital assets.</p>
       </div>
       <div className="flex flex-col gap-6">
-        {/* Smart Account Mode Toggle */}
-        {smartAccountAvailable && (
-          <div className="rounded-lg border border-blue-500/30 bg-blue-500/10 p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-semibold text-blue-400">ERC-4337 Smart Account</span>
-                  <span className="text-xs bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded">Gasless</span>
-                </div>
-                <p className="text-xs text-blue-300/70 mt-1">
-                  {smartAccountAddress ? `${smartAccountAddress.slice(0, 8)}...${smartAccountAddress.slice(-6)}` : 'Loading...'}
-                </p>
-              </div>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  className="sr-only peer"
-                  checked={useSmartAccount}
-                  onChange={(e) => setUseSmartAccount(e.target.checked)}
-                />
-                <div className="w-11 h-6 bg-slate-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-              </label>
+        {/* PasskeyAccount Status */}
+        {passkeyConnected && (
+          <div className="rounded-lg border border-green-500/30 bg-green-500/10 p-4">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-semibold text-green-400">PasskeyAccount Smart Wallet</span>
+              <span className="text-xs bg-green-500/20 text-green-300 px-2 py-0.5 rounded">Gasless</span>
             </div>
-            {useSmartAccount && (
-              <p className="text-xs text-green-400 mt-2">
-                ✓ Gasless transactions enabled
-              </p>
-            )}
+            <p className="text-xs text-green-300/70 mt-1">
+              {walletAddress ? `${walletAddress.slice(0, 10)}...${walletAddress.slice(-8)}` : 'Loading...'}
+            </p>
           </div>
         )}
 
@@ -1068,12 +587,10 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
           )}
 
           {/* Gas Sponsorship Indicator */}
-          {isGasSponsored && (
-            <GasSponsorshipIndicator
-              isSponsored={true}
-              estimatedGas={feeDisplay !== 'Estimating…' && feeDisplay !== '-' ? feeDisplay : undefined}
-            />
-          )}
+          <GasSponsorshipIndicator
+            isSponsored={true}
+            estimatedGas="Sponsored"
+          />
 
           <div className="flex flex-col gap-2.5 text-sm">
             <div className="flex justify-between">
@@ -1091,9 +608,7 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
             </div>
             <div className="flex justify-between">
               <span className="text-text-secondary">Execution Route</span>
-              <span className="text-text-primary font-medium">
-                {usingSmartAccount ? 'Smart Account' : 'Signer Wallet'}
-              </span>
+              <span className="text-text-primary font-medium">PasskeyAccount</span>
             </div>
             <div className="flex justify-between">
               <span className="text-text-secondary">Network Fee</span>
@@ -1113,7 +628,7 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
             </div>
           </div>
         </div>
-        {!hasSession && (
+        {!passkeyConnected && (
           <p className="text-sm text-accent-orange text-center">
             Connect with your passkey to send transactions.
           </p>

@@ -109,8 +109,8 @@ export const ETHEREUM_SEPOLIA: NetworkConfig = {
     decimals: 18,
   },
   rpcUrls: {
-    default: 'https://rpc.sepolia.org',
-    public: 'https://ethereum-sepolia.publicnode.com',
+    default: 'https://ethereum-sepolia.publicnode.com',
+    public: 'https://rpc.sepolia.org',
     fallback: [
       'https://rpc.ankr.com/eth_sepolia',
       'https://sepolia.drpc.org',

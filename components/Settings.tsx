@@ -1,8 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useWallet } from '../contexts/WalletContext';
 import { useSession } from '../contexts/SessionContext';
 import { usePasskeyAccount } from '../contexts/PasskeyAccountContext';
-import { useSelfCustodialWallet } from '../contexts/SelfCustodialWalletContext';
 
 import { passkeyClient, type SessionKeySummary } from '../services/passkeyClient';
 import { WalletIcon, CopyIcon, AddIcon, LaptopIcon, PhoneIcon, ChevronDownIcon, LockIcon, KeyIcon } from './Icons';
@@ -13,9 +11,9 @@ import NotificationManager from './NotificationManager';
 import { ARC_TESTNET_CONTRACTS, KEY_TYPE } from '../config/contracts';
 
 const SecuritySection: React.FC = () => {
-    const { address: passkeyAddress } = usePasskeyAccount();
-    const { userId, address: selfCustodialAddress } = useSelfCustodialWallet();
-    const address = passkeyAddress || selfCustodialAddress;
+    // PasskeyAccount - Smart Wallet (single wallet system)
+    const { address } = usePasskeyAccount();
+    const { userId } = useSession();
     const [loading, setLoading] = useState(false);
     const [keys, setKeys] = useState<SessionKeySummary[]>([]);
     const [devices, setDevices] = useState<any[]>([]);
@@ -159,9 +157,8 @@ const NetworkSection: React.FC = () => (
 
 
 const OrganizationRolesSection: React.FC = () => {
-    const { address: passkeyAddress } = usePasskeyAccount();
-    const { address: selfCustodialAddress } = useSelfCustodialWallet();
-    const address = passkeyAddress || selfCustodialAddress;
+    // PasskeyAccount - Smart Wallet (single wallet system)
+    const { address } = usePasskeyAccount();
     const { email } = useSession();
 
     return (
@@ -215,9 +212,8 @@ const OrganizationRolesSection: React.FC = () => {
 
 // Smart Wallet Section - Shows ArcAccount contract info
 const SmartWalletSection: React.FC = () => {
-    const { address: passkeyAddress } = usePasskeyAccount();
-    const { address: selfCustodialAddress } = useSelfCustodialWallet();
-    const address = passkeyAddress || selfCustodialAddress;
+    // PasskeyAccount - Smart Wallet (single wallet system)
+    const { address } = usePasskeyAccount();
     const [copied, setCopied] = useState<string | null>(null);
     const [isExpanded, setIsExpanded] = useState(false);
 
@@ -337,7 +333,7 @@ const SmartWalletSection: React.FC = () => {
 
 const SessionInfoSection: React.FC = () => {
     const { email, logout: sessionLogout } = useSession();
-    const { logout: walletLogout } = useWallet();
+    const { disconnect } = usePasskeyAccount();
 
     if (!email) {
         return null;
@@ -345,7 +341,7 @@ const SessionInfoSection: React.FC = () => {
 
     const handleLogout = async () => {
         await sessionLogout();
-        walletLogout();
+        disconnect();
     };
 
     return (

@@ -11,10 +11,7 @@ import SwapScreen from './SwapScreen';
 import Bridge from './Bridge';
 import AgentScreen, { WalletBalance } from './AgentScreen';
 import NetworkSelector from './NetworkSelector';
-// import Bridge from './Bridge';
 import { Transaction } from '../types';
-import { useWallet } from '../contexts/WalletContext';
-import { useSelfCustodialWallet } from '../contexts/SelfCustodialWalletContext';
 import { usePasskeyAccount } from '../contexts/PasskeyAccountContext';
 import { useArcAccount } from '../contexts/ArcAccountContext';
 import { useNetwork } from '../contexts/NetworkContext';
@@ -52,11 +49,8 @@ interface NotificationDropdownProps {
 
 const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ isOpen, onClose, onNavigateToTransactions }) => {
   const { activities } = useActivity();
-  // Get address from passkey account (smart contract) or self-custodial (EOA)
-  const { address: passkeyAddress } = usePasskeyAccount();
-  const { address: selfCustodialAddress } = useSelfCustodialWallet();
-  const { sessionKey } = useWallet();
-  const walletAddress = passkeyAddress || selfCustodialAddress || sessionKey?.address;
+  // PasskeyAccount - Smart Wallet (single wallet system)
+  const { address: walletAddress } = usePasskeyAccount();
 
   if (!isOpen) return null;
 
@@ -157,12 +151,8 @@ interface AgentIntentData {
 }
 
 const DashboardHeader: React.FC<DashboardHeaderPropsWithNav> = ({ account, isRefreshing, onRefresh, error, onNavigate }) => {
-  // Get address from passkey account (smart contract) or self-custodial (EOA) or legacy
-  const { address: passkeyAddress, disconnect: passkeyDisconnect } = usePasskeyAccount();
-  const { address: selfCustodialAddress, lockWallet } = useSelfCustodialWallet();
-  const { address: legacyAddress, logout: legacyLogout } = useWallet();
-  const address = passkeyAddress || selfCustodialAddress || legacyAddress;
-  const logout = passkeyAddress ? passkeyDisconnect : (selfCustodialAddress ? lockWallet : legacyLogout);
+  // PasskeyAccount - Smart Wallet (single wallet system)
+  const { address, disconnect } = usePasskeyAccount();
   const { isPrivacyMode, togglePrivacyMode } = usePrivacy();
   const { currentNetwork } = useNetwork();
 
@@ -233,7 +223,7 @@ const DashboardHeader: React.FC<DashboardHeaderPropsWithNav> = ({ account, isRef
           />
         </div>
         <button
-          onClick={logout}
+          onClick={disconnect}
           className="flex min-w-[84px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 px-4 bg-[#151A22] text-[#E6EEF3] text-sm font-bold tracking-wide hover:bg-[#1f252e]"
         >
           <LockIcon size={18} className="mr-2" />
@@ -338,11 +328,8 @@ interface TokenAssetData {
 }
 
 const AssetsTable: React.FC<AssetsTableProps> = ({ balanceDisplay, isLoading }) => {
-  // Get address from passkey account (smart contract) or self-custodial (EOA) or legacy
-  const { address: passkeyAddress } = usePasskeyAccount();
-  const { address: selfCustodialAddress } = useSelfCustodialWallet();
-  const { sessionKey } = useWallet();
-  const walletAddress = passkeyAddress || selfCustodialAddress || sessionKey?.address;
+  // PasskeyAccount - Smart Wallet (single wallet system)
+  const { address: walletAddress } = usePasskeyAccount();
   const { currentNetwork } = useNetwork();
 
   const [activeTab, setActiveTab] = useState<'tokens'>('tokens');
@@ -364,10 +351,14 @@ const AssetsTable: React.FC<AssetsTableProps> = ({ balanceDisplay, isLoading }) 
       }
 
       // Determine chain key based on network ID
-      const chainKey = currentNetwork.id === 'arc-testnet' ? 'arcTestnet' :
+      type ChainKey = 'ethereum' | 'sepolia' | 'base' | 'baseSepolia' | 'avalanche' | 'avalancheFuji' | 'arc' | 'arcTestnet';
+      const chainKey: ChainKey = currentNetwork.id === 'arc-testnet' ? 'arcTestnet' :
                        currentNetwork.id === 'sepolia' ? 'sepolia' :
                        currentNetwork.id === 'base-sepolia' ? 'baseSepolia' :
                        currentNetwork.id === 'avalanche-fuji' ? 'avalancheFuji' :
+                       currentNetwork.id === 'ethereum' ? 'ethereum' :
+                       currentNetwork.id === 'base' ? 'base' :
+                       currentNetwork.id === 'avalanche' ? 'avalanche' :
                        'arcTestnet';
       const networkType = currentNetwork.testnet ? 'testnet' : 'mainnet';
 
@@ -376,7 +367,7 @@ const AssetsTable: React.FC<AssetsTableProps> = ({ balanceDisplay, isLoading }) 
       setIsLoadingTokens(true);
       try {
         // Fetch token balances for wallet address
-        const tokenResults = await tokenService.getAllTokenBalances(walletAddress, networkType, chainKey as any);
+        const tokenResults = await tokenService.getAllTokenBalances(walletAddress, networkType, chainKey);
         console.log('[AssetsTable] Token balances fetched:', tokenResults);
 
         // Set the fetched balances directly
@@ -551,11 +542,8 @@ const WalletDashboard: React.FC = () => {
     }
   };
 
-  // Get address from passkey account (smart contract) or self-custodial (EOA) or legacy
-  const { address: passkeyAddress } = usePasskeyAccount();
-  const { address: selfCustodialAddress } = useSelfCustodialWallet();
-  const { address: legacyAddress, sessionKey } = useWallet();
-  const address = passkeyAddress || selfCustodialAddress || legacyAddress;
+  // PasskeyAccount - Smart Wallet (single wallet system)
+  const { address } = usePasskeyAccount();
   const { currentNetwork } = useNetwork();
 
   const { snapshot, formattedBalance, isLoading: isAccountLoading, error: accountError, refresh, lastUpdated } = useArcAccount();
@@ -583,16 +571,20 @@ const WalletDashboard: React.FC = () => {
       }
 
       // Determine chain key based on network ID
-      const chainKey = currentNetwork.id === 'arc-testnet' ? 'arcTestnet' :
+      type ChainKey2 = 'ethereum' | 'sepolia' | 'base' | 'baseSepolia' | 'avalanche' | 'avalancheFuji' | 'arc' | 'arcTestnet';
+      const chainKey: ChainKey2 = currentNetwork.id === 'arc-testnet' ? 'arcTestnet' :
                        currentNetwork.id === 'sepolia' ? 'sepolia' :
                        currentNetwork.id === 'base-sepolia' ? 'baseSepolia' :
                        currentNetwork.id === 'avalanche-fuji' ? 'avalancheFuji' :
+                       currentNetwork.id === 'ethereum' ? 'ethereum' :
+                       currentNetwork.id === 'base' ? 'base' :
+                       currentNetwork.id === 'avalanche' ? 'avalanche' :
                        'arcTestnet';
       const networkType = currentNetwork.testnet ? 'testnet' : 'mainnet';
 
       setIsLoadingTotalBalance(true);
       try {
-        const tokenBalances = await tokenService.getAllTokenBalances(address, networkType, chainKey as any);
+        const tokenBalances = await tokenService.getAllTokenBalances(address, networkType, chainKey);
         const symbols = getAllSupportedTokens().map(t => t.symbol);
         const prices = await tokenService.getTokenPrices(symbols);
 

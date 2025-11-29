@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { API_ENDPOINTS } from '../config/app.config';
-import { useWallet } from '../contexts/WalletContext';
+import { usePasskeyAccount } from '../contexts/PasskeyAccountContext';
 import { BellIcon, CheckCircleIcon } from './Icons';
 
 const NotificationManager: React.FC = () => {
-    const { address } = useWallet();
+    const { address } = usePasskeyAccount();
     const [isSubscribed, setIsSubscribed] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [permission, setPermission] = useState<NotificationPermission>('default');

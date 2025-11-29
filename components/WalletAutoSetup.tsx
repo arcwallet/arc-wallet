@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { useSelfCustodialWallet } from '../contexts/SelfCustodialWalletContext';
+import { usePasskeyAccount } from '../contexts/PasskeyAccountContext';
 import { useSession } from '../contexts/SessionContext';
 
 interface WalletAutoSetupProps {
@@ -7,7 +7,8 @@ interface WalletAutoSetupProps {
 }
 
 const WalletAutoSetup: React.FC<WalletAutoSetupProps> = ({ onComplete }) => {
-  const { createWallet } = useSelfCustodialWallet();
+  // PasskeyAccount - Smart Wallet (single wallet system)
+  const { createAccount, hasAccount, isConnected } = usePasskeyAccount();
   const { currentEmail } = useSession();
   const [status, setStatus] = useState('Waiting for verified email...');
   const [error, setError] = useState<string | null>(null);
@@ -20,11 +21,19 @@ const WalletAutoSetup: React.FC<WalletAutoSetupProps> = ({ onComplete }) => {
       setError(null);
       return;
     }
+
+    // If already connected, skip wallet creation
+    if (isConnected) {
+      setStatus('Wallet already connected. Loading dashboard...');
+      onComplete();
+      return;
+    }
+
     setIsRunning(true);
     setError(null);
     setStatus(`Requesting biometric approval for ${currentEmail}...`);
     try {
-      await createWallet(currentEmail);
+      await createAccount();
       setStatus('Wallet created successfully. Loading dashboard...');
       onComplete();
     } catch (err: any) {
@@ -39,7 +48,7 @@ const WalletAutoSetup: React.FC<WalletAutoSetupProps> = ({ onComplete }) => {
     } finally {
       setIsRunning(false);
     }
-  }, [createWallet, currentEmail, onComplete]);
+  }, [createAccount, currentEmail, onComplete, isConnected]);
 
   useEffect(() => {
     if (currentEmail && !hasAttempted.current) {

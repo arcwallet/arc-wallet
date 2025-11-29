@@ -1,7 +1,5 @@
 import React, { createContext, useContext, ReactNode } from 'react';
-import { useWallet } from './WalletContext';
 import { useArcAccountSnapshot, type UseArcAccountSnapshotState } from '../hooks/useArcAccountSnapshot';
-import { useSelfCustodialWallet } from './SelfCustodialWalletContext';
 import { usePasskeyAccount } from './PasskeyAccountContext';
 
 interface ArcAccountContextValue extends UseArcAccountSnapshotState {
@@ -11,11 +9,8 @@ interface ArcAccountContextValue extends UseArcAccountSnapshotState {
 const ArcAccountContext = createContext<ArcAccountContextValue | undefined>(undefined);
 
 export const ArcAccountProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const { address: legacyAddress } = useWallet();
-  const { address: selfCustodialAddress } = useSelfCustodialWallet();
-  const { address: passkeyAddress } = usePasskeyAccount();
-  // Priority: passkey > self-custodial > legacy
-  const address = passkeyAddress || selfCustodialAddress || legacyAddress;
+  // PasskeyAccount - Smart Wallet (single wallet system)
+  const { address } = usePasskeyAccount();
   const snapshotState = useArcAccountSnapshot(address);
 
   return (

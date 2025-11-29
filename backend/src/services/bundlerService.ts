@@ -427,6 +427,9 @@ export class BundlerService {
             throw new Error('Missing signature');
         }
 
+        // Detailed signature analysis for debugging AA23 errors
+        this.analyzeSignature(userOp.signature);
+
         // Check gas limits are reasonable
         if (userOp.callGasLimit < 21000n) {
             throw new Error('callGasLimit too low');
@@ -650,6 +653,120 @@ export class BundlerService {
             return null;
         }
         return paymasterAndData.slice(0, 42);
+    }
+
+    /**
+     * Analyze WebAuthn/Passkey signature for debugging
+     * Expected format: abi.encode(bytes authenticatorData, string clientDataJSON, uint256 challengeIndex, uint256 typeIndex, uint256 r, uint256 s)
+     */
+    private analyzeSignature(signature: string): void {
+        console.log('\n🔍 ═══════════════════════════════════════════════════════');
+        console.log('   SIGNATURE ANALYSIS');
+        console.log('═══════════════════════════════════════════════════════════');
+        console.log(`📏 Signature length: ${(signature.length - 2) / 2} bytes`);
+        console.log(`📝 First 66 chars: ${signature.slice(0, 66)}`);
+
+        try {
+            // Remove 0x prefix
+            const sigData = signature.slice(2);
+
+            // ABI encoding of dynamic types starts with offsets
+            // bytes authenticatorData -> offset at position 0 (32 bytes)
+            // string clientDataJSON -> offset at position 1 (32 bytes)
+            // uint256 challengeIndex -> value at position 2
+            // uint256 typeIndex -> value at position 3
+            // uint256 r -> value at position 4
+            // uint256 s -> value at position 5
+
+            if (sigData.length < 384) { // Minimum 6 * 32 bytes = 192 bytes = 384 hex chars
+                console.log('❌ Signature too short for WebAuthn format');
+                return;
+            }
+
+            // Read the first 6 slots (32 bytes each)
+            const slot0 = sigData.slice(0, 64);      // authenticatorData offset
+            const slot1 = sigData.slice(64, 128);    // clientDataJSON offset
+            const slot2 = sigData.slice(128, 192);   // challengeIndex
+            const slot3 = sigData.slice(192, 256);   // typeIndex
+            const slot4 = sigData.slice(256, 320);   // r
+            const slot5 = sigData.slice(320, 384);   // s
+
+            const offset0 = BigInt('0x' + slot0);
+            const offset1 = BigInt('0x' + slot1);
+            const challengeIndex = BigInt('0x' + slot2);
+            const typeIndex = BigInt('0x' + slot3);
+            const r = BigInt('0x' + slot4);
+            const s = BigInt('0x' + slot5);
+
+            console.log('\n📊 Slot values:');
+            console.log(`   Slot 0 (authData offset): 0x${slot0} = ${offset0}`);
+            console.log(`   Slot 1 (clientData offset): 0x${slot1} = ${offset1}`);
+            console.log(`   Slot 2 (challengeIndex): ${challengeIndex}`);
+            console.log(`   Slot 3 (typeIndex): ${typeIndex}`);
+            console.log(`   Slot 4 (r): 0x${slot4.slice(0, 16)}...`);
+            console.log(`   Slot 5 (s): 0x${slot5.slice(0, 16)}...`);
+
+            // Check if offsets make sense (should be >= 192 = 0xc0 for 6 slots)
+            if (offset0 < 192n) {
+                console.log(`\n⚠️ WARNING: authenticatorData offset (${offset0}) is less than expected (192)`);
+                console.log('   This suggests the signature might have wrong byte order or extra padding');
+            }
+
+            if (offset1 < 192n) {
+                console.log(`\n⚠️ WARNING: clientDataJSON offset (${offset1}) is less than expected`);
+            }
+
+            // Try to extract authenticatorData
+            if (offset0 >= 192n && offset0 < BigInt(sigData.length / 2)) {
+                const authDataStart = Number(offset0) * 2;
+                const authDataLenHex = sigData.slice(authDataStart, authDataStart + 64);
+                const authDataLen = Number(BigInt('0x' + authDataLenHex));
+                console.log(`\n📦 authenticatorData:`);
+                console.log(`   Length: ${authDataLen} bytes`);
+                if (authDataLen > 0 && authDataLen < 1000) {
+                    const authDataHex = sigData.slice(authDataStart + 64, authDataStart + 64 + authDataLen * 2);
+                    console.log(`   Data: 0x${authDataHex.slice(0, 40)}...`);
+                }
+            }
+
+            // Try to extract clientDataJSON
+            if (offset1 >= 192n && offset1 < BigInt(sigData.length / 2)) {
+                const clientDataStart = Number(offset1) * 2;
+                const clientDataLenHex = sigData.slice(clientDataStart, clientDataStart + 64);
+                const clientDataLen = Number(BigInt('0x' + clientDataLenHex));
+                console.log(`\n📦 clientDataJSON:`);
+                console.log(`   Length: ${clientDataLen} bytes`);
+                if (clientDataLen > 0 && clientDataLen < 2000) {
+                    const clientDataHex = sigData.slice(clientDataStart + 64, clientDataStart + 64 + clientDataLen * 2);
+                    try {
+                        const clientDataStr = Buffer.from(clientDataHex, 'hex').toString('utf8');
+                        console.log(`   Content: ${clientDataStr.slice(0, 100)}...`);
+
+                        // Parse JSON to check challenge
+                        const clientData = JSON.parse(clientDataStr);
+                        if (clientData.challenge) {
+                            console.log(`   Challenge (base64url): ${clientData.challenge}`);
+                        }
+                    } catch (e) {
+                        console.log(`   Raw hex: 0x${clientDataHex.slice(0, 40)}...`);
+                    }
+                }
+            }
+
+            // Validate r and s are in valid P256 range
+            const P256_ORDER = BigInt('0xffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551');
+            if (r >= P256_ORDER || r === 0n) {
+                console.log(`\n❌ ERROR: r value is invalid for P256 curve!`);
+            }
+            if (s >= P256_ORDER || s === 0n) {
+                console.log(`\n❌ ERROR: s value is invalid for P256 curve!`);
+            }
+
+            console.log('\n═══════════════════════════════════════════════════════════\n');
+
+        } catch (error: any) {
+            console.log(`❌ Signature analysis error: ${error.message}`);
+        }
     }
 
     /**

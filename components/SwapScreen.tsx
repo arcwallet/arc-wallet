@@ -2,9 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { SwapIcon, SpinnerIcon } from './Icons';
 import { getAllSupportedTokens, TokenInfo } from '../config/tokens';
 import { swapService, Quote } from '../services/swapService';
-import { useWallet } from '../contexts/WalletContext';
 import { usePasskeyAccount } from '../contexts/PasskeyAccountContext';
-import { useSelfCustodialWallet } from '../contexts/SelfCustodialWalletContext';
 import { useActivity } from '../contexts/ActivityContext';
 import { TransactionStatus, TransactionType } from '../types';
 import { TX_EXPLORER_URL } from '../config/app.config';
@@ -17,14 +15,9 @@ interface SwapScreenProps {
 
 const SwapScreen: React.FC<SwapScreenProps> = ({ initialFromToken, initialToToken, initialAmount = '' }) => {
     const tokens = getAllSupportedTokens();
-    const { sessionKey } = useWallet();
-    const { address: passkeyAddress } = usePasskeyAccount();
-    const { address: selfCustodialAddress, getPrivateKey } = useSelfCustodialWallet();
+    // PasskeyAccount - Smart Wallet (single wallet system)
+    const { address: walletAddress, isConnected: passkeyConnected, manager: passkeyManager } = usePasskeyAccount();
     const { addActivity } = useActivity();
-
-    // Get wallet address - prioritize passkey wallet
-    const walletAddress = passkeyAddress || selfCustodialAddress || sessionKey?.address;
-    const walletPrivateKey = selfCustodialAddress ? getPrivateKey() : sessionKey?.privateKey;
 
     const [fromToken, setFromToken] = useState<TokenInfo>(() => {
         if (initialFromToken) {
@@ -69,8 +62,8 @@ const SwapScreen: React.FC<SwapScreenProps> = ({ initialFromToken, initialToToke
     }, [amount, fromToken, toToken]);
 
     const handleSwap = async () => {
-        if (!quote || !walletPrivateKey || !walletAddress) {
-            setError('Wallet not available. Please unlock your wallet.');
+        if (!quote || !passkeyConnected || !passkeyManager || !walletAddress) {
+            setError('Wallet not connected. Please connect your passkey wallet.');
             return;
         }
 
@@ -78,13 +71,14 @@ const SwapScreen: React.FC<SwapScreenProps> = ({ initialFromToken, initialToToke
         setError(null);
 
         try {
-            console.log('[SWAP UI] Starting swap:', {
+            console.log('[SWAP UI] Starting swap via PasskeyAccount:', {
                 from: quote.fromToken.symbol,
                 to: quote.toToken.symbol,
                 amount: quote.fromAmount
             });
 
-            const hash = await swapService.executeSwap(quote, walletPrivateKey);
+            // Execute swap via PasskeyAccount smart wallet
+            const hash = await swapService.executeSwapWithPasskey(quote, passkeyManager);
 
             console.log('[SWAP UI] Swap successful! Hash:', hash);
             setTxHash(hash);
@@ -104,7 +98,7 @@ const SwapScreen: React.FC<SwapScreenProps> = ({ initialFromToken, initialToToke
                 hash,
                 from: walletAddress,
                 to: walletAddress, // Swap is to self
-                networkFee: parseFloat(quote.estimatedGas),
+                networkFee: 0, // Gasless via smart wallet
                 approvals: {
                     required: 0,
                     list: [],
@@ -118,11 +112,6 @@ const SwapScreen: React.FC<SwapScreenProps> = ({ initialFromToken, initialToToke
             console.error('[SWAP UI] Swap failed:', error);
             const errorMessage = error?.message || 'Swap failed. Please try again.';
             setError(errorMessage);
-
-            // Show error notification
-            if (typeof window !== 'undefined') {
-                alert(errorMessage);
-            }
         } finally {
             setSwapping(false);
         }

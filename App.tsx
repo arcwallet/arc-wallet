@@ -6,16 +6,13 @@ import LoginPage from './pages/LoginPage';
 const PrivacyPolicy = React.lazy(() => import('./pages/PrivacyPolicy'));
 const TermsAndConditions = React.lazy(() => import('./pages/TermsAndConditions'));
 import { SessionProvider, useSession } from './contexts/SessionContext';
-import { WalletProvider } from './contexts/WalletContext';
 import { ArcAccountProvider } from './contexts/ArcAccountContext';
 import { ActivityProvider } from './contexts/ActivityContext';
 import { MultiSigProvider } from './contexts/MultiSigContext';
 import { PrivacyProvider } from './contexts/PrivacyContext';
 import { NetworkProvider } from './contexts/NetworkContext';
-// Smart Contract Passkey Wallet (NEW - default)
+// Smart Contract Passkey Wallet (ERC-4337)
 import { PasskeyAccountProvider, usePasskeyAccount } from './contexts/PasskeyAccountContext';
-// Legacy EOA wallet (kept for backwards compatibility)
-import { SelfCustodialWalletProvider } from './contexts/SelfCustodialWalletContext';
 import WalletSetup from './components/WalletSetup';
 
 // Smart Contract Passkey Wallet Experience
@@ -84,23 +81,19 @@ const App: React.FC = () => {
       <SessionProvider>
         <NetworkProvider>
           <PasskeyAccountProvider>
-            <SelfCustodialWalletProvider>
-              <WalletProvider>
-                <ArcAccountProvider>
-                  <ActivityProvider>
-                    <PrivacyProvider>
-                      <MultiSigProvider>
-                        <div className="auth-wrapper">
-                          <React.Suspense fallback={null}>
-                            <RootView />
-                          </React.Suspense>
-                        </div>
-                      </MultiSigProvider>
-                    </PrivacyProvider>
-                  </ActivityProvider>
-                </ArcAccountProvider>
-              </WalletProvider>
-            </SelfCustodialWalletProvider>
+            <ArcAccountProvider>
+              <ActivityProvider>
+                <PrivacyProvider>
+                  <MultiSigProvider>
+                    <div className="auth-wrapper">
+                      <React.Suspense fallback={null}>
+                        <RootView />
+                      </React.Suspense>
+                    </div>
+                  </MultiSigProvider>
+                </PrivacyProvider>
+              </ActivityProvider>
+            </ArcAccountProvider>
           </PasskeyAccountProvider>
         </NetworkProvider>
       </SessionProvider>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { API_ENDPOINTS } from '../config/app.config';
-import { useWallet } from '../contexts/WalletContext';
+import { usePasskeyAccount } from '../contexts/PasskeyAccountContext';
 import { PlusIcon, TrashIcon, CheckCircleIcon, XCircleIcon, RefreshIcon } from './Icons';
 
 interface Webhook {
@@ -12,7 +12,7 @@ interface Webhook {
 }
 
 const WebhookManager: React.FC = () => {
-    const { address } = useWallet();
+    const { address } = usePasskeyAccount();
     const [webhooks, setWebhooks] = useState<Webhook[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [newUrl, setNewUrl] = useState('');

@@ -13,7 +13,7 @@ import type { Transaction } from '../types';
 import { TransactionStatus, TransactionType } from '../types';
 import { RPC_URL } from '../services/transactionService';
 import { fetchRecentTransactions, RateLimitError } from '../services/activityService';
-import { useWallet } from './WalletContext';
+import { usePasskeyAccount } from './PasskeyAccountContext';
 import { API_ENDPOINTS } from '../config/app.config';
 
 interface ActivityContextValue {
@@ -158,7 +158,7 @@ const usePersistedActivities = (): [Transaction[], React.Dispatch<React.SetState
 };
 
 export const ActivityProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const { address } = useWallet();
+  const { address } = usePasskeyAccount();
   const [activities, setActivities] = usePersistedActivities();
   const pendingRef = useRef(new Set<string>());
   const [cooldownUntil, setCooldownUntil] = useState<number | null>(null);

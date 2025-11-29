@@ -1543,8 +1543,8 @@
       ]
     },
     "/Users/seher/Desktop/arcwallet/contracts/PasskeyAccount.sol": {
-      "lastModificationDate": 1764112689744,
-      "contentHash": "408e67845f7d1e68ab144a7b39e5250b",
+      "lastModificationDate": 1764339134001,
+      "contentHash": "152d2299131ce550dc9dc35e1ba7874d",
       "sourceName": "contracts/PasskeyAccount.sol",
       "solcConfig": {
         "version": "0.8.23",
@@ -1578,6 +1578,7 @@
       ],
       "artifacts": [
         "IP256Verifier",
+        "P256Verifier",
         "PasskeyAccount",
         "PasskeyAccountFactory",
         "WebAuthn"

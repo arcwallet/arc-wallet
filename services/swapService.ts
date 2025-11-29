@@ -1,6 +1,7 @@
-import { Contract, JsonRpcProvider, Wallet, parseUnits, formatUnits } from 'ethers';
+import { Contract, JsonRpcProvider, Wallet, parseUnits, formatUnits, Interface } from 'ethers';
 import { TokenInfo, getTokenContractAddress, SWAP_CONFIG } from '../config/tokens';
 import { getProvider, getFeeSettings } from './transactionService';
+import type { PasskeyAccountManager } from '@arc/wallet-sdk';
 
 export interface Quote {
   fromToken: TokenInfo;
@@ -237,6 +238,116 @@ class SwapService {
       return receipt.hash;
     } catch (error: any) {
       console.error('[SWAP] Swap execution failed:', error);
+
+      // Enhanced error messages
+      if (error?.message?.includes('insufficient allowance')) {
+        throw new Error('Token approval failed. Please try again.');
+      } else if (error?.message?.includes('insufficient balance')) {
+        throw new Error('Insufficient token balance for swap.');
+      } else if (error?.message?.includes('Too little received')) {
+        throw new Error('Price moved unfavorably. Please try again with higher slippage.');
+      } else if (error?.message?.includes('STF')) {
+        throw new Error('Swap transaction failed. Pool may have insufficient liquidity.');
+      }
+
+      throw new Error(error?.message || 'Swap failed. Please try again.');
+    }
+  }
+
+  /**
+   * Execute a token swap using PasskeyAccount (ERC-4337 Smart Wallet)
+   * No private key required - uses passkey signing
+   */
+  async executeSwapWithPasskey(
+    quote: Quote,
+    passkeyManager: PasskeyAccountManager
+  ): Promise<string> {
+    try {
+      // MEV Protection: Check quote expiration
+      if (this.isQuoteExpired(quote)) {
+        throw new Error('Quote expired. Please get a fresh quote to avoid unfavorable pricing.');
+      }
+
+      const walletAddress = passkeyManager.getAccountAddress();
+      if (!walletAddress) {
+        throw new Error('PasskeyAccount not connected');
+      }
+
+      const tokenInAddress = getTokenContractAddress(quote.fromToken.symbol, 'testnet', 'arcTestnet');
+      const tokenOutAddress = getTokenContractAddress(quote.toToken.symbol, 'testnet', 'arcTestnet');
+
+      if (!tokenInAddress || !tokenOutAddress) {
+        throw new Error('Token addresses not found');
+      }
+
+      const amountIn = parseUnits(quote.fromAmount, quote.fromToken.decimals);
+
+      // MEV Protection: Re-quote if quote is stale
+      let amountOutMinimum: bigint;
+      if (!this.isQuoteFresh(quote)) {
+        console.log('[SWAP] Quote stale, re-quoting for current price...');
+        const freshQuote = await this.getQuote(quote.fromToken, quote.toToken, quote.fromAmount);
+        amountOutMinimum = parseUnits(freshQuote.minimumReceived, quote.toToken.decimals);
+        console.log('[SWAP] Fresh minimum received:', freshQuote.minimumReceived);
+      } else {
+        amountOutMinimum = parseUnits(quote.minimumReceived, quote.toToken.decimals);
+      }
+
+      // Step 1: Check and approve token if needed via PasskeyAccount
+      const erc20Interface = new Interface(ERC20_ABI);
+      const allowanceData = erc20Interface.encodeFunctionData('allowance', [walletAddress, this.routerAddress]);
+      const allowanceResult = await this.provider.call({
+        to: tokenInAddress,
+        data: allowanceData,
+      });
+      const currentAllowance = BigInt(allowanceResult);
+
+      if (currentAllowance < amountIn) {
+        console.log('[SWAP] Approving token via PasskeyAccount...');
+        const approveData = erc20Interface.encodeFunctionData('approve', [this.routerAddress, amountIn * 2n]);
+        const approveResult = await passkeyManager.executeTransaction(tokenInAddress, 0n, approveData);
+        console.log('[SWAP] Token approved via PasskeyAccount:', approveResult.hash);
+      }
+
+      // Step 2: Execute swap via PasskeyAccount
+      const routerInterface = new Interface(UNISWAP_ROUTER_ABI);
+
+      // MEV Protection: Shorter deadline (5 min instead of 20)
+      const deadline = Math.floor(Date.now() / 1000) + MEV_CONFIG.DEADLINE_SECONDS;
+      const fee = this.isStablecoinPair(quote.fromToken.symbol, quote.toToken.symbol)
+        ? FEE_TIERS.LOW
+        : FEE_TIERS.MEDIUM;
+
+      const params = {
+        tokenIn: tokenInAddress,
+        tokenOut: tokenOutAddress,
+        fee,
+        recipient: walletAddress,
+        deadline,
+        amountIn,
+        amountOutMinimum,
+        sqrtPriceLimitX96: 0, // No price limit
+      };
+
+      console.log('[SWAP] Executing swap via PasskeyAccount with params:', {
+        from: quote.fromToken.symbol,
+        to: quote.toToken.symbol,
+        amountIn: quote.fromAmount,
+        minimumOut: quote.minimumReceived,
+        router: this.routerAddress,
+      });
+
+      // Encode the swap call
+      const swapData = routerInterface.encodeFunctionData('exactInputSingle', [params]);
+
+      // Execute via PasskeyAccount (UserOperation with passkey signature)
+      const swapResult = await passkeyManager.executeTransaction(this.routerAddress, 0n, swapData);
+
+      console.log('[SWAP] Swap successful via PasskeyAccount! TxHash:', swapResult.hash);
+
+      return swapResult.hash || '';
+    } catch (error: any) {
+      console.error('[SWAP] Swap execution via PasskeyAccount failed:', error);
 
       // Enhanced error messages
       if (error?.message?.includes('insufficient allowance')) {

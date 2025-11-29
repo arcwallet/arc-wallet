@@ -7,7 +7,8 @@ import {
   AccountWithDetails,
   TransactionWithDetails,
 } from '../services/multiSigClient';
-import { useSelfCustodialWallet } from './SelfCustodialWalletContext';
+import { usePasskeyAccount } from './PasskeyAccountContext';
+import { useSession } from './SessionContext';
 
 interface MultiSigContextType {
   // State
@@ -61,7 +62,9 @@ const MultiSigContext = createContext<MultiSigContextType | undefined>(undefined
 export const MultiSigProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  const { userId, address: walletAddress } = useSelfCustodialWallet();
+  // PasskeyAccount - Smart Wallet (single wallet system)
+  const { address: walletAddress } = usePasskeyAccount();
+  const { userId } = useSession();
 
   const [accounts, setAccounts] = useState<AccountWithDetails[]>([]);
   const [selectedAccount, setSelectedAccount] = useState<AccountWithDetails | null>(null);

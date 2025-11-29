@@ -1,6 +1,5 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { usePasskeyAccount } from '../contexts/PasskeyAccountContext';
-import { useSelfCustodialWallet } from '../contexts/SelfCustodialWalletContext';
 import { useActivity } from '../contexts/ActivityContext';
 import { TransactionStatus, TransactionType } from '../types';
 import { SpinnerIcon } from './Icons';
@@ -42,13 +41,12 @@ const DIRECTIONS: { id: BridgeDirection; label: string; description: string; dis
 ];
 
 const Bridge: React.FC = () => {
+  // PasskeyAccount - Smart Wallet (single wallet system)
   const {
-    address: passkeyAddress,
+    address,
     isConnected: passkeyConnected,
     manager: passkeyManager,
   } = usePasskeyAccount();
-  const { address: selfCustodialAddress } = useSelfCustodialWallet();
-  const address = passkeyAddress || selfCustodialAddress;
   const { addActivity } = useActivity();
 
   const [direction, setDirection] = useState<BridgeDirection>('arc-to-sepolia');
@@ -318,7 +316,7 @@ const Bridge: React.FC = () => {
             <div>
               <p className="text-green-400 font-medium">Passkey Wallet Connected</p>
               <p className="text-green-300/70 text-sm font-mono">
-                {passkeyAddress?.slice(0, 10)}...{passkeyAddress?.slice(-8)}
+                {address?.slice(0, 10)}...{address?.slice(-8)}
               </p>
             </div>
             <div className="flex gap-4">

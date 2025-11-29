@@ -57,7 +57,7 @@ class TokenService {
     tokenSymbol: string,
     walletAddress: string,
     network: 'mainnet' | 'testnet' = 'testnet',
-    chain: 'arcTestnet' | 'sepolia' = 'arcTestnet'
+    chain: 'ethereum' | 'sepolia' | 'base' | 'baseSepolia' | 'avalanche' | 'avalancheFuji' | 'arc' | 'arcTestnet' = 'arcTestnet'
   ): Promise<TokenBalance | null> {
     const token = getTokenInfo(tokenSymbol);
     if (!token) {
@@ -106,7 +106,7 @@ class TokenService {
   async getAllTokenBalances(
     walletAddress: string,
     network: 'mainnet' | 'testnet' = 'testnet',
-    chain: 'arcTestnet' | 'sepolia' = 'arcTestnet'
+    chain: 'ethereum' | 'sepolia' | 'base' | 'baseSepolia' | 'avalanche' | 'avalancheFuji' | 'arc' | 'arcTestnet' = 'arcTestnet'
   ): Promise<TokenBalance[]> {
     console.log('[TokenService] getAllTokenBalances called:', { walletAddress, network, chain, rpcUrl: this.currentRpcUrl });
 
@@ -208,7 +208,7 @@ class TokenService {
   getTokenContract(
     tokenSymbol: string,
     network: 'mainnet' | 'testnet' = 'testnet',
-    chain: 'arcTestnet' | 'sepolia' = 'arcTestnet'
+    chain: 'ethereum' | 'sepolia' | 'base' | 'baseSepolia' | 'avalanche' | 'avalancheFuji' | 'arc' | 'arcTestnet' = 'arcTestnet'
   ): Contract | null {
     const contractAddress = getTokenContractAddress(tokenSymbol, network, chain);
     if (!contractAddress) return null;

@@ -166,14 +166,17 @@ export const PasskeyAccountProvider: React.FC<PasskeyAccountProviderProps> = ({ 
           setCredential(storedCred);
           console.log('[PasskeyAccount] Found existing credential for current user:', storedCred);
 
-          // Restore address from stored credential AND update manager's internal state
+          // Restore address from stored credential for display purposes
+          // BUT DO NOT set isConnected = true - user must authenticate with passkey first!
           if (storedCred.publicKeyX && storedCred.publicKeyY && storedCred.userId) {
             try {
-              // Use restoreFromCredential to properly set manager's internal state
+              // Use restoreFromCredential to compute the address (for display)
               const restoredAddress = await manager.restoreFromCredential(storedCred);
               setAddress(restoredAddress);
-              setIsConnected(true);
-              console.log('[PasskeyAccount] Restored address from credential:', restoredAddress);
+              // SECURITY: Do NOT auto-connect! User must re-authenticate with passkey
+              // isConnected stays false until user explicitly calls connect()
+              setIsConnected(false);
+              console.log('[PasskeyAccount] Address restored (requires passkey auth):', restoredAddress);
             } catch (err) {
               console.error('[PasskeyAccount] Failed to restore address:', err);
             }
