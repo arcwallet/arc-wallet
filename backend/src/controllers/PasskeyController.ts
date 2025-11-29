@@ -991,14 +991,9 @@ export class PasskeyController {
         });
       }
 
-      // Create a minimal COSE public key structure for P256
-      // Format: CBOR map with kty=2 (EC), alg=-7 (ES256), crv=1 (P-256), x, y
-      const xBytes = Buffer.from(publicKeyX.replace('0x', ''), 'hex');
-      const yBytes = Buffer.from(publicKeyY.replace('0x', ''), 'hex');
-
-      // Simplified COSE key - backend needs the raw x,y for verification
-      // Store as concatenated x||y (64 bytes)
-      const publicKeyBuffer = Buffer.concat([xBytes, yBytes]);
+      // Create COSE-encoded public key for @simplewebauthn compatibility
+      const { XYtoCOSE } = await import('../utils/passkeyUtils.js');
+      const publicKeyBuffer = XYtoCOSE(publicKeyX, publicKeyY);
 
       // Create passkey credential
       await this.db.createPasskeyCredential({

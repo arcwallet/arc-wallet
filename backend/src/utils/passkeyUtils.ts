@@ -126,11 +126,46 @@ export function deriveAddressFromPublicKey(derPublicKey: string): string {
 
 /**
  * Derives Ethereum address directly from COSE public key
- * 
+ *
  * @param cosePublicKey - COSE-encoded public key
  * @returns Ethereum address (0x-prefixed)
  */
 export function deriveAddressFromCOSE(cosePublicKey: Uint8Array): string {
     const derPublicKey = COSEECDHAtoDER(cosePublicKey);
     return deriveAddressFromPublicKey(derPublicKey);
+}
+
+/**
+ * Creates a COSE-encoded public key from raw X and Y coordinates
+ *
+ * COSE Key structure for P-256 (EC2):
+ * {
+ *   1: 2,    // kty: EC2
+ *   3: -7,   // alg: ES256 (ECDSA w/ SHA-256)
+ *  -1: 1,    // crv: P-256
+ *  -2: x,    // x coordinate (32 bytes)
+ *  -3: y     // y coordinate (32 bytes)
+ * }
+ *
+ * @param publicKeyX - X coordinate as hex string (with or without 0x prefix)
+ * @param publicKeyY - Y coordinate as hex string (with or without 0x prefix)
+ * @returns COSE-encoded public key as Uint8Array
+ */
+export function XYtoCOSE(publicKeyX: string, publicKeyY: string): Uint8Array {
+    const xBytes = Buffer.from(publicKeyX.replace('0x', ''), 'hex');
+    const yBytes = Buffer.from(publicKeyY.replace('0x', ''), 'hex');
+
+    if (xBytes.length !== 32 || yBytes.length !== 32) {
+        throw new Error(`Invalid key coordinates: x=${xBytes.length} bytes, y=${yBytes.length} bytes (expected 32 each)`);
+    }
+
+    // Create COSE key structure
+    const coseKey = new Map<number, number | Uint8Array>();
+    coseKey.set(1, 2);      // kty: EC2
+    coseKey.set(3, -7);     // alg: ES256
+    coseKey.set(-1, 1);     // crv: P-256
+    coseKey.set(-2, xBytes); // x coordinate
+    coseKey.set(-3, yBytes); // y coordinate
+
+    return cbor.encode(coseKey);
 }
