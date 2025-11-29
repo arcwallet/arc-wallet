@@ -11,7 +11,7 @@
  * - Works with ERC-4337 bundler (Pimlico)
  */
 
-import { Interface, parseUnits, JsonRpcProvider } from 'ethers';
+import { Interface, parseUnits, JsonRpcProvider, getAddress } from 'ethers';
 import type { PasskeyAccountManager } from '@arc/wallet-sdk';
 
 // Arc Testnet CCTP Configuration (from docs.arc.network)
@@ -324,8 +324,13 @@ export async function getUsdcBalance(
   const config = chain === 'arc' ? ARC_TESTNET_CONFIG : SEPOLIA_CONFIG;
   const provider = new JsonRpcProvider(config.rpcUrl);
 
+  // Normalize address to checksum format
+  const checksumAddress = getAddress(address.toLowerCase());
+
   const usdcInterface = new Interface(USDC_ABI);
-  const balanceData = usdcInterface.encodeFunctionData('balanceOf', [address]);
+  const balanceData = usdcInterface.encodeFunctionData('balanceOf', [checksumAddress]);
+
+  console.log(`[Bridge] Fetching ${chain} USDC balance for:`, checksumAddress);
 
   const result = await provider.call({
     to: config.usdc,
@@ -333,7 +338,9 @@ export async function getUsdcBalance(
   });
 
   const balance = BigInt(result);
-  return (Number(balance) / 1e6).toFixed(2);
+  const formatted = (Number(balance) / 1e6).toFixed(2);
+  console.log(`[Bridge] ${chain} USDC balance:`, formatted);
+  return formatted;
 }
 
 /**

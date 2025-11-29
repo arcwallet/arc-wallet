@@ -94,14 +94,19 @@ const Bridge: React.FC = () => {
 
       setIsLoadingBalance(true);
       try {
+        console.log('[Bridge] Fetching balances for:', address);
         const [arcBal, sepoliaBal] = await Promise.all([
           getUsdcBalance(address, 'arc'),
           getUsdcBalance(address, 'sepolia'),
         ]);
+        console.log('[Bridge] Balances fetched - Arc:', arcBal, 'Sepolia:', sepoliaBal);
         setArcBalance(arcBal);
         setSepoliaBalance(sepoliaBal);
       } catch (error) {
-        console.error('Failed to fetch balances:', error);
+        console.error('[Bridge] Failed to fetch balances:', error);
+        // Set 0 on error instead of leaving null
+        setArcBalance('0.00');
+        setSepoliaBalance('0.00');
       } finally {
         setIsLoadingBalance(false);
       }
