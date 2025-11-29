@@ -57,6 +57,7 @@ export type BridgeDirection = 'arc-to-sepolia' | 'sepolia-to-arc';
 
 export interface PasskeyBridgeParams {
   passkeyManager: PasskeyAccountManager;
+  sepoliaPasskeyManager?: PasskeyAccountManager; // Optional: for Sepolia→Arc direction
   amount: string; // Human readable (e.g., "100" for 100 USDC)
   direction: BridgeDirection;
   recipientAddress?: string; // Optional: defaults to sender address
@@ -86,12 +87,18 @@ export interface BridgeResult {
  * Executes approve + depositForBurn as UserOperations signed with passkey
  */
 export async function bridgeUsdcWithPasskey(params: PasskeyBridgeParams): Promise<BridgeResult> {
-  const { passkeyManager, amount, direction, recipientAddress, onProgress } = params;
+  const { passkeyManager, sepoliaPasskeyManager, amount, direction, recipientAddress, onProgress } = params;
 
   const sourceConfig = direction === 'arc-to-sepolia' ? ARC_TESTNET_CONFIG : SEPOLIA_CONFIG;
   const destConfig = direction === 'arc-to-sepolia' ? SEPOLIA_CONFIG : ARC_TESTNET_CONFIG;
 
-  const senderAddress = passkeyManager.getAccountAddress();
+  // For sepolia-to-arc, we need a Sepolia-configured PasskeyManager for burn operations
+  const sourceManager = direction === 'sepolia-to-arc' && sepoliaPasskeyManager
+    ? sepoliaPasskeyManager
+    : passkeyManager;
+  const destManager = passkeyManager; // Arc manager is always used for Arc operations
+
+  const senderAddress = sourceManager.getAccountAddress();
   if (!senderAddress) {
     throw new Error('PasskeyAccount not connected. Please connect first.');
   }
@@ -150,7 +157,7 @@ export async function bridgeUsdcWithPasskey(params: PasskeyBridgeParams): Promis
       ]);
 
       // Execute approve via PasskeyAccount (UserOperation)
-      const approveResult = await passkeyManager.executeTransaction(
+      const approveResult = await sourceManager.executeTransaction(
         sourceConfig.usdc,
         0n, // No native value
         approveData
@@ -188,7 +195,7 @@ export async function bridgeUsdcWithPasskey(params: PasskeyBridgeParams): Promis
     ]);
 
     // Execute depositForBurn via PasskeyAccount (UserOperation)
-    const burnResult = await passkeyManager.executeTransaction(
+    const burnResult = await sourceManager.executeTransaction(
       sourceConfig.tokenMessenger,
       0n,
       depositForBurnData
@@ -221,7 +228,7 @@ export async function bridgeUsdcWithPasskey(params: PasskeyBridgeParams): Promis
         attestation,
       ]);
 
-      const mintResult = await passkeyManager.executeTransaction(
+      const mintResult = await destManager.executeTransaction(
         destConfig.messageTransmitter,
         0n,
         receiveMessageData

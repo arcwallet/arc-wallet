@@ -14,6 +14,7 @@ export interface PasskeyAccountConfig {
     backendUrl: string;
     rpId: string;
     rpName: string;
+    chainId?: number;
 }
 export interface PasskeyCredential {
     credentialId: string;

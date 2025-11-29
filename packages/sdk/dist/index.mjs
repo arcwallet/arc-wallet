@@ -2759,9 +2759,9 @@ class Xe {
         e.maxPriorityFeePerGas,
         A(e.paymasterAndData)
       ]
-    ), r = A(n), i = t.encode(
+    ), r = A(n), s = BigInt(this.config.chainId || 5042002), i = t.encode(
       ["bytes32", "address", "uint256"],
-      [r, this.config.entryPointAddress, 5042002n]
+      [r, this.config.entryPointAddress, s]
     );
     return A(i);
   }

@@ -57,6 +57,7 @@ export interface PasskeyAccountConfig {
   backendUrl: string;
   rpId: string;
   rpName: string;
+  chainId?: number; // Chain ID (default: 5042002 for Arc Testnet)
 }
 
 export interface PasskeyCredential {
@@ -535,7 +536,7 @@ export class PasskeyAccountManager {
     const userOpHashInner = keccak256(packed);
 
     // Final hash includes entryPoint and chainId
-    const chainId = 5042002n; // Arc Testnet
+    const chainId = BigInt(this.config.chainId || 5042002); // Default to Arc Testnet
     const finalPacked = abiCoder.encode(
       ['bytes32', 'address', 'uint256'],
       [userOpHashInner, this.config.entryPointAddress, chainId]

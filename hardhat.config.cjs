@@ -44,6 +44,11 @@ const config = {
       chainId: 5042002,
       accounts: process.env.DEPLOYER_PRIVATE_KEY ? [process.env.DEPLOYER_PRIVATE_KEY] : [],
     },
+    sepolia: {
+      url: 'https://ethereum-sepolia-rpc.publicnode.com',
+      chainId: 11155111,
+      accounts: process.env.DEPLOYER_PRIVATE_KEY ? [process.env.DEPLOYER_PRIVATE_KEY] : [],
+    },
   },
 };
 

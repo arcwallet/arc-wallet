@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { usePasskeyAccount } from '../contexts/PasskeyAccountContext';
 import { useSelfCustodialWallet } from '../contexts/SelfCustodialWalletContext';
 import { useActivity } from '../contexts/ActivityContext';
@@ -13,6 +13,19 @@ import {
   type BridgeProgressStep,
 } from '../services/passkeyBridgeService';
 import { TX_EXPLORER_URL } from '../config/app.config';
+import { PasskeyAccountManager } from '@arc/wallet-sdk';
+
+// Sepolia config for PasskeyAccountManager
+const SEPOLIA_PASSKEY_CONFIG = {
+  factoryAddress: import.meta.env.VITE_SEPOLIA_PASSKEY_FACTORY_ADDRESS || '0x9AE89FbF3C32F976Db2A668d5a5c7B00032BD14a',
+  entryPointAddress: '0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789',
+  rpcUrl: 'https://ethereum-sepolia-rpc.publicnode.com',
+  bundlerUrl: `https://api.pimlico.io/v2/sepolia/rpc?apikey=${import.meta.env.VITE_PIMLICO_API_KEY || 'pim_5XLAHAuCB39DQzCZbvJdmu'}`,
+  backendUrl: import.meta.env.VITE_BACKEND_URL || 'https://arcwallet-backend.onrender.com',
+  rpId: window.location.hostname || 'app.arcwallet.network',
+  rpName: 'Arc Wallet',
+  chainId: 11155111, // Sepolia
+};
 
 const DIRECTIONS: { id: BridgeDirection; label: string; description: string; disabled?: boolean }[] = [
   {
@@ -23,8 +36,7 @@ const DIRECTIONS: { id: BridgeDirection; label: string; description: string; dis
   {
     id: 'sepolia-to-arc',
     label: 'Sepolia → Arc',
-    description: 'Coming soon (requires wallet on Sepolia)',
-    disabled: true,
+    description: 'Burn USDC on Sepolia and mint on Arc',
   },
 ];
 
@@ -53,6 +65,27 @@ const Bridge: React.FC = () => {
   const [arcBalance, setArcBalance] = useState<string | null>(null);
   const [sepoliaBalance, setSepoliaBalance] = useState<string | null>(null);
   const [isLoadingBalance, setIsLoadingBalance] = useState(false);
+
+  // Create Sepolia PasskeyManager for sepolia-to-arc direction
+  const sepoliaManagerRef = useRef<PasskeyAccountManager | null>(null);
+
+  // Initialize Sepolia manager when we have credentials from Arc manager
+  useEffect(() => {
+    if (passkeyManager && passkeyConnected) {
+      const credential = passkeyManager.getCurrentCredential();
+      if (credential) {
+        // Create Sepolia manager with same credentials
+        const sepoliaManager = new PasskeyAccountManager(SEPOLIA_PASSKEY_CONFIG);
+        // Restore the credential to Sepolia manager (same passkey, different chain)
+        sepoliaManager.restoreFromCredential(credential).then(() => {
+          sepoliaManagerRef.current = sepoliaManager;
+          console.log('[Bridge] Sepolia PasskeyManager initialized');
+        }).catch(err => {
+          console.error('[Bridge] Failed to init Sepolia manager:', err);
+        });
+      }
+    }
+  }, [passkeyManager, passkeyConnected]);
 
   // Fetch balances on both chains
   React.useEffect(() => {
@@ -161,6 +194,13 @@ const Bridge: React.FC = () => {
       return;
     }
 
+    // For sepolia-to-arc, we need the Sepolia manager
+    if (direction === 'sepolia-to-arc' && !sepoliaManagerRef.current) {
+      setStatusVariant('error');
+      setStatusMessage('Sepolia wallet not initialized. Please wait and try again.');
+      return;
+    }
+
     const normalized = normalizeAmount(amount);
     if (!normalized) {
       setStatusVariant('error');
@@ -187,6 +227,7 @@ const Bridge: React.FC = () => {
     try {
       const result = await bridgeUsdcWithPasskey({
         passkeyManager,
+        sepoliaPasskeyManager: sepoliaManagerRef.current || undefined,
         amount: normalized,
         direction,
         onProgress: handleProgressUpdate,
