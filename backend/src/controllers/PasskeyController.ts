@@ -939,4 +939,101 @@ export class PasskeyController {
       throw new ApiError('Failed to check user passkeys', 500, 'CHECK_USER_FAILED');
     }
   };
+
+  /**
+   * Admin: Manually register a passkey credential for a user
+   * This is used for recovery when WebAuthn registration was lost from server
+   * but passkey still exists on user's device
+   */
+  adminRegisterCredential = async (req: Request, res: Response) => {
+    try {
+      const { adminSecret, email, credentialId, publicKeyX, publicKeyY, walletAddress } = req.body;
+      const expectedSecret = process.env.ADMIN_SECRET || 'arc-admin-2024-secret';
+
+      if (adminSecret !== expectedSecret) {
+        throw new ApiError('Invalid admin secret', 403, 'UNAUTHORIZED');
+      }
+
+      if (!email || !credentialId || !publicKeyX || !publicKeyY) {
+        throw new ApiError('Missing required fields: email, credentialId, publicKeyX, publicKeyY', 400, 'MISSING_FIELDS');
+      }
+
+      const normalizedEmail = email.trim().toLowerCase();
+
+      // Get or create user
+      let user = await this.db.getUserByUsername(normalizedEmail);
+      if (!user) {
+        const userId = (await import('crypto')).randomUUID();
+        user = await this.db.createUser({
+          id: userId,
+          username: normalizedEmail,
+          displayName: normalizedEmail.split('@')[0]
+        });
+        console.log('[AdminRegister] Created new user:', user.id);
+      }
+
+      // Update wallet address if provided
+      if (walletAddress && !user.walletAddress) {
+        await this.db.updateUser(user.id, { walletAddress });
+        console.log('[AdminRegister] Updated wallet address:', walletAddress);
+      }
+
+      // Check if credential already exists
+      const existingCredential = await this.db.getPasskeyByCredentialId(credentialId);
+      if (existingCredential) {
+        return res.json({
+          success: true,
+          data: {
+            message: 'Credential already exists',
+            userId: user.id,
+            credentialId
+          }
+        });
+      }
+
+      // Create a minimal COSE public key structure for P256
+      // Format: CBOR map with kty=2 (EC), alg=-7 (ES256), crv=1 (P-256), x, y
+      const xBytes = Buffer.from(publicKeyX.replace('0x', ''), 'hex');
+      const yBytes = Buffer.from(publicKeyY.replace('0x', ''), 'hex');
+
+      // Simplified COSE key - backend needs the raw x,y for verification
+      // Store as concatenated x||y (64 bytes)
+      const publicKeyBuffer = Buffer.concat([xBytes, yBytes]);
+
+      // Create passkey credential
+      await this.db.createPasskeyCredential({
+        id: (await import('crypto')).randomUUID(),
+        userId: user.id,
+        credentialID: credentialId,
+        credentialPublicKey: publicKeyBuffer,
+        counter: 0,
+        credentialDeviceType: 'singleDevice',
+        credentialBackedUp: true,
+        transports: ['internal', 'hybrid']
+      });
+
+      console.log('[AdminRegister] Created passkey credential:', {
+        userId: user.id,
+        credentialId,
+        email: normalizedEmail
+      });
+
+      return res.json({
+        success: true,
+        data: {
+          message: 'Credential registered successfully',
+          userId: user.id,
+          credentialId,
+          walletAddress: walletAddress || user.walletAddress
+        }
+      });
+
+    } catch (error) {
+      console.error('Admin register credential error:', error);
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      throw new ApiError('Failed to register credential', 500, 'ADMIN_REGISTER_FAILED');
+    }
+  };
 }

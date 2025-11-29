@@ -116,4 +116,9 @@ export declare class PasskeyAccountManager {
     private fromBase64Url;
     private storeCredential;
     private loadCredential;
+    /**
+     * Sync credential to backend for future protection
+     * This registers the credential in backend DB so user can't accidentally create a new passkey
+     */
+    private syncCredentialToBackend;
 }

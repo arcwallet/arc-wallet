@@ -295,5 +295,22 @@ export function createPasskeyRoutes(db: Database, config: EnvConfig, sessionStor
     }
   });
 
+  /**
+   * POST /passkeys/admin/register-credential
+   * Admin endpoint to manually register a passkey credential
+   * Used for recovery when passkey exists on device but not in server DB
+   */
+  router.post(
+    '/admin/register-credential',
+    validateRequestBody(['adminSecret', 'email', 'credentialId', 'publicKeyX', 'publicKeyY']),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        await passkeyController.adminRegisterCredential(req, res);
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
+
   return router;
 }

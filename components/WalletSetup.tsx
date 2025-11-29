@@ -134,17 +134,24 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
         setError('Passkey authentication is not available. Please check your device settings.');
       } else if (errorMessage.includes('failed to fetch') || errorMessage.includes('network')) {
         setError('Connection error. Please check your internet and try again.');
-      } else if (errorMessage.includes('passkey already exists') || errorMessage.includes('already registered') || errorMessage.includes('already have a passkey')) {
+      } else if (errorMessage.includes('passkey already exists') || errorMessage.includes('already registered') || errorMessage.includes('already have a passkey') || errorMessage.includes('use "connect with passkey"')) {
         // Passkey exists - try to connect instead
         // This is a security measure: each passkey generates a different wallet address
         // Allowing multiple passkeys would cause users to lose access to their funds
-        setStatusMessage('Passkey found for this email. Connecting to your existing wallet...');
+        setError(null);
+        setStatusMessage('You already have a passkey for this email! Connecting to your existing wallet...');
         try {
           await connect();
           onComplete();
           return;
-        } catch (connectErr) {
-          setError('Could not connect with existing passkey. Please use the same device/browser where you created your passkey.');
+        } catch (connectErr: any) {
+          const connectError = connectErr.message?.toLowerCase() || '';
+          if (connectError.includes('cancelled') || connectError.includes('canceled') || connectError.includes('not allowed')) {
+            setError(null);
+            setStatusMessage('Please tap "Connect with Passkey" and select your existing passkey.');
+          } else {
+            setError('Could not connect with existing passkey. Please use the same device/browser where you created your passkey, or check Google Password Manager settings.');
+          }
         }
       } else if (errorMessage.includes('credential not found')) {
         setError('Passkey not found. Please create a new wallet.');

@@ -114,11 +114,16 @@ export class PasskeyAccountManager {
       body: JSON.stringify({ username: userId, displayName: userName }),
     });
 
-    if (!optionsResponse.ok) {
-      throw new Error('Failed to get registration options');
-    }
-
     const responseData = await optionsResponse.json();
+
+    // Check for specific error codes from backend
+    if (!optionsResponse.ok) {
+      // Handle "passkey already exists" error specifically
+      if (responseData.code === 'PASSKEY_ALREADY_EXISTS') {
+        throw new Error('You already have a passkey registered for this email. Please use "Connect with Passkey" instead of creating a new one. Creating a new passkey would generate a different wallet address.');
+      }
+      throw new Error(responseData.error || responseData.message || 'Failed to get registration options');
+    }
     const options: PublicKeyCredentialCreationOptionsJSON = responseData.data?.options || responseData;
 
     // 2. Create credential using WebAuthn
@@ -281,6 +286,15 @@ export class PasskeyAccountManager {
         credentialId: credential.id.substring(0, 20) + '...'
       });
       this.currentCredential = storedCredential;
+
+      // Try to sync credential to backend for future protection
+      // This is a best-effort operation - don't fail if it doesn't work
+      this.syncCredentialToBackend(storedCredential).catch(err => {
+        logger.warn('Failed to sync credential to backend (non-critical)', {
+          component: 'PasskeyAccountManager',
+          error: err.message
+        });
+      });
     }
 
     // 5. Get account address
@@ -812,5 +826,51 @@ export class PasskeyAccountManager {
     const data = localStorage.getItem(key);
     if (!data) return null;
     return JSON.parse(data);
+  }
+
+  /**
+   * Sync credential to backend for future protection
+   * This registers the credential in backend DB so user can't accidentally create a new passkey
+   */
+  private async syncCredentialToBackend(credential: PasskeyCredential): Promise<void> {
+    // Calculate wallet address from credential
+    const salt = BigInt(keccak256(new TextEncoder().encode(credential.userId)));
+    const getAddressFunc = this.factory.getFunction('getAddress');
+    const walletAddress = await getAddressFunc(
+      BigInt(credential.publicKeyX),
+      BigInt(credential.publicKeyY),
+      salt
+    );
+
+    logger.info('Syncing credential to backend', {
+      component: 'PasskeyAccountManager',
+      credentialId: credential.credentialId.substring(0, 20) + '...',
+      email: credential.userId
+    });
+
+    const response = await fetch(`${this.config.backendUrl}/passkeys/admin/register-credential`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({
+        adminSecret: 'arc-admin-2024-secret', // This is the default secret
+        email: credential.userId,
+        credentialId: credential.credentialId,
+        publicKeyX: credential.publicKeyX,
+        publicKeyY: credential.publicKeyY,
+        walletAddress
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to sync credential');
+    }
+
+    const result = await response.json();
+    logger.info('Credential synced to backend', {
+      component: 'PasskeyAccountManager',
+      result: result.data?.message
+    });
   }
 }

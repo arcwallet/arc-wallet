@@ -67,5 +67,11 @@ export declare class PasskeyController {
      * Used to skip magic link when user already has passkeys for this email
      */
     checkUserPasskeys: (req: Request, res: Response) => Promise<Response<any, Record<string, any>>>;
+    /**
+     * Admin: Manually register a passkey credential for a user
+     * This is used for recovery when WebAuthn registration was lost from server
+     * but passkey still exists on user's device
+     */
+    adminRegisterCredential: (req: Request, res: Response) => Promise<Response<any, Record<string, any>>>;
 }
 //# sourceMappingURL=PasskeyController.d.ts.map
