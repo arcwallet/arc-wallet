@@ -321,26 +321,39 @@ export async function getUsdcBalance(
   address: string,
   chain: 'arc' | 'sepolia'
 ): Promise<string> {
-  const config = chain === 'arc' ? ARC_TESTNET_CONFIG : SEPOLIA_CONFIG;
-  const provider = new JsonRpcProvider(config.rpcUrl);
+  try {
+    const config = chain === 'arc' ? ARC_TESTNET_CONFIG : SEPOLIA_CONFIG;
+    console.log(`[Bridge] getUsdcBalance called for ${chain}:`, {
+      address,
+      rpcUrl: config.rpcUrl,
+      usdcContract: config.usdc,
+    });
 
-  // Normalize address to checksum format
-  const checksumAddress = getAddress(address.toLowerCase());
+    const provider = new JsonRpcProvider(config.rpcUrl);
 
-  const usdcInterface = new Interface(USDC_ABI);
-  const balanceData = usdcInterface.encodeFunctionData('balanceOf', [checksumAddress]);
+    // Normalize address to checksum format
+    const checksumAddress = getAddress(address.toLowerCase());
+    console.log(`[Bridge] Checksum address:`, checksumAddress);
 
-  console.log(`[Bridge] Fetching ${chain} USDC balance for:`, checksumAddress);
+    const usdcInterface = new Interface(USDC_ABI);
+    const balanceData = usdcInterface.encodeFunctionData('balanceOf', [checksumAddress]);
+    console.log(`[Bridge] Encoded balanceOf data:`, balanceData.slice(0, 20) + '...');
 
-  const result = await provider.call({
-    to: config.usdc,
-    data: balanceData,
-  });
+    const result = await provider.call({
+      to: config.usdc,
+      data: balanceData,
+    });
+    console.log(`[Bridge] Raw RPC result for ${chain}:`, result);
 
-  const balance = BigInt(result);
-  const formatted = (Number(balance) / 1e6).toFixed(2);
-  console.log(`[Bridge] ${chain} USDC balance:`, formatted);
-  return formatted;
+    const balance = BigInt(result);
+    const formatted = (Number(balance) / 1e6).toFixed(2);
+    console.log(`[Bridge] ${chain} USDC balance:`, formatted);
+    return formatted;
+  } catch (error: any) {
+    console.error(`[Bridge] Error fetching ${chain} USDC balance:`, error.message || error);
+    // Return 0 on error instead of throwing
+    return '0.00';
+  }
 }
 
 /**
