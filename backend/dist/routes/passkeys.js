@@ -191,8 +191,8 @@ export function createPasskeyRoutes(db, config, sessionStore) {
                     code: 'UNAUTHORIZED'
                 });
             }
-            // Set confirmReset to true for admin requests
-            req.body.confirmReset = true;
+            // Set confirmReset to required value for admin requests
+            req.body.confirmReset = 'DELETE_ALL_PASSKEYS';
             await passkeyController.resetUserPasskeys(req, res);
         }
         catch (error) {

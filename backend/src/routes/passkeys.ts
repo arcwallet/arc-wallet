@@ -274,8 +274,8 @@ export function createPasskeyRoutes(db: Database, config: EnvConfig, sessionStor
           });
         }
 
-        // Set confirmReset to true for admin requests
-        req.body.confirmReset = true;
+        // Set confirmReset to required value for admin requests
+        req.body.confirmReset = 'DELETE_ALL_PASSKEYS';
         await passkeyController.resetUserPasskeys(req, res);
       } catch (error) {
         next(error);
