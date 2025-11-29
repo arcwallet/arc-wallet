@@ -214,6 +214,20 @@ export class PasskeyAccountManager {
     const responseData = await optionsResponse.json();
     const options: PublicKeyCredentialRequestOptionsJSON = responseData.data?.options || responseData;
 
+    // If we have a stored credential ID, add it to allowCredentials
+    // This helps Google Password Manager and other authenticators find the right passkey
+    if (storedCredentialId && (!options.allowCredentials || options.allowCredentials.length === 0)) {
+      options.allowCredentials = [{
+        id: storedCredentialId,
+        type: 'public-key',
+        transports: ['internal', 'hybrid'] as AuthenticatorTransport[],
+      }];
+      logger.info('Added stored credential to allowCredentials', {
+        component: 'PasskeyAccountManager',
+        credentialId: storedCredentialId.substring(0, 20) + '...'
+      });
+    }
+
     // 2. Authenticate with WebAuthn
     const credential: AuthenticationResponseJSON = await startAuthentication({ optionsJSON: options });
 

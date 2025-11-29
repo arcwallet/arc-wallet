@@ -1,7 +1,7 @@
 var ae = Object.defineProperty;
 var se = (a, e, t) => e in a ? ae(a, e, { enumerable: !0, configurable: !0, writable: !0, value: t }) : a[e] = t;
 var h = (a, e, t) => se(a, typeof e != "symbol" ? e + "" : e, t);
-import { Wallet as K, parseUnits as ie, Contract as v, keccak256 as A, getBytes as I, formatUnits as oe, AbiCoder as B, Interface as N, toBeHex as T, JsonRpcProvider as q } from "ethers";
+import { Wallet as K, parseUnits as ie, Contract as v, keccak256 as A, getBytes as k, formatUnits as oe, AbiCoder as B, Interface as N, toBeHex as T, JsonRpcProvider as q } from "ethers";
 import { set as F, get as O, del as ce, clear as de } from "idb-keyval";
 function D(a) {
   const e = new Uint8Array(a);
@@ -464,7 +464,7 @@ const me = [
   "coloros",
   "oxygenos",
   "originos"
-], k = {
+], I = {
   HIGH_RISK_DEVICE: "Passkey creation may not be reliable on this device. Try using a device with iCloud Keychain (iOS) or Google Password Manager (Android) for best results.",
   NO_PLATFORM_SUPPORT: "Your browser does not support passkeys. Please use a modern browser like Chrome, Safari, or Edge.",
   DIAGNOSTIC_FAILED: "Passkey health check failed. Try creating your passkey on a different device or browser."
@@ -523,14 +523,14 @@ async function Ee(a = "high-risk") {
         success: !1,
         deviceRisk: e,
         platformSupport: !1,
-        errorMessage: k.NO_PLATFORM_SUPPORT
+        errorMessage: I.NO_PLATFORM_SUPPORT
       };
     if (e === "high")
       return {
         success: !1,
         deviceRisk: e,
         platformSupport: t,
-        errorMessage: k.HIGH_RISK_DEVICE
+        errorMessage: I.HIGH_RISK_DEVICE
       };
   }
   return a === "high-risk" && e === "high" ? (o.warn("High-risk device detected", {
@@ -541,7 +541,7 @@ async function Ee(a = "high-risk") {
     // Allow but warn
     deviceRisk: e,
     platformSupport: t,
-    errorMessage: k.HIGH_RISK_DEVICE
+    errorMessage: I.HIGH_RISK_DEVICE
   }) : {
     success: !0,
     deviceRisk: e,
@@ -549,7 +549,7 @@ async function Ee(a = "high-risk") {
   };
 }
 function Se(a) {
-  return a.success && !a.errorMessage ? null : a.errorMessage ? a.errorMessage : a.platformSupport ? a.deviceRisk === "high" ? k.HIGH_RISK_DEVICE : k.DIAGNOSTIC_FAILED : k.NO_PLATFORM_SUPPORT;
+  return a.success && !a.errorMessage ? null : a.errorMessage ? a.errorMessage : a.platformSupport ? a.deviceRisk === "high" ? I.HIGH_RISK_DEVICE : I.DIAGNOSTIC_FAILED : I.NO_PLATFORM_SUPPORT;
 }
 class De {
   constructor(e) {
@@ -1042,7 +1042,7 @@ class Te {
     return new TextDecoder().decode(i);
   }
 }
-class Ie {
+class ke {
   constructor(e, t) {
     h(this, "webauthn");
     h(this, "storage");
@@ -1260,7 +1260,7 @@ class Ie {
     return [];
   }
 }
-const ke = {
+const Ie = {
   // Token Messenger contract addresses by chain ID
   tokenMessengerAddresses: {
     // TESTNETS
@@ -1673,7 +1673,7 @@ class Me {
   constructor(e, t) {
     h(this, "config");
     h(this, "provider");
-    this.provider = e, this.config = { ...ke, ...t };
+    this.provider = e, this.config = { ...Ie, ...t };
   }
   /**
    * Transfer USDC cross-chain using CCTP
@@ -1780,7 +1780,7 @@ class Me {
    */
   extractMessageHash(e) {
     const t = A(
-      I(
+      k(
         "MessageSent(bytes)"
       )
     ), n = e.logs.find((s) => s.topics[0] === t);
@@ -1864,7 +1864,7 @@ class Ne {
    * Get counterfactual Smart Account address
    */
   getAccountAddress(e) {
-    const t = A(I(e)), n = A(
+    const t = A(k(e)), n = A(
       R.encode(
         ["address", "address"],
         [this.config.accountImplementation, e]
@@ -1997,7 +1997,7 @@ class Ne {
    */
   async signUserOperation(e, t) {
     const n = this.getUserOpHash(t);
-    return await e.signMessage(I(n));
+    return await e.signMessage(k(n));
   }
   /**
    * Get UserOperation hash
@@ -2032,15 +2032,15 @@ class Ne {
       [
         e.sender,
         e.nonce,
-        A(e.initCode === "0x" ? new Uint8Array() : I(e.initCode)),
-        A(e.callData === "0x" ? new Uint8Array() : I(e.callData)),
+        A(e.initCode === "0x" ? new Uint8Array() : k(e.initCode)),
+        A(e.callData === "0x" ? new Uint8Array() : k(e.callData)),
         e.callGasLimit,
         e.verificationGasLimit,
         e.preVerificationGas,
         e.maxFeePerGas,
         e.maxPriorityFeePerGas,
         A(
-          e.paymasterAndData === "0x" ? new Uint8Array() : I(e.paymasterAndData)
+          e.paymasterAndData === "0x" ? new Uint8Array() : k(e.paymasterAndData)
         )
       ]
     );
@@ -2136,7 +2136,7 @@ class ze {
       rpId: e.rpId,
       rpName: e.appName,
       backendUrl: e.backendUrl
-    }), this.storage = new ve(), this.keyManager = new Ie(this.webauthn, this.storage), this.provider = new q(e.rpcUrl), this.cctpManager = new Me(this.provider, e.cctp), this.accountType = e.accountType || "eoa", this.accountType === "smart-account" && (this.smartAccountManager = new Ne(
+    }), this.storage = new ve(), this.keyManager = new ke(this.webauthn, this.storage), this.provider = new q(e.rpcUrl), this.cctpManager = new Me(this.provider, e.cctp), this.accountType = e.accountType || "eoa", this.accountType === "smart-account" && (this.smartAccountManager = new Ne(
       this.provider,
       e.smartAccount,
       e.paymaster
@@ -2552,7 +2552,16 @@ class Xe {
     });
     if (!r.ok)
       throw new Error("Failed to get authentication options");
-    const s = await r.json(), i = ((w = s.data) == null ? void 0 : w.options) || s, c = await L({ optionsJSON: i }), u = await fetch(`${this.config.backendUrl}/passkeys/auth/finish`, {
+    const s = await r.json(), i = ((w = s.data) == null ? void 0 : w.options) || s;
+    t && (!i.allowCredentials || i.allowCredentials.length === 0) && (i.allowCredentials = [{
+      id: t,
+      type: "public-key",
+      transports: ["internal", "hybrid"]
+    }], o.info("Added stored credential to allowCredentials", {
+      component: "PasskeyAccountManager",
+      credentialId: t.substring(0, 20) + "..."
+    }));
+    const c = await L({ optionsJSON: i }), u = await fetch(`${this.config.backendUrl}/passkeys/auth/finish`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
@@ -2922,10 +2931,10 @@ export {
   Ye as CircleApiClient,
   Ke as CirclePaymasterClient,
   Ue as DEFAULT_AA_CONFIG,
-  ke as DEFAULT_CCTP_CONFIG,
-  Ie as KeyManager,
+  Ie as DEFAULT_CCTP_CONFIG,
+  ke as KeyManager,
   ge as LogLevel,
-  k as PASSKEY_DIAGNOSTIC_MESSAGES,
+  I as PASSKEY_DIAGNOSTIC_MESSAGES,
   Xe as PasskeyAccountManager,
   Ve as PasskeyDiagnosticError,
   ve as SecureStorage,
