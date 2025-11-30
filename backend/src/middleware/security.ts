@@ -89,11 +89,11 @@ const rateLimiters = {
     blockDuration: 300, // Block for 5 minutes on limit
   }),
 
-  // Very strict rate limiter for registration/OTP
+  // Rate limiter for registration/OTP
   registration: new RateLimiterMemory({
-    points: 5,          // Number of requests
-    duration: 3600,     // Per hour
-    blockDuration: 1800,// Block for 30 minutes on limit
+    points: 10,         // Number of requests
+    duration: 300,      // Per 5 minutes
+    blockDuration: 60,  // Block for 1 minute on limit
   }),
 
   // Stricter rate limiter for recovery endpoints
