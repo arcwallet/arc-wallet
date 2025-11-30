@@ -171,7 +171,9 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
       } else if (errorMessage.includes('credential not found')) {
         setError('Passkey not found. Please create a new wallet.');
       } else {
-        setError('Something went wrong. Please try again.');
+        // Show actual error for debugging
+        console.error('[WalletSetup] Unhandled error:', err.message);
+        setError(`Error: ${err.message || 'Something went wrong. Please try again.'}`);
       }
     } finally {
       setIsCreating(false);
