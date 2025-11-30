@@ -131,6 +131,12 @@ export declare class PasskeyAccountManager {
     private storeCredential;
     private loadCredential;
     /**
+     * Recover credential from deployed smart contract on chain
+     * When localStorage and backend both lost the credential, but wallet is deployed,
+     * we can read the public key directly from the smart contract
+     */
+    private recoverCredentialFromChain;
+    /**
      * Sync credential to backend for future protection
      * This registers the credential in backend DB so user can't accidentally create a new passkey
      */
