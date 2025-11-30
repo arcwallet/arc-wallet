@@ -61,6 +61,7 @@ export interface PasskeyBridgeParams {
   amount: string; // Human readable (e.g., "100" for 100 USDC)
   direction: BridgeDirection;
   recipientAddress?: string; // Optional: defaults to sender address
+  senderAddressOverride?: string; // Optional: override sender address for balance checks (when cross-chain factories differ)
   onProgress?: (step: BridgeProgressStep) => void;
 }
 
@@ -87,7 +88,7 @@ export interface BridgeResult {
  * Executes approve + depositForBurn as UserOperations signed with passkey
  */
 export async function bridgeUsdcWithPasskey(params: PasskeyBridgeParams): Promise<BridgeResult> {
-  const { passkeyManager, sepoliaPasskeyManager, amount, direction, recipientAddress, onProgress } = params;
+  const { passkeyManager, sepoliaPasskeyManager, amount, direction, recipientAddress, senderAddressOverride, onProgress } = params;
 
   const sourceConfig = direction === 'arc-to-sepolia' ? ARC_TESTNET_CONFIG : SEPOLIA_CONFIG;
   const destConfig = direction === 'arc-to-sepolia' ? SEPOLIA_CONFIG : ARC_TESTNET_CONFIG;
@@ -98,7 +99,9 @@ export async function bridgeUsdcWithPasskey(params: PasskeyBridgeParams): Promis
     : passkeyManager;
   const destManager = passkeyManager; // Arc manager is always used for Arc operations
 
-  const senderAddress = sourceManager.getAccountAddress();
+  // Get sender address - use override if provided (for cross-chain factory address mismatch)
+  // This allows balance checks on the actual EOA/smart wallet address where funds are
+  const senderAddress = senderAddressOverride || sourceManager.getAccountAddress();
   if (!senderAddress) {
     throw new Error('PasskeyAccount not connected. Please connect first.');
   }

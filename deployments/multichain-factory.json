@@ -1,0 +1,18 @@
+{
+  "factoryAddress": "0x38bdac0eA9FFA6cE260370D98Fd2b89a3257A9c8",
+  "entryPoint": "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789",
+  "salt": "0x41726357616c6c65745f506173736b6579466163746f72795f76310000000000",
+  "initCodeHash": "0xedfcf85b79333a3e3732bbdd6abad392fc9ce788b321426327ad770783870fe5",
+  "deployMethod": "CREATE2",
+  "create2Deployer": "0x4e59b44847b379578588920cA78FbF26c0B4956C",
+  "timestamp": "2025-11-30T00:55:34.146Z",
+  "chains": {
+    "arcTestnet": {
+      "name": "Arc Testnet",
+      "chainId": 5042002,
+      "address": "0x38bdac0eA9FFA6cE260370D98Fd2b89a3257A9c8",
+      "txHash": "0xf3e3ad7fab111a29ca22a227a3fa79f87a899eb529a7e99d8c5bdbbfe8671498",
+      "alreadyDeployed": false
+    }
+  }
+}

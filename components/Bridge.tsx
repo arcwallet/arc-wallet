@@ -27,7 +27,7 @@ const SEPOLIA_PASSKEY_CONFIG = {
   chainId: 11155111, // Sepolia
 };
 
-const DIRECTIONS: { id: BridgeDirection; label: string; description: string; disabled?: boolean }[] = [
+const DIRECTIONS: { id: BridgeDirection; label: string; description: string; disabled?: boolean; disabledReason?: string }[] = [
   {
     id: 'arc-to-sepolia',
     label: 'Arc → Sepolia',
@@ -37,6 +37,7 @@ const DIRECTIONS: { id: BridgeDirection; label: string; description: string; dis
     id: 'sepolia-to-arc',
     label: 'Sepolia → Arc',
     description: 'Burn USDC on Sepolia and mint on Arc',
+    // Now enabled with CREATE2 deployed factory (same address on both chains)
   },
 ];
 
@@ -229,11 +230,17 @@ const Bridge: React.FC = () => {
     setDestTxHash(null);
 
     try {
+      // For sepolia-to-arc direction, override sender address with Arc address
+      // because different factory contracts on Sepolia produce different counterfactual addresses
+      // but the actual USDC is held at the Arc address
+      const senderOverride = direction === 'sepolia-to-arc' ? address : undefined;
+
       const result = await bridgeUsdcWithPasskey({
         passkeyManager,
         sepoliaPasskeyManager: sepoliaManagerRef.current || undefined,
         amount: normalized,
         direction,
+        senderAddressOverride: senderOverride,
         onProgress: handleProgressUpdate,
       });
 
@@ -364,6 +371,9 @@ const Bridge: React.FC = () => {
               >
                 <p className="text-base font-semibold">{option.label}</p>
                 <p className="text-xs text-slate-400 mt-1">{option.description}</p>
+                {option.disabled && option.disabledReason && (
+                  <p className="text-xs text-amber-400/80 mt-2 italic">{option.disabledReason}</p>
+                )}
               </button>
             ))}
           </div>
