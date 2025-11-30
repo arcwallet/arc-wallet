@@ -98,10 +98,25 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
           throw connectErr; // Re-throw to handle in outer catch
         }
 
-        // If no credential found on device, fall back to creating new
+        // If no credential found on device, check if server has passkey first
         if (connectError.includes('no credential') || connectError.includes('not found') ||
             connectError.includes('no passkey') || connectError.includes('could not find')) {
-          console.log('[WalletSetup] No existing passkey found on device, creating new...');
+          console.log('[WalletSetup] No existing passkey found on device...');
+
+          // CRITICAL: Check if user already has a passkey on server before creating new
+          // This prevents creating duplicate wallets when user cleared cookies/changed device
+          if (hasServerPasskey) {
+            console.log('[WalletSetup] Server has passkey but device does not - user must use original device');
+            setError(
+              'Your passkey was created on a different device/browser. ' +
+              'Please use the same device where you originally created your wallet, ' +
+              'or check your iCloud Keychain / Google Password Manager for synced passkeys.'
+            );
+            return;
+          }
+
+          // No passkey on server either - safe to create new wallet
+          console.log('[WalletSetup] No passkey on server either, creating new wallet...');
           setStatusMessage(`Creating new wallet for ${currentEmail}...`);
 
           const result = await createAccount();
