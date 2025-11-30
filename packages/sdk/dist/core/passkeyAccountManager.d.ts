@@ -79,7 +79,9 @@ export declare class PasskeyAccountManager {
      */
     isAccountDeployed(): Promise<boolean>;
     /**
-     * Get account nonce
+     * Get account nonce from EntryPoint
+     * IMPORTANT: Nonce must be retrieved from EntryPoint, not from smart wallet
+     * Each EntryPoint tracks nonces independently
      */
     getAccountNonce(): Promise<bigint>;
     /**

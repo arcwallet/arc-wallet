@@ -415,16 +415,35 @@ export class PasskeyAccountManager {
   }
 
   /**
-   * Get account nonce
+   * Get account nonce from EntryPoint
+   * IMPORTANT: Nonce must be retrieved from EntryPoint, not from smart wallet
+   * Each EntryPoint tracks nonces independently
    */
   async getAccountNonce(): Promise<bigint> {
     if (!this.accountAddress) throw new Error('No account connected');
 
-    const isDeployed = await this.isAccountDeployed();
-    if (!isDeployed) return 0n;
+    // Get nonce from EntryPoint using getNonce(address sender, uint192 key)
+    // key = 0 for default nonce sequence
+    const ENTRY_POINT_ABI = [
+      'function getNonce(address sender, uint192 key) view returns (uint256)',
+    ];
+    const entryPoint = new Contract(this.config.entryPointAddress, ENTRY_POINT_ABI, this.provider);
 
-    const account = new Contract(this.accountAddress, ACCOUNT_ABI, this.provider);
-    return await account.getUserOpNonce();
+    try {
+      const nonce = await entryPoint.getNonce(this.accountAddress, 0);
+      logger.info('Got nonce from EntryPoint', {
+        component: 'PasskeyAccountManager',
+        nonce: nonce.toString(),
+        entryPoint: this.config.entryPointAddress,
+      });
+      return nonce;
+    } catch (error) {
+      // Fallback to 0 if EntryPoint call fails (e.g., not deployed yet)
+      logger.warn('Failed to get nonce from EntryPoint, using 0', {
+        component: 'PasskeyAccountManager',
+      });
+      return 0n;
+    }
   }
 
   /**
