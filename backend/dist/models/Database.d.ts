@@ -100,5 +100,15 @@ export declare class Database {
     }): Promise<void>;
     getAllTokenMetadata(): Promise<any[]>;
     close(): Promise<void>;
+    /**
+     * ADMIN ONLY: Reset all user data for testing
+     * WARNING: This deletes ALL users, passkeys, sessions, etc.
+     */
+    resetAllUserData(): Promise<{
+        users: number;
+        passkeys: number;
+        sessions: number;
+        challenges: number;
+    }>;
 }
 //# sourceMappingURL=Database.d.ts.map

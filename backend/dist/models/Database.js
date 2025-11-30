@@ -1126,5 +1126,31 @@ export class Database {
         const close = promisify(this.db.close.bind(this.db));
         await close();
     }
+    /**
+     * ADMIN ONLY: Reset all user data for testing
+     * WARNING: This deletes ALL users, passkeys, sessions, etc.
+     */
+    async resetAllUserData() {
+        await this.waitForReady();
+        const run = promisify(this.db.run.bind(this.db));
+        const get = promisify(this.db.get.bind(this.db));
+        // Get counts before deletion
+        const userCount = await get('SELECT COUNT(*) as count FROM users');
+        const passkeyCount = await get('SELECT COUNT(*) as count FROM passkey_credentials');
+        const sessionCount = await get('SELECT COUNT(*) as count FROM session_keys');
+        const challengeCount = await get('SELECT COUNT(*) as count FROM challenges');
+        // Delete in order (foreign key constraints)
+        await run('DELETE FROM session_keys');
+        await run('DELETE FROM passkey_credentials');
+        await run('DELETE FROM challenges');
+        await run('DELETE FROM recovery_tokens');
+        await run('DELETE FROM users');
+        return {
+            users: userCount?.count || 0,
+            passkeys: passkeyCount?.count || 0,
+            sessions: sessionCount?.count || 0,
+            challenges: challengeCount?.count || 0
+        };
+    }
 }
 //# sourceMappingURL=Database.js.map

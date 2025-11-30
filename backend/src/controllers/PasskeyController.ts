@@ -1031,4 +1031,41 @@ export class PasskeyController {
       throw new ApiError('Failed to register credential', 500, 'ADMIN_REGISTER_FAILED');
     }
   };
+
+  /**
+   * Admin endpoint to reset ALL user data (for testing)
+   * POST /passkeys/admin/reset-all
+   */
+  adminResetAll = async (req: Request, res: Response) => {
+    try {
+      const { adminSecret } = req.body;
+
+      // Verify admin secret
+      const expectedSecret = process.env.ADMIN_SECRET || 'arc-wallet-admin-2024';
+      if (adminSecret !== expectedSecret) {
+        throw new ApiError('Invalid admin secret', 401, 'UNAUTHORIZED');
+      }
+
+      console.log('[AdminResetAll] Resetting all user data...');
+
+      const result = await this.db.resetAllUserData();
+
+      console.log('[AdminResetAll] Reset complete:', result);
+
+      return res.json({
+        success: true,
+        data: {
+          message: 'All user data has been reset',
+          deleted: result
+        }
+      });
+
+    } catch (error) {
+      console.error('Admin reset all error:', error);
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      throw new ApiError('Failed to reset data', 500, 'ADMIN_RESET_FAILED');
+    }
+  };
 }

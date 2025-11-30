@@ -224,6 +224,19 @@ export function createPasskeyRoutes(db, config, sessionStore) {
             next(error);
         }
     });
+    /**
+     * POST /passkeys/admin/reset-all
+     * Admin endpoint to reset ALL user data (for testing)
+     * WARNING: This deletes all users, passkeys, sessions, etc.
+     */
+    router.post('/admin/reset-all', validateRequestBody(['adminSecret']), async (req, res, next) => {
+        try {
+            await passkeyController.adminResetAll(req, res);
+        }
+        catch (error) {
+            next(error);
+        }
+    });
     return router;
 }
 //# sourceMappingURL=passkeys.js.map

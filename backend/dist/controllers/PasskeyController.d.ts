@@ -73,5 +73,10 @@ export declare class PasskeyController {
      * but passkey still exists on user's device
      */
     adminRegisterCredential: (req: Request, res: Response) => Promise<Response<any, Record<string, any>>>;
+    /**
+     * Admin endpoint to reset ALL user data (for testing)
+     * POST /passkeys/admin/reset-all
+     */
+    adminResetAll: (req: Request, res: Response) => Promise<Response<any, Record<string, any>>>;
 }
 //# sourceMappingURL=PasskeyController.d.ts.map

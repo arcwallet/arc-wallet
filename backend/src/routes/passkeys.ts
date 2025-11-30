@@ -312,5 +312,22 @@ export function createPasskeyRoutes(db: Database, config: EnvConfig, sessionStor
     }
   );
 
+  /**
+   * POST /passkeys/admin/reset-all
+   * Admin endpoint to reset ALL user data (for testing)
+   * WARNING: This deletes all users, passkeys, sessions, etc.
+   */
+  router.post(
+    '/admin/reset-all',
+    validateRequestBody(['adminSecret']),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        await passkeyController.adminResetAll(req, res);
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
+
   return router;
 }
