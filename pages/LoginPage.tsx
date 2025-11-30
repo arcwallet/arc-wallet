@@ -142,6 +142,12 @@ const LoginPage: React.FC = () => {
       const data = await response.json();
 
       if (!response.ok || !data.success) {
+        // Check for rate limit error
+        if (data.code === 'RATE_LIMIT_EXCEEDED' && data.retryAfter) {
+          setCooldown(data.retryAfter);
+          showMessage(`Please wait ${data.retryAfter} seconds before trying again`, 'info');
+          return;
+        }
         throw new Error(data.error || 'Failed to send verification code');
       }
 
@@ -149,12 +155,24 @@ const LoginPage: React.FC = () => {
       setCooldown(60);
       showMessage('Verification code sent to your email', 'success');
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('[LoginPage] Error:', error);
-      showMessage(
-        error instanceof Error ? error.message : 'Something went wrong. Please try again.',
-        'error'
-      );
+
+      // Check if it's a rate limit error - show as info, not error
+      const errorMessage = error instanceof Error ? error.message : 'Something went wrong. Please try again.';
+      const isRateLimitError = errorMessage.toLowerCase().includes('too many') ||
+                               errorMessage.toLowerCase().includes('rate limit') ||
+                               error?.code === 'RATE_LIMIT_EXCEEDED';
+
+      if (isRateLimitError) {
+        // Extract retry time if available
+        const retryMatch = errorMessage.match(/(\d+)\s*(saniye|second|s\b)/i);
+        const retrySeconds = retryMatch ? parseInt(retryMatch[1]) : 60;
+        setCooldown(retrySeconds);
+        showMessage(`Please wait ${retrySeconds} seconds before trying again`, 'info');
+      } else {
+        showMessage(errorMessage, 'error');
+      }
       setStep('email');
     } finally {
       setSubmitting(false);
@@ -239,16 +257,28 @@ const LoginPage: React.FC = () => {
       const data = await response.json();
 
       if (!response.ok || !data.success) {
+        // Check for rate limit error
+        if (data.code === 'RATE_LIMIT_EXCEEDED' && data.retryAfter) {
+          setCooldown(data.retryAfter);
+          showMessage(`Please wait ${data.retryAfter} seconds before trying again`, 'info');
+          return;
+        }
         throw new Error(data.error || 'Failed to resend code');
       }
 
       setCooldown(60);
       showMessage('New verification code sent', 'success');
-    } catch (error) {
-      showMessage(
-        error instanceof Error ? error.message : 'Failed to resend code',
-        'error'
-      );
+    } catch (error: any) {
+      // Check if it's a rate limit error
+      const errorMessage = error instanceof Error ? error.message : 'Failed to resend code';
+      const isRateLimitError = errorMessage.toLowerCase().includes('too many') ||
+                               errorMessage.toLowerCase().includes('rate limit');
+
+      if (isRateLimitError) {
+        showMessage('Please wait before trying again', 'info');
+      } else {
+        showMessage(errorMessage, 'error');
+      }
     } finally {
       setSubmitting(false);
     }
