@@ -15,12 +15,13 @@ import { TX_EXPLORER_URL } from '../config/app.config';
 import { PasskeyAccountManager } from '@arc/wallet-sdk';
 
 // Sepolia config for PasskeyAccountManager
-// Uses our own bundler running on backend (not Pimlico)
+// Uses our own Sepolia bundler running on backend (separate from Arc bundler)
 const SEPOLIA_PASSKEY_CONFIG = {
   factoryAddress: import.meta.env.VITE_SEPOLIA_PASSKEY_FACTORY_ADDRESS || '0x9AE89FbF3C32F976Db2A668d5a5c7B00032BD14a',
   entryPointAddress: '0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789',
   rpcUrl: 'https://ethereum-sepolia-rpc.publicnode.com',
-  bundlerUrl: `${import.meta.env.VITE_BACKEND_URL || 'https://arcwallet-backend.onrender.com'}/api/bundler/rpc`,
+  // IMPORTANT: Use Sepolia-specific bundler endpoint (not the Arc bundler!)
+  bundlerUrl: `${import.meta.env.VITE_BACKEND_URL || 'https://arcwallet-backend.onrender.com'}/api/bundler/sepolia/rpc`,
   backendUrl: import.meta.env.VITE_BACKEND_URL || 'https://arcwallet-backend.onrender.com',
   rpId: window.location.hostname || 'app.arcwallet.network',
   rpName: 'Arc Wallet',

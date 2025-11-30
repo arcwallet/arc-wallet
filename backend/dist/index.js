@@ -17,9 +17,11 @@ import { createHistoryRouter } from './routes/history.js';
 import { createWebhookRouter } from './routes/webhooks.js';
 import { createGasStationRouter } from './routes/gasStation.js';
 import { createBundlerRouter } from './routes/bundler.js';
+import { createSepoliaBundlerRouter } from './routes/sepoliaBundler.js';
 import { WalletBackupService } from './services/walletBackupService.js';
 import { IndexerService } from './services/indexerService.js';
 import { getBundlerService } from './services/bundlerService.js';
+import { getSepoliaBundlerService } from './services/sepoliaBundlerService.js';
 import { webhookService } from './services/webhookService.js';
 import { initIndexerDB } from './db/indexer.js';
 import { MagicSessionStore } from './magicLink/SessionStore.js';
@@ -112,6 +114,7 @@ app.use('/api/history', createHistoryRouter());
 app.use('/api/webhooks', createWebhookRouter());
 app.use('/api/gas-station', createGasStationRouter());
 app.use('/api/bundler', createBundlerRouter());
+app.use('/api/bundler/sepolia', createSepoliaBundlerRouter());
 app.use('/api/agent', agentRouter);
 // Initialize indexer database
 console.log('🔧 Initializing indexer database...');
@@ -130,20 +133,26 @@ else {
     console.log('⏸️ Indexer service disabled (INDEXER_ENABLED=false)');
 }
 webhookService.start();
-// Initialize and start bundler service (optional - can be disabled via env)
+// Initialize and start bundler services (optional - can be disabled via env)
 const BUNDLER_ENABLED = process.env.BUNDLER_ENABLED === 'true';
 if (BUNDLER_ENABLED && process.env.BUNDLER_PRIVATE_KEY) {
-    console.log('🚀 Starting bundler service...');
+    console.log('🚀 Starting bundler services...');
     try {
+        // Arc bundler
         const bundlerService = getBundlerService();
         bundlerService.start();
+        console.log('✅ Arc bundler started');
+        // Sepolia bundler
+        const sepoliaBundlerService = getSepoliaBundlerService();
+        sepoliaBundlerService.start();
+        console.log('✅ Sepolia bundler started');
     }
     catch (error) {
         console.error('❌ Failed to start bundler service:', error.message);
     }
 }
 else {
-    console.log('⏸️ Bundler service disabled (BUNDLER_ENABLED=false or no private key)');
+    console.log('⏸️ Bundler services disabled (BUNDLER_ENABLED=false or no private key)');
 }
 // Root endpoint
 app.get('/', (req, res) => {
