@@ -3,8 +3,8 @@ import { body, param, query, validationResult } from 'express-validator';
 import { Database } from '../models/Database.js';
 import { rateLimitMiddleware } from '../middleware/security.js';
 import { MagicSessionStore } from '../magicLink/SessionStore.js';
-// Note: Bridge execution moved to client-side for self-custodial architecture
-// BridgeKit and signing now happens in frontend/services/bridgeService.ts
+import { getBridgeCompleterService } from '../services/bridgeCompleterService.js';
+// Enterprise wallet: Backend auto-completes bridge claims when attestation is ready
 
 const SESSION_COOKIE_NAME = 'arcwallet_session';
 
@@ -322,8 +322,88 @@ export function createBridgeRoutes(db: Database, config: BridgeConfig, sessionSt
     }
   );
 
+  /**
+   * POST /bridge/complete
+   * Manually trigger bridge completion (claim on destination chain)
+   *
+   * ENTERPRISE WALLET: Backend executes receiveMessage with bundler key
+   */
+  router.post(
+    '/bridge/complete',
+    [
+      body('sourceTxHash').isString().notEmpty().withMessage('sourceTxHash is required'),
+      body('direction').isIn(['arc-to-sepolia', 'sepolia-to-arc']).withMessage('Invalid direction'),
+    ],
+    async (req: Request, res: Response) => {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          error: errors.array()[0].msg,
+          code: 'INVALID_REQUEST'
+        });
+      }
+
+      const { sourceTxHash, direction } = req.body;
+      const sourceDomain = direction === 'arc-to-sepolia' ? 26 : 0;
+
+      try {
+        console.log(`🌉 [BRIDGE COMPLETE] Manual claim request: ${sourceTxHash} (${direction})`);
+
+        const completer = getBridgeCompleterService();
+        const result = await completer.manualComplete(sourceTxHash, sourceDomain);
+
+        if (result.success) {
+          console.log(`✅ [BRIDGE COMPLETE] Claim successful: ${result.txHash}`);
+          return res.json({
+            success: true,
+            data: {
+              sourceTxHash,
+              destinationTxHash: result.txHash,
+              message: 'Bridge claim completed successfully'
+            }
+          });
+        } else {
+          console.log(`❌ [BRIDGE COMPLETE] Claim failed: ${result.error}`);
+          return res.status(400).json({
+            success: false,
+            error: result.error,
+            code: 'BRIDGE_CLAIM_FAILED'
+          });
+        }
+
+      } catch (error: any) {
+        console.error('Bridge complete error:', error);
+        return res.status(500).json({
+          success: false,
+          error: error.message || 'Failed to complete bridge claim',
+          code: 'BRIDGE_COMPLETE_ERROR'
+        });
+      }
+    }
+  );
+
+  /**
+   * GET /bridge/completer/status
+   * Get bridge completer service status
+   */
+  router.get('/bridge/completer/status', async (req: Request, res: Response) => {
+    try {
+      const completer = getBridgeCompleterService();
+      const status = completer.getStatus();
+
+      return res.json({
+        success: true,
+        data: status
+      });
+    } catch (error: any) {
+      return res.status(500).json({
+        success: false,
+        error: error.message,
+        code: 'STATUS_ERROR'
+      });
+    }
+  });
+
   return router;
 }
-
-// Note: Bridge execution (signing) moved to client-side
-// See: frontend/services/bridgeService.ts
