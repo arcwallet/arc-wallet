@@ -216,12 +216,11 @@ export async function bridgeUsdcWithPasskey(params: PasskeyBridgeParams): Promis
     onProgress?.({ type: 'attestation-received', attestation });
 
     // Step 6: Call receiveMessage on destination chain
-    // Note: For Arc -> Sepolia, user needs to execute on Sepolia (different chain)
-    // For now, we'll return the attestation and let the user complete on destination
     console.log('[PasskeyBridge] Bridge deposit complete. Attestation ready for destination claim.');
 
-    // If going TO Arc Testnet, we can complete it via PasskeyAccount
+    // Complete the bridge on destination chain
     if (direction === 'sepolia-to-arc') {
+      // Sepolia -> Arc: Use Arc PasskeyManager
       console.log('[PasskeyBridge] Completing on Arc Testnet...');
       onProgress?.({ type: 'minting-usdc' });
 
@@ -245,16 +244,36 @@ export async function bridgeUsdcWithPasskey(params: PasskeyBridgeParams): Promis
         sourceTxHash: burnResult.hash,
         destinationTxHash: mintResult.hash,
       };
+    } else {
+      // Arc -> Sepolia: Use Sepolia PasskeyManager
+      console.log('[PasskeyBridge] Completing on Sepolia...');
+      onProgress?.({ type: 'minting-usdc' });
+
+      if (!sepoliaPasskeyManager) {
+        throw new Error('Sepolia PasskeyManager required for Arc -> Sepolia bridge claim');
+      }
+
+      const messageTransmitterInterface = new Interface(MESSAGE_TRANSMITTER_V2_ABI);
+      const receiveMessageData = messageTransmitterInterface.encodeFunctionData('receiveMessage', [
+        message,
+        attestation,
+      ]);
+
+      const mintResult = await sepoliaPasskeyManager.executeTransaction(
+        destConfig.messageTransmitter,
+        0n,
+        receiveMessageData
+      );
+
+      console.log('[PasskeyBridge] USDC minted on Sepolia:', mintResult.hash);
+      onProgress?.({ type: 'completed', sourceTxHash: burnResult.hash, destinationTxHash: mintResult.hash });
+
+      return {
+        success: true,
+        sourceTxHash: burnResult.hash,
+        destinationTxHash: mintResult.hash,
+      };
     }
-
-    // For Arc -> Sepolia, user needs to complete on Sepolia manually or via different wallet
-    onProgress?.({ type: 'completed', sourceTxHash: burnResult.hash });
-
-    return {
-      success: true,
-      sourceTxHash: burnResult.hash,
-      // destinationTxHash will be completed on Sepolia
-    };
 
   } catch (error: any) {
     console.error('[PasskeyBridge] Error:', error);
