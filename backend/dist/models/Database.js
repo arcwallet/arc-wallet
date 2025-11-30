@@ -1138,11 +1138,11 @@ export class Database {
         const userCount = await get('SELECT COUNT(*) as count FROM users');
         const passkeyCount = await get('SELECT COUNT(*) as count FROM passkey_credentials');
         const sessionCount = await get('SELECT COUNT(*) as count FROM session_keys');
-        const challengeCount = await get('SELECT COUNT(*) as count FROM challenges');
+        const challengeCount = await get('SELECT COUNT(*) as count FROM webauthn_challenges');
         // Delete in order (foreign key constraints)
         await run('DELETE FROM session_keys');
         await run('DELETE FROM passkey_credentials');
-        await run('DELETE FROM challenges');
+        await run('DELETE FROM webauthn_challenges');
         await run('DELETE FROM recovery_tokens');
         await run('DELETE FROM users');
         return {
