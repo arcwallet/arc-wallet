@@ -337,18 +337,22 @@ export class PasskeyController {
       let allowCredentials = undefined;
       const normalizedUsername = username?.trim() ? normalizeUsername(username) : undefined;
 
-      // If username is provided, get user's credentials
+      // If username is provided, try to get user's credentials
+      // But don't fail if user not found - allow discoverable credential flow
+      // This enables recovery when backend DB lost the credential but user has passkey on device
       if (normalizedUsername) {
         const user = await this.db.getUserByUsername(normalizedUsername);
-        if (!user) {
-          throw new ApiError('User not found', 404, 'USER_NOT_FOUND');
+        if (user) {
+          const userPasskeys = await this.db.getPasskeysByUserId(user.id);
+          allowCredentials = userPasskeys.map(passkey => ({
+            id: passkey.credentialID,
+            transports: ['internal'] as any
+          }));
+        } else {
+          // User not found in DB - allow discoverable credential flow
+          // SDK will handle recovery from chain if wallet is deployed
+          console.log('[PasskeyAuth] User not found in DB, allowing discoverable credential flow:', normalizedUsername);
         }
-
-        const userPasskeys = await this.db.getPasskeysByUserId(user.id);
-        allowCredentials = userPasskeys.map(passkey => ({
-          id: passkey.credentialID,
-          transports: ['internal'] as any
-        }));
       }
 
       // Generate authentication options
