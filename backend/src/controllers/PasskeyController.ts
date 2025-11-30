@@ -332,15 +332,23 @@ export class PasskeyController {
    */
   authenticationStart = async (req: Request, res: Response) => {
     try {
-      const { username }: AuthenticationStartRequest = req.body;
+      const { username, credentialId, challenge }: AuthenticationStartRequest & { credentialId?: string; challenge?: string } = req.body;
 
       let allowCredentials = undefined;
       const normalizedUsername = username?.trim() ? normalizeUsername(username) : undefined;
 
+      // If credentialId is provided directly (for signing operations), use it
+      if (credentialId) {
+        allowCredentials = [{
+          id: credentialId,
+          transports: ['internal', 'hybrid'] as any
+        }];
+        console.log('[PasskeyAuth] Using provided credentialId for authentication');
+      }
       // If username is provided, try to get user's credentials
       // But don't fail if user not found - allow discoverable credential flow
       // This enables recovery when backend DB lost the credential but user has passkey on device
-      if (normalizedUsername) {
+      else if (normalizedUsername) {
         const user = await this.db.getUserByUsername(normalizedUsername);
         if (user) {
           const userPasskeys = await this.db.getPasskeysByUserId(user.id);
@@ -356,11 +364,13 @@ export class PasskeyController {
       }
 
       // Generate authentication options
+      // If custom challenge provided (for UserOp signing), use it
       const options = await generateAuthenticationOptions({
         rpID: this.config.RP_ID,
         allowCredentials,
         userVerification: 'required',
-        timeout: 60000 // 60 seconds timeout
+        timeout: 60000, // 60 seconds timeout
+        challenge: challenge ? Buffer.from(challenge.replace('0x', ''), 'hex') : undefined,
       });
 
       // Store challenge in database
