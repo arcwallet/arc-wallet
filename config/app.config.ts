@@ -17,7 +17,7 @@ export const BACKEND_URL = getEnv('VITE_BACKEND_URL', 'https://arcwallet-backend
 
 // Blockchain Configuration
 export const RPC_URL = getEnv('VITE_ARC_RPC_URL', 'https://rpc.testnet.arc.network');
-export const ENTRY_POINT = getEnv('VITE_ARC_ENTRY_POINT', '0x0000000071727De22E5E9d8BAf0edAc6f37da032'); // ERC-4337 v0.7 EntryPoint
+export const ENTRY_POINT = getEnv('VITE_ARC_ENTRY_POINT', '0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789'); // ERC-4337 v0.6 EntryPoint
 
 // Arc Testnet Chain Configuration
 export const ARC_TESTNET = {
