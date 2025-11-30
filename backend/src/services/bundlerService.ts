@@ -332,6 +332,11 @@ export class BundlerService {
             // Prepare operations for handleOps
             const ops = pendingOps.map(([_, entry]) => entry.userOp);
 
+            // Check and ensure sufficient deposits for all senders
+            for (const op of ops) {
+                await this.ensureSufficientDeposit(op.sender, op);
+            }
+
             // Estimate gas for the bundle
             const gasEstimate = await this.entryPoint.handleOps.estimateGas(
                 ops,
@@ -803,6 +808,57 @@ export class BundlerService {
             mempoolSize: this.mempool.size,
             pendingCount,
         };
+    }
+
+    /**
+     * Ensure sufficient deposit in EntryPoint for a sender
+     * If deposit is insufficient, bundler will sponsor by depositing ETH
+     */
+    private async ensureSufficientDeposit(sender: string, userOp: PackedUserOperation): Promise<void> {
+        // Skip if paymaster is being used
+        if (userOp.paymasterAndData && userOp.paymasterAndData !== '0x') {
+            return;
+        }
+
+        // Calculate required prefund
+        const requiredPrefund = this.calculateRequiredPrefund(userOp);
+
+        // Check current deposit
+        const currentDeposit = await this.entryPoint.balanceOf(sender);
+
+        console.log(`💰 Deposit check for ${sender.slice(0, 10)}...:`);
+        console.log(`   Current deposit: ${ethers.formatEther(currentDeposit)} ETH`);
+        console.log(`   Required prefund: ${ethers.formatEther(requiredPrefund)} ETH`);
+
+        if (currentDeposit >= requiredPrefund) {
+            console.log(`   ✅ Sufficient deposit`);
+            return;
+        }
+
+        // Calculate how much to deposit (with 50% buffer for gas price fluctuations)
+        const depositAmount = (requiredPrefund - currentDeposit) * 150n / 100n;
+
+        console.log(`   ⚠️ Insufficient deposit, sponsoring ${ethers.formatEther(depositAmount)} ETH...`);
+
+        // Check bundler has enough ETH
+        const bundlerBalance = await this.provider.getBalance(this.bundlerWallet.address);
+        if (bundlerBalance < depositAmount) {
+            throw new Error(`Bundler has insufficient ETH to sponsor. Needed: ${ethers.formatEther(depositAmount)}, Has: ${ethers.formatEther(bundlerBalance)}`);
+        }
+
+        // Deposit to EntryPoint for the sender
+        try {
+            const tx = await this.entryPoint.depositTo(sender, {
+                value: depositAmount,
+            });
+            console.log(`   📤 Deposit tx submitted: ${tx.hash}`);
+
+            const receipt = await tx.wait();
+            console.log(`   ✅ Deposit confirmed in block ${receipt?.blockNumber}`);
+        } catch (error: any) {
+            console.error(`   ❌ Deposit failed: ${error.message}`);
+            throw error;
+        }
     }
 
     /**
