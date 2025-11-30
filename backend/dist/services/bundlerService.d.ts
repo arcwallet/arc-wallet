@@ -136,6 +136,11 @@ export declare class BundlerService {
         pendingCount: number;
     };
     /**
+     * Ensure sufficient deposit in EntryPoint for a sender
+     * If deposit is insufficient, bundler will sponsor by depositing ETH
+     */
+    private ensureSufficientDeposit;
+    /**
      * Get bundler wallet balance
      */
     getBalance(): Promise<string>;

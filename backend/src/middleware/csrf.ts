@@ -38,6 +38,7 @@ const CSRF_EXEMPT_ROUTES = [
   '/api/gas-station',   // Gas station routes (used internally by bundler for sponsoring transactions)
   '/health',
   '/passkeys',          // All passkey routes exempt (WebAuthn provides cryptographic security)
+  '/api/passkeys',      // Also exempt with /api prefix
 ];
 
 /**
