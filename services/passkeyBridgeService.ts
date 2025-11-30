@@ -149,29 +149,8 @@ export async function bridgeUsdcWithPasskey(params: PasskeyBridgeParams): Promis
     });
     const currentAllowance = BigInt(allowanceResult);
 
-    if (currentAllowance < amountWei) {
-      console.log('[PasskeyBridge] Approving USDC...');
-      onProgress?.({ type: 'approving-usdc' });
-
-      // Encode approve call
-      const approveData = usdcInterface.encodeFunctionData('approve', [
-        sourceConfig.tokenMessenger,
-        amountWei,
-      ]);
-
-      // Execute approve via PasskeyAccount (UserOperation)
-      const approveResult = await sourceManager.executeTransaction(
-        sourceConfig.usdc,
-        0n, // No native value
-        approveData
-      );
-
-      console.log('[PasskeyBridge] USDC approved:', approveResult.hash);
-      onProgress?.({ type: 'approving-usdc', txHash: approveResult.hash });
-    }
-
-    // Step 3: Call depositForBurn on TokenMessengerV2
-    console.log('[PasskeyBridge] Burning USDC...');
+    // Step 3: Prepare depositForBurn call
+    console.log('[PasskeyBridge] Preparing bridge transaction...');
     onProgress?.({ type: 'burning-usdc' });
 
     const tokenMessengerInterface = new Interface(TOKEN_MESSENGER_V2_ABI);
@@ -197,15 +176,39 @@ export async function bridgeUsdcWithPasskey(params: PasskeyBridgeParams): Promis
       minFinalityThreshold,
     ]);
 
-    // Execute depositForBurn via PasskeyAccount (UserOperation)
-    const burnResult = await sourceManager.executeTransaction(
-      sourceConfig.tokenMessenger,
-      0n,
-      depositForBurnData
-    );
+    let burnResult: { hash: string; userOpHash?: string };
 
-    console.log('[PasskeyBridge] USDC burned:', burnResult.hash);
-    onProgress?.({ type: 'burning-usdc', txHash: burnResult.hash });
+    // Use batch transaction if approve is needed (single passkey signature for both)
+    if (currentAllowance < amountWei) {
+      console.log('[PasskeyBridge] Using batch: approve + depositForBurn in single signature');
+      onProgress?.({ type: 'approving-usdc' });
+
+      // Encode approve call
+      const approveData = usdcInterface.encodeFunctionData('approve', [
+        sourceConfig.tokenMessenger,
+        amountWei,
+      ]);
+
+      // Execute both in a single batch transaction (1 passkey signature)
+      burnResult = await sourceManager.executeBatchTransaction([
+        { to: sourceConfig.usdc, value: 0n, data: approveData },
+        { to: sourceConfig.tokenMessenger, value: 0n, data: depositForBurnData },
+      ]);
+
+      console.log('[PasskeyBridge] Batch tx (approve + burn):', burnResult.hash);
+      onProgress?.({ type: 'burning-usdc', txHash: burnResult.hash });
+    } else {
+      // Allowance already sufficient, just do depositForBurn
+      console.log('[PasskeyBridge] Allowance sufficient, executing depositForBurn only');
+      burnResult = await sourceManager.executeTransaction(
+        sourceConfig.tokenMessenger,
+        0n,
+        depositForBurnData
+      );
+
+      console.log('[PasskeyBridge] USDC burned:', burnResult.hash);
+      onProgress?.({ type: 'burning-usdc', txHash: burnResult.hash });
+    }
 
     // Step 4: Wait for attestation from Circle (V2 API uses txHash instead of messageHash)
     console.log('[PasskeyBridge] Waiting for attestation...');

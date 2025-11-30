@@ -1,9 +1,9 @@
 var ae = Object.defineProperty;
 var se = (a, e, t) => e in a ? ae(a, e, { enumerable: !0, configurable: !0, writable: !0, value: t }) : a[e] = t;
 var h = (a, e, t) => se(a, typeof e != "symbol" ? e + "" : e, t);
-import { Wallet as K, parseUnits as ie, Contract as P, keccak256 as b, getBytes as T, formatUnits as oe, AbiCoder as B, Interface as N, toBeHex as k, JsonRpcProvider as q } from "ethers";
+import { Wallet as K, parseUnits as ie, Contract as D, keccak256 as C, getBytes as T, formatUnits as oe, AbiCoder as L, Interface as N, toBeHex as k, JsonRpcProvider as q } from "ethers";
 import { set as F, get as O, del as ce, clear as de } from "idb-keyval";
-function S(a) {
+function v(a) {
   const e = new Uint8Array(a);
   let t = "";
   for (const r of e)
@@ -16,7 +16,7 @@ function U(a) {
     i[c] = r.charCodeAt(c);
   return s;
 }
-function $() {
+function V() {
   return le.stubThis((globalThis == null ? void 0 : globalThis.PublicKeyCredential) !== void 0 && typeof globalThis.PublicKeyCredential == "function");
 }
 const le = {
@@ -41,7 +41,7 @@ function Z(a) {
     a === "localhost" || /^([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{2,}$/i.test(a)
   );
 }
-class C extends Error {
+class E extends Error {
   constructor({ message: e, code: t, cause: n, name: r }) {
     super(e, { cause: n }), Object.defineProperty(this, "code", {
       enumerable: !0,
@@ -58,14 +58,14 @@ function ue({ error: a, options: e }) {
     throw Error("options was missing required publicKey property");
   if (a.name === "AbortError") {
     if (e.signal instanceof AbortSignal)
-      return new C({
+      return new E({
         message: "Registration ceremony was sent an abort signal",
         code: "ERROR_CEREMONY_ABORTED",
         cause: a
       });
   } else if (a.name === "ConstraintError") {
     if (((n = t.authenticatorSelection) == null ? void 0 : n.requireResidentKey) === !0)
-      return new C({
+      return new E({
         message: "Discoverable credentials were required but no available authenticator supported it",
         code: "ERROR_AUTHENTICATOR_MISSING_DISCOVERABLE_CREDENTIAL_SUPPORT",
         cause: a
@@ -74,36 +74,36 @@ function ue({ error: a, options: e }) {
       // @ts-ignore: `mediation` doesn't yet exist on CredentialCreationOptions but it's possible as of Sept 2024
       e.mediation === "conditional" && ((r = t.authenticatorSelection) == null ? void 0 : r.userVerification) === "required"
     )
-      return new C({
+      return new E({
         message: "User verification was required during automatic registration but it could not be performed",
         code: "ERROR_AUTO_REGISTER_USER_VERIFICATION_FAILURE",
         cause: a
       });
     if (((s = t.authenticatorSelection) == null ? void 0 : s.userVerification) === "required")
-      return new C({
+      return new E({
         message: "User verification was required but no available authenticator supported it",
         code: "ERROR_AUTHENTICATOR_MISSING_USER_VERIFICATION_SUPPORT",
         cause: a
       });
   } else {
     if (a.name === "InvalidStateError")
-      return new C({
+      return new E({
         message: "The authenticator was previously registered",
         code: "ERROR_AUTHENTICATOR_PREVIOUSLY_REGISTERED",
         cause: a
       });
     if (a.name === "NotAllowedError")
-      return new C({
+      return new E({
         message: a.message,
         code: "ERROR_PASSTHROUGH_SEE_CAUSE_PROPERTY",
         cause: a
       });
     if (a.name === "NotSupportedError")
-      return t.pubKeyCredParams.filter((c) => c.type === "public-key").length === 0 ? new C({
+      return t.pubKeyCredParams.filter((c) => c.type === "public-key").length === 0 ? new E({
         message: 'No entry in pubKeyCredParams was of type "public-key"',
         code: "ERROR_MALFORMED_PUBKEYCREDPARAMS",
         cause: a
-      }) : new C({
+      }) : new E({
         message: "No available authenticator supported any of the specified pubKeyCredParams algorithms",
         code: "ERROR_AUTHENTICATOR_NO_SUPPORTED_PUBKEYCREDPARAMS_ALG",
         cause: a
@@ -112,25 +112,25 @@ function ue({ error: a, options: e }) {
       const i = globalThis.location.hostname;
       if (Z(i)) {
         if (t.rp.id !== i)
-          return new C({
+          return new E({
             message: `The RP ID "${t.rp.id}" is invalid for this domain`,
             code: "ERROR_INVALID_RP_ID",
             cause: a
           });
-      } else return new C({
+      } else return new E({
         message: `${globalThis.location.hostname} is an invalid domain`,
         code: "ERROR_INVALID_DOMAIN",
         cause: a
       });
     } else if (a.name === "TypeError") {
       if (t.user.id.byteLength < 1 || t.user.id.byteLength > 64)
-        return new C({
+        return new E({
           message: "User ID was not between 1 and 64 characters",
           code: "ERROR_INVALID_USER_ID_LENGTH",
           cause: a
         });
     } else if (a.name === "UnknownError")
-      return new C({
+      return new E({
         message: "The authenticator was unable to process the specified options, or could not create a new credential",
         code: "ERROR_AUTHENTICATOR_GENERAL_ERROR",
         cause: a
@@ -168,10 +168,10 @@ function te(a) {
     return a;
 }
 async function ne(a) {
-  var w;
+  var A;
   !a.optionsJSON && a.challenge && (console.warn("startRegistration() was not called correctly. It will try to continue with the provided options, but this call should be refactored to use the expected call structure instead. See https://simplewebauthn.dev/docs/packages/browser#typeerror-cannot-read-properties-of-undefined-reading-challenge for more information."), a = { optionsJSON: a });
   const { optionsJSON: e, useAutoRegister: t = !1 } = a;
-  if (!$())
+  if (!V())
     throw new Error("WebAuthn is not supported in this browser");
   const n = {
     ...e,
@@ -180,7 +180,7 @@ async function ne(a) {
       ...e.user,
       id: U(e.user.id)
     },
-    excludeCredentials: (w = e.excludeCredentials) == null ? void 0 : w.map(Q)
+    excludeCredentials: (A = e.excludeCredentials) == null ? void 0 : A.map(Q)
   }, r = {};
   t && (r.mediation = "conditional"), r.publicKey = n, r.signal = ee.createNewAbortSignal();
   let s;
@@ -191,58 +191,58 @@ async function ne(a) {
   }
   if (!s)
     throw new Error("Registration was not completed");
-  const { id: i, rawId: c, response: l, type: d } = s;
+  const { id: i, rawId: c, response: d, type: l } = s;
   let u;
-  typeof l.getTransports == "function" && (u = l.getTransports());
+  typeof d.getTransports == "function" && (u = d.getTransports());
   let y;
-  if (typeof l.getPublicKeyAlgorithm == "function")
+  if (typeof d.getPublicKeyAlgorithm == "function")
     try {
-      y = l.getPublicKeyAlgorithm();
+      y = d.getPublicKeyAlgorithm();
     } catch (g) {
-      _("getPublicKeyAlgorithm()", g);
+      G("getPublicKeyAlgorithm()", g);
     }
   let f;
-  if (typeof l.getPublicKey == "function")
+  if (typeof d.getPublicKey == "function")
     try {
-      const g = l.getPublicKey();
-      g !== null && (f = S(g));
+      const g = d.getPublicKey();
+      g !== null && (f = v(g));
     } catch (g) {
-      _("getPublicKey()", g);
+      G("getPublicKey()", g);
     }
   let p;
-  if (typeof l.getAuthenticatorData == "function")
+  if (typeof d.getAuthenticatorData == "function")
     try {
-      p = S(l.getAuthenticatorData());
+      p = v(d.getAuthenticatorData());
     } catch (g) {
-      _("getAuthenticatorData()", g);
+      G("getAuthenticatorData()", g);
     }
   return {
     id: i,
-    rawId: S(c),
+    rawId: v(c),
     response: {
-      attestationObject: S(l.attestationObject),
-      clientDataJSON: S(l.clientDataJSON),
+      attestationObject: v(d.attestationObject),
+      clientDataJSON: v(d.clientDataJSON),
       transports: u,
       publicKeyAlgorithm: y,
       publicKey: f,
       authenticatorData: p
     },
-    type: d,
+    type: l,
     clientExtensionResults: s.getClientExtensionResults(),
     authenticatorAttachment: te(s.authenticatorAttachment)
   };
 }
-function _(a, e) {
+function G(a, e) {
   console.warn(`The browser extension that intercepted this WebAuthn API call incorrectly implemented ${a}. You should report this error to them.
 `, e);
 }
 function ye() {
-  if (!$())
-    return G.stubThis(new Promise((e) => e(!1)));
+  if (!V())
+    return _.stubThis(new Promise((e) => e(!1)));
   const a = globalThis.PublicKeyCredential;
-  return (a == null ? void 0 : a.isConditionalMediationAvailable) === void 0 ? G.stubThis(new Promise((e) => e(!1))) : G.stubThis(a.isConditionalMediationAvailable());
+  return (a == null ? void 0 : a.isConditionalMediationAvailable) === void 0 ? _.stubThis(new Promise((e) => e(!1))) : _.stubThis(a.isConditionalMediationAvailable());
 }
-const G = {
+const _ = {
   stubThis: (a) => a
 };
 function fe({ error: a, options: e }) {
@@ -251,14 +251,14 @@ function fe({ error: a, options: e }) {
     throw Error("options was missing required publicKey property");
   if (a.name === "AbortError") {
     if (e.signal instanceof AbortSignal)
-      return new C({
+      return new E({
         message: "Authentication ceremony was sent an abort signal",
         code: "ERROR_CEREMONY_ABORTED",
         cause: a
       });
   } else {
     if (a.name === "NotAllowedError")
-      return new C({
+      return new E({
         message: a.message,
         code: "ERROR_PASSTHROUGH_SEE_CAUSE_PROPERTY",
         cause: a
@@ -267,18 +267,18 @@ function fe({ error: a, options: e }) {
       const n = globalThis.location.hostname;
       if (Z(n)) {
         if (t.rpId !== n)
-          return new C({
+          return new E({
             message: `The RP ID "${t.rpId}" is invalid for this domain`,
             code: "ERROR_INVALID_RP_ID",
             cause: a
           });
-      } else return new C({
+      } else return new E({
         message: `${globalThis.location.hostname} is an invalid domain`,
         code: "ERROR_INVALID_DOMAIN",
         cause: a
       });
     } else if (a.name === "UnknownError")
-      return new C({
+      return new E({
         message: "The authenticator was unable to process the specified options, or could not create a new assertion signature",
         code: "ERROR_AUTHENTICATOR_GENERAL_ERROR",
         cause: a
@@ -286,14 +286,14 @@ function fe({ error: a, options: e }) {
   }
   return a;
 }
-async function L(a) {
-  var p, w;
+async function H(a) {
+  var p, A;
   !a.optionsJSON && a.challenge && (console.warn("startAuthentication() was not called correctly. It will try to continue with the provided options, but this call should be refactored to use the expected call structure instead. See https://simplewebauthn.dev/docs/packages/browser#typeerror-cannot-read-properties-of-undefined-reading-challenge for more information."), a = { optionsJSON: a });
   const { optionsJSON: e, useBrowserAutofill: t = !1, verifyBrowserAutofillInput: n = !0 } = a;
-  if (!$())
+  if (!V())
     throw new Error("WebAuthn is not supported in this browser");
   let r;
-  ((p = e.allowCredentials) == null ? void 0 : p.length) !== 0 && (r = (w = e.allowCredentials) == null ? void 0 : w.map(Q));
+  ((p = e.allowCredentials) == null ? void 0 : p.length) !== 0 && (r = (A = e.allowCredentials) == null ? void 0 : A.map(Q));
   const s = {
     ...e,
     challenge: U(e.challenge),
@@ -315,15 +315,15 @@ async function L(a) {
   }
   if (!c)
     throw new Error("Authentication was not completed");
-  const { id: l, rawId: d, response: u, type: y } = c;
+  const { id: d, rawId: l, response: u, type: y } = c;
   let f;
-  return u.userHandle && (f = S(u.userHandle)), {
-    id: l,
-    rawId: S(d),
+  return u.userHandle && (f = v(u.userHandle)), {
+    id: d,
+    rawId: v(l),
     response: {
-      authenticatorData: S(u.authenticatorData),
-      clientDataJSON: S(u.clientDataJSON),
-      signature: S(u.signature),
+      authenticatorData: v(u.authenticatorData),
+      clientDataJSON: v(u.clientDataJSON),
+      signature: v(u.signature),
       userHandle: f
     },
     type: y,
@@ -598,7 +598,7 @@ class Pe {
         platformSupport: i.platformSupport,
         message: c
       });
-      const l = await fetch(`${this.backendUrl}/passkeys/register/start`, {
+      const d = await fetch(`${this.backendUrl}/passkeys/register/start`, {
         method: "POST",
         headers: this.getHeaders(),
         credentials: "include",
@@ -609,9 +609,9 @@ class Pe {
           // Backend expects 'displayName' (friendly name)
         })
       });
-      if (!l.ok)
+      if (!d.ok)
         throw new Error("Failed to get registration options");
-      const d = await l.json(), u = ((n = d.data) == null ? void 0 : n.options) || d;
+      const l = await d.json(), u = ((n = l.data) == null ? void 0 : n.options) || l;
       o.debug("Received registration options from backend", {
         component: "WebAuthn",
         challenge: ((r = u.challenge) == null ? void 0 : r.substring(0, 20)) + "..."
@@ -632,8 +632,8 @@ class Pe {
         })
       });
       if (!f.ok) {
-        const w = await f.json().catch(() => ({})), g = w.error || w.message || "Failed to verify credential";
-        throw console.error("[WebAuthn] Credential verification failed:", w), new Error(g);
+        const A = await f.json().catch(() => ({})), g = A.error || A.message || "Failed to verify credential";
+        throw console.error("[WebAuthn] Credential verification failed:", A), new Error(g);
       }
       const p = await f.json();
       return o.info("Passkey registered successfully", {
@@ -682,12 +682,12 @@ class Pe {
         component: "WebAuthn",
         challenge: ((n = i.challenge) == null ? void 0 : n.substring(0, 20)) + "..."
       });
-      const c = await L({ optionsJSON: i });
+      const c = await H({ optionsJSON: i });
       o.debug("Authentication response received", {
         component: "WebAuthn",
         credentialId: c.id.substring(0, 20) + "..."
       });
-      const l = await fetch(`${this.backendUrl}/passkeys/auth/finish`, {
+      const d = await fetch(`${this.backendUrl}/passkeys/auth/finish`, {
         method: "POST",
         headers: this.getHeaders(),
         credentials: "include",
@@ -695,18 +695,18 @@ class Pe {
           credential: c
         })
       });
-      if (!l.ok) {
-        const u = await l.json().catch(() => ({}));
+      if (!d.ok) {
+        const u = await d.json().catch(() => ({}));
         throw new Error(u.message || "Failed to verify authentication");
       }
-      const d = await l.json();
+      const l = await d.json();
       return o.info("Authentication successful", {
         component: "WebAuthn",
         credentialId: c.id.substring(0, 20) + "..."
       }), {
         success: !0,
         credentialId: c.id,
-        userId: d.userId
+        userId: l.userId
         // Authenticator data is handled by backend
       };
     } catch (r) {
@@ -1061,10 +1061,10 @@ class Te {
       await this.webCrypto.generateMasterKey(n.id), o.info("WebCrypto master key derived (non-extractable, deterministic)", { component: "KeyManager" });
       const r = K.createRandom(), s = r.privateKey, i = r.address;
       o.info("Wallet created", { component: "KeyManager", address: i });
-      const { encrypted: c, iv: l } = await this.webCrypto.encrypt(s);
+      const { encrypted: c, iv: d } = await this.webCrypto.encrypt(s);
       return await this.storage.storeWebCryptoData(n.id, {
         encrypted: Array.from(c),
-        iv: Array.from(l),
+        iv: Array.from(d),
         address: i,
         keyType: "webcrypto-master"
         // Mark as WebCrypto protected
@@ -1101,14 +1101,14 @@ class Te {
       let i;
       if (s.keyType === "webcrypto-master") {
         console.log("[KeyManager] Deriving WebCrypto master key for decryption"), await this.webCrypto.generateMasterKey(n);
-        const l = new Uint8Array(s.encrypted), d = new Uint8Array(s.iv);
-        i = await this.webCrypto.decrypt(l, d);
+        const d = new Uint8Array(s.encrypted), l = new Uint8Array(s.iv);
+        i = await this.webCrypto.decrypt(d, l);
       } else {
         console.log("[KeyManager] Using legacy decryption method");
-        const l = new Uint8Array(r.salt || []), d = await this.storage.deriveEncryptionKey(
+        const d = new Uint8Array(r.salt || []), l = await this.storage.deriveEncryptionKey(
           n,
-          l
-        ), u = await this.storage.getKey(n, d);
+          d
+        ), u = await this.storage.getKey(n, l);
         if (!u)
           throw new Error("Failed to decrypt private key");
         i = u;
@@ -1431,7 +1431,7 @@ const Ie = {
     name: "DepositForBurn",
     type: "event"
   }
-], j = [
+], J = [
   {
     inputs: [
       {
@@ -1512,7 +1512,7 @@ const Ie = {
     stateMutability: "view",
     type: "function"
   }
-], V = {
+], j = {
   // Ethereum
   1: {
     chainId: 1,
@@ -1602,54 +1602,54 @@ const Ie = {
   }
 };
 function xe(a) {
-  return V[a];
+  return j[a];
 }
 function Me(a) {
   var e;
-  return ((e = V[a]) == null ? void 0 : e.cctpSupported) ?? !1;
+  return ((e = j[a]) == null ? void 0 : e.cctpSupported) ?? !1;
 }
 function je(a) {
   var e;
-  return ((e = V[a]) == null ? void 0 : e.nativeUSDC) ?? !1;
+  return ((e = j[a]) == null ? void 0 : e.nativeUSDC) ?? !1;
 }
-const J = "0x0000000000000000000000000000000000000000", z = /^0x\.\.\.$/;
-function H(a, e) {
-  var i, c, l;
+const z = "0x0000000000000000000000000000000000000000", Y = /^0x\.\.\.$/;
+function $(a, e) {
+  var i, c, d;
   const t = {
     isValid: !0,
     errors: [],
     warnings: []
   };
   if (!Me(e)) {
-    const d = xe(e), u = d ? d.name : `Chain ID ${e}`;
+    const l = xe(e), u = l ? l.name : `Chain ID ${e}`;
     return t.errors.push(`${u} does not support Circle CCTP`), t.isValid = !1, t;
   }
-  const n = (i = a.tokenMessengerAddresses) == null ? void 0 : i[e], r = (c = a.usdcAddresses) == null ? void 0 : c[e], s = (l = a.domainIds) == null ? void 0 : l[e];
+  const n = (i = a.tokenMessengerAddresses) == null ? void 0 : i[e], r = (c = a.usdcAddresses) == null ? void 0 : c[e], s = (d = a.domainIds) == null ? void 0 : d[e];
   return n || (t.errors.push(
     `TokenMessenger address not configured for chain ID ${e}`
-  ), t.isValid = !1), r || (t.errors.push(`USDC address not configured for chain ID ${e}`), t.isValid = !1), s === void 0 && (t.errors.push(`Domain ID not configured for chain ID ${e}`), t.isValid = !1), e === 412346 && ((n === J || z.test(n || "")) && (t.warnings.push(
+  ), t.isValid = !1), r || (t.errors.push(`USDC address not configured for chain ID ${e}`), t.isValid = !1), s === void 0 && (t.errors.push(`Domain ID not configured for chain ID ${e}`), t.isValid = !1), e === 412346 && ((n === z || Y.test(n || "")) && (t.warnings.push(
     "⚠️  Arc Network TokenMessenger address is a PLACEHOLDER. Cross-chain transfers will FAIL. Please obtain the correct address from the Arc Network team."
-  ), t.isValid = !1), (r === J || z.test(r || "")) && (t.warnings.push(
+  ), t.isValid = !1), (r === z || Y.test(r || "")) && (t.warnings.push(
     "⚠️  Arc Network USDC address is a PLACEHOLDER. Cross-chain transfers will FAIL. Please obtain the correct address from the Arc Network team."
   ), t.isValid = !1), s === 7 && t.warnings.push(
     "ℹ️  Arc Network domain ID (7) should be verified with Circle team. Incorrect domain ID will cause transfer failures."
-  )), t.warnings.length > 0 && t.warnings.forEach((d) => {
-    o.warn(d, {
+  )), t.warnings.length > 0 && t.warnings.forEach((l) => {
+    o.warn(l, {
       component: "CCTPValidator",
       chainId: e
     });
-  }), t.errors.length > 0 && t.errors.forEach((d) => {
-    o.error(d, void 0, {
+  }), t.errors.length > 0 && t.errors.forEach((l) => {
+    o.error(l, void 0, {
       component: "CCTPValidator",
       chainId: e
     });
   }), t;
 }
 function Je(a) {
-  const e = H(a, 412346);
+  const e = $(a, 412346);
   return e.isValid && e.warnings.length === 0;
 }
-function Y(a) {
+function X(a) {
   return a === 412346 ? `Arc Network CCTP is not properly configured. Please update the following in your WalletSDK config:
 
 \`\`\`typescript
@@ -1679,23 +1679,23 @@ class Re {
    * Transfer USDC cross-chain using CCTP
    */
   async transferUSDC(e, t) {
-    const { amount: n, destinationAddress: r, destinationChainId: s } = t, i = await e.provider.getNetwork().then((d) => Number(d.chainId)), c = H(this.config, i);
+    const { amount: n, destinationAddress: r, destinationChainId: s } = t, i = await e.provider.getNetwork().then((l) => Number(l.chainId)), c = $(this.config, i);
     if (!c.isValid) {
-      const d = Y(i);
+      const l = X(i);
       throw o.error("CCTP configuration invalid for source chain", void 0, {
         component: "CCTPManager",
         chainId: i,
         errors: c.errors
-      }), new Error(d);
+      }), new Error(l);
     }
-    const l = H(this.config, s);
-    if (!l.isValid) {
-      const d = Y(s);
+    const d = $(this.config, s);
+    if (!d.isValid) {
+      const l = X(s);
       throw o.error("CCTP configuration invalid for destination chain", void 0, {
         component: "CCTPManager",
         chainId: s,
-        errors: l.errors
-      }), new Error(d);
+        errors: d.errors
+      }), new Error(l);
     }
     try {
       console.log("[CCTP] Starting cross-chain USDC transfer:", {
@@ -1703,18 +1703,18 @@ class Re {
         to: s,
         amount: n
       });
-      const d = this.config.tokenMessengerAddresses[i], u = this.config.usdcAddresses[i], y = this.config.domainIds[s];
-      if (!d || !u || y === void 0)
+      const l = this.config.tokenMessengerAddresses[i], u = this.config.usdcAddresses[i], y = this.config.domainIds[s];
+      if (!l || !u || y === void 0)
         throw new Error(`CCTP not supported for chain ${i}`);
-      const f = ie(n, 6), p = new P(u, j, e);
-      await p.allowance(e.address, d) < f && (console.log("[CCTP] Approving USDC..."), await (await p.approve(
-        d,
+      const f = ie(n, 6), p = new D(u, J, e);
+      await p.allowance(e.address, l) < f && (console.log("[CCTP] Approving USDC..."), await (await p.approve(
+        l,
         f
       )).wait(), console.log("[CCTP] USDC approved"));
       const g = this.addressToBytes32(r);
       console.log("[CCTP] Calling depositForBurn...");
-      const D = await (await new P(
-        d,
+      const w = await (await new D(
+        l,
         Oe,
         e
       ).depositForBurn(
@@ -1723,19 +1723,19 @@ class Re {
         g,
         u
       )).wait();
-      console.log("[CCTP] Burn transaction confirmed:", D.hash);
-      const A = this.extractMessageHash(D), v = {
-        sourceTxHash: D.hash,
-        messageHash: A,
+      console.log("[CCTP] Burn transaction confirmed:", w.hash);
+      const b = this.extractMessageHash(w), P = {
+        sourceTxHash: w.hash,
+        messageHash: b,
         status: "pending"
       };
-      return this.pollForAttestation(A).then((x) => {
-        v.attestation = x, v.status = "attested", console.log("[CCTP] Attestation received");
+      return this.pollForAttestation(b).then((x) => {
+        P.attestation = x, P.status = "attested", console.log("[CCTP] Attestation received");
       }).catch((x) => {
-        console.error("[CCTP] Attestation failed:", x), v.status = "failed";
-      }), v;
-    } catch (d) {
-      throw console.error("[CCTP] Transfer failed:", d), new Error(`CCTP transfer failed: ${d.message}`);
+        console.error("[CCTP] Attestation failed:", x), P.status = "failed";
+      }), P;
+    } catch (l) {
+      throw console.error("[CCTP] Transfer failed:", l), new Error(`CCTP transfer failed: ${l.message}`);
     }
   }
   /**
@@ -1779,7 +1779,7 @@ class Re {
    * Extract message hash from transaction receipt
    */
   extractMessageHash(e) {
-    const t = b(
+    const t = C(
       T(
         "MessageSent(bytes)"
       )
@@ -1787,7 +1787,7 @@ class Re {
     if (!n)
       throw new Error("MessageSent event not found in transaction");
     const r = n.data;
-    return b(r);
+    return C(r);
   }
   /**
    * Get USDC balance
@@ -1796,7 +1796,7 @@ class Re {
     const n = t || Number((await this.provider.getNetwork()).chainId), r = this.config.usdcAddresses[n];
     if (!r)
       throw new Error(`USDC not supported on chain ${n}`);
-    const i = await new P(r, j, this.provider).balanceOf(e);
+    const i = await new D(r, J, this.provider).balanceOf(e);
     return oe(i, 6);
   }
 }
@@ -1842,7 +1842,7 @@ class Ke {
     }
   }
 }
-const M = new B(), R = [
+const M = new L(), R = [
   "function execute(address dest, uint256 value, bytes calldata func)",
   "function executeBatch(address[] calldata dest, uint256[] calldata value, bytes[] calldata func)",
   "function getNonce() view returns (uint256)"
@@ -1864,13 +1864,13 @@ class Ne {
    * Get counterfactual Smart Account address
    */
   getAccountAddress(e) {
-    const t = b(T(e)), n = b(
+    const t = C(T(e)), n = C(
       M.encode(
         ["address", "address"],
         [this.config.accountImplementation, e]
       )
     );
-    return "0x" + b(
+    return "0x" + C(
       M.encode(
         ["bytes1", "address", "bytes32", "bytes32"],
         ["0xff", this.config.factoryAddress, t, n]
@@ -1896,18 +1896,18 @@ class Ne {
       t.data || "0x"
     ]);
     let c = 0n;
-    r && (c = await new P(n, R, this.provider).getNonce());
-    const l = r ? "0x" : this.buildInitCode(e.address), d = await this.provider.getFeeData(), u = {
+    r && (c = await new D(n, R, this.provider).getNonce());
+    const d = r ? "0x" : this.buildInitCode(e.address), l = await this.provider.getFeeData(), u = {
       sender: n,
       nonce: c,
-      initCode: l,
+      initCode: d,
       callData: i,
       callGasLimit: 100000n,
       // Estimate
       verificationGasLimit: 200000n,
       preVerificationGas: 50000n,
-      maxFeePerGas: d.maxFeePerGas || 0n,
-      maxPriorityFeePerGas: d.maxPriorityFeePerGas || 0n,
+      maxFeePerGas: l.maxFeePerGas || 0n,
+      maxPriorityFeePerGas: l.maxPriorityFeePerGas || 0n,
       paymasterAndData: "0x",
       signature: "0x"
     };
@@ -1922,17 +1922,17 @@ class Ne {
    * Build UserOperation for batch transactions
    */
   async buildBatchUserOperation(e, t, n = !1) {
-    var E;
+    var S;
     const r = this.accountAddress || this.getAccountAddress(e.address);
     this.accountAddress = r;
-    const s = await this.isDeployed(r), i = new N(R), c = t.map((m) => m.to), l = t.map((m) => BigInt(m.value || "0")), d = t.map((m) => m.data || "0x"), u = i.encodeFunctionData("executeBatch", [
+    const s = await this.isDeployed(r), i = new N(R), c = t.map((m) => m.to), d = t.map((m) => BigInt(m.value || "0")), l = t.map((m) => m.data || "0x"), u = i.encodeFunctionData("executeBatch", [
       c,
-      l,
-      d
+      d,
+      l
     ]);
     let y = 0n;
-    s && (y = await new P(r, R, this.provider).getNonce());
-    const f = s ? "0x" : this.buildInitCode(e.address), p = await this.provider.getFeeData(), w = {
+    s && (y = await new D(r, R, this.provider).getNonce());
+    const f = s ? "0x" : this.buildInitCode(e.address), p = await this.provider.getFeeData(), A = {
       sender: r,
       nonce: y,
       initCode: f,
@@ -1946,12 +1946,12 @@ class Ne {
       paymasterAndData: "0x",
       signature: "0x"
     };
-    if (n && ((E = this.paymasterConfig) != null && E.enabled)) {
-      const m = await this.getPaymasterData(w);
-      m && (w.paymasterAndData = m.paymasterAndData);
+    if (n && ((S = this.paymasterConfig) != null && S.enabled)) {
+      const m = await this.getPaymasterData(A);
+      m && (A.paymasterAndData = m.paymasterAndData);
     }
-    const g = await this.signUserOperation(e, w);
-    return w.signature = g, w;
+    const g = await this.signUserOperation(e, A);
+    return A.signature = g, A;
   }
   /**
    * Send UserOperation to bundler
@@ -2004,8 +2004,8 @@ class Ne {
    */
   getUserOpHash(e) {
     var s;
-    const t = this.packUserOp(e), n = b(t), r = ((s = this.provider._network) == null ? void 0 : s.chainId) || 1n;
-    return b(
+    const t = this.packUserOp(e), n = C(t), r = ((s = this.provider._network) == null ? void 0 : s.chainId) || 1n;
+    return C(
       M.encode(
         ["bytes32", "address", "uint256"],
         [n, this.config.entryPoint, r]
@@ -2032,14 +2032,14 @@ class Ne {
       [
         e.sender,
         e.nonce,
-        b(e.initCode === "0x" ? new Uint8Array() : T(e.initCode)),
-        b(e.callData === "0x" ? new Uint8Array() : T(e.callData)),
+        C(e.initCode === "0x" ? new Uint8Array() : T(e.initCode)),
+        C(e.callData === "0x" ? new Uint8Array() : T(e.callData)),
         e.callGasLimit,
         e.verificationGasLimit,
         e.preVerificationGas,
         e.maxFeePerGas,
         e.maxPriorityFeePerGas,
-        b(
+        C(
           e.paymasterAndData === "0x" ? new Uint8Array() : T(e.paymasterAndData)
         )
       ]
@@ -2099,7 +2099,7 @@ class Ne {
    * Create Circle-compatible smart account (MSCA)
    */
   async createCircleMSCA(e, t) {
-    const n = "0x0000000000000000000000000000000000000000", r = new P(
+    const n = "0x0000000000000000000000000000000000000000", r = new D(
       n,
       ["function createAccount(address owner, uint256 salt) returns (address)"],
       t
@@ -2471,15 +2471,15 @@ class Ye {
     }
   }
 }
-const W = (a) => Array.from(a).map((e) => e.toString(16).padStart(2, "0")).join(""), Fe = (a) => {
+const B = (a) => Array.from(a).map((e) => e.toString(16).padStart(2, "0")).join(""), Fe = (a) => {
   const e = a.startsWith("0x") ? a.slice(2) : a, t = new Uint8Array(e.length / 2);
   for (let n = 0; n < t.length; n++)
     t[n] = parseInt(e.substr(n * 2, 2), 16);
   return t;
-}, _e = (a) => new TextDecoder().decode(a), Ge = [
+}, Ge = (a) => new TextDecoder().decode(a), _e = [
   "function getAddress(uint256 x, uint256 y, uint256 salt) view returns (address)",
   "function createAccount(uint256 x, uint256 y, uint256 salt) returns (address)"
-], X = [
+], W = [
   "function execute(address target, uint256 value, bytes data) returns (bytes)",
   "function executeBatch(address[] dest, uint256[] value, bytes[] func)",
   "function validateUserOp(tuple(address sender, uint256 nonce, bytes initCode, bytes callData, uint256 callGasLimit, uint256 verificationGasLimit, uint256 preVerificationGas, uint256 maxFeePerGas, uint256 maxPriorityFeePerGas, bytes paymasterAndData, bytes signature) userOp, bytes32 userOpHash, uint256 missingFunds) returns (uint256)",
@@ -2493,13 +2493,13 @@ class Xe {
     h(this, "config");
     h(this, "currentCredential", null);
     h(this, "accountAddress", null);
-    this.config = e, this.provider = new q(e.rpcUrl), this.factory = new P(e.factoryAddress, Ge, this.provider);
+    this.config = e, this.provider = new q(e.rpcUrl), this.factory = new D(e.factoryAddress, _e, this.provider);
   }
   /**
    * Create new passkey and get account address
    */
   async createAccount(e, t) {
-    var E, m;
+    var S, m;
     o.info("Creating passkey account", { component: "PasskeyAccountManager", userId: e });
     const n = await fetch(`${this.config.backendUrl}/passkeys/register/start`, {
       method: "POST",
@@ -2509,7 +2509,7 @@ class Xe {
     }), r = await n.json();
     if (!n.ok)
       throw r.code === "PASSKEY_ALREADY_EXISTS" ? new Error('You already have a passkey registered for this email. Please use "Connect with Passkey" instead of creating a new one. Creating a new passkey would generate a different wallet address.') : new Error(r.error || r.message || "Failed to get registration options");
-    const s = ((E = r.data) == null ? void 0 : E.options) || r, i = await ne({ optionsJSON: s }), c = await fetch(`${this.config.backendUrl}/passkeys/register/finish`, {
+    const s = ((S = r.data) == null ? void 0 : S.options) || r, i = await ne({ optionsJSON: s }), c = await fetch(`${this.config.backendUrl}/passkeys/register/finish`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
@@ -2517,15 +2517,15 @@ class Xe {
     });
     if (!c.ok)
       throw new Error("Failed to verify credential");
-    const d = (m = (await c.json()).data) == null ? void 0 : m.publicKey;
-    if (!(d != null && d.x) || !(d != null && d.y))
+    const l = (m = (await c.json()).data) == null ? void 0 : m.publicKey;
+    if (!(l != null && l.x) || !(l != null && l.y))
       throw new Error("Server did not return public key coordinates");
-    const { x: u, y } = d, f = {
+    const { x: u, y } = l, f = {
       credentialId: i.id,
       publicKeyX: u,
       publicKeyY: y,
       userId: e
-    }, p = BigInt(b(new TextEncoder().encode(e))), g = await this.factory.getFunction("getAddress")(BigInt(u), BigInt(y), p);
+    }, p = BigInt(C(new TextEncoder().encode(e))), g = await this.factory.getFunction("getAddress")(BigInt(u), BigInt(y), p);
     return this.currentCredential = f, this.accountAddress = g, this.storeCredential(f), o.info("Passkey account created", {
       component: "PasskeyAccountManager",
       address: g,
@@ -2537,7 +2537,7 @@ class Xe {
    * @param username Optional username/email to find specific credentials
    */
   async connect(e) {
-    var p, w, g, E, m, D;
+    var p, A, g, S, m, w;
     o.info("Connecting with existing passkey", { component: "PasskeyAccountManager", username: e });
     const t = localStorage.getItem("arcwallet:passkey:current"), n = {};
     t ? (n.credentialId = t, o.info("Using stored credential ID for authentication", {
@@ -2561,48 +2561,48 @@ class Xe {
       component: "PasskeyAccountManager",
       credentialId: t.substring(0, 20) + "..."
     }));
-    const c = await L({ optionsJSON: i });
-    let l = null;
+    const c = await H({ optionsJSON: i });
+    let d = null;
     try {
-      const A = await fetch(`${this.config.backendUrl}/passkeys/auth/finish`, {
+      const b = await fetch(`${this.config.backendUrl}/passkeys/auth/finish`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({ credential: c })
       });
-      A.ok ? l = await A.json() : o.warn("Backend verification failed, will try localStorage fallback", {
+      b.ok ? d = await b.json() : o.warn("Backend verification failed, will try localStorage fallback", {
         component: "PasskeyAccountManager",
-        status: A.status
+        status: b.status
       });
     } catch {
       o.warn("Backend verification request failed, will try localStorage fallback", {
         component: "PasskeyAccountManager"
       });
     }
-    const d = (w = l == null ? void 0 : l.data) == null ? void 0 : w.publicKey, u = ((E = (g = l == null ? void 0 : l.data) == null ? void 0 : g.user) == null ? void 0 : E.username) || ((D = (m = l == null ? void 0 : l.data) == null ? void 0 : m.user) == null ? void 0 : D.id);
-    if (d != null && d.x && (d != null && d.y)) {
-      const A = {
+    const l = (A = d == null ? void 0 : d.data) == null ? void 0 : A.publicKey, u = ((S = (g = d == null ? void 0 : d.data) == null ? void 0 : g.user) == null ? void 0 : S.username) || ((w = (m = d == null ? void 0 : d.data) == null ? void 0 : m.user) == null ? void 0 : w.id);
+    if (l != null && l.x && (l != null && l.y)) {
+      const b = {
         credentialId: c.id,
-        publicKeyX: d.x,
-        publicKeyY: d.y,
+        publicKeyX: l.x,
+        publicKeyY: l.y,
         userId: u
       };
-      this.currentCredential = A, this.storeCredential(A);
+      this.currentCredential = b, this.storeCredential(b);
     } else {
-      const A = this.loadCredential(c.id);
-      if (!A)
+      const b = this.loadCredential(c.id);
+      if (!b)
         throw new Error("Credential not found in server or localStorage. Please create a new passkey.");
       o.info("Using localStorage credential (server did not have it)", {
         component: "PasskeyAccountManager",
         credentialId: c.id.substring(0, 20) + "..."
-      }), this.currentCredential = A, this.syncCredentialToBackend(A).catch((v) => {
+      }), this.currentCredential = b, this.syncCredentialToBackend(b).catch((P) => {
         o.warn("Failed to sync credential to backend (non-critical)", {
           component: "PasskeyAccountManager",
-          error: v.message
+          error: P.message
         });
       });
     }
-    const y = BigInt(b(new TextEncoder().encode(this.currentCredential.userId))), f = this.factory.getFunction("getAddress");
+    const y = BigInt(C(new TextEncoder().encode(this.currentCredential.userId))), f = this.factory.getFunction("getAddress");
     return this.accountAddress = await f(
       BigInt(this.currentCredential.publicKeyX),
       BigInt(this.currentCredential.publicKeyY),
@@ -2634,11 +2634,11 @@ class Xe {
       throw new Error("Failed to get signing options");
     const r = await n.json(), s = ((g = r.data) == null ? void 0 : g.options) || r;
     s.challenge = this.toBase64Url(t);
-    const i = await L({ optionsJSON: s }), { r: c, s: l, authenticatorData: d, clientDataJSON: u, challengeIndex: y, typeIndex: f } = await this.extractSignatureComponents(i), w = B.defaultAbiCoder().encode(
+    const i = await H({ optionsJSON: s }), { r: c, s: d, authenticatorData: l, clientDataJSON: u, challengeIndex: y, typeIndex: f } = await this.extractSignatureComponents(i), A = L.defaultAbiCoder().encode(
       ["bytes", "string", "uint256", "uint256", "uint256", "uint256"],
-      [d, u, y, f, c, l]
+      [l, u, y, f, c, d]
     );
-    return o.info("UserOperation signed", { component: "PasskeyAccountManager" }), w;
+    return o.info("UserOperation signed", { component: "PasskeyAccountManager" }), A;
   }
   /**
    * Get current account address
@@ -2680,14 +2680,14 @@ class Xe {
    */
   async getAccountNonce() {
     if (!this.accountAddress) throw new Error("No account connected");
-    return await this.isAccountDeployed() ? await new P(this.accountAddress, X, this.provider).getUserOpNonce() : 0n;
+    return await this.isAccountDeployed() ? await new D(this.accountAddress, W, this.provider).getUserOpNonce() : 0n;
   }
   /**
    * Build init code for account deployment
    */
   getInitCode() {
     if (!this.currentCredential) throw new Error("No credential connected");
-    const e = BigInt(b(new TextEncoder().encode(this.currentCredential.userId))), t = this.factory.interface.encodeFunctionData("createAccount", [
+    const e = BigInt(C(new TextEncoder().encode(this.currentCredential.userId))), t = this.factory.interface.encodeFunctionData("createAccount", [
       BigInt(this.currentCredential.publicKeyX),
       BigInt(this.currentCredential.publicKeyY),
       e
@@ -2710,7 +2710,7 @@ class Xe {
       to: e,
       value: t.toString()
     });
-    const r = await this.isAccountDeployed(), i = new P(this.accountAddress, X, this.provider).interface.encodeFunctionData("execute", [e, t, n]), c = await this.provider.getFeeData(), l = c.maxFeePerGas || c.gasPrice || 1000000000n, d = c.maxPriorityFeePerGas || 100000000n, u = await this.getAccountNonce(), y = r ? "0x" : this.getInitCode();
+    const r = await this.isAccountDeployed(), i = new D(this.accountAddress, W, this.provider).interface.encodeFunctionData("execute", [e, t, n]), c = await this.provider.getFeeData(), d = c.maxFeePerGas || c.gasPrice || 1000000000n, l = c.maxPriorityFeePerGas || 100000000n, u = await this.getAccountNonce(), y = r ? "0x" : this.getInitCode();
     let f = {
       preVerificationGas: 100000n,
       // Deployment needs ~1.4M for initCode + ~300K for P256 verify
@@ -2721,7 +2721,7 @@ class Xe {
       callGasLimit: r ? 500000n : 1000000n
     };
     try {
-      const m = this.config.bundlerUrl || this.config.rpcUrl, A = await (await fetch(m, {
+      const m = this.config.bundlerUrl || this.config.rpcUrl, b = await (await fetch(m, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -2737,13 +2737,13 @@ class Xe {
           id: Date.now()
         })
       })).json();
-      A.result && (f = {
-        preVerificationGas: BigInt(A.result.preVerificationGas),
-        verificationGasLimit: BigInt(A.result.verificationGasLimit),
-        callGasLimit: BigInt(A.result.callGasLimit)
+      b.result && (f = {
+        preVerificationGas: BigInt(b.result.preVerificationGas),
+        verificationGasLimit: BigInt(b.result.verificationGasLimit),
+        callGasLimit: BigInt(b.result.callGasLimit)
       }, o.info("Got gas estimates from bundler", {
         component: "PasskeyAccountManager",
-        estimates: A.result
+        estimates: b.result
       }));
     } catch {
       o.warn("Could not get gas estimates from bundler, using defaults", {
@@ -2756,46 +2756,118 @@ class Xe {
       initCode: y,
       callData: i,
       ...f,
-      maxFeePerGas: l,
-      maxPriorityFeePerGas: d,
+      maxFeePerGas: d,
+      maxPriorityFeePerGas: l,
       paymasterAndData: "0x"
       // No paymaster for now
-    }, w = this.calculateUserOpHash(p), g = await this.signUserOperation(p, w), E = { ...p, signature: g };
+    }, A = this.calculateUserOpHash(p), g = await this.signUserOperation(p, A), S = { ...p, signature: g };
     try {
-      const m = await this.submitUserOperation(E);
+      const m = await this.submitUserOperation(S);
       return { hash: m.hash, userOpHash: m.userOpHash };
     } catch (m) {
       o.error("Bundler submission failed", m instanceof Error ? m : void 0, {
         component: "PasskeyAccountManager",
         error: (m == null ? void 0 : m.message) || "Unknown error"
       });
-      const D = (m == null ? void 0 : m.message) || "Bundler submission failed";
-      throw new Error(`Transaction failed: ${D}`);
+      const w = (m == null ? void 0 : m.message) || "Bundler submission failed";
+      throw new Error(`Transaction failed: ${w}`);
+    }
+  }
+  /**
+   * Execute multiple transactions in a single UserOperation (batch)
+   * This allows approve + transfer in one passkey signature
+   */
+  async executeBatchTransaction(e) {
+    if (!this.accountAddress)
+      throw new Error("No account connected. Please connect first.");
+    if (e.length === 0)
+      throw new Error("No transactions provided");
+    o.info("Executing batch transaction via passkey account", {
+      component: "PasskeyAccountManager",
+      count: e.length
+    });
+    const t = await this.isAccountDeployed(), n = new D(this.accountAddress, W, this.provider).interface, r = e.map((w) => w.to), s = e.map((w) => w.value), i = e.map((w) => w.data), c = n.encodeFunctionData("executeBatch", [r, s, i]), d = await this.provider.getFeeData(), l = d.maxFeePerGas || d.gasPrice || 1000000000n, u = d.maxPriorityFeePerGas || 100000000n, y = await this.getAccountNonce(), f = t ? "0x" : this.getInitCode();
+    let p = {
+      preVerificationGas: 150000n,
+      verificationGasLimit: t ? 500000n : 3000000n,
+      // More gas for batch execution
+      callGasLimit: t ? 800000n : 1500000n
+    };
+    try {
+      const w = this.config.bundlerUrl || this.config.rpcUrl, P = await (await fetch(w, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          method: "eth_estimateUserOperationGas",
+          params: [{
+            sender: this.accountAddress,
+            nonce: "0x" + y.toString(16),
+            initCode: f,
+            callData: c,
+            paymasterAndData: "0x"
+          }, this.config.entryPointAddress],
+          id: Date.now()
+        })
+      })).json();
+      P.result && (p = {
+        preVerificationGas: BigInt(P.result.preVerificationGas),
+        verificationGasLimit: BigInt(P.result.verificationGasLimit),
+        callGasLimit: BigInt(P.result.callGasLimit)
+      }, o.info("Got batch gas estimates from bundler", {
+        component: "PasskeyAccountManager",
+        estimates: P.result
+      }));
+    } catch {
+      o.warn("Could not get batch gas estimates from bundler, using defaults", {
+        component: "PasskeyAccountManager"
+      });
+    }
+    const A = {
+      sender: this.accountAddress,
+      nonce: y,
+      initCode: f,
+      callData: c,
+      ...p,
+      maxFeePerGas: l,
+      maxPriorityFeePerGas: u,
+      paymasterAndData: "0x"
+    }, g = this.calculateUserOpHash(A), S = await this.signUserOperation(A, g), m = { ...A, signature: S };
+    try {
+      const w = await this.submitUserOperation(m);
+      return { hash: w.hash, userOpHash: w.userOpHash };
+    } catch (w) {
+      o.error("Batch bundler submission failed", w instanceof Error ? w : void 0, {
+        component: "PasskeyAccountManager",
+        error: (w == null ? void 0 : w.message) || "Unknown error"
+      });
+      const b = (w == null ? void 0 : w.message) || "Bundler submission failed";
+      throw new Error(`Batch transaction failed: ${b}`);
     }
   }
   /**
    * Calculate UserOperation hash for signing
    */
   calculateUserOpHash(e) {
-    const t = B.defaultAbiCoder(), n = t.encode(
+    const t = L.defaultAbiCoder(), n = t.encode(
       ["address", "uint256", "bytes32", "bytes32", "uint256", "uint256", "uint256", "uint256", "uint256", "bytes32"],
       [
         e.sender,
         e.nonce,
-        b(e.initCode),
-        b(e.callData),
+        C(e.initCode),
+        C(e.callData),
         e.callGasLimit,
         e.verificationGasLimit,
         e.preVerificationGas,
         e.maxFeePerGas,
         e.maxPriorityFeePerGas,
-        b(e.paymasterAndData)
+        C(e.paymasterAndData)
       ]
-    ), r = b(n), s = BigInt(this.config.chainId || 5042002), i = t.encode(
+    ), r = C(n), s = BigInt(this.config.chainId || 5042002), i = t.encode(
       ["bytes32", "address", "uint256"],
       [r, this.config.entryPointAddress, s]
     );
-    return b(i);
+    return C(i);
   }
   /**
    * Submit UserOperation to Pimlico bundler
@@ -2831,13 +2903,13 @@ class Xe {
         })
       })).json();
       if (s.error) {
-        const l = s.error.data ? `${s.error.message}: ${s.error.data}` : s.error.message;
+        const d = s.error.data ? `${s.error.message}: ${s.error.data}` : s.error.message;
         throw o.error("Bundler rejected UserOperation", void 0, {
           component: "PasskeyAccountManager",
           error: s.error,
           errorCode: s.error.code,
           errorData: s.error.data
-        }), new Error(l || "Bundler rejected UserOperation");
+        }), new Error(d || "Bundler rejected UserOperation");
       }
       const i = s.result;
       return o.info("UserOperation submitted successfully", {
@@ -2854,7 +2926,7 @@ class Xe {
    * Wait for UserOperation to be included in a transaction
    */
   async waitForUserOperation(e, t, n = 12e4) {
-    var l, d;
+    var d, l;
     const r = t || this.config.bundlerUrl || this.config.rpcUrl, s = Date.now();
     let i = 5e3;
     const c = 15e3;
@@ -2878,7 +2950,7 @@ class Xe {
           continue;
         }
         const y = await u.json();
-        if ((d = (l = y.result) == null ? void 0 : l.receipt) != null && d.transactionHash)
+        if ((l = (d = y.result) == null ? void 0 : d.receipt) != null && l.transactionHash)
           return o.info("UserOperation confirmed", {
             component: "PasskeyAccountManager",
             txHash: y.result.receipt.transactionHash
@@ -2894,10 +2966,10 @@ class Xe {
   }
   // ============ Private Methods ============
   async extractSignatureComponents(e) {
-    const t = "0x" + W(this.fromBase64Url(e.response.authenticatorData)), n = _e(this.fromBase64Url(e.response.clientDataJSON)), r = n.indexOf('"challenge"'), s = n.indexOf('"type"'), i = this.fromBase64Url(e.response.signature), { r: c, s: l } = this.parseDERSignature(i);
+    const t = "0x" + B(this.fromBase64Url(e.response.authenticatorData)), n = Ge(this.fromBase64Url(e.response.clientDataJSON)), r = n.indexOf('"challenge"'), s = n.indexOf('"type"'), i = this.fromBase64Url(e.response.signature), { r: c, s: d } = this.parseDERSignature(i);
     return {
-      r: BigInt("0x" + W(c)),
-      s: BigInt("0x" + W(l)),
+      r: BigInt("0x" + B(c)),
+      s: BigInt("0x" + B(d)),
       authenticatorData: t,
       clientDataJSON: n,
       challengeIndex: r,
@@ -2910,8 +2982,8 @@ class Xe {
     if (t++, e[t++] !== 2) throw new Error("Invalid DER signature");
     const n = e[t++], r = e.slice(t, t + n);
     if (t += n, e[t++] !== 2) throw new Error("Invalid DER signature");
-    const s = e[t++], i = e.slice(t, t + s), c = r[0] === 0 ? r.slice(1) : r, l = i[0] === 0 ? i.slice(1) : i, d = new Uint8Array(32), u = new Uint8Array(32);
-    return d.set(c, 32 - c.length), u.set(l, 32 - l.length), { r: d, s: u };
+    const s = e[t++], i = e.slice(t, t + s), c = r[0] === 0 ? r.slice(1) : r, d = i[0] === 0 ? i.slice(1) : i, l = new Uint8Array(32), u = new Uint8Array(32);
+    return l.set(c, 32 - c.length), u.set(d, 32 - d.length), { r: l, s: u };
   }
   toBase64Url(e) {
     const t = Fe(e);
@@ -2937,7 +3009,7 @@ class Xe {
    */
   async syncCredentialToBackend(e) {
     var c;
-    const t = BigInt(b(new TextEncoder().encode(e.userId))), r = await this.factory.getFunction("getAddress")(
+    const t = BigInt(C(new TextEncoder().encode(e.userId))), r = await this.factory.getFunction("getAddress")(
       BigInt(e.publicKeyX),
       BigInt(e.publicKeyY),
       t
@@ -2962,8 +3034,8 @@ class Xe {
       })
     });
     if (!s.ok) {
-      const l = await s.json().catch(() => ({}));
-      throw new Error(l.error || "Failed to sync credential");
+      const d = await s.json().catch(() => ({}));
+      throw new Error(d.error || "Failed to sync credential");
     }
     const i = await s.json();
     o.info("Credential synced to backend", {
@@ -2972,12 +3044,12 @@ class Xe {
     });
   }
 }
-const We = "0x00000000";
+const Be = "0x00000000";
 async function qe(a, e) {
   try {
-    return await e.getCode(a) === "0x" ? !1 : await new P(a, [
+    return await e.getCode(a) === "0x" ? !1 : await new D(a, [
       "function supportsInterface(bytes4) view returns (bool)"
-    ], e).supportsInterface(We);
+    ], e).supportsInterface(Be);
   } catch {
     return !1;
   }
@@ -2985,7 +3057,7 @@ async function qe(a, e) {
 const Qe = "1.0.0";
 export {
   Re as CCTPManager,
-  V as CIRCLE_NETWORKS,
+  j as CIRCLE_NETWORKS,
   Ye as CircleApiClient,
   Ke as CirclePaymasterClient,
   Ue as DEFAULT_AA_CONFIG,
@@ -3002,7 +3074,7 @@ export {
   Pe as WebAuthnManager,
   Ce as checkPlatformAuthenticatorSupport,
   $e as createLogger,
-  Y as getCCTPConfigErrorMessage,
+  X as getCCTPConfigErrorMessage,
   xe as getCircleNetwork,
   be as getDeviceRiskLevel,
   Se as getDiagnosticErrorMessage,
@@ -3014,6 +3086,6 @@ export {
   je as isNativeUSDC,
   o as logger,
   Ee as runPasskeyDiagnostic,
-  H as validateCCTPConfig
+  $ as validateCCTPConfig
 };
 //# sourceMappingURL=index.mjs.map

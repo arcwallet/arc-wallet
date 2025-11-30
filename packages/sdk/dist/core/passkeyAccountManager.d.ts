@@ -99,6 +99,18 @@ export declare class PasskeyAccountManager {
         userOpHash?: string;
     }>;
     /**
+     * Execute multiple transactions in a single UserOperation (batch)
+     * This allows approve + transfer in one passkey signature
+     */
+    executeBatchTransaction(transactions: Array<{
+        to: string;
+        value: bigint;
+        data: string;
+    }>): Promise<{
+        hash: string;
+        userOpHash?: string;
+    }>;
+    /**
      * Calculate UserOperation hash for signing
      */
     private calculateUserOpHash;

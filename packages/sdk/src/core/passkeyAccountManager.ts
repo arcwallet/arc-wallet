@@ -569,6 +569,125 @@ export class PasskeyAccountManager {
   }
 
   /**
+   * Execute multiple transactions in a single UserOperation (batch)
+   * This allows approve + transfer in one passkey signature
+   */
+  async executeBatchTransaction(
+    transactions: Array<{ to: string; value: bigint; data: string }>
+  ): Promise<{ hash: string; userOpHash?: string }> {
+    if (!this.accountAddress) {
+      throw new Error('No account connected. Please connect first.');
+    }
+
+    if (transactions.length === 0) {
+      throw new Error('No transactions provided');
+    }
+
+    logger.info('Executing batch transaction via passkey account', {
+      component: 'PasskeyAccountManager',
+      count: transactions.length,
+    });
+
+    // Check if account is deployed
+    const isDeployed = await this.isAccountDeployed();
+
+    // Build callData for the executeBatch function
+    const accountInterface = new Contract(this.accountAddress, ACCOUNT_ABI, this.provider).interface;
+    const destinations = transactions.map(tx => tx.to);
+    const values = transactions.map(tx => tx.value);
+    const datas = transactions.map(tx => tx.data);
+    const callData = accountInterface.encodeFunctionData('executeBatch', [destinations, values, datas]);
+
+    // Get current gas prices
+    const feeData = await this.provider.getFeeData();
+    const maxFeePerGas = feeData.maxFeePerGas || feeData.gasPrice || 1000000000n;
+    const maxPriorityFeePerGas = feeData.maxPriorityFeePerGas || 100000000n;
+
+    // Get nonce
+    const nonce = await this.getAccountNonce();
+
+    // Get gas estimates - batch needs more gas
+    const initCode = isDeployed ? '0x' : this.getInitCode();
+    let gasEstimates = {
+      preVerificationGas: 150000n,
+      verificationGasLimit: isDeployed ? 500000n : 3000000n,
+      // More gas for batch execution
+      callGasLimit: isDeployed ? 800000n : 1500000n,
+    };
+
+    // Try to get better estimates from bundler
+    try {
+      const bundlerUrl = this.config.bundlerUrl || this.config.rpcUrl;
+      const estimateResponse = await fetch(bundlerUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          method: 'eth_estimateUserOperationGas',
+          params: [{
+            sender: this.accountAddress,
+            nonce: '0x' + nonce.toString(16),
+            initCode,
+            callData,
+            paymasterAndData: '0x',
+          }, this.config.entryPointAddress],
+          id: Date.now(),
+        }),
+      });
+      const estimateResult = await estimateResponse.json();
+      if (estimateResult.result) {
+        gasEstimates = {
+          preVerificationGas: BigInt(estimateResult.result.preVerificationGas),
+          verificationGasLimit: BigInt(estimateResult.result.verificationGasLimit),
+          callGasLimit: BigInt(estimateResult.result.callGasLimit),
+        };
+        logger.info('Got batch gas estimates from bundler', {
+          component: 'PasskeyAccountManager',
+          estimates: estimateResult.result,
+        });
+      }
+    } catch (e) {
+      logger.warn('Could not get batch gas estimates from bundler, using defaults', {
+        component: 'PasskeyAccountManager',
+      });
+    }
+
+    // Build UserOperation
+    const userOp = {
+      sender: this.accountAddress,
+      nonce,
+      initCode,
+      callData,
+      ...gasEstimates,
+      maxFeePerGas,
+      maxPriorityFeePerGas,
+      paymasterAndData: '0x',
+    };
+
+    // Calculate userOpHash
+    const userOpHash = this.calculateUserOpHash(userOp);
+
+    // Sign with passkey
+    const signature = await this.signUserOperation(userOp, userOpHash);
+
+    // Create signed UserOperation
+    const signedUserOp = { ...userOp, signature };
+
+    // Submit via bundler
+    try {
+      const result = await this.submitUserOperation(signedUserOp);
+      return { hash: result.hash, userOpHash: result.userOpHash };
+    } catch (bundlerError: any) {
+      logger.error('Batch bundler submission failed', bundlerError instanceof Error ? bundlerError : undefined, {
+        component: 'PasskeyAccountManager',
+        error: bundlerError?.message || 'Unknown error'
+      });
+      const errorMessage = bundlerError?.message || 'Bundler submission failed';
+      throw new Error(`Batch transaction failed: ${errorMessage}`);
+    }
+  }
+
+  /**
    * Calculate UserOperation hash for signing
    */
   private calculateUserOpHash(userOp: Omit<UserOperation, 'signature'>): string {
