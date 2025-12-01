@@ -3,6 +3,28 @@ const resolveUrl = (path: string) => `${API_BASE}${path}`;
 
 import { getCsrfToken, refreshCsrfToken } from './csrfService';
 
+// Admin emails get extended timeouts (5 minutes instead of 30 seconds)
+// These accounts are used for testing and development
+const ADMIN_EMAILS = [
+  'seher@arc.network',
+  'admin@arcwallet.network',
+  'test@arcwallet.network',
+  ((import.meta as any).env.VITE_ADMIN_EMAIL || '').toLowerCase(),
+].filter(Boolean);
+
+const ADMIN_TIMEOUT_MS = 300000; // 5 minutes for admin accounts
+const DEFAULT_TIMEOUT_MS = 30000; // 30 seconds for regular users
+
+const getTimeoutForEmail = (email?: string, defaultTimeout: number = DEFAULT_TIMEOUT_MS): number => {
+  if (!email) return defaultTimeout;
+  const normalizedEmail = email.toLowerCase().trim();
+  if (ADMIN_EMAILS.includes(normalizedEmail)) {
+    console.log('[SessionApi] Admin account detected, using extended timeout');
+    return ADMIN_TIMEOUT_MS;
+  }
+  return defaultTimeout;
+};
+
 interface ApiResponse<T = unknown> {
   success: boolean;
   message?: string;
@@ -26,9 +48,10 @@ const handleResponse = async <T>(response: Response): Promise<T> => {
 
 export const sessionApi = {
   // Circle OTP Methods
-  async requestOtp(email: string, timeoutMs = 30000, isRetry = false) {
+  async requestOtp(email: string, timeoutMs?: number, isRetry = false) {
+    const effectiveTimeout = timeoutMs ?? getTimeoutForEmail(email);
     const controller = new AbortController();
-    const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+    const timer = window.setTimeout(() => controller.abort(), effectiveTimeout);
     try {
       const csrfToken = getCsrfToken();
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -49,7 +72,7 @@ export const sessionApi = {
           const errorBody = await clone.json();
           if (errorBody.code === 'CSRF_VALIDATION_FAILED' || errorBody.error === 'Invalid CSRF token') {
             await refreshCsrfToken();
-            return sessionApi.requestOtp(email, timeoutMs, true);
+            return sessionApi.requestOtp(email, effectiveTimeout, true);
           }
         } catch (e) {
           // Ignore JSON parse error
@@ -67,9 +90,10 @@ export const sessionApi = {
     }
   },
 
-  async verifyOtp(email: string, code: string, timeoutMs = 15000, isRetry = false) {
+  async verifyOtp(email: string, code: string, timeoutMs?: number, isRetry = false) {
+    const effectiveTimeout = timeoutMs ?? getTimeoutForEmail(email, 15000);
     const controller = new AbortController();
-    const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+    const timer = window.setTimeout(() => controller.abort(), effectiveTimeout);
     try {
       const csrfToken = getCsrfToken();
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -90,7 +114,7 @@ export const sessionApi = {
           const errorBody = await clone.json();
           if (errorBody.code === 'CSRF_VALIDATION_FAILED' || errorBody.error === 'Invalid CSRF token') {
             await refreshCsrfToken();
-            return sessionApi.verifyOtp(email, code, timeoutMs, true);
+            return sessionApi.verifyOtp(email, code, effectiveTimeout, true);
           }
         } catch (e) {
           // Ignore JSON parse error
@@ -108,9 +132,10 @@ export const sessionApi = {
     }
   },
 
-  async resendOtp(email: string, timeoutMs = 30000, isRetry = false) {
+  async resendOtp(email: string, timeoutMs?: number, isRetry = false) {
+    const effectiveTimeout = timeoutMs ?? getTimeoutForEmail(email);
     const controller = new AbortController();
-    const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+    const timer = window.setTimeout(() => controller.abort(), effectiveTimeout);
     try {
       const csrfToken = getCsrfToken();
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -131,7 +156,7 @@ export const sessionApi = {
           const errorBody = await clone.json();
           if (errorBody.code === 'CSRF_VALIDATION_FAILED' || errorBody.error === 'Invalid CSRF token') {
             await refreshCsrfToken();
-            return sessionApi.resendOtp(email, timeoutMs, true);
+            return sessionApi.resendOtp(email, effectiveTimeout, true);
           }
         } catch (e) {
           // Ignore JSON parse error
@@ -150,9 +175,10 @@ export const sessionApi = {
   },
 
   // Legacy Magic Link Methods
-  async sendLink(email: string, timeoutMs = 30000, isRetry = false) {
+  async sendLink(email: string, timeoutMs?: number, isRetry = false) {
+    const effectiveTimeout = timeoutMs ?? getTimeoutForEmail(email);
     const controller = new AbortController();
-    const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+    const timer = window.setTimeout(() => controller.abort(), effectiveTimeout);
     try {
       const csrfToken = getCsrfToken();
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -174,7 +200,7 @@ export const sessionApi = {
           const errorBody = await clone.json();
           if (errorBody.code === 'CSRF_VALIDATION_FAILED' || errorBody.error === 'Invalid CSRF token') {
             await refreshCsrfToken();
-            return sessionApi.sendLink(email, timeoutMs, true);
+            return sessionApi.sendLink(email, effectiveTimeout, true);
           }
         } catch (e) {
           // Ignore JSON parse error
