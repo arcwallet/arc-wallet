@@ -54,10 +54,10 @@ export function createPasskeyRoutes(db: Database, config: EnvConfig, sessionStor
   /**
    * POST /passkeys/auth/start
    * Start passkey authentication process
+   * Note: No rate limit - WebAuthn provides cryptographic security
    */
   router.post(
     '/auth/start',
-    rateLimitMiddleware('auth'),
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         await passkeyController.authenticationStart(req, res);
@@ -70,10 +70,10 @@ export function createPasskeyRoutes(db: Database, config: EnvConfig, sessionStor
   /**
    * POST /passkeys/auth/finish
    * Complete passkey authentication
+   * Note: No rate limit - WebAuthn provides cryptographic security
    */
   router.post(
     '/auth/finish',
-    rateLimitMiddleware('auth'),
     validateRequestBody(['credential']),
     async (req: Request, res: Response, next: NextFunction) => {
       try {
