@@ -32,3 +32,5 @@ test-results
 *.env
 backend/.env
 backend/data/*.db
+.vercel
+.env*.local
