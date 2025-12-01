@@ -9,6 +9,12 @@
  * - Uses PasskeyAccountManager.executeTransaction() for UserOperations
  * - Signs with WebAuthn/P256 passkey
  * - Works with ERC-4337 bundler (Pimlico)
+ *
+ * CCTP V2 Fee Mechanism:
+ * - maxFee parameter specifies maximum fee that can be charged during minting
+ * - Fee is calculated as: amount * feeRate (in basis points)
+ * - For testnet/sandbox, we use a default fee rate of 50 bps (0.5%)
+ * - Fee is deducted from the minted amount on destination chain
  */
 
 import { Interface, parseUnits, JsonRpcProvider, getAddress } from 'ethers';
@@ -22,6 +28,8 @@ const ARC_TESTNET_CONFIG = {
   messageTransmitter: '0xE737e5cEBEEBa77EFE34D4aa090756590b1CE275',
   usdc: '0x3600000000000000000000000000000000000000',
   domain: 26,
+  // Fee configuration for Arc (destination fees when bridging TO Arc)
+  feeRateBps: 50, // 0.5% - conservative estimate for testnet
 };
 
 // Sepolia CCTP V2 Configuration (same addresses as Arc - Circle uses deterministic deployment)
@@ -32,10 +40,18 @@ const SEPOLIA_CONFIG = {
   messageTransmitter: '0xE737e5cEBEEBa77EFE34D4aa090756590b1CE275', // MessageTransmitterV2
   usdc: '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238',
   domain: 0,
+  // Fee configuration for Sepolia (destination fees when bridging TO Sepolia)
+  feeRateBps: 50, // 0.5% - conservative estimate for testnet
 };
 
 // Circle Attestation API
 const ATTESTATION_API = 'https://iris-api-sandbox.circle.com';
+
+// Minimum fee in USDC units (e.g., 1000 = 0.001 USDC)
+const MIN_FEE_AMOUNT = 1000n; // 0.001 USDC minimum
+
+// Maximum fee percentage (10% cap for safety)
+const MAX_FEE_PERCENTAGE = 1000; // 10% in basis points
 
 // ABIs for CCTP V2 contracts (Arc Testnet and Sepolia both use V2)
 const TOKEN_MESSENGER_V2_ABI = [
@@ -67,6 +83,7 @@ export interface PasskeyBridgeParams {
 
 export type BridgeProgressStep =
   | { type: 'checking-balance' }
+  | { type: 'calculating-fee'; estimatedFee?: string }
   | { type: 'approving-usdc'; txHash?: string }
   | { type: 'burning-usdc'; txHash?: string }
   | { type: 'waiting-attestation'; messageHash?: string }
@@ -74,6 +91,51 @@ export type BridgeProgressStep =
   | { type: 'minting-usdc'; txHash?: string }
   | { type: 'completed'; sourceTxHash?: string; destinationTxHash?: string }
   | { type: 'error'; message: string };
+
+/**
+ * Calculate the bridge fee for CCTP V2
+ * Fee = amount * feeRateBps / 10000
+ * @param amountWei - Amount in USDC wei (6 decimals)
+ * @param destConfig - Destination chain configuration
+ * @returns Fee amount in USDC wei
+ */
+export function calculateBridgeFee(amountWei: bigint, destConfig: typeof ARC_TESTNET_CONFIG | typeof SEPOLIA_CONFIG): bigint {
+  // Calculate fee based on destination chain's fee rate
+  const feeRateBps = BigInt(destConfig.feeRateBps);
+  let fee = (amountWei * feeRateBps) / 10000n;
+
+  // Ensure minimum fee is met
+  if (fee < MIN_FEE_AMOUNT) {
+    fee = MIN_FEE_AMOUNT;
+  }
+
+  // Cap fee at MAX_FEE_PERCENTAGE of amount for safety
+  const maxFee = (amountWei * BigInt(MAX_FEE_PERCENTAGE)) / 10000n;
+  if (fee > maxFee) {
+    fee = maxFee;
+  }
+
+  return fee;
+}
+
+/**
+ * Get estimated fee for UI display
+ * @param amount - Human readable amount (e.g., "100")
+ * @param direction - Bridge direction
+ * @returns Estimated fee in human readable format
+ */
+export function getEstimatedFee(amount: string, direction: BridgeDirection): { fee: string; netAmount: string; feePercentage: string } {
+  const destConfig = direction === 'arc-to-sepolia' ? SEPOLIA_CONFIG : ARC_TESTNET_CONFIG;
+  const amountWei = parseUnits(amount, 6);
+  const feeWei = calculateBridgeFee(amountWei, destConfig);
+  const netAmountWei = amountWei - feeWei;
+
+  return {
+    fee: (Number(feeWei) / 1e6).toFixed(4),
+    netAmount: (Number(netAmountWei) / 1e6).toFixed(4),
+    feePercentage: (destConfig.feeRateBps / 100).toFixed(2),
+  };
+}
 
 export interface BridgeResult {
   success: boolean;
@@ -149,7 +211,20 @@ export async function bridgeUsdcWithPasskey(params: PasskeyBridgeParams): Promis
     });
     const currentAllowance = BigInt(allowanceResult);
 
-    // Step 3: Prepare depositForBurn call
+    // Step 3: Calculate fee and prepare depositForBurn call
+    console.log('[PasskeyBridge] Calculating bridge fee...');
+    onProgress?.({ type: 'calculating-fee' });
+
+    // Calculate fee based on destination chain config
+    const maxFee = calculateBridgeFee(amountWei, destConfig);
+    const estimatedFee = (Number(maxFee) / 1e6).toFixed(4);
+    console.log('[PasskeyBridge] Calculated maxFee:', {
+      maxFee: maxFee.toString(),
+      estimatedFeeUSDC: estimatedFee,
+      feeRateBps: destConfig.feeRateBps,
+    });
+    onProgress?.({ type: 'calculating-fee', estimatedFee });
+
     console.log('[PasskeyBridge] Preparing bridge transaction...');
     onProgress?.({ type: 'burning-usdc' });
 
@@ -160,10 +235,9 @@ export async function bridgeUsdcWithPasskey(params: PasskeyBridgeParams): Promis
 
     // CCTP V2 new parameters:
     // - destinationCaller: bytes32(0) allows anyone to call receiveMessage on destination
-    // - maxFee: 0 for no fee (can be calculated as feeRate * amount in basis points)
+    // - maxFee: calculated fee that Circle can deduct during minting
     // - minFinalityThreshold: 1000 or less for Fast Transfer mode
     const destinationCaller = '0x0000000000000000000000000000000000000000000000000000000000000000';
-    const maxFee = 0n;
     const minFinalityThreshold = 1000; // Fast Transfer mode
 
     const depositForBurnData = tokenMessengerInterface.encodeFunctionData('depositForBurn', [
@@ -300,6 +374,11 @@ function addressToBytes32(address: string): string {
 /**
  * Wait for Circle attestation service to provide attestation (CCTP V2 API)
  * V2 uses /v2/messages/{domain}?transactionHash={txHash} instead of /attestations/{messageHash}
+ *
+ * Handles various status responses including:
+ * - complete: Attestation ready
+ * - pending_confirmations: Still waiting for confirmations
+ * - insufficient_fee: Fee provided was too low (will provide detailed error)
  */
 async function waitForAttestationV2(
   txHash: string,
@@ -307,6 +386,9 @@ async function waitForAttestationV2(
   maxRetries = 120,
   interval = 3000 // 3 seconds (faster polling since V2 attestation is usually quick)
 ): Promise<{ attestation: string; message: string }> {
+
+  let lastStatus = '';
+  let lastDelayReason = '';
 
   for (let i = 0; i < maxRetries; i++) {
     try {
@@ -320,15 +402,43 @@ async function waitForAttestationV2(
         // V2 returns { messages: [...] } array
         if (data.messages && data.messages.length > 0) {
           const msg = data.messages[0];
+          lastStatus = msg.status;
+          lastDelayReason = msg.delayReason || '';
+
+          // Success case
           if (msg.status === 'complete' && msg.attestation) {
+            console.log('[PasskeyBridge] Attestation received successfully');
             return {
               attestation: msg.attestation,
               message: msg.message,
             };
           }
+
+          // Handle insufficient_fee - this is a non-recoverable error
+          if (msg.delayReason === 'insufficient_fee') {
+            console.error('[PasskeyBridge] Insufficient fee error detected');
+            throw new Error(
+              'Bridge fee was insufficient. The USDC has been burned but cannot be minted on the destination chain. ' +
+              'Please contact support with your transaction hash: ' + txHash
+            );
+          }
+
+          // Log progress for debugging
+          if (i % 10 === 0) {
+            console.log('[PasskeyBridge] Waiting for attestation...', {
+              status: msg.status,
+              delayReason: msg.delayReason,
+              attempt: i + 1,
+              maxRetries,
+            });
+          }
         }
       }
-    } catch (error) {
+    } catch (error: any) {
+      // Re-throw if it's our custom error
+      if (error.message?.includes('Bridge fee was insufficient')) {
+        throw error;
+      }
       console.warn('[PasskeyBridge] Attestation check failed, retrying...', error);
     }
 
@@ -336,7 +446,18 @@ async function waitForAttestationV2(
     await new Promise(resolve => setTimeout(resolve, interval));
   }
 
-  throw new Error('Attestation timeout. Please try again later.');
+  // Provide more helpful error message based on last known status
+  let errorMessage = 'Attestation timeout. ';
+  if (lastDelayReason === 'insufficient_fee') {
+    errorMessage += 'The bridge fee was insufficient. Your USDC may be stuck. Please contact support.';
+  } else if (lastStatus === 'pending_confirmations') {
+    errorMessage += 'The transfer is still being processed. Please check again later.';
+  } else {
+    errorMessage += 'Please try again later or contact support if the issue persists.';
+  }
+  errorMessage += ` Transaction: ${txHash}`;
+
+  throw new Error(errorMessage);
 }
 
 /**

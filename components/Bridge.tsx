@@ -8,6 +8,7 @@ import {
   bridgeUsdcWithPasskey,
   getUsdcBalance,
   estimateBridgeTime,
+  getEstimatedFee,
   type BridgeDirection,
   type BridgeProgressStep,
 } from '../services/passkeyBridgeService';
@@ -185,6 +186,12 @@ const Bridge: React.FC = () => {
     switch (step.type) {
       case 'checking-balance':
         setProgressItem('Checking USDC balance...');
+        break;
+      case 'calculating-fee':
+        setProgressItem(step.estimatedFee
+          ? `Estimated bridge fee: ${step.estimatedFee} USDC`
+          : 'Calculating bridge fee...'
+        );
         break;
       case 'approving-usdc':
         setProgressItem(step.txHash
@@ -472,6 +479,29 @@ const Bridge: React.FC = () => {
                 <span className="text-xs text-accent-orange">{amountError}</span>
               )}
             </label>
+
+            {/* Fee Estimation Display */}
+            {amount && Number(normalizeAmount(amount) || 0) > 0 && (() => {
+              const normalized = normalizeAmount(amount);
+              if (!normalized) return null;
+              const feeInfo = getEstimatedFee(normalized, direction);
+              return (
+                <div className="rounded-lg bg-slate-800/50 border border-slate-600/30 p-4 space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-400">You send</span>
+                    <span className="text-white font-medium">{normalized} USDC</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-400">Bridge fee ({feeInfo.feePercentage}%)</span>
+                    <span className="text-amber-400">-{feeInfo.fee} USDC</span>
+                  </div>
+                  <div className="border-t border-slate-600/30 pt-2 flex justify-between text-sm">
+                    <span className="text-slate-400">You receive</span>
+                    <span className="text-green-400 font-semibold">{feeInfo.netAmount} USDC</span>
+                  </div>
+                </div>
+              );
+            })()}
 
             <div className="rounded-lg bg-blue-500/10 border border-blue-500/30 p-3">
               <p className="text-xs text-blue-300">
