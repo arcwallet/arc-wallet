@@ -7,7 +7,6 @@ import { getAllSupportedTokens, TokenInfo } from '../config/tokens';
 import {
   bridgeUsdcWithPasskey,
   getUsdcBalance,
-  estimateBridgeTime,
   getEstimatedFee,
   type BridgeDirection,
   type BridgeProgressStep,
@@ -207,7 +206,7 @@ const Bridge: React.FC = () => {
         if (step.txHash) setSourceTxHash(step.txHash);
         break;
       case 'waiting-attestation':
-        setProgressItem(`Waiting for Circle attestation (10-20 min)...`);
+        setProgressItem(`Waiting for Circle attestation...`);
         break;
       case 'attestation-received':
         setProgressItem('Attestation received from Circle!');
@@ -350,9 +349,6 @@ const Bridge: React.FC = () => {
           <span className="text-blue-400 font-semibold">Arc Testnet</span> and{' '}
           <span className="text-blue-400 font-semibold">Ethereum Sepolia</span> using Circle CCTP.
         </p>
-        <p className="text-slate-500 text-sm mt-1">
-          Estimated time: {estimateBridgeTime(direction)}
-        </p>
       </div>
 
       {/* Passkey Wallet Status */}
@@ -366,11 +362,11 @@ const Bridge: React.FC = () => {
       )}
 
       {passkeyConnected && (
-        <div className="rounded-xl border border-green-500/30 bg-green-500/10 p-4">
+        <div className="rounded-xl border border-blue-500/30 bg-blue-500/10 p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-green-400 font-medium">Passkey Wallet Connected</p>
-              <p className="text-green-300/70 text-sm font-mono">
+              <p className="text-blue-400 font-medium">Passkey Wallet Connected</p>
+              <p className="text-slate-400 text-sm font-mono">
                 {address?.slice(0, 10)}...{address?.slice(-8)}
               </p>
               {direction === 'sepolia-to-arc' && !sepoliaManagerReady && (
@@ -532,7 +528,7 @@ const Bridge: React.FC = () => {
               statusVariant === 'error'
                 ? 'border-red-400/50 bg-red-500/10 text-red-200'
                 : statusVariant === 'success'
-                ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-200'
+                ? 'border-blue-400/40 bg-blue-500/10 text-blue-200'
                 : 'border-white/10 bg-white/5 text-text-secondary'
             }`}
           >
