@@ -489,11 +489,11 @@ const Bridge: React.FC = () => {
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-slate-400">Bridge fee ({feeInfo.feePercentage}%)</span>
-                    <span className="text-amber-400">-{feeInfo.fee} USDC</span>
+                    <span className="text-slate-300">-{feeInfo.fee} USDC</span>
                   </div>
                   <div className="border-t border-slate-600/30 pt-2 flex justify-between text-sm">
                     <span className="text-slate-400">You receive</span>
-                    <span className="text-green-400 font-semibold">{feeInfo.netAmount} USDC</span>
+                    <span className="text-blue-400 font-semibold">{feeInfo.netAmount} USDC</span>
                   </div>
                 </div>
               );
