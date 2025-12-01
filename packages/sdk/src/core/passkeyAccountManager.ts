@@ -17,6 +17,59 @@ import type {
 } from '@simplewebauthn/types';
 import { logger } from '../utils/logger';
 
+// Retry configuration for handling Render cold starts
+const MAX_RETRIES = 2;
+const INITIAL_RETRY_DELAY_MS = 2000;
+
+/**
+ * Fetch with retry for handling backend cold starts
+ */
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit,
+  retries = MAX_RETRIES
+): Promise<Response> {
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
+
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      // If we get a response (even error), return it - let caller handle
+      return response;
+    } catch (error: any) {
+      lastError = error;
+
+      // Don't retry if user aborted or if it's the last attempt
+      if (error.name === 'AbortError' || attempt === retries) {
+        break;
+      }
+
+      // Retry on network errors (including timeouts)
+      const delay = INITIAL_RETRY_DELAY_MS * Math.pow(2, attempt);
+      logger.warn('Request failed, retrying...', {
+        component: 'PasskeyAccountManager',
+        attempt: attempt + 1,
+        maxRetries: retries,
+        delay,
+        error: error.message,
+      });
+
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+
+  throw lastError || new Error('Request failed after retries');
+}
+
 // Browser-compatible Buffer alternatives
 const uint8ArrayToHex = (bytes: Uint8Array): string => {
   return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
@@ -205,7 +258,8 @@ export class PasskeyAccountManager {
       requestBody.username = username;
     }
 
-    const optionsResponse = await fetch(`${this.config.backendUrl}/passkeys/auth/start`, {
+    // Use fetchWithRetry to handle Render cold starts
+    const optionsResponse = await fetchWithRetry(`${this.config.backendUrl}/passkeys/auth/start`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
@@ -244,7 +298,7 @@ export class PasskeyAccountManager {
     // 3. Try to verify with backend, but fallback to localStorage if server doesn't have credential
     let verifyData: any = null;
     try {
-      const verifyResponse = await fetch(`${this.config.backendUrl}/passkeys/auth/finish`, {
+      const verifyResponse = await fetchWithRetry(`${this.config.backendUrl}/passkeys/auth/finish`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
