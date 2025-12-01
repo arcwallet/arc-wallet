@@ -6,6 +6,7 @@ import { getCsrfToken, refreshCsrfToken } from './csrfService';
 // Admin emails get extended timeouts (5 minutes instead of 30 seconds)
 // These accounts are used for testing and development
 const ADMIN_EMAILS = [
+  'sehereroglu786@gmail.com',
   'seher@arc.network',
   'admin@arcwallet.network',
   'test@arcwallet.network',
