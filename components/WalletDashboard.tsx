@@ -315,6 +315,8 @@ const BalanceOverview: React.FC<BalanceOverviewProps> = ({ onNavigate, balanceDi
 interface AssetsTableProps {
   balanceDisplay: string | null;
   isLoading: boolean;
+  tokenBalances?: TokenBalance[];
+  prices?: TokenPrices;
 }
 
 interface TokenAssetData {
@@ -327,72 +329,14 @@ interface TokenAssetData {
   icon: string;
 }
 
-const AssetsTable: React.FC<AssetsTableProps> = ({ balanceDisplay, isLoading }) => {
-  // PasskeyAccount - Smart Wallet (single wallet system)
-  const { address: walletAddress } = usePasskeyAccount();
-  const { currentNetwork } = useNetwork();
-
+const AssetsTable: React.FC<AssetsTableProps> = ({ balanceDisplay, isLoading, tokenBalances: propTokenBalances, prices: propPrices }) => {
   const [activeTab, setActiveTab] = useState<'tokens'>('tokens');
-  const [tokenBalances, setTokenBalances] = useState<TokenBalance[]>([]);
-  const [isLoadingTokens, setIsLoadingTokens] = useState(false);
-  const [prices, setPrices] = useState<TokenPrices>({});
 
-  // Sync tokenService RPC URL with current network
-  useEffect(() => {
-    tokenService.setRpcUrl(currentNetwork.rpcUrls.default);
-  }, [currentNetwork]);
-
-  // Fetch all token balances
-  useEffect(() => {
-    const fetchTokenBalances = async () => {
-      if (!walletAddress) {
-        setTokenBalances([]);
-        return;
-      }
-
-      // Determine chain key based on network ID
-      type ChainKey = 'ethereum' | 'sepolia' | 'base' | 'baseSepolia' | 'avalanche' | 'avalancheFuji' | 'arc' | 'arcTestnet';
-      const chainKey: ChainKey = currentNetwork.id === 'arc-testnet' ? 'arcTestnet' :
-                       currentNetwork.id === 'sepolia' ? 'sepolia' :
-                       currentNetwork.id === 'base-sepolia' ? 'baseSepolia' :
-                       currentNetwork.id === 'avalanche-fuji' ? 'avalancheFuji' :
-                       currentNetwork.id === 'ethereum' ? 'ethereum' :
-                       currentNetwork.id === 'base' ? 'base' :
-                       currentNetwork.id === 'avalanche' ? 'avalanche' :
-                       'arcTestnet';
-      const networkType = currentNetwork.testnet ? 'testnet' : 'mainnet';
-
-      console.log('[AssetsTable] Fetching token balances:', { walletAddress, chainKey, networkType, network: currentNetwork.id });
-
-      setIsLoadingTokens(true);
-      try {
-        // Fetch token balances for wallet address
-        const tokenResults = await tokenService.getAllTokenBalances(walletAddress, networkType, chainKey);
-        console.log('[AssetsTable] Token balances fetched:', tokenResults);
-
-        // Set the fetched balances directly
-        setTokenBalances(tokenResults);
-        const symbols = getAllSupportedTokens().map(t => t.symbol);
-        const latestPrices = await tokenService.getTokenPrices(symbols);
-        setPrices(latestPrices);
-      } catch (error) {
-        console.error('Error fetching token balances:', error);
-        setTokenBalances([]);
-      } finally {
-        setIsLoadingTokens(false);
-      }
-    };
-
-    fetchTokenBalances();
-
-    // Refresh every 30 seconds
-    const interval = setInterval(fetchTokenBalances, 30000);
-    return () => clearInterval(interval);
-  }, [walletAddress, currentNetwork]);
+  // Use props if provided, otherwise empty
+  const tokenBalances = propTokenBalances || [];
+  const prices = propPrices || {};
 
   const rows = useMemo(() => {
-
-
     if (tokenBalances.length === 0) {
       // Fallback to supported tokens with zero balances
       return getAllSupportedTokens().map((token): TokenAssetData => {
@@ -425,7 +369,7 @@ const AssetsTable: React.FC<AssetsTableProps> = ({ balanceDisplay, isLoading }) 
         icon: tokenBalance.token.icon || DEFAULT_TOKEN_ICON,
       };
     });
-  }, [tokenBalances, prices, activeTab]);
+  }, [tokenBalances, prices]);
 
   return (
     <div className="mt-8">
@@ -502,11 +446,13 @@ interface DashboardHomeProps {
   isRefreshing: boolean;
   isHidden: boolean;
   toggleHidden: () => void;
+  tokenBalances?: TokenBalance[];
+  prices?: TokenPrices;
 }
 
 // SmartAccount panel removed
 
-const DashboardHome: React.FC<DashboardHomeProps> = ({ onNavigate, balanceDisplay, isLoading, lastUpdated, error, onRefresh, isRefreshing, isHidden, toggleHidden }) => (
+const DashboardHome: React.FC<DashboardHomeProps> = ({ onNavigate, balanceDisplay, isLoading, lastUpdated, error, onRefresh, isRefreshing, isHidden, toggleHidden, tokenBalances, prices }) => (
   <>
     <BalanceOverview
       onNavigate={onNavigate}
@@ -519,7 +465,7 @@ const DashboardHome: React.FC<DashboardHomeProps> = ({ onNavigate, balanceDispla
       isHidden={isHidden}
       toggleHidden={toggleHidden}
     />
-    <AssetsTable balanceDisplay={balanceDisplay} isLoading={isLoading} />
+    <AssetsTable balanceDisplay={balanceDisplay} isLoading={isLoading} tokenBalances={tokenBalances} prices={prices} />
   </>
 );
 
@@ -556,6 +502,9 @@ const WalletDashboard: React.FC = () => {
   const [isLoadingTotalBalance, setIsLoadingTotalBalance] = useState(false);
   // State for agent wallet balances
   const [agentBalances, setAgentBalances] = useState<WalletBalance[]>([]);
+  // State for token balances and prices (shared with AssetsTable)
+  const [tokenBalancesState, setTokenBalancesState] = useState<TokenBalance[]>([]);
+  const [pricesState, setPricesState] = useState<TokenPrices>({});
 
   // Sync tokenService RPC URL with current network
   useEffect(() => {
@@ -587,6 +536,10 @@ const WalletDashboard: React.FC = () => {
         const tokenBalances = await tokenService.getAllTokenBalances(address, networkType, chainKey);
         const symbols = getAllSupportedTokens().map(t => t.symbol);
         const prices = await tokenService.getTokenPrices(symbols);
+
+        // Store for AssetsTable (avoid duplicate fetches)
+        setTokenBalancesState(tokenBalances);
+        setPricesState(prices);
 
         let total = 0;
         const walletBalances: WalletBalance[] = [];
@@ -639,6 +592,8 @@ const WalletDashboard: React.FC = () => {
             isRefreshing={isAccountLoading || isLoadingTotalBalance}
             isHidden={isBalanceHidden}
             toggleHidden={() => setIsBalanceHidden((prev) => !prev)}
+            tokenBalances={tokenBalancesState}
+            prices={pricesState}
           />
         );
       case 'Send':
@@ -690,6 +645,8 @@ const WalletDashboard: React.FC = () => {
             isRefreshing={isAccountLoading || isLoadingTotalBalance}
             isHidden={isBalanceHidden}
             toggleHidden={() => setIsBalanceHidden((prev) => !prev)}
+            tokenBalances={tokenBalancesState}
+            prices={pricesState}
           />
         );
     }

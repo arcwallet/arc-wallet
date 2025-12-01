@@ -69,23 +69,47 @@ const Bridge: React.FC = () => {
 
   // Create Sepolia PasskeyManager for sepolia-to-arc direction
   const sepoliaManagerRef = useRef<PasskeyAccountManager | null>(null);
+  const [sepoliaManagerReady, setSepoliaManagerReady] = useState(false);
 
   // Initialize Sepolia manager when we have credentials from Arc manager
   useEffect(() => {
-    if (passkeyManager && passkeyConnected) {
+    let isMounted = true;
+
+    const initSepoliaManager = async () => {
+      if (!passkeyManager || !passkeyConnected) {
+        return;
+      }
+
       const credential = passkeyManager.getCurrentCredential();
-      if (credential) {
+      if (!credential) {
+        console.warn('[Bridge] No credential available for Sepolia manager');
+        return;
+      }
+
+      try {
         // Create Sepolia manager with same credentials
         const sepoliaManager = new PasskeyAccountManager(SEPOLIA_PASSKEY_CONFIG);
         // Restore the credential to Sepolia manager (same passkey, different chain)
-        sepoliaManager.restoreFromCredential(credential).then(() => {
+        await sepoliaManager.restoreFromCredential(credential);
+
+        if (isMounted) {
           sepoliaManagerRef.current = sepoliaManager;
-          console.log('[Bridge] Sepolia PasskeyManager initialized');
-        }).catch(err => {
-          console.error('[Bridge] Failed to init Sepolia manager:', err);
-        });
+          setSepoliaManagerReady(true);
+          console.log('[Bridge] Sepolia PasskeyManager initialized, address:', sepoliaManager.getAccountAddress());
+        }
+      } catch (err) {
+        console.error('[Bridge] Failed to init Sepolia manager:', err);
+        if (isMounted) {
+          setSepoliaManagerReady(false);
+        }
       }
-    }
+    };
+
+    initSepoliaManager();
+
+    return () => {
+      isMounted = false;
+    };
   }, [passkeyManager, passkeyConnected]);
 
   // Fetch balances on both chains
@@ -145,11 +169,16 @@ const Bridge: React.FC = () => {
     }
     if (isSubmitting) return false;
 
+    // For Sepolia → Arc, require Sepolia manager to be ready
+    if (direction === 'sepolia-to-arc' && !sepoliaManagerReady) {
+      return false;
+    }
+
     const normalized = normalizeAmount(amount);
     if (!normalized) return false;
     const numeric = Number(normalized);
     return Number.isFinite(numeric) && numeric > 0;
-  }, [passkeyConnected, passkeyManager, amount, isSubmitting]);
+  }, [passkeyConnected, passkeyManager, amount, isSubmitting, direction, sepoliaManagerReady]);
 
   const handleProgressUpdate = (step: BridgeProgressStep) => {
     switch (step.type) {
@@ -200,11 +229,21 @@ const Bridge: React.FC = () => {
       return;
     }
 
-    // For sepolia-to-arc, we need the Sepolia manager
-    if (direction === 'sepolia-to-arc' && !sepoliaManagerRef.current) {
-      setStatusVariant('error');
-      setStatusMessage('Sepolia wallet not initialized. Please wait and try again.');
-      return;
+    // For sepolia-to-arc, we need the Sepolia manager to be ready
+    if (direction === 'sepolia-to-arc') {
+      if (!sepoliaManagerReady || !sepoliaManagerRef.current) {
+        setStatusVariant('error');
+        setStatusMessage('Sepolia wallet not initialized. Please wait a moment and try again.');
+        return;
+      }
+      // Also verify the manager has a valid address
+      const sepoliaAddress = sepoliaManagerRef.current.getAccountAddress();
+      if (!sepoliaAddress) {
+        setStatusVariant('error');
+        setStatusMessage('Sepolia wallet address not available. Please reconnect your wallet.');
+        return;
+      }
+      console.log('[Bridge] Sepolia manager ready, address:', sepoliaAddress);
     }
 
     const normalized = normalizeAmount(amount);
@@ -326,6 +365,11 @@ const Bridge: React.FC = () => {
               <p className="text-green-300/70 text-sm font-mono">
                 {address?.slice(0, 10)}...{address?.slice(-8)}
               </p>
+              {direction === 'sepolia-to-arc' && !sepoliaManagerReady && (
+                <p className="text-yellow-400/80 text-xs mt-1">
+                  Initializing Sepolia wallet...
+                </p>
+              )}
             </div>
             <div className="flex gap-4">
               <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${direction === 'arc-to-sepolia' ? 'bg-blue-500/10 border border-blue-500/30' : 'bg-slate-800/50'}`}>
