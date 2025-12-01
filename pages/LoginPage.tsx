@@ -438,7 +438,7 @@ const LoginPage: React.FC = () => {
 
       {/* Top Left Logo */}
       <div className="absolute top-8 left-8 z-20 opacity-90 hover:opacity-100 transition-opacity cursor-pointer">
-        <img src={arcLogo} alt="Arc Wallet" className="w-20 h-20 object-contain drop-shadow-[0_0_20px_rgba(255,255,255,0.6)]" />
+        <img src={arcLogo} alt="Arc Wallet" className="w-40 h-40 object-contain drop-shadow-[0_0_20px_rgba(255,255,255,0.6)]" />
       </div>
 
       {/* Login Container */}

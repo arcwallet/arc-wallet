@@ -17,7 +17,8 @@ import { PasskeyAccountManager } from '@arc/wallet-sdk';
 // Sepolia config for PasskeyAccountManager
 // Uses our own Sepolia bundler running on backend (separate from Arc bundler)
 const SEPOLIA_PASSKEY_CONFIG = {
-  factoryAddress: import.meta.env.VITE_SEPOLIA_PASSKEY_FACTORY_ADDRESS || '0x9AE89FbF3C32F976Db2A668d5a5c7B00032BD14a',
+  // IMPORTANT: Must use the same CREATE2-deployed factory address as Arc for matching smart wallet addresses
+  factoryAddress: import.meta.env.VITE_SEPOLIA_PASSKEY_FACTORY_ADDRESS || '0x38bdac0eA9FFA6cE260370D98Fd2b89a3257A9c8',
   entryPointAddress: '0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789',
   rpcUrl: 'https://ethereum-sepolia-rpc.publicnode.com',
   // IMPORTANT: Use Sepolia-specific bundler endpoint (not the Arc bundler!)
