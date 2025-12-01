@@ -2550,8 +2550,15 @@ class et {
       credentials: "include",
       body: JSON.stringify(n)
     });
-    if (!r.ok)
-      throw new Error("Failed to get authentication options");
+    if (!r.ok) {
+      let b = `Status: ${r.status}`;
+      try {
+        const I = await r.json();
+        b = I.error || I.message || b;
+      } catch {
+      }
+      throw new Error(`Failed to get authentication options: ${b}`);
+    }
     const s = await r.json(), i = ((g = s.data) == null ? void 0 : g.options) || s;
     t && (!i.allowCredentials || i.allowCredentials.length === 0) && (i.allowCredentials = [{
       id: t,

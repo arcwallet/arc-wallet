@@ -213,7 +213,12 @@ export class PasskeyAccountManager {
     });
 
     if (!optionsResponse.ok) {
-      throw new Error('Failed to get authentication options');
+      let errorDetail = `Status: ${optionsResponse.status}`;
+      try {
+        const errorBody = await optionsResponse.json();
+        errorDetail = errorBody.error || errorBody.message || errorDetail;
+      } catch { /* ignore */ }
+      throw new Error(`Failed to get authentication options: ${errorDetail}`);
     }
 
     const responseData = await optionsResponse.json();
