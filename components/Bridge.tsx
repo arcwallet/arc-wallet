@@ -11,8 +11,17 @@ import {
   type BridgeDirection,
   type BridgeProgressStep,
 } from '../services/passkeyBridgeService';
+import {
+  transferWithGateway,
+  estimateGatewayTransfer,
+  type GatewayDirection,
+  type GatewayProgressStep,
+} from '../services/circleGatewayService';
 import { TX_EXPLORER_URL } from '../config/app.config';
 import { PasskeyAccountManager } from '@arc/wallet-sdk';
+
+// Bridge mode: instant (Gateway) or standard (CCTP)
+type BridgeMode = 'instant' | 'standard';
 
 // Sepolia config for PasskeyAccountManager
 // Uses our own Sepolia bundler running on backend (separate from Arc bundler)
@@ -53,6 +62,7 @@ const Bridge: React.FC = () => {
   const { addActivity } = useActivity();
 
   const [direction, setDirection] = useState<BridgeDirection>('arc-to-sepolia');
+  const [bridgeMode, setBridgeMode] = useState<BridgeMode>('instant'); // Default to instant (Gateway)
   const [selectedToken] = useState<TokenInfo>(
     getAllSupportedTokens().find(t => t.symbol === 'USDC') || getAllSupportedTokens()[0]
   );
@@ -229,6 +239,51 @@ const Bridge: React.FC = () => {
     }
   };
 
+  // Gateway progress handler
+  const handleGatewayProgressUpdate = (step: GatewayProgressStep) => {
+    switch (step.type) {
+      case 'checking-balance':
+        setProgressItem('Checking USDC balance...');
+        break;
+      case 'approving-usdc':
+        setProgressItem(step.txHash
+          ? `USDC approved! Tx: ${step.txHash.slice(0, 10)}...`
+          : 'Approving USDC for Gateway...'
+        );
+        break;
+      case 'depositing':
+        setProgressItem(step.txHash
+          ? `Deposited to Gateway! Tx: ${step.txHash.slice(0, 10)}...`
+          : 'Depositing USDC to Gateway...'
+        );
+        break;
+      case 'signing-burn-intent':
+        setProgressItem('Signing burn intent...');
+        break;
+      case 'requesting-attestation':
+        setProgressItem('Requesting instant attestation...');
+        break;
+      case 'attestation-received':
+        setProgressItem('Attestation received instantly!');
+        break;
+      case 'minting':
+        setProgressItem(step.txHash
+          ? `USDC minted! Tx: ${step.txHash.slice(0, 10)}...`
+          : 'Minting USDC on destination...'
+        );
+        if (step.txHash) setDestTxHash(step.txHash);
+        break;
+      case 'completed':
+        setProgressItem('Gateway transfer completed!');
+        if (step.sourceTxHash) setSourceTxHash(step.sourceTxHash);
+        if (step.destinationTxHash) setDestTxHash(step.destinationTxHash);
+        break;
+      case 'error':
+        setProgressItem(`Error: ${step.message}`);
+        break;
+    }
+  };
+
   const handleBridge = async () => {
     if (!passkeyConnected || !passkeyManager) {
       setStatusVariant('error');
@@ -271,29 +326,46 @@ const Bridge: React.FC = () => {
 
     setIsSubmitting(true);
     setStatusVariant('info');
-    setStatusMessage('Starting bridge transaction...');
+    setStatusMessage(bridgeMode === 'instant'
+      ? 'Starting instant Gateway transfer...'
+      : 'Starting standard bridge transaction...'
+    );
     setProgressItem('');
     setSourceTxHash(null);
     setDestTxHash(null);
 
     try {
-      // For sepolia-to-arc direction, override sender address with Arc address
-      // because different factory contracts on Sepolia produce different counterfactual addresses
-      // but the actual USDC is held at the Arc address
-      const senderOverride = direction === 'sepolia-to-arc' ? address : undefined;
+      let result;
 
-      const result = await bridgeUsdcWithPasskey({
-        passkeyManager,
-        sepoliaPasskeyManager: sepoliaManagerRef.current || undefined,
-        amount: normalized,
-        direction,
-        senderAddressOverride: senderOverride,
-        onProgress: handleProgressUpdate,
-      });
+      if (bridgeMode === 'instant') {
+        // Use Circle Gateway for instant transfer
+        result = await transferWithGateway({
+          passkeyManager,
+          sepoliaPasskeyManager: sepoliaManagerRef.current || undefined,
+          amount: normalized,
+          direction: direction as GatewayDirection,
+          onProgress: handleGatewayProgressUpdate,
+        });
+      } else {
+        // Use standard CCTP bridge
+        const senderOverride = direction === 'sepolia-to-arc' ? address : undefined;
+
+        result = await bridgeUsdcWithPasskey({
+          passkeyManager,
+          sepoliaPasskeyManager: sepoliaManagerRef.current || undefined,
+          amount: normalized,
+          direction,
+          senderAddressOverride: senderOverride,
+          onProgress: handleProgressUpdate,
+        });
+      }
 
       if (result.success) {
         setStatusVariant('success');
-        setStatusMessage('Bridge completed successfully!');
+        setStatusMessage(bridgeMode === 'instant'
+          ? 'Instant transfer completed!'
+          : 'Bridge completed successfully!'
+        );
 
         const amountNumber = Number(normalized);
         const now = new Date();
@@ -304,8 +376,8 @@ const Bridge: React.FC = () => {
             id: result.sourceTxHash,
             type: TransactionType.Bridge,
             description: direction === 'arc-to-sepolia'
-              ? `Bridge ${selectedToken.symbol} from Arc to Sepolia`
-              : `Bridge ${selectedToken.symbol} from Sepolia to Arc`,
+              ? `${bridgeMode === 'instant' ? 'Instant ' : ''}Bridge ${selectedToken.symbol} from Arc to Sepolia`
+              : `${bridgeMode === 'instant' ? 'Instant ' : ''}Bridge ${selectedToken.symbol} from Sepolia to Arc`,
             timestamp: 'Just now',
             date: now,
             amount: direction === 'arc-to-sepolia' ? -amountNumber : amountNumber,
@@ -400,6 +472,53 @@ const Bridge: React.FC = () => {
       )}
 
       <div className="grid gap-6">
+        {/* Bridge Mode Selection */}
+        <div className="rounded-xl border border-slate-500/50 bg-slate-900/60 backdrop-blur-sm p-6 space-y-4">
+          <p className="text-sm font-medium text-slate-400">Transfer Speed</p>
+          <div className="grid sm:grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => setBridgeMode('instant')}
+              disabled={isSubmitting}
+              className={`rounded-xl border px-4 py-4 text-left transition-all relative overflow-hidden ${
+                bridgeMode === 'instant'
+                  ? 'border-emerald-400 bg-emerald-400/10 text-emerald-400 shadow-[0_0_15px_rgba(52,211,153,0.2)]'
+                  : 'border-slate-500/30 bg-transparent text-slate-300 hover:border-emerald-400/50 hover:bg-emerald-400/5'
+              } disabled:opacity-50`}
+            >
+              {bridgeMode === 'instant' && (
+                <div className="absolute top-2 right-2 bg-emerald-400 text-slate-900 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                  RECOMMENDED
+                </div>
+              )}
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-lg">&#x26A1;</span>
+                <p className="text-base font-semibold">Instant (Gateway)</p>
+              </div>
+              <p className="text-xs text-slate-400">~1 minute via Circle Gateway</p>
+              <p className="text-[10px] text-emerald-400/70 mt-1">Unified USDC balance, no fee</p>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setBridgeMode('standard')}
+              disabled={isSubmitting}
+              className={`rounded-xl border px-4 py-4 text-left transition-all ${
+                bridgeMode === 'standard'
+                  ? 'border-blue-400 bg-blue-400/10 text-blue-400 shadow-[0_0_15px_rgba(96,165,250,0.2)]'
+                  : 'border-slate-500/30 bg-transparent text-slate-300 hover:border-blue-400/50 hover:bg-blue-400/5'
+              } disabled:opacity-50`}
+            >
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-lg">&#x1F550;</span>
+                <p className="text-base font-semibold">Standard (CCTP)</p>
+              </div>
+              <p className="text-xs text-slate-400">~15-20 minutes via attestation</p>
+              <p className="text-[10px] text-blue-400/70 mt-1">Classic cross-chain bridge</p>
+            </button>
+          </div>
+        </div>
+
         {/* Direction Selection */}
         <div className="rounded-xl border border-slate-500/50 bg-slate-900/60 backdrop-blur-sm p-6 space-y-4">
           <p className="text-sm font-medium text-slate-400">Bridge Direction</p>
@@ -480,28 +599,58 @@ const Bridge: React.FC = () => {
             {amount && Number(normalizeAmount(amount) || 0) > 0 && (() => {
               const normalized = normalizeAmount(amount);
               if (!normalized) return null;
-              const feeInfo = getEstimatedFee(normalized, direction);
+
+              // Use appropriate fee estimation based on mode
+              const gatewayFeeInfo = bridgeMode === 'instant'
+                ? estimateGatewayTransfer(normalized, direction as GatewayDirection)
+                : null;
+              const standardFeeInfo = bridgeMode === 'standard'
+                ? getEstimatedFee(normalized, direction)
+                : null;
+
               return (
-                <div className="rounded-lg bg-slate-800/50 border border-slate-600/30 p-4 space-y-2">
+                <div className={`rounded-lg border p-4 space-y-2 ${
+                  bridgeMode === 'instant'
+                    ? 'bg-emerald-500/5 border-emerald-500/20'
+                    : 'bg-slate-800/50 border-slate-600/30'
+                }`}>
                   <div className="flex justify-between text-sm">
                     <span className="text-slate-400">You send</span>
                     <span className="text-white font-medium">{normalized} USDC</span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-slate-400">Bridge fee ({feeInfo.feePercentage}%)</span>
-                    <span className="text-slate-300">-{feeInfo.fee} USDC</span>
+                    <span className="text-slate-400">
+                      {bridgeMode === 'instant' ? 'Gateway fee' : `Bridge fee (${standardFeeInfo?.feePercentage}%)`}
+                    </span>
+                    <span className={bridgeMode === 'instant' ? 'text-emerald-400' : 'text-slate-300'}>
+                      {bridgeMode === 'instant' ? 'FREE' : `-${standardFeeInfo?.fee} USDC`}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-400">Estimated time</span>
+                    <span className={bridgeMode === 'instant' ? 'text-emerald-400' : 'text-slate-300'}>
+                      {bridgeMode === 'instant' ? gatewayFeeInfo?.estimatedTime || '< 1 min' : '~15-20 min'}
+                    </span>
                   </div>
                   <div className="border-t border-slate-600/30 pt-2 flex justify-between text-sm">
                     <span className="text-slate-400">You receive</span>
-                    <span className="text-blue-400 font-semibold">{feeInfo.netAmount} USDC</span>
+                    <span className={`font-semibold ${bridgeMode === 'instant' ? 'text-emerald-400' : 'text-blue-400'}`}>
+                      {bridgeMode === 'instant' ? gatewayFeeInfo?.netAmount : standardFeeInfo?.netAmount} USDC
+                    </span>
                   </div>
                 </div>
               );
             })()}
 
-            <div className="rounded-lg bg-blue-500/10 border border-blue-500/30 p-3">
-              <p className="text-xs text-blue-300">
-                Bridge uses your PasskeyAccount smart wallet. You'll be prompted to sign with your passkey for each step (approve + burn).
+            <div className={`rounded-lg p-3 ${
+              bridgeMode === 'instant'
+                ? 'bg-emerald-500/10 border border-emerald-500/30'
+                : 'bg-blue-500/10 border border-blue-500/30'
+            }`}>
+              <p className={`text-xs ${bridgeMode === 'instant' ? 'text-emerald-300' : 'text-blue-300'}`}>
+                {bridgeMode === 'instant'
+                  ? 'Gateway uses unified USDC balance for instant transfers. You\'ll sign: approve → deposit → burn intent.'
+                  : 'Bridge uses your PasskeyAccount smart wallet. You\'ll be prompted to sign with your passkey for each step (approve + burn).'}
               </p>
             </div>
           </div>
@@ -511,13 +660,21 @@ const Bridge: React.FC = () => {
         <button
           onClick={handleBridge}
           disabled={!canSubmit}
-          className="flex items-center justify-center gap-2 h-14 rounded-lg bg-slate-200 hover:bg-white text-slate-900 text-lg font-semibold transition-all shadow-[0_0_20px_rgba(255,255,255,0.1)] hover:shadow-[0_0_30px_rgba(255,255,255,0.2)] disabled:cursor-not-allowed disabled:opacity-50"
+          className={`flex items-center justify-center gap-2 h-14 rounded-lg text-lg font-semibold transition-all disabled:cursor-not-allowed disabled:opacity-50 ${
+            bridgeMode === 'instant'
+              ? 'bg-emerald-500 hover:bg-emerald-400 text-white shadow-[0_0_20px_rgba(52,211,153,0.2)] hover:shadow-[0_0_30px_rgba(52,211,153,0.3)]'
+              : 'bg-slate-200 hover:bg-white text-slate-900 shadow-[0_0_20px_rgba(255,255,255,0.1)] hover:shadow-[0_0_30px_rgba(255,255,255,0.2)]'
+          }`}
         >
           {isSubmitting && <SpinnerIcon size={20} />}
           <span>
             {isSubmitting
-              ? `Bridging ${selectedToken.symbol}…`
-              : `Bridge ${selectedToken.symbol} ${directionDetails?.label ?? ''}`}
+              ? bridgeMode === 'instant'
+                ? `Instant Transfer ${selectedToken.symbol}…`
+                : `Bridging ${selectedToken.symbol}…`
+              : bridgeMode === 'instant'
+                ? `⚡ Instant Transfer ${selectedToken.symbol}`
+                : `Bridge ${selectedToken.symbol} ${directionDetails?.label ?? ''}`}
           </span>
         </button>
 
