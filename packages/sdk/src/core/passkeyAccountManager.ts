@@ -317,16 +317,60 @@ export class PasskeyAccountManager {
     // Note: Use getFunction() because Ethers v6 Contract has its own getAddress() method from Addressable interface
     const salt = BigInt(keccak256(new TextEncoder().encode(this.currentCredential.userId)));
     const getAddressFunc = this.factory.getFunction('getAddress');
-    this.accountAddress = await getAddressFunc(
+    const computedAddress = await getAddressFunc(
       BigInt(this.currentCredential.publicKeyX),
       BigInt(this.currentCredential.publicKeyY),
       salt
     );
 
-    logger.info('Connected with passkey', {
-      component: 'PasskeyAccountManager',
-      address: this.accountAddress
-    });
+    // Check if computed address is deployed
+    const computedCode = await this.provider.getCode(computedAddress);
+
+    if (computedCode !== '0x') {
+      // Computed address is deployed, use it
+      this.accountAddress = computedAddress;
+      logger.info('Connected with passkey - computed address is deployed', {
+        component: 'PasskeyAccountManager',
+        address: this.accountAddress
+      });
+    } else {
+      // Computed address not deployed - check if there's a stored deployed wallet
+      const storedAddress = localStorage.getItem(`arcwallet:address:${this.currentCredential.userId}`);
+      if (storedAddress) {
+        const storedCode = await this.provider.getCode(storedAddress);
+        if (storedCode !== '0x') {
+          // Verify stored wallet has the same public key
+          try {
+            const accountContract = new Contract(storedAddress, ACCOUNT_ABI, this.provider);
+            const [x, y] = await accountContract.getOwnerPublicKey();
+            if (x.toString() === this.currentCredential.publicKeyX && y.toString() === this.currentCredential.publicKeyY) {
+              this.accountAddress = storedAddress;
+              logger.info('Connected with passkey - using stored deployed wallet', {
+                component: 'PasskeyAccountManager',
+                address: this.accountAddress
+              });
+              // Update localStorage with correct address
+              localStorage.setItem(`arcwallet:address:${this.currentCredential.userId}`, storedAddress);
+              return { address: this.accountAddress!, credential: this.currentCredential! };
+            }
+          } catch (e) {
+            logger.warn('Failed to verify stored wallet', { component: 'PasskeyAccountManager', error: e });
+          }
+        }
+      }
+
+      // No deployed wallet found, use computed (counterfactual) address
+      this.accountAddress = computedAddress;
+      logger.info('Connected with passkey - using counterfactual address', {
+        component: 'PasskeyAccountManager',
+        address: this.accountAddress
+      });
+    }
+
+    // Store the address for future use
+    if (this.accountAddress) {
+      localStorage.setItem(`arcwallet:address:${this.currentCredential.userId}`, this.accountAddress);
+    }
 
     return { address: this.accountAddress!, credential: this.currentCredential! };
   }
@@ -407,16 +451,53 @@ export class PasskeyAccountManager {
     // Calculate account address from credential
     const salt = BigInt(keccak256(new TextEncoder().encode(credential.userId)));
     const getAddressFunc = this.factory.getFunction('getAddress');
-    this.accountAddress = await getAddressFunc(
+    const computedAddress = await getAddressFunc(
       BigInt(credential.publicKeyX),
       BigInt(credential.publicKeyY),
       salt
     );
 
-    logger.info('Restored from credential', {
-      component: 'PasskeyAccountManager',
-      address: this.accountAddress
-    });
+    // Check if computed address is deployed
+    const computedCode = await this.provider.getCode(computedAddress);
+
+    if (computedCode !== '0x') {
+      // Computed address is deployed, use it
+      this.accountAddress = computedAddress;
+      logger.info('Restored from credential - computed address is deployed', {
+        component: 'PasskeyAccountManager',
+        address: this.accountAddress
+      });
+    } else {
+      // Computed address not deployed - check if there's a stored deployed wallet
+      const storedAddress = localStorage.getItem(`arcwallet:address:${credential.userId}`);
+      if (storedAddress) {
+        const storedCode = await this.provider.getCode(storedAddress);
+        if (storedCode !== '0x') {
+          // Verify stored wallet has the same public key
+          try {
+            const accountContract = new Contract(storedAddress, ACCOUNT_ABI, this.provider);
+            const [x, y] = await accountContract.getOwnerPublicKey();
+            if (x.toString() === credential.publicKeyX && y.toString() === credential.publicKeyY) {
+              this.accountAddress = storedAddress;
+              logger.info('Restored from stored deployed wallet', {
+                component: 'PasskeyAccountManager',
+                address: this.accountAddress
+              });
+              return this.accountAddress!;
+            }
+          } catch (e) {
+            logger.warn('Failed to verify stored wallet', { component: 'PasskeyAccountManager', error: e });
+          }
+        }
+      }
+
+      // No deployed wallet found, use computed (counterfactual) address
+      this.accountAddress = computedAddress;
+      logger.info('Restored from credential - using counterfactual address', {
+        component: 'PasskeyAccountManager',
+        address: this.accountAddress
+      });
+    }
 
     return this.accountAddress!;
   }
@@ -1010,10 +1091,11 @@ export class PasskeyAccountManager {
         possibleAddresses.push(storedAddress);
       }
 
-      // Also try the known wallet address from context (if this is a recovery)
-      // The user's wallet: 0x72c90791145C55966903D661Fc286eBbbB47f151
+      // Also try the known founder/admin wallet addresses (for recovery)
+      // These are protected wallets that should always be recoverable
+      // Founder: sehereroglu786@gmail.com -> 0x72c90791145C55966903D661Fc286eBbbB47f151
       const knownWallets = [
-        '0x72c90791145C55966903D661Fc286eBbbB47f151', // Known deployed wallet
+        '0x72c90791145C55966903D661Fc286eBbbB47f151', // Founder wallet - sehereroglu786@gmail.com
       ];
       possibleAddresses.push(...knownWallets);
 

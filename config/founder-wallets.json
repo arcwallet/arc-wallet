@@ -1,0 +1,16 @@
+{
+  "description": "Founder and admin wallet addresses - these are protected and have special privileges",
+  "founders": [
+    {
+      "email": "sehereroglu786@gmail.com",
+      "walletAddress": "0x72c90791145C55966903D661Fc286eBbbB47f151",
+      "chain": "arc-testnet",
+      "deployedAt": "2024",
+      "notes": "Primary founder wallet - CCTP bridge tested, USDC balances: Arc 11.68, Sepolia 2.0"
+    }
+  ],
+  "adminWallets": [
+    "0x72c90791145C55966903D661Fc286eBbbB47f151"
+  ],
+  "bundlerWallet": "0x5cd69aCF4CC78D9f84df5A75E456d2aEc1021391"
+}
