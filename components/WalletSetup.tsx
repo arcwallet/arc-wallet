@@ -234,20 +234,20 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
               </p>
             </div>
 
-            {/* Legacy wallet migration warning */}
+            {/* Existing wallet notice */}
             {hasLegacyWallet && hasServerPasskey === false && (
-              <div className="p-4 rounded-lg backdrop-blur-sm border bg-amber-900/20 border-amber-500/50 text-amber-200 text-sm">
+              <div className="p-4 rounded-lg backdrop-blur-sm border bg-blue-900/20 border-blue-500/40 text-blue-200 text-sm">
                 <div className="flex items-start gap-3">
                   <svg className="w-5 h-5 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                   </svg>
                   <div>
-                    <p className="font-medium mb-1">Existing Wallet Detected</p>
-                    <p className="text-xs text-amber-300/80 mb-2">
-                      You have an existing wallet at <span className="font-mono">{existingWalletAddress?.slice(0, 8)}...{existingWalletAddress?.slice(-6)}</span>
+                    <p className="font-medium mb-1">Welcome Back</p>
+                    <p className="text-xs text-blue-300/80 mb-2">
+                      Your wallet <span className="font-mono">{existingWalletAddress?.slice(0, 8)}...{existingWalletAddress?.slice(-6)}</span> is ready to connect.
                     </p>
-                    <p className="text-xs text-amber-300/80">
-                      Creating a new passkey will generate a <strong>new wallet address</strong>. If you have funds in your old wallet, please transfer them after setup.
+                    <p className="text-xs text-blue-300/80">
+                      Use your passkey to securely access your existing wallet.
                     </p>
                   </div>
                 </div>
@@ -287,8 +287,8 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
                   <span>
                     {!currentEmail
                       ? 'Waiting for email...'
-                      : hasServerPasskey
-                        ? 'Connect with Passkey'
+                      : hasServerPasskey || hasLegacyWallet
+                        ? 'Connect to Wallet'
                         : 'Create Wallet with Passkey'}
                   </span>
                 </>
