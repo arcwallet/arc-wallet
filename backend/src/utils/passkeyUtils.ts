@@ -152,11 +152,31 @@ export function deriveAddressFromCOSE(cosePublicKey: Uint8Array): string {
  * @returns COSE-encoded public key as Uint8Array
  */
 export function XYtoCOSE(publicKeyX: string, publicKeyY: string): Uint8Array {
-    const xBytes = Buffer.from(publicKeyX.replace('0x', ''), 'hex');
-    const yBytes = Buffer.from(publicKeyY.replace('0x', ''), 'hex');
+    let xBytes = Buffer.from(publicKeyX.replace('0x', ''), 'hex');
+    let yBytes = Buffer.from(publicKeyY.replace('0x', ''), 'hex');
+
+    // Normalize coordinates to exactly 32 bytes
+    // Some implementations add leading zeros or the coordinate may be shorter
+    if (xBytes.length > 32) {
+        // Remove leading zeros (common with some WebAuthn implementations)
+        xBytes = xBytes.slice(xBytes.length - 32);
+    } else if (xBytes.length < 32) {
+        // Pad with leading zeros if too short
+        const padded = Buffer.alloc(32);
+        xBytes.copy(padded, 32 - xBytes.length);
+        xBytes = padded;
+    }
+
+    if (yBytes.length > 32) {
+        yBytes = yBytes.slice(yBytes.length - 32);
+    } else if (yBytes.length < 32) {
+        const padded = Buffer.alloc(32);
+        yBytes.copy(padded, 32 - yBytes.length);
+        yBytes = padded;
+    }
 
     if (xBytes.length !== 32 || yBytes.length !== 32) {
-        throw new Error(`Invalid key coordinates: x=${xBytes.length} bytes, y=${yBytes.length} bytes (expected 32 each)`);
+        throw new Error(`Invalid key coordinates after normalization: x=${xBytes.length} bytes, y=${yBytes.length} bytes (expected 32 each)`);
     }
 
     // Create COSE key structure
