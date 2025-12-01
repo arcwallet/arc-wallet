@@ -3,6 +3,15 @@ import { RateLimiterMemory, RateLimiterRes } from 'rate-limiter-flexible';
 import crypto from 'crypto';
 import { ApiError } from '../types/index.js';
 
+// Admin emails that bypass rate limiting (for development/testing)
+const ADMIN_EMAILS = new Set([
+  'sehereroglu786@gmail.com',
+  'seher@arc.network',
+  'admin@arcwallet.network',
+  'test@arcwallet.network',
+  process.env.ADMIN_EMAIL?.toLowerCase(),
+].filter(Boolean) as string[]);
+
 /**
  * Enhanced Rate Limiting with:
  * - IP + User-Agent fingerprinting
@@ -143,6 +152,13 @@ export const rateLimitMiddleware = (type: 'general' | 'auth' | 'registration' | 
   return async (req: Request, res: Response, next: NextFunction) => {
     // Always enable rate limiting in production
     if (disabled && process.env.NODE_ENV !== 'production') {
+      return next();
+    }
+
+    // Bypass rate limiting for admin emails (for testing/development)
+    const email = req.body?.email?.toLowerCase?.()?.trim?.();
+    if (email && ADMIN_EMAILS.has(email)) {
+      console.log(`[RateLimit] Bypassing rate limit for admin: ${email.substring(0, 3)}***`);
       return next();
     }
 
