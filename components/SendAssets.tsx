@@ -342,7 +342,7 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
                 <span className="text-xs font-medium text-slate-300 bg-slate-700/60 px-2.5 py-1 rounded-md border border-slate-600/50">
                   ERC-4337
                 </span>
-                <span className="text-xs font-medium text-emerald-300 bg-emerald-500/15 px-2.5 py-1 rounded-md border border-emerald-500/30">
+                <span className="text-xs font-medium text-blue-300 bg-blue-500/15 px-2.5 py-1 rounded-md border border-blue-500/30">
                   Gasless
                 </span>
               </div>
