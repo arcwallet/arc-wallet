@@ -22,16 +22,38 @@ const getStatusBadgeClasses = (status: TransactionStatus) => {
   }
 };
 
+// Swap icon SVG
+const SwapIcon = ({ size = 20, className = '' }: { size?: number; className?: string }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M7 16V4M7 4L3 8M7 4L11 8" />
+    <path d="M17 8V20M17 20L21 16M17 20L13 16" />
+  </svg>
+);
+
+// Bridge icon SVG
+const BridgeIcon = ({ size = 20, className = '' }: { size?: number; className?: string }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M4 15V9C4 7.89543 4.89543 7 6 7H18C19.1046 7 20 7.89543 20 9V15" />
+    <path d="M4 17H20" />
+    <circle cx="8" cy="12" r="2" />
+    <circle cx="16" cy="12" r="2" />
+  </svg>
+);
+
 const getIcon = (type: TransactionType, status: TransactionStatus) => {
   switch (type) {
     case TransactionType.Sent:
-      return <SendIcon size={20} className={status === TransactionStatus.Failed ? 'text-red-400' : 'text-orange-400'} />;
+      return <SendIcon size={20} className={status === TransactionStatus.Failed ? 'text-red-400' : 'text-red-400'} />;
     case TransactionType.Received:
       return <ReceiveIcon size={20} className="text-emerald-400" />;
+    case TransactionType.Swap:
+      return <SwapIcon size={20} className="text-purple-400" />;
+    case TransactionType.Bridge:
+      return <BridgeIcon size={20} className="text-blue-400" />;
     case TransactionType.Contract:
-      return <DocumentIcon size={20} />;
+      return <DocumentIcon size={20} className="text-slate-400" />;
     default:
-      return <ReceiptIcon size={20} />;
+      return <ReceiptIcon size={20} className="text-slate-400" />;
   }
 }
 
@@ -58,8 +80,20 @@ const TransactionListItem: React.FC<TransactionListItemProps> = ({ transaction, 
       </div>
       <div className="flex items-center gap-4">
         <div className="text-right hidden sm:block">
-          <p className="text-slate-100 text-base font-normal leading-normal">{amount > 0 ? '+' : ''}{amount} {currency}</p>
-          <p className="text-slate-400 text-sm font-normal leading-normal line-clamp-2">{amount > 0 ? '+' : ''}${Math.abs(usdValue).toFixed(2)}</p>
+          <p className={`text-base font-medium leading-normal ${
+            type === TransactionType.Received ? 'text-emerald-400' :
+            type === TransactionType.Sent ? 'text-red-400' :
+            'text-slate-100'
+          }`}>
+            {amount > 0 ? '+' : ''}{amount} {currency}
+          </p>
+          <p className={`text-sm font-normal leading-normal line-clamp-2 ${
+            type === TransactionType.Received ? 'text-emerald-400/70' :
+            type === TransactionType.Sent ? 'text-red-400/70' :
+            'text-slate-400'
+          }`}>
+            {amount > 0 ? '+' : ''}${Math.abs(usdValue).toFixed(2)}
+          </p>
         </div>
         <div className={`px-2.5 py-1 rounded-full ${getStatusBadgeClasses(status)}`}>
           <p className="text-xs font-medium">{status}</p>

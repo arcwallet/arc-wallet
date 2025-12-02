@@ -257,20 +257,39 @@ export async function fetchRecentTransactions(
 
       const amount = parseFloat(formatUnits(tx.value || '0', decimals));
 
+      // Determine transaction type based on method
+      let type: TransactionType;
+      let description: string;
+      const method = tx.method?.toLowerCase() || '';
+
+      if (method.includes('swap') || method.includes('exchange')) {
+        type = TransactionType.Swap;
+        description = 'Swap';
+      } else if (method.includes('bridge') || method.includes('cctp') || method.includes('depositForBurn')) {
+        type = TransactionType.Bridge;
+        description = 'Bridge';
+      } else if (method.includes('approve') || method.includes('contract') || method === 'unknown') {
+        type = TransactionType.Contract;
+        description = 'Contract Interaction';
+      } else {
+        type = isSent ? TransactionType.Sent : TransactionType.Received;
+        description = isSent ? `Sent ${symbol}` : `Received ${symbol}`;
+      }
+
       return {
         id: tx.hash,
-        type: isSent ? TransactionType.Sent : TransactionType.Received,
-        description: isSent ? 'Sent' : 'Received', // Simplified description
+        type,
+        description,
         timestamp: formatRelativeTime(tx.timestamp * 1000),
         date: new Date(tx.timestamp * 1000),
         amount: isSent ? -amount : amount,
         currency: symbol,
-        usdValue: amount * 0.1, // Placeholder
+        usdValue: amount * 1, // 1:1 for stablecoins
         status: tx.status === 1 ? TransactionStatus.Completed : TransactionStatus.Failed,
         hash: tx.hash,
         from: tx.from_address,
         to: tx.to_address,
-        networkFee: parseFloat(tx.gas_price || '0'), // Simplified
+        networkFee: parseFloat(tx.gas_price || '0'),
         approvals: { required: 0, list: [] },
       };
     });
