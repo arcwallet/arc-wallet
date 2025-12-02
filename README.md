@@ -84,8 +84,8 @@ Arc Wallet is an enterprise-grade, self-custodial Web3 wallet built for Arc Netw
 ┌─────────────────────────────────────────────────────────────────────┐
 │                           CLIENT LAYER                               │
 ├─────────────────────────────────────────────────────────────────────┤
-│  React Frontend          │  @arc/wallet-sdk         │  WebAuthn     │
-│  (TypeScript + Vite)     │  (NPM Package)           │  (Passkeys)   │
+│  React Frontend          │  Passkey Manager         │  WebAuthn     │
+│  (TypeScript + Vite)     │  (services/)             │  (Passkeys)   │
 └──────────┬───────────────┴──────────┬───────────────┴───────┬───────┘
            │                          │                       │
            ▼                          ▼                       ▼
@@ -198,12 +198,6 @@ Arc Wallet is an enterprise-grade, self-custodial Web3 wallet built for Arc Netw
 | P256Verifier.sol | RIP-7212 wrapper |
 | ArcMultiSigWallet.sol | Multi-signature wallet |
 
-### SDK
-
-| Package | Purpose |
-|---------|---------|
-| @arc/wallet-sdk | Reusable wallet SDK for integration |
-
 ---
 
 ## Getting Started
@@ -227,8 +221,6 @@ npm install
 # Install backend dependencies
 cd backend && npm install && cd ..
 
-# Install SDK dependencies
-cd packages/sdk && npm install && cd ../..
 ```
 
 ### Environment Setup
@@ -338,9 +330,6 @@ arcwallet/
 │
 ├── contracts/           # Solidity smart contracts (9 files)
 ├── test/                # Contract tests
-│
-├── packages/
-│   └── sdk/             # @arc/wallet-sdk package
 │
 └── scripts/             # Build and deployment scripts
 ```

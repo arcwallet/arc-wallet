@@ -17,8 +17,8 @@ import React, {
   useState,
   ReactNode,
 } from 'react';
-import { PasskeyAccountManager } from '@arc/wallet-sdk';
-import type { PasskeyAccountConfig, PasskeyAccountCredential } from '@arc/wallet-sdk';
+import { PasskeyAccountManager } from '../services/passkeyAccountManager';
+import type { PasskeyAccountConfig, PasskeyAccountCredential } from '../services/passkeyAccountManager';
 import { useSession } from './SessionContext';
 
 // Types

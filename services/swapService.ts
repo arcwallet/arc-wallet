@@ -1,7 +1,7 @@
 import { Contract, JsonRpcProvider, Wallet, parseUnits, formatUnits, Interface } from 'ethers';
 import { TokenInfo, getTokenContractAddress, SWAP_CONFIG } from '../config/tokens';
 import { getProvider, getFeeSettings } from './transactionService';
-import type { PasskeyAccountManager } from '@arc/wallet-sdk';
+import type { PasskeyAccountManager } from './passkeyAccountManager';
 
 export interface Quote {
   fromToken: TokenInfo;

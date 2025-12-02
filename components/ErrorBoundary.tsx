@@ -1,5 +1,5 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
-import { logger } from '@arc/wallet-sdk';
+import { logger } from '../services/logger';
 
 interface Props {
   children: ReactNode;

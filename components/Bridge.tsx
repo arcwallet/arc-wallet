@@ -12,7 +12,7 @@ import {
   type BridgeProgressStep,
 } from '../services/passkeyBridgeService';
 import { TX_EXPLORER_URL } from '../config/app.config';
-import { PasskeyAccountManager } from '@arc/wallet-sdk';
+import { PasskeyAccountManager } from '../services/passkeyAccountManager';
 
 // Sepolia config for PasskeyAccountManager
 // Uses our own Sepolia bundler running on backend (separate from Arc bundler)

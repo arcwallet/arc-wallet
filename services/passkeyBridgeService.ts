@@ -18,7 +18,7 @@
  */
 
 import { Interface, parseUnits, JsonRpcProvider, getAddress } from 'ethers';
-import type { PasskeyAccountManager } from '@arc/wallet-sdk';
+import type { PasskeyAccountManager } from './passkeyAccountManager';
 
 // Arc Testnet CCTP Configuration (from docs.arc.network)
 const ARC_TESTNET_CONFIG = {

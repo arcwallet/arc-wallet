@@ -15,7 +15,7 @@ import type {
   RegistrationResponseJSON,
   AuthenticationResponseJSON,
 } from '@simplewebauthn/types';
-import { logger } from '../utils/logger';
+import { logger } from './logger';
 
 // Retry configuration for handling Render cold starts
 const MAX_RETRIES = 2;
@@ -119,6 +119,9 @@ export interface PasskeyCredential {
   publicKeyY: string; // hex string
   userId: string;
 }
+
+// Alias for backward compatibility
+export type PasskeyAccountCredential = PasskeyCredential;
 
 export interface UserOperation {
   sender: string;
