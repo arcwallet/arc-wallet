@@ -492,7 +492,7 @@ const Bridge: React.FC = () => {
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-slate-400">Estimated time</span>
-                    <span className="text-slate-300">~15-20 min</span>
+                    <span className="text-slate-300">~2-3 min</span>
                   </div>
                   <div className="border-t border-slate-600/30 pt-2 flex justify-between text-sm">
                     <span className="text-slate-400">You receive</span>
