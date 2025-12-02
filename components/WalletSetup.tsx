@@ -74,11 +74,24 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
     setIsCreating(true);
 
     try {
+      // CRITICAL: If user already has a wallet but no passkey, DON'T create new wallet!
+      // This protects users who lost their passkey but still have funds in their wallet
+      if (hasExistingWallet && existingWalletAddress && hasServerPasskey === false) {
+        console.log('[WalletSetup] User has existing wallet but no passkey - showing recovery message');
+        setError(
+          `You already have a wallet (${existingWalletAddress.slice(0, 8)}...${existingWalletAddress.slice(-6)}) ` +
+          'but your passkey is not registered. Please use your original device/browser where you created the passkey, ' +
+          'or contact support if you need to recover your wallet.'
+        );
+        setIsCreating(false);
+        return;
+      }
+
       // CRITICAL FIX: Check if user has passkey on server FIRST before calling connect()
       // This prevents showing the "Select passkey" dialog for users who don't have one yet
       if (hasServerPasskey === false) {
-        // User does NOT have a passkey - go straight to creation
-        console.log('[WalletSetup] User has no passkey on server, creating new wallet...');
+        // User does NOT have a passkey AND no existing wallet - safe to create new
+        console.log('[WalletSetup] New user with no passkey on server, creating new wallet...');
         setStatusMessage(`Creating new wallet for ${currentEmail}...`);
 
         const result = await createAccount();
@@ -174,7 +187,7 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
     } finally {
       setIsCreating(false);
     }
-  }, [createAccount, connect, onComplete, currentEmail, hasServerPasskey]);
+  }, [createAccount, connect, onComplete, currentEmail, hasServerPasskey, hasExistingWallet, existingWalletAddress]);
 
   // Auto-start wallet access when email is verified
   // Skip auto-start if user has legacy wallet without passkey (show warning first)
