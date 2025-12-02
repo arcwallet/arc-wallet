@@ -482,6 +482,16 @@ export class Database {
     );
   }
 
+  async updatePasskeyPublicKey(credentialId: string, publicKey: Uint8Array): Promise<void> {
+    await this.waitForReady();
+    const run: any = promisify(this.db.run.bind(this.db));
+
+    await run(
+      'UPDATE passkey_credentials SET credential_public_key = ? WHERE credential_id = ?',
+      [Buffer.from(publicKey), credentialId]
+    );
+  }
+
   // Session key operations
   async createSessionKey(sessionKey: Omit<SessionKey, 'createdAt'>): Promise<SessionKey> {
     await this.waitForReady();

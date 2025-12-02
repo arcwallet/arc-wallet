@@ -329,5 +329,37 @@ export function createPasskeyRoutes(db: Database, config: EnvConfig, sessionStor
     }
   );
 
+  /**
+   * POST /passkeys/admin/debug-passkey
+   * Admin endpoint to debug passkey data for a user
+   */
+  router.post(
+    '/admin/debug-passkey',
+    validateRequestBody(['adminSecret', 'email']),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        await passkeyController.adminDebugPasskey(req, res);
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
+
+  /**
+   * POST /passkeys/admin/update-public-key
+   * Admin endpoint to update passkey public key
+   */
+  router.post(
+    '/admin/update-public-key',
+    validateRequestBody(['adminSecret', 'email', 'credentialId', 'publicKeyX', 'publicKeyY']),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        await passkeyController.adminUpdatePublicKey(req, res);
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
+
   return router;
 }
