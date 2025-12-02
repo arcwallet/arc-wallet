@@ -523,11 +523,33 @@ export class Database {
         };
     }
     mapPasskeyCredential(row) {
+        // Convert SQLite BLOB (Buffer) to Uint8Array properly
+        let credentialPublicKey;
+        const rawKey = row.credential_public_key;
+        if (Buffer.isBuffer(rawKey)) {
+            // SQLite returns Buffer for BLOB columns
+            credentialPublicKey = new Uint8Array(rawKey.buffer, rawKey.byteOffset, rawKey.byteLength);
+        }
+        else if (rawKey instanceof Uint8Array) {
+            credentialPublicKey = rawKey;
+        }
+        else if (typeof rawKey === 'string') {
+            // If stored as base64 string, decode it
+            credentialPublicKey = new Uint8Array(Buffer.from(rawKey, 'base64'));
+        }
+        else if (rawKey && typeof rawKey === 'object') {
+            // Handle array-like objects from SQLite
+            credentialPublicKey = new Uint8Array(Object.values(rawKey));
+        }
+        else {
+            console.error('[Database] Invalid credentialPublicKey format:', typeof rawKey, rawKey);
+            throw new Error('Invalid credentialPublicKey format in database');
+        }
         return {
             id: row.id,
             userId: row.user_id,
             credentialID: row.credential_id,
-            credentialPublicKey: new Uint8Array(row.credential_public_key),
+            credentialPublicKey,
             counter: row.counter,
             credentialDeviceType: row.credential_device_type,
             credentialBackedUp: row.credential_backed_up === 1,

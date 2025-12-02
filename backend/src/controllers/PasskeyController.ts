@@ -433,6 +433,15 @@ export class PasskeyController {
         throw new ApiError('Invalid or expired challenge', 400, 'INVALID_CHALLENGE');
       }
 
+      // Debug: Log public key info before verification
+      console.log('[PasskeyAuth] Public key info:', {
+        type: typeof passkeyCredential.credentialPublicKey,
+        isUint8Array: passkeyCredential.credentialPublicKey instanceof Uint8Array,
+        length: passkeyCredential.credentialPublicKey?.length,
+        firstBytes: passkeyCredential.credentialPublicKey ?
+          Array.from(passkeyCredential.credentialPublicKey.slice(0, 10)).map(b => b.toString(16).padStart(2, '0')).join(' ') : 'null'
+      });
+
       // Verify authentication response
       const verification = await verifyAuthenticationResponse({
         response: credential,
