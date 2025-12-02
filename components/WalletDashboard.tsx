@@ -9,6 +9,7 @@ import MultiSigDashboard from './MultiSigDashboard';
 import Faucet from './Faucet';
 import SwapScreen from './SwapScreen';
 import Bridge from './Bridge';
+import History from './History';
 import AgentScreen, { WalletBalance } from './AgentScreen';
 import NetworkSelector from './NetworkSelector';
 import { Transaction } from '../types';
@@ -372,19 +373,19 @@ const AssetsTable: React.FC<AssetsTableProps> = ({ balanceDisplay, isLoading, to
   }, [tokenBalances, prices]);
 
   return (
-    <div className="mt-8">
+    <div>
       <div className="flex items-center justify-between">
         <div className="flex gap-6">
           <button
             onClick={() => setActiveTab('tokens')}
-            className={`text-xl font-bold transition-colors ${activeTab === 'tokens' ? 'text-[#E6EEF3]' : 'text-[#A7B4C8] hover:text-white'}`}
+            className={`text-lg font-semibold transition-colors ${activeTab === 'tokens' ? 'text-[#E6EEF3]' : 'text-[#A7B4C8] hover:text-white'}`}
           >
             My Assets
           </button>
 
         </div>
       </div>
-      <div className="mt-4 flow-root">
+      <div className="mt-3 flow-root">
         <div className="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
           <div className="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
             <table className="min-w-full">
@@ -448,11 +449,108 @@ interface DashboardHomeProps {
   toggleHidden: () => void;
   tokenBalances?: TokenBalance[];
   prices?: TokenPrices;
+  recentActivities?: any[];
 }
 
-// SmartAccount panel removed
+// Quick Actions Component
+const QuickActions: React.FC<{ onNavigate: (page: string) => void }> = ({ onNavigate }) => {
+  const actions = [
+    { id: 'Swap', label: 'Swap', icon: '&#8644;', description: 'Exchange tokens', color: 'blue' },
+    { id: 'Bridge', label: 'Bridge', icon: '&#x1F310;', description: 'Cross-chain transfer', color: 'purple' },
+    { id: 'Faucet', label: 'Faucet', icon: '&#x1F4A7;', description: 'Get test tokens', color: 'cyan' },
+    { id: 'Agent', label: 'AI Agent', icon: '&#x1F916;', description: 'Smart assistance', color: 'emerald' },
+  ];
 
-const DashboardHome: React.FC<DashboardHomeProps> = ({ onNavigate, balanceDisplay, isLoading, lastUpdated, error, onRefresh, isRefreshing, isHidden, toggleHidden, tokenBalances, prices }) => (
+  return (
+    <div className="mt-6">
+      <h3 className="text-lg font-semibold text-[#E6EEF3] mb-4">Quick Actions</h3>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {actions.map((action) => (
+          <button
+            key={action.id}
+            onClick={() => onNavigate(action.id)}
+            className={`rounded-xl border border-slate-500/30 bg-slate-900/60 p-4 text-left hover:bg-slate-800/60 hover:border-${action.color}-500/30 transition-all group`}
+          >
+            <div className={`w-10 h-10 rounded-lg bg-${action.color}-500/10 flex items-center justify-center mb-3 group-hover:bg-${action.color}-500/20 transition-colors`}>
+              <span className={`text-xl text-${action.color}-400`} dangerouslySetInnerHTML={{ __html: action.icon }} />
+            </div>
+            <p className="text-white font-medium text-sm">{action.label}</p>
+            <p className="text-slate-500 text-xs mt-0.5">{action.description}</p>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// Recent Activity Component
+const RecentActivity: React.FC<{ activities: any[]; onNavigate: (page: string) => void }> = ({ activities, onNavigate }) => {
+  const recentItems = activities.slice(0, 5);
+
+  const formatTime = (date: Date) => {
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+
+    if (minutes < 1) return 'Just now';
+    if (minutes < 60) return `${minutes}m ago`;
+    if (hours < 24) return `${hours}h ago`;
+    return date.toLocaleDateString();
+  };
+
+  return (
+    <div className="mt-6">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-lg font-semibold text-[#E6EEF3]">Recent Activity</h3>
+        <button
+          onClick={() => onNavigate('History')}
+          className="text-sm text-blue-400 hover:text-blue-300 transition-colors"
+        >
+          View All
+        </button>
+      </div>
+      <div className="rounded-xl border border-slate-500/30 bg-slate-900/60 overflow-hidden">
+        {recentItems.length > 0 ? (
+          <div className="divide-y divide-slate-700/50">
+            {recentItems.map((activity, index) => (
+              <div key={activity.id || index} className="p-4 flex items-center justify-between hover:bg-slate-800/40 transition-colors">
+                <div className="flex items-center gap-3">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                    activity.amount >= 0 ? 'bg-green-500/10' : 'bg-red-500/10'
+                  }`}>
+                    <span className={activity.amount >= 0 ? 'text-green-400' : 'text-red-400'}>
+                      {activity.amount >= 0 ? '&#8595;' : '&#8593;'}
+                    </span>
+                  </div>
+                  <div>
+                    <p className="text-white text-sm font-medium">{activity.description}</p>
+                    <p className="text-slate-500 text-xs">{formatTime(activity.date)}</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className={`font-semibold text-sm ${activity.amount >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                    {activity.amount >= 0 ? '+' : ''}{activity.amount?.toFixed(2) || '0.00'} {activity.currency || 'USDC'}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="p-8 text-center">
+            <div className="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center mx-auto mb-3">
+              <span className="text-slate-500 text-xl">&#x1F4CB;</span>
+            </div>
+            <p className="text-slate-400 text-sm">No recent activity</p>
+            <p className="text-slate-500 text-xs mt-1">Your transactions will appear here</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const DashboardHome: React.FC<DashboardHomeProps> = ({ onNavigate, balanceDisplay, isLoading, lastUpdated, error, onRefresh, isRefreshing, isHidden, toggleHidden, tokenBalances, prices, recentActivities = [] }) => (
   <>
     <BalanceOverview
       onNavigate={onNavigate}
@@ -465,7 +563,11 @@ const DashboardHome: React.FC<DashboardHomeProps> = ({ onNavigate, balanceDispla
       isHidden={isHidden}
       toggleHidden={toggleHidden}
     />
-    <AssetsTable balanceDisplay={balanceDisplay} isLoading={isLoading} tokenBalances={tokenBalances} prices={prices} />
+    <QuickActions onNavigate={onNavigate} />
+    <div className="grid lg:grid-cols-2 gap-6 mt-6">
+      <AssetsTable balanceDisplay={balanceDisplay} isLoading={isLoading} tokenBalances={tokenBalances} prices={prices} />
+      <RecentActivity activities={recentActivities} onNavigate={onNavigate} />
+    </div>
   </>
 );
 
@@ -594,6 +696,7 @@ const WalletDashboard: React.FC = () => {
             toggleHidden={() => setIsBalanceHidden((prev) => !prev)}
             tokenBalances={tokenBalancesState}
             prices={pricesState}
+            recentActivities={transactions}
           />
         );
       case 'Send':
@@ -616,6 +719,8 @@ const WalletDashboard: React.FC = () => {
         );
       case 'Bridge':
         return <Bridge />;
+      case 'History':
+        return <History />;
       case 'Transactions':
         return null;
       case 'Multi-Sig':

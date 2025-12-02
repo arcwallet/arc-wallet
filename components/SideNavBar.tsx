@@ -64,7 +64,7 @@ const SideNavBar: React.FC<SideNavBarProps> = ({ currentPage, onNavigate }) => {
     { id: 'Receive', icon: 'arrow_downward', label: 'Receive' },
     { id: 'Swap', icon: 'swap_horiz', label: 'Swap' },
     { id: 'Bridge', icon: 'link', label: 'Bridge' },
-    { id: 'Transactions', icon: 'receipt_long', label: 'Transactions' },
+    { id: 'History', icon: 'receipt_long', label: 'History' },
     { id: 'Multi-Sig', icon: 'group', label: 'Multi-Sig' },
     { id: 'Agent', icon: 'smart_toy', label: 'AI Agent' },
     { id: 'Faucet', icon: 'water_drop', label: 'Faucet' },

@@ -119,39 +119,72 @@ export async function getGatewayNonce(
 }
 
 /**
- * Poll for attestation status
+ * Poll for attestation status using CCTP V2 API
+ * V2 uses /v2/messages/{domain}?transactionHash={txHash} format
  */
 async function pollAttestation(params: {
   sourceChain: SupportedChain;
   burnTxHash: string;
   maxAttempts?: number;
   intervalMs?: number;
-}): Promise<{ attestation: string; signature: string }> {
+}): Promise<{ attestation: string; message: string }> {
   const { sourceChain, burnTxHash, maxAttempts = 60, intervalMs = 1000 } = params;
+  const sourceDomain = GATEWAY_DOMAINS[sourceChain];
+
+  console.log('[Gateway] Starting attestation poll:', { burnTxHash, sourceDomain });
 
   for (let i = 0; i < maxAttempts; i++) {
     try {
+      // Use CCTP V2 API format
       const response = await fetch(
-        `${GATEWAY_API.TESTNET}/attestations/${burnTxHash}?domain=${GATEWAY_DOMAINS[sourceChain]}`
+        `${GATEWAY_API.TESTNET}/v2/messages/${sourceDomain}?transactionHash=${burnTxHash}`
       );
 
       if (response.ok) {
         const data = await response.json();
-        if (data.attestation && data.status === 'complete') {
-          return {
-            attestation: data.attestation,
-            signature: data.signature || '0x',
-          };
+
+        // V2 returns { messages: [...] } array
+        if (data.messages && data.messages.length > 0) {
+          const msg = data.messages[0];
+
+          // Success case
+          if (msg.status === 'complete' && msg.attestation) {
+            console.log('[Gateway] Attestation received successfully');
+            return {
+              attestation: msg.attestation,
+              message: msg.message,
+            };
+          }
+
+          // Handle insufficient_fee - non-recoverable error
+          if (msg.delayReason === 'insufficient_fee') {
+            throw new Error(
+              'Gateway fee was insufficient. Transaction: ' + burnTxHash
+            );
+          }
+
+          // Log progress periodically
+          if (i % 10 === 0) {
+            console.log('[Gateway] Waiting for attestation...', {
+              status: msg.status,
+              delayReason: msg.delayReason,
+              attempt: i + 1,
+            });
+          }
         }
       }
-    } catch (error) {
+    } catch (error: any) {
+      // Re-throw custom errors
+      if (error.message?.includes('insufficient')) {
+        throw error;
+      }
       console.log(`[Gateway] Attestation poll attempt ${i + 1}/${maxAttempts}`);
     }
 
     await new Promise((resolve) => setTimeout(resolve, intervalMs));
   }
 
-  throw new Error('Attestation timeout');
+  throw new Error('Attestation timeout. Transaction: ' + burnTxHash);
 }
 
 /**
@@ -305,9 +338,10 @@ export async function transferWithGateway(
       new ethers.JsonRpcProvider(chainInfo.destRpc)
     );
 
-    const mintCalldata = gatewayMinter.interface.encodeFunctionData('gatewayMint', [
+    // Use CCTP's receiveMessage with message and attestation
+    const mintCalldata = gatewayMinter.interface.encodeFunctionData('receiveMessage', [
+      attestationResult.message,
       attestationResult.attestation,
-      attestationResult.signature,
     ]);
 
     const mintResult = await destManager.executeTransaction(

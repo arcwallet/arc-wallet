@@ -17,6 +17,7 @@ export declare class Database {
     getPasskeysByUserId(userId: string): Promise<PasskeyCredential[]>;
     getPasskeyByCredentialId(credentialId: string): Promise<PasskeyCredential | null>;
     updatePasskeyCounter(credentialId: string, counter: number): Promise<void>;
+    updatePasskeyPublicKey(credentialId: string, publicKey: Uint8Array): Promise<void>;
     createSessionKey(sessionKey: Omit<SessionKey, 'createdAt'>): Promise<SessionKey>;
     getActiveSessionKeysByUserId(userId: string): Promise<SessionKey[]>;
     getActiveSessionKeyByAddress(address: string): Promise<SessionKey | null>;

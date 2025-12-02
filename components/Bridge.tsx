@@ -472,51 +472,85 @@ const Bridge: React.FC = () => {
       )}
 
       <div className="grid gap-6">
-        {/* Bridge Mode Selection */}
-        <div className="rounded-xl border border-slate-500/50 bg-slate-900/60 backdrop-blur-sm p-6 space-y-4">
-          <p className="text-sm font-medium text-slate-400">Transfer Speed</p>
-          <div className="grid sm:grid-cols-2 gap-3">
-            <button
-              type="button"
-              onClick={() => setBridgeMode('instant')}
-              disabled={isSubmitting}
-              className={`rounded-xl border px-4 py-4 text-left transition-all relative overflow-hidden ${
-                bridgeMode === 'instant'
-                  ? 'border-emerald-400 bg-emerald-400/10 text-emerald-400 shadow-[0_0_15px_rgba(52,211,153,0.2)]'
-                  : 'border-slate-500/30 bg-transparent text-slate-300 hover:border-emerald-400/50 hover:bg-emerald-400/5'
-              } disabled:opacity-50`}
-            >
-              {bridgeMode === 'instant' && (
-                <div className="absolute top-2 right-2 bg-emerald-400 text-slate-900 text-[10px] font-bold px-2 py-0.5 rounded-full">
-                  RECOMMENDED
-                </div>
-              )}
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-lg">&#x26A1;</span>
-                <p className="text-base font-semibold">Instant (Gateway)</p>
+        {/* Smart Recommendation Section */}
+        <div className="rounded-xl border-2 border-emerald-500/40 bg-gradient-to-br from-emerald-500/10 to-emerald-600/5 backdrop-blur-sm p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                <span className="text-xl">&#x26A1;</span>
               </div>
-              <p className="text-xs text-slate-400">~1 minute via Circle Gateway</p>
-              <p className="text-[10px] text-emerald-400/70 mt-1">Unified USDC balance, no fee</p>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setBridgeMode('standard')}
-              disabled={isSubmitting}
-              className={`rounded-xl border px-4 py-4 text-left transition-all ${
-                bridgeMode === 'standard'
-                  ? 'border-blue-400 bg-blue-400/10 text-blue-400 shadow-[0_0_15px_rgba(96,165,250,0.2)]'
-                  : 'border-slate-500/30 bg-transparent text-slate-300 hover:border-blue-400/50 hover:bg-blue-400/5'
-              } disabled:opacity-50`}
-            >
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-lg">&#x1F550;</span>
-                <p className="text-base font-semibold">Standard (CCTP)</p>
+              <div>
+                <p className="text-emerald-400 font-semibold text-lg">Recommended Method</p>
+                <p className="text-emerald-300/70 text-sm">Gateway Express</p>
               </div>
-              <p className="text-xs text-slate-400">~15-20 minutes via attestation</p>
-              <p className="text-[10px] text-blue-400/70 mt-1">Classic cross-chain bridge</p>
-            </button>
+            </div>
+            <div className="text-right">
+              <p className="text-emerald-400 font-bold text-lg">~30 sec</p>
+              <p className="text-emerald-300/60 text-xs">FREE</p>
+            </div>
           </div>
+
+          <div className="grid grid-cols-3 gap-4 pt-2 border-t border-emerald-500/20">
+            <div className="text-center">
+              <p className="text-emerald-300/60 text-xs mb-1">Speed</p>
+              <p className="text-emerald-400 font-semibold">Instant</p>
+            </div>
+            <div className="text-center border-x border-emerald-500/20">
+              <p className="text-emerald-300/60 text-xs mb-1">Fee</p>
+              <p className="text-emerald-400 font-semibold">0%</p>
+            </div>
+            <div className="text-center">
+              <p className="text-emerald-300/60 text-xs mb-1">Security</p>
+              <p className="text-emerald-400 font-semibold">Circle</p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setBridgeMode('instant')}
+            disabled={isSubmitting}
+            className={`w-full py-3 rounded-lg font-semibold transition-all ${
+              bridgeMode === 'instant'
+                ? 'bg-emerald-500 text-white shadow-[0_0_20px_rgba(52,211,153,0.3)]'
+                : 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 border border-emerald-500/30'
+            } disabled:opacity-50`}
+          >
+            {bridgeMode === 'instant' ? 'Selected' : 'Use Gateway Express'}
+          </button>
+        </div>
+
+        {/* Alternative Option - Collapsible */}
+        <div className="rounded-xl border border-slate-500/30 bg-slate-900/40 backdrop-blur-sm overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setBridgeMode('standard')}
+            disabled={isSubmitting}
+            className={`w-full p-4 text-left transition-all flex items-center justify-between ${
+              bridgeMode === 'standard'
+                ? 'bg-blue-500/10 border-b border-blue-500/30'
+                : 'hover:bg-slate-800/50'
+            } disabled:opacity-50`}
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-slate-700/50 flex items-center justify-center">
+                <span className="text-sm">&#x1F550;</span>
+              </div>
+              <div>
+                <p className={`font-medium ${bridgeMode === 'standard' ? 'text-blue-400' : 'text-slate-300'}`}>
+                  Alternative: Standard CCTP
+                </p>
+                <p className="text-slate-500 text-xs">~15-20 minutes via attestation</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className={`text-sm font-medium ${bridgeMode === 'standard' ? 'text-blue-400' : 'text-slate-400'}`}>
+                0.1% fee
+              </p>
+              {bridgeMode === 'standard' && (
+                <span className="text-xs text-blue-400 bg-blue-500/20 px-2 py-0.5 rounded-full">Selected</span>
+              )}
+            </div>
+          </button>
         </div>
 
         {/* Direction Selection */}

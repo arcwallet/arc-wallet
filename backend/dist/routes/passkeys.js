@@ -239,6 +239,30 @@ export function createPasskeyRoutes(db, config, sessionStore) {
             next(error);
         }
     });
+    /**
+     * POST /passkeys/admin/debug-passkey
+     * Admin endpoint to debug passkey data for a user
+     */
+    router.post('/admin/debug-passkey', validateRequestBody(['adminSecret', 'email']), async (req, res, next) => {
+        try {
+            await passkeyController.adminDebugPasskey(req, res);
+        }
+        catch (error) {
+            next(error);
+        }
+    });
+    /**
+     * POST /passkeys/admin/update-public-key
+     * Admin endpoint to update passkey public key
+     */
+    router.post('/admin/update-public-key', validateRequestBody(['adminSecret', 'email', 'credentialId', 'publicKeyX', 'publicKeyY']), async (req, res, next) => {
+        try {
+            await passkeyController.adminUpdatePublicKey(req, res);
+        }
+        catch (error) {
+            next(error);
+        }
+    });
     return router;
 }
 //# sourceMappingURL=passkeys.js.map

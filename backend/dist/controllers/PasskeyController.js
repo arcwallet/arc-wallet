@@ -930,5 +930,130 @@ export class PasskeyController {
             throw new ApiError('Failed to reset data', 500, 'ADMIN_RESET_FAILED');
         }
     };
+    /**
+     * Admin: Debug passkey data for a user
+     * POST /passkeys/admin/debug-passkey
+     */
+    adminDebugPasskey = async (req, res) => {
+        try {
+            const { adminSecret, email } = req.body;
+            const expectedSecret = process.env.ADMIN_SECRET || 'arc-admin-2024-secret';
+            if (adminSecret !== expectedSecret) {
+                throw new ApiError('Invalid admin secret', 403, 'UNAUTHORIZED');
+            }
+            if (!email) {
+                throw new ApiError('Email is required', 400, 'MISSING_EMAIL');
+            }
+            const normalizedEmail = email.trim().toLowerCase();
+            const user = await this.db.getUserByUsername(normalizedEmail);
+            if (!user) {
+                return res.json({
+                    success: false,
+                    error: 'User not found',
+                    data: { email: normalizedEmail }
+                });
+            }
+            const passkeys = await this.db.getPasskeysByUserId(user.id);
+            const passkeyData = passkeys.map(pk => {
+                const pubKeyHex = Buffer.from(pk.credentialPublicKey).toString('hex');
+                let parsedCOSE = null;
+                let publicKeyX = null;
+                let publicKeyY = null;
+                try {
+                    // Try to parse COSE and extract X,Y
+                    const { COSEECDHAtoXY } = require('../utils/passkeyUtils.js');
+                    const [x, y] = COSEECDHAtoXY(pk.credentialPublicKey);
+                    publicKeyX = x;
+                    publicKeyY = y;
+                    parsedCOSE = 'valid';
+                }
+                catch (e) {
+                    parsedCOSE = `error: ${e.message}`;
+                }
+                return {
+                    credentialID: pk.credentialID,
+                    counter: pk.counter,
+                    deviceType: pk.credentialDeviceType,
+                    backedUp: pk.credentialBackedUp,
+                    transports: pk.transports,
+                    publicKeyLength: pk.credentialPublicKey.length,
+                    publicKeyHex: pubKeyHex,
+                    parsedCOSE,
+                    publicKeyX,
+                    publicKeyY
+                };
+            });
+            return res.json({
+                success: true,
+                data: {
+                    user: {
+                        id: user.id,
+                        username: user.username,
+                        walletAddress: user.walletAddress,
+                        displayName: user.displayName
+                    },
+                    passkeys: passkeyData
+                }
+            });
+        }
+        catch (error) {
+            console.error('Admin debug passkey error:', error);
+            if (error instanceof ApiError) {
+                throw error;
+            }
+            throw new ApiError('Failed to debug passkey', 500, 'ADMIN_DEBUG_FAILED');
+        }
+    };
+    /**
+     * Admin: Update passkey public key
+     * POST /passkeys/admin/update-public-key
+     */
+    adminUpdatePublicKey = async (req, res) => {
+        try {
+            const { adminSecret, email, credentialId, publicKeyX, publicKeyY } = req.body;
+            const expectedSecret = process.env.ADMIN_SECRET || 'arc-admin-2024-secret';
+            if (adminSecret !== expectedSecret) {
+                throw new ApiError('Invalid admin secret', 403, 'UNAUTHORIZED');
+            }
+            if (!email || !credentialId || !publicKeyX || !publicKeyY) {
+                throw new ApiError('Missing required fields: email, credentialId, publicKeyX, publicKeyY', 400, 'MISSING_FIELDS');
+            }
+            const normalizedEmail = email.trim().toLowerCase();
+            const user = await this.db.getUserByUsername(normalizedEmail);
+            if (!user) {
+                throw new ApiError('User not found', 404, 'USER_NOT_FOUND');
+            }
+            // Get existing passkey
+            const existingPasskey = await this.db.getPasskeyByCredentialId(credentialId);
+            if (!existingPasskey) {
+                throw new ApiError('Passkey not found', 404, 'PASSKEY_NOT_FOUND');
+            }
+            // Create new COSE-encoded public key
+            const { XYtoCOSE } = await import('../utils/passkeyUtils.js');
+            const newPublicKey = XYtoCOSE(publicKeyX, publicKeyY);
+            // Update the public key in database
+            await this.db.updatePasskeyPublicKey(credentialId, newPublicKey);
+            console.log('[AdminUpdatePublicKey] Updated public key for:', {
+                email: normalizedEmail,
+                credentialId,
+                newKeyLength: newPublicKey.length
+            });
+            return res.json({
+                success: true,
+                data: {
+                    message: 'Public key updated successfully',
+                    credentialId,
+                    newPublicKeyLength: newPublicKey.length
+                }
+            });
+        }
+        catch (error) {
+            console.error('Admin update public key error:', error);
+            if (error instanceof ApiError) {
+                throw error;
+            }
+            throw new ApiError('Failed to update public key', 500, 'ADMIN_UPDATE_FAILED');
+        }
+    };
 }
 //# sourceMappingURL=PasskeyController.js.map

@@ -41,10 +41,11 @@ export const RPC_URLS = {
   avalancheFuji: 'https://api.avax-test.network/ext/bc/C/rpc',
 } as const;
 
-// Gateway API endpoint
+// Gateway API endpoint - Uses Circle's attestation API (same as CCTP)
+// Gateway attestation is faster but uses same infrastructure
 export const GATEWAY_API = {
-  TESTNET: 'https://gateway-api-testnet.circle.com/v1',
-  MAINNET: 'https://gateway-api.circle.com/v1',
+  TESTNET: 'https://iris-api-sandbox.circle.com',
+  MAINNET: 'https://iris-api.circle.com',
 } as const;
 
 // EIP-712 TypedData for burn intent
@@ -106,16 +107,17 @@ export const GATEWAY_WALLET_ABI = [
 ] as const;
 
 // Gateway Minter ABI (for receiving USDC on destination)
+// Uses CCTP's receiveMessage function - same as MessageTransmitter
 export const GATEWAY_MINTER_ABI = [
   {
-    name: 'gatewayMint',
+    name: 'receiveMessage',
     type: 'function',
     stateMutability: 'nonpayable',
     inputs: [
+      { name: 'message', type: 'bytes' },
       { name: 'attestation', type: 'bytes' },
-      { name: 'signature', type: 'bytes' },
     ],
-    outputs: [],
+    outputs: [{ name: 'success', type: 'bool' }],
   },
 ] as const;
 

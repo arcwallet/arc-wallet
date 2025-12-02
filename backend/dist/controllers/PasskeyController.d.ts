@@ -78,5 +78,15 @@ export declare class PasskeyController {
      * POST /passkeys/admin/reset-all
      */
     adminResetAll: (req: Request, res: Response) => Promise<Response<any, Record<string, any>>>;
+    /**
+     * Admin: Debug passkey data for a user
+     * POST /passkeys/admin/debug-passkey
+     */
+    adminDebugPasskey: (req: Request, res: Response) => Promise<Response<any, Record<string, any>>>;
+    /**
+     * Admin: Update passkey public key
+     * POST /passkeys/admin/update-public-key
+     */
+    adminUpdatePublicKey: (req: Request, res: Response) => Promise<Response<any, Record<string, any>>>;
 }
 //# sourceMappingURL=PasskeyController.d.ts.map

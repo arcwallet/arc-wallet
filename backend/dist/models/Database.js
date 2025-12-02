@@ -402,6 +402,11 @@ export class Database {
         const run = promisify(this.db.run.bind(this.db));
         await run('UPDATE passkey_credentials SET counter = ? WHERE credential_id = ?', [counter, credentialId]);
     }
+    async updatePasskeyPublicKey(credentialId, publicKey) {
+        await this.waitForReady();
+        const run = promisify(this.db.run.bind(this.db));
+        await run('UPDATE passkey_credentials SET credential_public_key = ? WHERE credential_id = ?', [Buffer.from(publicKey), credentialId]);
+    }
     // Session key operations
     async createSessionKey(sessionKey) {
         await this.waitForReady();
