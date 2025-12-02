@@ -74,11 +74,23 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
     setIsCreating(true);
 
     try {
-      // NEW APPROACH: Always try connect() first!
-      // WebAuthn credentials are stored on the DEVICE, not just on server
-      // If user has a passkey on this device, WebAuthn will find it
-      console.log('[WalletSetup] Attempting to connect with existing passkey first...');
-      setStatusMessage(`Looking for existing passkey for ${currentEmail}...`);
+      // CRITICAL FIX: Check if user has passkey on server FIRST before calling connect()
+      // This prevents showing the "Select passkey" dialog for users who don't have one yet
+      if (hasServerPasskey === false) {
+        // User does NOT have a passkey - go straight to creation
+        console.log('[WalletSetup] User has no passkey on server, creating new wallet...');
+        setStatusMessage(`Creating new wallet for ${currentEmail}...`);
+
+        const result = await createAccount();
+        console.log('[WalletSetup] Smart Contract Wallet created:', result.address);
+        setStatusMessage('Wallet created successfully. Loading dashboard...');
+        onComplete();
+        return;
+      }
+
+      // User HAS a passkey on server - try to connect with it
+      console.log('[WalletSetup] User has passkey on server, attempting to connect...');
+      setStatusMessage(`Connecting to your wallet for ${currentEmail}...`);
 
       try {
         // Try to connect with existing passkey on device
@@ -98,31 +110,15 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
           throw connectErr; // Re-throw to handle in outer catch
         }
 
-        // If no credential found on device, check if server has passkey first
+        // If no credential found on device but server has passkey
         if (connectError.includes('no credential') || connectError.includes('not found') ||
             connectError.includes('no passkey') || connectError.includes('could not find')) {
-          console.log('[WalletSetup] No existing passkey found on device...');
-
-          // CRITICAL: Check if user already has a passkey on server before creating new
-          // This prevents creating duplicate wallets when user cleared cookies/changed device
-          if (hasServerPasskey) {
-            console.log('[WalletSetup] Server has passkey but device does not - user must use original device');
-            setError(
-              'Your passkey was created on a different device/browser. ' +
-              'Please use the same device where you originally created your wallet, ' +
-              'or check your iCloud Keychain / Google Password Manager for synced passkeys.'
-            );
-            return;
-          }
-
-          // No passkey on server either - safe to create new wallet
-          console.log('[WalletSetup] No passkey on server either, creating new wallet...');
-          setStatusMessage(`Creating new wallet for ${currentEmail}...`);
-
-          const result = await createAccount();
-          console.log('[WalletSetup] Smart Contract Wallet created:', result.address);
-          setStatusMessage('Wallet created successfully. Loading dashboard...');
-          onComplete();
+          console.log('[WalletSetup] Server has passkey but device does not - user must use original device');
+          setError(
+            'Your passkey was created on a different device/browser. ' +
+            'Please use the same device where you originally created your wallet, ' +
+            'or check your iCloud Keychain / Google Password Manager for synced passkeys.'
+          );
           return;
         }
 
@@ -178,7 +174,7 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
     } finally {
       setIsCreating(false);
     }
-  }, [createAccount, connect, onComplete, currentEmail]);
+  }, [createAccount, connect, onComplete, currentEmail, hasServerPasskey]);
 
   // Auto-start wallet access when email is verified
   // Skip auto-start if user has legacy wallet without passkey (show warning first)
