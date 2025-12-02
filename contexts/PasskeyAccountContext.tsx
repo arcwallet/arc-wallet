@@ -166,17 +166,24 @@ export const PasskeyAccountProvider: React.FC<PasskeyAccountProviderProps> = ({ 
           setCredential(storedCred);
           console.log('[PasskeyAccount] Found existing credential for current user:', storedCred);
 
-          // Restore address from stored credential for display purposes
-          // BUT DO NOT set isConnected = true - user must authenticate with passkey first!
+          // Restore address from stored credential
           if (storedCred.publicKeyX && storedCred.publicKeyY && storedCred.userId) {
             try {
-              // Use restoreFromCredential to compute the address (for display)
               const restoredAddress = await manager.restoreFromCredential(storedCred);
               setAddress(restoredAddress);
-              // SECURITY: Do NOT auto-connect! User must re-authenticate with passkey
-              // isConnected stays false until user explicitly calls connect()
-              setIsConnected(false);
-              console.log('[PasskeyAccount] Address restored (requires passkey auth):', restoredAddress);
+
+              // Check if last auth was within 15 minutes - auto-connect if so
+              const SESSION_DURATION = 15 * 60 * 1000; // 15 minutes
+              const lastAuthTime = localStorage.getItem('arcwallet:lastAuthTime');
+              const isSessionValid = lastAuthTime && (Date.now() - parseInt(lastAuthTime)) < SESSION_DURATION;
+
+              if (isSessionValid) {
+                setIsConnected(true);
+                console.log('[PasskeyAccount] Session valid, auto-connected:', restoredAddress);
+              } else {
+                setIsConnected(false);
+                console.log('[PasskeyAccount] Session expired, requires passkey auth:', restoredAddress);
+              }
             } catch (err) {
               console.error('[PasskeyAccount] Failed to restore address:', err);
             }
@@ -217,6 +224,9 @@ export const PasskeyAccountProvider: React.FC<PasskeyAccountProviderProps> = ({ 
       setIsConnected(true);
       setHasAccount(true);
 
+      // Save auth time for session persistence (15 min)
+      localStorage.setItem('arcwallet:lastAuthTime', Date.now().toString());
+
       console.log('[PasskeyAccount] Account created:', result.address);
 
       return { address: result.address };
@@ -245,6 +255,9 @@ export const PasskeyAccountProvider: React.FC<PasskeyAccountProviderProps> = ({ 
       setCredential(result.credential);
       setIsConnected(true);
       setHasAccount(true);
+
+      // Save auth time for session persistence (15 min)
+      localStorage.setItem('arcwallet:lastAuthTime', Date.now().toString());
 
       console.log('[PasskeyAccount] Connected:', result.address);
 
