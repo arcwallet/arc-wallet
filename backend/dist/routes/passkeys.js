@@ -301,6 +301,30 @@ export function createPasskeyRoutes(db, config, sessionStore) {
             next(error);
         }
     });
+    /**
+     * POST /passkeys/admin/link-passkey/start
+     * Admin endpoint to start passkey linking (discoverable credential mode)
+     */
+    router.post('/admin/link-passkey/start', validateRequestBody(['adminSecret', 'email']), async (req, res, next) => {
+        try {
+            await passkeyController.adminLinkPasskeyStart(req, res);
+        }
+        catch (error) {
+            next(error);
+        }
+    });
+    /**
+     * POST /passkeys/admin/link-passkey/finish
+     * Admin endpoint to finish passkey linking and register credential
+     */
+    router.post('/admin/link-passkey/finish', validateRequestBody(['adminSecret', 'email', 'credential']), async (req, res, next) => {
+        try {
+            await passkeyController.adminLinkPasskeyFinish(req, res);
+        }
+        catch (error) {
+            next(error);
+        }
+    });
     return router;
 }
 //# sourceMappingURL=passkeys.js.map

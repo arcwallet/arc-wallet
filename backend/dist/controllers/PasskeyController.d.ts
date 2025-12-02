@@ -105,5 +105,17 @@ export declare class PasskeyController {
      * Used for recovery when user's wallet address in database is incorrect
      */
     adminUpdateWalletAddress: (req: Request, res: Response) => Promise<Response<any, Record<string, any>>>;
+    /**
+     * Admin: Start passkey linking process
+     * POST /passkeys/admin/link-passkey/start
+     * Uses discoverable credentials to allow any passkey to be selected
+     */
+    adminLinkPasskeyStart: (req: Request, res: Response) => Promise<Response<any, Record<string, any>>>;
+    /**
+     * Admin: Finish passkey linking process
+     * POST /passkeys/admin/link-passkey/finish
+     * Captures credential ID and public key, registers it for the admin user
+     */
+    adminLinkPasskeyFinish: (req: Request, res: Response) => Promise<Response<any, Record<string, any>>>;
 }
 //# sourceMappingURL=PasskeyController.d.ts.map

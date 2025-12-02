@@ -2,7 +2,7 @@ import { generateRegistrationOptions, verifyRegistrationResponse, generateAuthen
 import { randomUUID } from 'crypto';
 import { SessionKeyManager } from '../utils/SessionKeyManager.js';
 import { ApiError } from '../types/index.js';
-import { getAdminAccount } from '../config/adminAccounts.js';
+import { getAdminAccount, isAdminEmail } from '../config/adminAccounts.js';
 // Session cookie configuration - Enterprise-friendly duration
 const SESSION_COOKIE_NAME = 'arcwallet_session';
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days - enterprise wallet standard
@@ -1225,6 +1225,174 @@ export class PasskeyController {
                 throw error;
             }
             throw new ApiError('Failed to update wallet address', 500, 'ADMIN_UPDATE_WALLET_FAILED');
+        }
+    };
+    /**
+     * Admin: Start passkey linking process
+     * POST /passkeys/admin/link-passkey/start
+     * Uses discoverable credentials to allow any passkey to be selected
+     */
+    adminLinkPasskeyStart = async (req, res) => {
+        try {
+            const { adminSecret, email } = req.body;
+            const expectedSecret = process.env.ADMIN_SECRET || 'arc-admin-2024-secret';
+            if (adminSecret !== expectedSecret) {
+                throw new ApiError('Invalid admin secret', 403, 'UNAUTHORIZED');
+            }
+            if (!email) {
+                throw new ApiError('Email is required', 400, 'MISSING_EMAIL');
+            }
+            const normalizedEmail = email.trim().toLowerCase();
+            // Check if this is an admin account
+            if (!isAdminEmail(normalizedEmail)) {
+                throw new ApiError('Not a registered admin account', 403, 'NOT_ADMIN');
+            }
+            // Generate authentication options with NO allowCredentials
+            // This enables discoverable credential mode - user can pick any passkey
+            const options = await generateAuthenticationOptions({
+                rpID: this.config.RP_ID,
+                userVerification: 'preferred',
+                // Empty allowCredentials = discoverable credential mode
+                allowCredentials: [],
+            });
+            // Store challenge for verification
+            const challengeId = randomUUID();
+            await this.db.createChallenge({
+                id: challengeId,
+                challenge: options.challenge,
+                userId: normalizedEmail, // Use email as userId temporarily
+                type: 'authentication',
+                expiresAt: new Date(Date.now() + 5 * 60 * 1000) // 5 minutes
+            });
+            console.log('[AdminLinkPasskey] Started for:', normalizedEmail);
+            return res.json({
+                success: true,
+                data: {
+                    options,
+                    message: 'Select any passkey from your device'
+                }
+            });
+        }
+        catch (error) {
+            console.error('Admin link passkey start error:', error);
+            if (error instanceof ApiError) {
+                throw error;
+            }
+            throw new ApiError('Failed to start passkey linking', 500, 'ADMIN_LINK_START_FAILED');
+        }
+    };
+    /**
+     * Admin: Finish passkey linking process
+     * POST /passkeys/admin/link-passkey/finish
+     * Captures credential ID and public key, registers it for the admin user
+     */
+    adminLinkPasskeyFinish = async (req, res) => {
+        try {
+            const { adminSecret, email, credential } = req.body;
+            const expectedSecret = process.env.ADMIN_SECRET || 'arc-admin-2024-secret';
+            if (adminSecret !== expectedSecret) {
+                throw new ApiError('Invalid admin secret', 403, 'UNAUTHORIZED');
+            }
+            if (!email || !credential) {
+                throw new ApiError('Email and credential are required', 400, 'MISSING_FIELDS');
+            }
+            const normalizedEmail = email.trim().toLowerCase();
+            // Check if this is an admin account
+            const adminConfig = getAdminAccount(normalizedEmail);
+            if (!adminConfig) {
+                throw new ApiError('Not a registered admin account', 403, 'NOT_ADMIN');
+            }
+            // Get user
+            let user = await this.db.getUserByUsername(normalizedEmail);
+            if (!user) {
+                // Create user if not exists
+                const userId = randomUUID();
+                user = await this.db.createUser({
+                    id: userId,
+                    username: normalizedEmail,
+                    displayName: normalizedEmail.split('@')[0],
+                    walletAddress: adminConfig.walletAddress
+                });
+            }
+            // Get stored challenge - using latest authentication challenge
+            const storedChallenge = await this.db.getLatestChallengeByType('authentication');
+            if (!storedChallenge) {
+                throw new ApiError('Challenge not found or expired', 400, 'CHALLENGE_NOT_FOUND');
+            }
+            // Extract credential ID from the response
+            const credentialId = credential.id;
+            // Get public key from authenticator data
+            // For discoverable credentials, we need to extract from response
+            const clientDataJSON = credential.response?.clientDataJSON;
+            const authenticatorData = credential.response?.authenticatorData;
+            const signature = credential.response?.signature;
+            console.log('[AdminLinkPasskey] Credential received:', {
+                credentialId,
+                hasClientData: !!clientDataJSON,
+                hasAuthData: !!authenticatorData,
+                hasSignature: !!signature
+            });
+            // Since we're linking an existing passkey (not verifying a specific one),
+            // we'll use the admin config's public key coordinates
+            // The credential ID is what we need to capture
+            // Check if passkey already exists
+            const existingPasskey = await this.db.getPasskeyByCredentialId(credentialId);
+            if (existingPasskey) {
+                if (existingPasskey.userId === user.id) {
+                    return res.json({
+                        success: true,
+                        data: {
+                            message: 'Passkey already linked to this account',
+                            credentialId,
+                            walletAddress: adminConfig.walletAddress
+                        }
+                    });
+                }
+                else {
+                    throw new ApiError('Passkey is registered to a different account', 400, 'PASSKEY_ALREADY_REGISTERED');
+                }
+            }
+            // Register the passkey with admin config's public key
+            // Convert X,Y coordinates to COSE-encoded public key
+            const publicKeyX = adminConfig.publicKeyX.startsWith('0x') ? adminConfig.publicKeyX.slice(2) : adminConfig.publicKeyX;
+            const publicKeyY = adminConfig.publicKeyY.startsWith('0x') ? adminConfig.publicKeyY.slice(2) : adminConfig.publicKeyY;
+            // Create uncompressed P-256 public key (0x04 || X || Y)
+            const uncompressedKey = new Uint8Array(65);
+            uncompressedKey[0] = 0x04; // Uncompressed point marker
+            const xBytes = Buffer.from(publicKeyX, 'hex');
+            const yBytes = Buffer.from(publicKeyY, 'hex');
+            uncompressedKey.set(xBytes, 1);
+            uncompressedKey.set(yBytes, 33);
+            await this.db.createPasskeyCredential({
+                id: randomUUID(),
+                credentialID: credentialId,
+                userId: user.id,
+                credentialPublicKey: uncompressedKey,
+                counter: 0,
+                credentialDeviceType: 'multiDevice',
+                credentialBackedUp: true,
+                transports: ['internal']
+            });
+            // Clear challenge
+            await this.db.deleteChallenge(storedChallenge.id);
+            console.log('[AdminLinkPasskey] Successfully linked passkey for:', normalizedEmail);
+            return res.json({
+                success: true,
+                data: {
+                    message: 'Passkey successfully linked to admin account',
+                    credentialId,
+                    walletAddress: adminConfig.walletAddress,
+                    publicKeyX: adminConfig.publicKeyX,
+                    publicKeyY: adminConfig.publicKeyY
+                }
+            });
+        }
+        catch (error) {
+            console.error('Admin link passkey finish error:', error);
+            if (error instanceof ApiError) {
+                throw error;
+            }
+            throw new ApiError('Failed to link passkey', 500, 'ADMIN_LINK_FINISH_FAILED');
         }
     };
 }
