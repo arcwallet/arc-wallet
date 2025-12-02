@@ -11,28 +11,28 @@ interface GasSponsorshipIndicatorProps {
  */
 export const GasSponsorshipIndicator: React.FC<GasSponsorshipIndicatorProps> = ({
     isSponsored,
-    estimatedGas,
 }) => {
     if (!isSponsored) {
         return null;
     }
 
     return (
-        <div className="rounded-lg bg-green-500/10 border border-green-500/30 p-3 mb-4">
-            <div className="flex items-center gap-2">
-                <span className="text-green-400 text-lg">⚡</span>
-                <span className="text-sm font-semibold text-green-400">
-                    Gas Sponsored
-                </span>
+        <div className="rounded-lg bg-slate-800/60 border border-slate-600/50 p-3 mb-4">
+            <div className="flex items-center gap-2.5">
+                <div className="w-7 h-7 rounded-md bg-gradient-to-br from-emerald-500/20 to-teal-500/20 border border-emerald-500/30 flex items-center justify-center">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-400">
+                        <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+                    </svg>
+                </div>
+                <div>
+                    <span className="text-sm font-medium text-white">
+                        Gas Sponsored
+                    </span>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                        Zero transaction fees
+                    </p>
+                </div>
             </div>
-            <p className="text-xs text-green-300/80 mt-1">
-                This transaction is free! No gas fees required.
-            </p>
-            {estimatedGas && (
-                <p className="text-xs text-green-300/60 mt-1">
-                    Saved: {estimatedGas} ETH
-                </p>
-            )}
         </div>
     );
 };
@@ -49,8 +49,11 @@ interface GasFeeBadgeProps {
 export const GasFeeBadge: React.FC<GasFeeBadgeProps> = ({ isSponsored, gasFee }) => {
     if (isSponsored) {
         return (
-            <span className="text-green-400 font-medium flex items-center gap-1">
-                FREE ⚡
+            <span className="text-emerald-400 font-medium flex items-center gap-1.5">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+                </svg>
+                FREE
             </span>
         );
     }
