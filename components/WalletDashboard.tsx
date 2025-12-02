@@ -532,9 +532,8 @@ const DashboardHome: React.FC<DashboardHomeProps> = ({ onNavigate, balanceDispla
       isHidden={isHidden}
       toggleHidden={toggleHidden}
     />
-    <div className="grid lg:grid-cols-2 gap-6 mt-6">
+    <div className="mt-6">
       <AssetsTable balanceDisplay={balanceDisplay} isLoading={isLoading} tokenBalances={tokenBalances} prices={prices} />
-      <RecentActivity activities={recentActivities} onNavigate={onNavigate} />
     </div>
   </>
 );
