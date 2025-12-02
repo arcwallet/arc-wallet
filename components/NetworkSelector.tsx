@@ -41,7 +41,7 @@ const NetworkSelector: React.FC<NetworkSelectorProps> = ({ compact = false, clas
 
   // Network logo mappings
   const networkLogos: Record<string, string> = {
-    'arc-testnet': '/arcwalletlogo.png',
+    'arc-testnet': '/arc-chain-logo.png',
     'ethereum': '/networks/ethereum.svg',
     'sepolia': '/networks/ethereum.svg',
     'base': '/networks/base.jpg',
