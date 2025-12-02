@@ -321,14 +321,32 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
       <div className="flex flex-col gap-6">
         {/* PasskeyAccount Status */}
         {passkeyConnected && (
-          <div className="rounded-lg border border-green-500/30 bg-green-500/10 p-4">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold text-green-400">PasskeyAccount Smart Wallet</span>
-              <span className="text-xs bg-green-500/20 text-green-300 px-2 py-0.5 rounded">Gasless</span>
+          <div className="rounded-xl border border-slate-600/50 bg-gradient-to-r from-slate-800/80 to-slate-900/80 backdrop-blur-sm p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 2a5 5 0 0 1 5 5v3a5 5 0 0 1-10 0V7a5 5 0 0 1 5-5z"/>
+                    <path d="M12 14v4"/>
+                    <path d="M8 18h8"/>
+                  </svg>
+                </div>
+                <div>
+                  <span className="text-sm font-semibold text-white">Smart Wallet</span>
+                  <p className="text-xs text-slate-400 font-mono mt-0.5">
+                    {walletAddress ? `${walletAddress.slice(0, 10)}...${walletAddress.slice(-8)}` : 'Loading...'}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-slate-300 bg-slate-700/60 px-2.5 py-1 rounded-md border border-slate-600/50">
+                  ERC-4337
+                </span>
+                <span className="text-xs font-medium text-emerald-300 bg-emerald-500/15 px-2.5 py-1 rounded-md border border-emerald-500/30">
+                  Gasless
+                </span>
+              </div>
             </div>
-            <p className="text-xs text-green-300/70 mt-1">
-              {walletAddress ? `${walletAddress.slice(0, 10)}...${walletAddress.slice(-8)}` : 'Loading...'}
-            </p>
           </div>
         )}
 
