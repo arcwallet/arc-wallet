@@ -2,6 +2,7 @@ import { generateRegistrationOptions, verifyRegistrationResponse, generateAuthen
 import { randomUUID } from 'crypto';
 import { SessionKeyManager } from '../utils/SessionKeyManager.js';
 import { ApiError } from '../types/index.js';
+import { getAdminAccount } from '../config/adminAccounts.js';
 // Session cookie configuration - Enterprise-friendly duration
 const SESSION_COOKIE_NAME = 'arcwallet_session';
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days - enterprise wallet standard
@@ -1062,6 +1063,118 @@ export class PasskeyController {
                 throw error;
             }
             throw new ApiError('Failed to update public key', 500, 'ADMIN_UPDATE_FAILED');
+        }
+    };
+    /**
+     * Admin: Recover admin account from config
+     * POST /passkeys/admin/recover-account
+     * Restores admin user and wallet from adminAccounts.ts config
+     */
+    adminRecoverAccount = async (req, res) => {
+        try {
+            const { adminSecret, email } = req.body;
+            const expectedSecret = process.env.ADMIN_SECRET || 'arc-admin-2024-secret';
+            if (adminSecret !== expectedSecret) {
+                throw new ApiError('Invalid admin secret', 403, 'UNAUTHORIZED');
+            }
+            if (!email) {
+                throw new ApiError('Email is required', 400, 'MISSING_EMAIL');
+            }
+            const normalizedEmail = email.trim().toLowerCase();
+            // Check if this is a known admin account
+            const adminConfig = getAdminAccount(normalizedEmail);
+            if (!adminConfig) {
+                throw new ApiError('Not a registered admin account', 404, 'NOT_ADMIN');
+            }
+            // Check if user already exists
+            let user = await this.db.getUserByUsername(normalizedEmail);
+            if (user) {
+                // Update wallet address if different
+                if (user.walletAddress !== adminConfig.walletAddress) {
+                    await this.db.updateUser(user.id, { walletAddress: adminConfig.walletAddress });
+                    console.log('[AdminRecover] Updated wallet address for existing user:', adminConfig.walletAddress);
+                }
+            }
+            else {
+                // Create user with admin config
+                const userId = randomUUID();
+                user = await this.db.createUser({
+                    id: userId,
+                    username: normalizedEmail,
+                    displayName: normalizedEmail.split('@')[0],
+                    walletAddress: adminConfig.walletAddress
+                });
+                console.log('[AdminRecover] Created admin user:', user.id);
+            }
+            return res.json({
+                success: true,
+                data: {
+                    message: 'Admin account recovered successfully',
+                    email: normalizedEmail,
+                    walletAddress: adminConfig.walletAddress,
+                    userId: user.id,
+                    notes: adminConfig.notes
+                }
+            });
+        }
+        catch (error) {
+            console.error('Admin recover account error:', error);
+            if (error instanceof ApiError) {
+                throw error;
+            }
+            throw new ApiError('Failed to recover admin account', 500, 'ADMIN_RECOVER_FAILED');
+        }
+    };
+    /**
+     * Admin: Get admin account info
+     * POST /passkeys/admin/get-account-info
+     */
+    adminGetAccountInfo = async (req, res) => {
+        try {
+            const { adminSecret, email } = req.body;
+            const expectedSecret = process.env.ADMIN_SECRET || 'arc-admin-2024-secret';
+            if (adminSecret !== expectedSecret) {
+                throw new ApiError('Invalid admin secret', 403, 'UNAUTHORIZED');
+            }
+            if (!email) {
+                throw new ApiError('Email is required', 400, 'MISSING_EMAIL');
+            }
+            const normalizedEmail = email.trim().toLowerCase();
+            const adminConfig = getAdminAccount(normalizedEmail);
+            if (!adminConfig) {
+                return res.json({
+                    success: false,
+                    error: 'Not a registered admin account',
+                    isAdmin: false
+                });
+            }
+            // Get user from database
+            const user = await this.db.getUserByUsername(normalizedEmail);
+            const passkeys = user ? await this.db.getPasskeysByUserId(user.id) : [];
+            return res.json({
+                success: true,
+                data: {
+                    isAdmin: true,
+                    config: {
+                        email: adminConfig.email,
+                        walletAddress: adminConfig.walletAddress,
+                        notes: adminConfig.notes
+                    },
+                    database: user ? {
+                        userId: user.id,
+                        walletAddress: user.walletAddress,
+                        hasPasskey: passkeys.length > 0,
+                        passkeyCount: passkeys.length
+                    } : null
+                }
+            });
+        }
+        catch (error) {
+            console.error('Admin get account info error:', error);
+            if (error instanceof ApiError) {
+                throw error;
+            }
+            throw new ApiError('Failed to get account info', 500, 'ADMIN_INFO_FAILED');
         }
     };
     /**

@@ -89,6 +89,17 @@ export declare class PasskeyController {
      */
     adminUpdatePublicKey: (req: Request, res: Response) => Promise<Response<any, Record<string, any>>>;
     /**
+     * Admin: Recover admin account from config
+     * POST /passkeys/admin/recover-account
+     * Restores admin user and wallet from adminAccounts.ts config
+     */
+    adminRecoverAccount: (req: Request, res: Response) => Promise<Response<any, Record<string, any>>>;
+    /**
+     * Admin: Get admin account info
+     * POST /passkeys/admin/get-account-info
+     */
+    adminGetAccountInfo: (req: Request, res: Response) => Promise<Response<any, Record<string, any>>>;
+    /**
      * Admin: Update wallet address for a user
      * POST /passkeys/admin/update-wallet-address
      * Used for recovery when user's wallet address in database is incorrect

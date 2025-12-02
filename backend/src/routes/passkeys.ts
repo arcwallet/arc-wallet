@@ -378,5 +378,38 @@ export function createPasskeyRoutes(db: Database, config: EnvConfig, sessionStor
     }
   );
 
+  /**
+   * POST /passkeys/admin/recover-account
+   * Admin endpoint to recover admin account from config
+   * Creates user with wallet address from adminAccounts.ts
+   */
+  router.post(
+    '/admin/recover-account',
+    validateRequestBody(['adminSecret', 'email']),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        await passkeyController.adminRecoverAccount(req, res);
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
+
+  /**
+   * POST /passkeys/admin/get-account-info
+   * Admin endpoint to get admin account info from config and database
+   */
+  router.post(
+    '/admin/get-account-info',
+    validateRequestBody(['adminSecret', 'email']),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        await passkeyController.adminGetAccountInfo(req, res);
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
+
   return router;
 }
