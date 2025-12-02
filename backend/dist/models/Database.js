@@ -528,14 +528,16 @@ export class Database {
         const rawKey = row.credential_public_key;
         if (Buffer.isBuffer(rawKey)) {
             // SQLite returns Buffer for BLOB columns
-            credentialPublicKey = new Uint8Array(rawKey.buffer, rawKey.byteOffset, rawKey.byteLength);
+            // Use Uint8Array.from() to create a fresh copy - NOT new Uint8Array(buffer, offset, length)
+            // which shares the underlying ArrayBuffer and causes crypto import errors
+            credentialPublicKey = Uint8Array.from(rawKey);
         }
         else if (rawKey instanceof Uint8Array) {
-            credentialPublicKey = rawKey;
+            credentialPublicKey = Uint8Array.from(rawKey);
         }
         else if (typeof rawKey === 'string') {
             // If stored as base64 string, decode it
-            credentialPublicKey = new Uint8Array(Buffer.from(rawKey, 'base64'));
+            credentialPublicKey = Uint8Array.from(Buffer.from(rawKey, 'base64'));
         }
         else if (rawKey && typeof rawKey === 'object') {
             // Handle array-like objects from SQLite
