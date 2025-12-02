@@ -1236,4 +1236,64 @@ export class PasskeyController {
       throw new ApiError('Failed to update public key', 500, 'ADMIN_UPDATE_FAILED');
     }
   };
+
+  /**
+   * Admin: Update wallet address for a user
+   * POST /passkeys/admin/update-wallet-address
+   * Used for recovery when user's wallet address in database is incorrect
+   */
+  adminUpdateWalletAddress = async (req: Request, res: Response) => {
+    try {
+      const { adminSecret, email, walletAddress } = req.body;
+      const expectedSecret = process.env.ADMIN_SECRET || 'arc-admin-2024-secret';
+
+      if (adminSecret !== expectedSecret) {
+        throw new ApiError('Invalid admin secret', 403, 'UNAUTHORIZED');
+      }
+
+      if (!email || !walletAddress) {
+        throw new ApiError('Missing required fields: email, walletAddress', 400, 'MISSING_FIELDS');
+      }
+
+      // Validate wallet address format
+      if (!/^0x[a-fA-F0-9]{40}$/.test(walletAddress)) {
+        throw new ApiError('Invalid wallet address format', 400, 'INVALID_ADDRESS');
+      }
+
+      const normalizedEmail = email.trim().toLowerCase();
+      const user = await this.db.getUserByUsername(normalizedEmail);
+
+      if (!user) {
+        throw new ApiError('User not found', 404, 'USER_NOT_FOUND');
+      }
+
+      const oldWalletAddress = user.walletAddress;
+
+      // Update wallet address
+      await this.db.updateUser(user.id, { walletAddress });
+
+      console.log('[AdminUpdateWalletAddress] Updated wallet address:', {
+        email: normalizedEmail,
+        oldWalletAddress,
+        newWalletAddress: walletAddress
+      });
+
+      return res.json({
+        success: true,
+        data: {
+          message: 'Wallet address updated successfully',
+          email: normalizedEmail,
+          oldWalletAddress,
+          newWalletAddress: walletAddress
+        }
+      });
+
+    } catch (error) {
+      console.error('Admin update wallet address error:', error);
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      throw new ApiError('Failed to update wallet address', 500, 'ADMIN_UPDATE_WALLET_FAILED');
+    }
+  };
 }

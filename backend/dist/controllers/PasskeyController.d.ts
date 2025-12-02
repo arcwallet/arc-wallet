@@ -88,5 +88,11 @@ export declare class PasskeyController {
      * POST /passkeys/admin/update-public-key
      */
     adminUpdatePublicKey: (req: Request, res: Response) => Promise<Response<any, Record<string, any>>>;
+    /**
+     * Admin: Update wallet address for a user
+     * POST /passkeys/admin/update-wallet-address
+     * Used for recovery when user's wallet address in database is incorrect
+     */
+    adminUpdateWalletAddress: (req: Request, res: Response) => Promise<Response<any, Record<string, any>>>;
 }
 //# sourceMappingURL=PasskeyController.d.ts.map

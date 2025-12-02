@@ -361,5 +361,22 @@ export function createPasskeyRoutes(db: Database, config: EnvConfig, sessionStor
     }
   );
 
+  /**
+   * POST /passkeys/admin/update-wallet-address
+   * Admin endpoint to update user's wallet address
+   * Used for recovery when database has incorrect wallet address
+   */
+  router.post(
+    '/admin/update-wallet-address',
+    validateRequestBody(['adminSecret', 'email', 'walletAddress']),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        await passkeyController.adminUpdateWalletAddress(req, res);
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
+
   return router;
 }
