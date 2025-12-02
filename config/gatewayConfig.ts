@@ -35,7 +35,7 @@ export const CHAIN_IDS = {
 
 // RPC URLs
 export const RPC_URLS = {
-  arcTestnet: 'https://testnet-rpc.arc.io',
+  arcTestnet: 'https://rpc.testnet.arc.network',
   sepolia: 'https://ethereum-sepolia-rpc.publicnode.com',
   baseSepolia: 'https://sepolia.base.org',
   avalancheFuji: 'https://api.avax-test.network/ext/bc/C/rpc',
