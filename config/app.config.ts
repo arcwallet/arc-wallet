@@ -50,17 +50,13 @@ export const ARC_GAS_CONFIG = {
     usesNativeGas: true,
 } as const;
 
-// Pimlico ERC-4337 Config - Arc Testnet IS SUPPORTED!
-// https://docs.pimlico.io/guides/supported-chains (chain slug: arc-testnet)
-export const PIMLICO_CONFIG = {
-    apiKey: getEnv('VITE_PIMLICO_API_KEY', ''),
-    // Pimlico bundler URL for Arc Testnet (chain ID: 5042002)
-    bundlerUrl: `https://api.pimlico.io/v2/5042002/rpc?apikey=${getEnv('VITE_PIMLICO_API_KEY', '')}`,
-    // Pimlico paymaster URL (same endpoint, different methods)
-    paymasterUrl: `https://api.pimlico.io/v2/5042002/rpc?apikey=${getEnv('VITE_PIMLICO_API_KEY', '')}`,
+// ERC-4337 Bundler Config
+// Arc Network uses its own bundler - no external service needed
+export const BUNDLER_CONFIG = {
+    // Arc bundler endpoint (same as backend)
+    bundlerUrl: `${BACKEND_URL}/api/bundler/rpc`,
     entryPoint: ENTRY_POINT,
-    // Enable if API key is provided
-    enabled: !!getEnv('VITE_PIMLICO_API_KEY', ''),
+    enabled: true,
 } as const;
 
 // Gas Sponsorship Configuration (Legacy - Arc uses native USDC gas)
@@ -163,7 +159,7 @@ export const config = {
     rpcUrl: RPC_URL,
     entryPoint: ENTRY_POINT,
     chain: ARC_TESTNET,
-    pimlico: PIMLICO_CONFIG,
+    bundler: BUNDLER_CONFIG,
     gasSponsorship: GAS_SPONSORSHIP,
     explorer: {
         base: EXPLORER_BASE_URL,

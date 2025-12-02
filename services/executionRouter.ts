@@ -147,8 +147,8 @@ export async function executeERC20Transfer(params: {
 // ============================================================================
 
 /**
- * Execute transfer via ERC-4337 Smart Account with Pimlico bundler
- * This is the Phase 2 implementation using proper account abstraction
+ * Execute transfer via ERC-4337 Smart Account
+ * Uses Arc's own bundler for UserOperation submission
  */
 export async function executeViaSmartAccount(params: {
   privateKey: string;
@@ -208,7 +208,7 @@ export async function executeBatchViaSmartAccount(params: {
 }
 
 /**
- * Check if ERC-4337 (Pimlico) is available
+ * Check if ERC-4337 bundler is available
  */
 export async function isERC4337Available(): Promise<boolean> {
   const { erc4337Service } = await import('./erc4337Service');

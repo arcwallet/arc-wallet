@@ -2969,7 +2969,7 @@ class rt {
     return C(i);
   }
   /**
-   * Submit UserOperation to Pimlico bundler
+   * Submit UserOperation to bundler
    */
   async submitUserOperation(e) {
     const t = this.config.bundlerUrl || this.config.rpcUrl, n = {

@@ -117,7 +117,7 @@ export declare class PasskeyAccountManager {
      */
     private calculateUserOpHash;
     /**
-     * Submit UserOperation to Pimlico bundler
+     * Submit UserOperation to bundler
      */
     private submitUserOperation;
     /**

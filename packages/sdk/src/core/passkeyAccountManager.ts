@@ -106,7 +106,7 @@ export interface PasskeyAccountConfig {
   factoryAddress: string;
   entryPointAddress: string;
   rpcUrl: string;
-  bundlerUrl?: string; // Pimlico bundler URL (optional, falls back to rpcUrl)
+  bundlerUrl?: string; // Arc bundler URL (optional, falls back to rpcUrl)
   backendUrl: string;
   rpId: string;
   rpName: string;
@@ -898,7 +898,7 @@ export class PasskeyAccountManager {
   }
 
   /**
-   * Submit UserOperation to Pimlico bundler
+   * Submit UserOperation to bundler
    */
   private async submitUserOperation(userOp: UserOperation): Promise<{ hash: string; userOpHash: string }> {
     // Use bundlerUrl if provided, otherwise fall back to rpcUrl
@@ -926,7 +926,7 @@ export class PasskeyAccountManager {
     });
 
     try {
-      // Send to Pimlico bundler
+      // Send to bundler
       const response = await fetch(bundlerUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

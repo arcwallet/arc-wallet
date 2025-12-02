@@ -3,11 +3,9 @@
  *
  * ARCHITECTURE:
  * - Passkey (P256) IS the signing key - NO private key stored
- * - Smart contract verifies P256 signatures on-chain
- * - Pimlico bundler submits UserOperations to Arc Testnet
+ * - Smart contract verifies P256 signatures on-chain via RIP-7212
+ * - Arc bundler submits UserOperations to Arc Network
  * - Same passkey = Same wallet address (even after clearing storage)
- *
- * Arc Testnet + Pimlico = Full ERC-4337 Support!
  */
 
 import React, { useCallback, useEffect, useState } from 'react';
@@ -24,7 +22,6 @@ interface WalletSetupProps {
 
 const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
   // Use PasskeyAccount (Smart Contract with P256 signing)
-  // Pimlico bundler handles UserOperation submission
   const {
     createAccount,
     connect,

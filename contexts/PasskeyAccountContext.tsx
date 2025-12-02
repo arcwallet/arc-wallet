@@ -53,7 +53,7 @@ const PasskeyAccountContext = createContext<PasskeyAccountContextValue | undefin
 const PASSKEY_FACTORY_ADDRESS = (import.meta as any).env.VITE_PASSKEY_FACTORY_ADDRESS || '0x4C16f269dE57B846309a8Eb3591ddb394aBba488';
 const ENTRY_POINT_ADDRESS = '0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789'; // v0.6
 
-// Initialize PasskeyAccountManager with bundler (own bundler preferred, Pimlico as fallback)
+// Initialize PasskeyAccountManager with Arc's own bundler
 const initializeManager = (): PasskeyAccountManager => {
   const backendUrl = typeof window !== 'undefined'
     ? ((import.meta as any).env.VITE_PASSKEY_API_URL || 'https://arcwallet-backend.onrender.com')
@@ -61,42 +61,21 @@ const initializeManager = (): PasskeyAccountManager => {
 
   const rpId = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
 
-  // Determine bundler URL - prefer our own bundler, fallback to Pimlico
-  let bundlerUrl: string | undefined;
-  let bundlerType = 'Not configured';
-
-  // Option 1: Use our own bundler (same backend URL)
-  const useOwnBundler = typeof window !== 'undefined'
-    ? (import.meta as any).env.VITE_USE_OWN_BUNDLER === 'true'
-    : false;
-
-  if (useOwnBundler) {
-    bundlerUrl = `${backendUrl}/api/bundler/rpc`;
-    bundlerType = 'Arc Bundler (Own)';
-  } else {
-    // Option 2: Pimlico bundler as fallback
-    const pimlicoApiKey = typeof window !== 'undefined'
-      ? (import.meta as any).env.VITE_PIMLICO_API_KEY || ''
-      : '';
-
-    if (pimlicoApiKey) {
-      bundlerUrl = `https://api.pimlico.io/v2/5042002/rpc?apikey=${pimlicoApiKey}`;
-      bundlerType = 'Pimlico (Arc Testnet)';
-    }
-  }
+  // Use Arc's own bundler
+  const bundlerUrl = `${backendUrl}/api/bundler/rpc`;
 
   console.log('[PasskeyAccount] Initializing manager:', {
     backendUrl,
     rpId,
     factory: PASSKEY_FACTORY_ADDRESS,
-    bundler: bundlerType,
+    bundler: 'Arc Bundler',
   });
 
   const config: PasskeyAccountConfig = {
     factoryAddress: PASSKEY_FACTORY_ADDRESS,
     entryPointAddress: ENTRY_POINT_ADDRESS,
     rpcUrl: 'https://rpc.testnet.arc.network',
-    bundlerUrl, // Pimlico bundler for UserOperation submission
+    bundlerUrl, // Arc bundler for UserOperation submission
     backendUrl,
     rpId,
     rpName: 'Arc Wallet',

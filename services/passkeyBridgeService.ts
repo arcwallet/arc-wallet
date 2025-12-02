@@ -8,7 +8,7 @@
  * - NO private key required
  * - Uses PasskeyAccountManager.executeTransaction() for UserOperations
  * - Signs with WebAuthn/P256 passkey
- * - Works with ERC-4337 bundler (Pimlico)
+ * - Works with Arc's ERC-4337 bundler
  *
  * CCTP V2 Fee Mechanism:
  * - maxFee parameter specifies maximum fee that can be charged during minting

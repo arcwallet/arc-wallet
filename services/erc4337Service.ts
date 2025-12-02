@@ -1,12 +1,14 @@
 /**
  * ERC-4337 Service
- * High-level service for ERC-4337 Smart Account operations with Pimlico
+ * High-level service for ERC-4337 Smart Account operations
  *
  * Features:
  * - Create counterfactual smart accounts
  * - Build and send UserOperations
  * - Paymaster integration for gas sponsorship
  * - Batch transactions
+ *
+ * Uses Arc's own bundler at /api/bundler/rpc
  */
 
 import {
@@ -21,13 +23,11 @@ import {
     parseUnits,
     formatUnits,
 } from 'ethers';
-import { pimlicoClient } from './pimlicoClient';
-import { RPC_URL, PIMLICO_CONFIG, ARC_TESTNET } from '../config/app.config';
+import { RPC_URL, BUNDLER_CONFIG, ARC_TESTNET } from '../config/app.config';
 
 const abiCoder = new AbiCoder();
 
 // Simple Account Factory (ERC-4337 reference implementation)
-// This address is typically the same across chains for the reference implementation
 const SIMPLE_ACCOUNT_FACTORY = '0x91E60e0613810449d098b0b5Ec8b51A0FE8c8985';
 
 // Simple Account ABI
@@ -67,11 +67,13 @@ class ERC4337Service {
     private provider: JsonRpcProvider;
     private entryPoint: string;
     private factoryAddress: string;
+    private bundlerUrl: string;
 
     constructor() {
         this.provider = new JsonRpcProvider(RPC_URL);
-        this.entryPoint = PIMLICO_CONFIG.entryPoint;
+        this.entryPoint = BUNDLER_CONFIG.entryPoint;
         this.factoryAddress = SIMPLE_ACCOUNT_FACTORY;
+        this.bundlerUrl = BUNDLER_CONFIG.bundlerUrl;
     }
 
     /**
@@ -83,7 +85,6 @@ class ERC4337Service {
             const address = await factory.getAddress(owner, salt);
             return address;
         } catch (error) {
-            // Fallback: Calculate CREATE2 address manually
             console.warn('[ERC4337] Factory call failed, calculating address manually');
             return this.calculateCreate2Address(owner, salt);
         }
@@ -164,6 +165,59 @@ class ERC4337Service {
     }
 
     /**
+     * Make RPC call to bundler
+     */
+    private async bundlerRpc(method: string, params: any[]): Promise<any> {
+        const response = await fetch(this.bundlerUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                jsonrpc: '2.0',
+                method,
+                params,
+                id: Date.now(),
+            }),
+        });
+
+        const data = await response.json();
+
+        if (data.error) {
+            console.error(`[ERC4337] Bundler RPC Error (${method}):`, data.error);
+            throw new Error(data.error.message || 'Bundler RPC error');
+        }
+
+        return data.result;
+    }
+
+    /**
+     * Get account nonce from bundler
+     */
+    async getAccountNonce(sender: string): Promise<bigint> {
+        try {
+            const result = await this.bundlerRpc('eth_getUserOperationCount', [sender, this.entryPoint]);
+            return BigInt(result);
+        } catch {
+            return 0n;
+        }
+    }
+
+    /**
+     * Estimate gas for UserOperation
+     */
+    async estimateUserOperationGas(userOp: any): Promise<{
+        callGasLimit: string;
+        verificationGasLimit: string;
+        preVerificationGas: string;
+    }> {
+        const result = await this.bundlerRpc('eth_estimateUserOperationGas', [userOp, this.entryPoint]);
+        return {
+            callGasLimit: result.callGasLimit,
+            verificationGasLimit: result.verificationGasLimit,
+            preVerificationGas: result.preVerificationGas,
+        };
+    }
+
+    /**
      * Build UserOperation
      */
     async buildUserOperation(
@@ -195,9 +249,8 @@ class ERC4337Service {
         let nonce = 0n;
         if (isDeployed) {
             try {
-                nonce = await pimlicoClient.getAccountNonce(smartAccountAddress);
+                nonce = await this.getAccountNonce(smartAccountAddress);
             } catch {
-                // Fallback to contract call
                 const account = new Contract(smartAccountAddress, SIMPLE_ACCOUNT_ABI, this.provider);
                 nonce = await account.getNonce();
             }
@@ -206,36 +259,18 @@ class ERC4337Service {
         // Build initCode
         const initCode = isDeployed ? '0x' : this.buildInitCode(owner);
 
-        // Get gas prices from Pimlico
-        let maxFeePerGas = '0x0';
-        let maxPriorityFeePerGas = '0x0';
+        // Get gas prices
+        const feeData = await this.provider.getFeeData();
+        const maxFeePerGas = toBeHex(feeData.maxFeePerGas || 0n);
+        const maxPriorityFeePerGas = toBeHex(feeData.maxPriorityFeePerGas || 0n);
 
-        try {
-            const gasPrices = await pimlicoClient.getGasPrices();
-            maxFeePerGas = gasPrices.standard.maxFeePerGas;
-            maxPriorityFeePerGas = gasPrices.standard.maxPriorityFeePerGas;
-        } catch {
-            // Fallback to provider fee data
-            const feeData = await this.provider.getFeeData();
-            maxFeePerGas = toBeHex(feeData.maxFeePerGas || 0n);
-            maxPriorityFeePerGas = toBeHex(feeData.maxPriorityFeePerGas || 0n);
-        }
-
-        // Build base UserOperation
-        // CRITICAL: Gas limits must be HIGH for undeployed wallets:
-        // - Account deployment via initCode costs ~1.4M gas
-        // - P256/Passkey signature verification costs ~300K gas
-        // - Actual transaction execution costs ~100K+ gas
-        // Previous bug: 200K callGasLimit caused AA23 errors
+        // Build base UserOperation with high defaults for deployment
         const userOp = {
             sender: smartAccountAddress,
             nonce: toBeHex(nonce),
             initCode,
             callData,
-            // For undeployed wallets: deployment + transfer needs ~2M callGas
             callGasLimit: toBeHex(isDeployed ? 500000n : 2000000n),
-            // Verification includes initCode execution + signature verification
-            // EntryPoint reserves ~10% of verification gas for other ops
             verificationGasLimit: toBeHex(isDeployed ? 300000n : 5000000n),
             preVerificationGas: toBeHex(100000n),
             maxFeePerGas,
@@ -244,18 +279,10 @@ class ERC4337Service {
             signature: '0x',
         };
 
-        console.log('[ERC4337] Initial gas limits:', {
-            callGasLimit: isDeployed ? '500K' : '2M',
-            verificationGasLimit: isDeployed ? '300K' : '5M',
-            preVerificationGas: '100K',
-            isDeployed
-        });
-
-        // Estimate gas from bundler (with buffer)
+        // Try to get better gas estimates from bundler
         try {
-            const gasEstimate = await pimlicoClient.estimateUserOperationGas(userOp);
+            const gasEstimate = await this.estimateUserOperationGas(userOp);
 
-            // Apply 20% buffer to estimated gas for safety
             const addBuffer = (hexValue: string, bufferPercent: number = 20) => {
                 const value = BigInt(hexValue);
                 const buffered = value * BigInt(100 + bufferPercent) / 100n;
@@ -266,29 +293,9 @@ class ERC4337Service {
             userOp.verificationGasLimit = addBuffer(gasEstimate.verificationGasLimit);
             userOp.preVerificationGas = addBuffer(gasEstimate.preVerificationGas);
 
-            console.log('[ERC4337] Gas estimate from bundler (with 20% buffer):', {
-                callGasLimit: userOp.callGasLimit,
-                verificationGasLimit: userOp.verificationGasLimit,
-                preVerificationGas: userOp.preVerificationGas
-            });
+            console.log('[ERC4337] Gas estimate from bundler (with 20% buffer)');
         } catch (error) {
-            console.warn('[ERC4337] Gas estimation failed, using high defaults:', error);
-            // Keep the high defaults we set above
-        }
-
-        // Get paymaster sponsorship if requested
-        if (options.sponsored) {
-            try {
-                const paymasterResult = await pimlicoClient.sponsorUserOperation(userOp);
-                userOp.paymasterAndData = paymasterResult.paymasterAndData;
-                if (paymasterResult.callGasLimit) userOp.callGasLimit = paymasterResult.callGasLimit;
-                if (paymasterResult.verificationGasLimit) userOp.verificationGasLimit = paymasterResult.verificationGasLimit;
-                if (paymasterResult.preVerificationGas) userOp.preVerificationGas = paymasterResult.preVerificationGas;
-                console.log('[ERC4337] Paymaster sponsorship applied');
-            } catch (error) {
-                console.warn('[ERC4337] Paymaster sponsorship failed:', error);
-                // Continue without sponsorship
-            }
+            console.warn('[ERC4337] Gas estimation failed, using high defaults');
         }
 
         // Sign UserOperation
@@ -355,7 +362,7 @@ class ERC4337Service {
     }
 
     /**
-     * Send UserOperation via Pimlico bundler
+     * Send UserOperation via bundler
      */
     async sendUserOperation(userOp: any): Promise<{
         userOpHash: string;
@@ -363,20 +370,43 @@ class ERC4337Service {
     }> {
         console.log('[ERC4337] Sending UserOperation...');
 
-        // Send to bundler
-        const userOpHash = await pimlicoClient.sendUserOperation(userOp);
+        const userOpHash = await this.bundlerRpc('eth_sendUserOperation', [userOp, this.entryPoint]);
 
         // Wait for inclusion
         try {
-            const receipt = await pimlicoClient.waitForUserOperation(userOpHash, 120000);
+            const receipt = await this.waitForUserOperation(userOpHash, 120000);
             return {
                 userOpHash,
-                txHash: receipt.receipt.transactionHash,
+                txHash: receipt.transactionHash,
             };
         } catch (error) {
             console.warn('[ERC4337] Waiting for receipt failed:', error);
             return { userOpHash };
         }
+    }
+
+    /**
+     * Wait for UserOperation to be included
+     */
+    private async waitForUserOperation(hash: string, timeout: number = 60000): Promise<any> {
+        const startTime = Date.now();
+        const pollInterval = 2000;
+
+        while (Date.now() - startTime < timeout) {
+            try {
+                const receipt = await this.bundlerRpc('eth_getUserOperationReceipt', [hash]);
+                if (receipt?.receipt?.transactionHash) {
+                    console.log('[ERC4337] UserOperation confirmed:', receipt.receipt.transactionHash);
+                    return receipt.receipt;
+                }
+            } catch {
+                // Continue polling
+            }
+
+            await new Promise(resolve => setTimeout(resolve, pollInterval));
+        }
+
+        throw new Error(`UserOperation ${hash} not confirmed within ${timeout}ms`);
     }
 
     /**
@@ -416,7 +446,7 @@ class ERC4337Service {
     }
 
     /**
-     * Transfer native token (USDC on Arc) via Smart Account
+     * Transfer native token via Smart Account
      */
     async transfer(
         signer: Wallet,
@@ -424,9 +454,7 @@ class ERC4337Service {
         amount: string,
         sponsored: boolean = true
     ): Promise<{ userOpHash: string; txHash?: string }> {
-        // Arc uses USDC as native gas (6 decimals)
         const value = parseUnits(amount, 6).toString();
-
         return this.executeTransaction(signer, to, value, '0x', sponsored);
     }
 
@@ -452,14 +480,18 @@ class ERC4337Service {
     }
 
     /**
-     * Check if ERC-4337 is available (Pimlico configured)
+     * Check if ERC-4337 bundler is available
      */
     async isAvailable(): Promise<boolean> {
-        if (!pimlicoClient.isConfigured()) {
-            console.log('[ERC4337] Pimlico not configured (missing API key)');
+        if (!BUNDLER_CONFIG.enabled) {
             return false;
         }
-        return pimlicoClient.checkHealth();
+        try {
+            const entryPoints = await this.bundlerRpc('eth_supportedEntryPoints', []);
+            return entryPoints.length > 0;
+        } catch {
+            return false;
+        }
     }
 
     /**
