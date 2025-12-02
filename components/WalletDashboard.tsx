@@ -452,37 +452,6 @@ interface DashboardHomeProps {
   recentActivities?: any[];
 }
 
-// Quick Actions Component
-const QuickActions: React.FC<{ onNavigate: (page: string) => void }> = ({ onNavigate }) => {
-  const actions = [
-    { id: 'Swap', label: 'Swap', icon: '&#8644;', description: 'Exchange tokens', color: 'blue' },
-    { id: 'Bridge', label: 'Bridge', icon: '&#x1F310;', description: 'Cross-chain transfer', color: 'purple' },
-    { id: 'Faucet', label: 'Faucet', icon: '&#x1F4A7;', description: 'Get test tokens', color: 'cyan' },
-    { id: 'Agent', label: 'AI Agent', icon: '&#x1F916;', description: 'Smart assistance', color: 'emerald' },
-  ];
-
-  return (
-    <div className="mt-6">
-      <h3 className="text-lg font-semibold text-[#E6EEF3] mb-4">Quick Actions</h3>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {actions.map((action) => (
-          <button
-            key={action.id}
-            onClick={() => onNavigate(action.id)}
-            className={`rounded-xl border border-slate-500/30 bg-slate-900/60 p-4 text-left hover:bg-slate-800/60 hover:border-${action.color}-500/30 transition-all group`}
-          >
-            <div className={`w-10 h-10 rounded-lg bg-${action.color}-500/10 flex items-center justify-center mb-3 group-hover:bg-${action.color}-500/20 transition-colors`}>
-              <span className={`text-xl text-${action.color}-400`} dangerouslySetInnerHTML={{ __html: action.icon }} />
-            </div>
-            <p className="text-white font-medium text-sm">{action.label}</p>
-            <p className="text-slate-500 text-xs mt-0.5">{action.description}</p>
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-};
-
 // Recent Activity Component
 const RecentActivity: React.FC<{ activities: any[]; onNavigate: (page: string) => void }> = ({ activities, onNavigate }) => {
   const recentItems = activities.slice(0, 5);
@@ -563,7 +532,6 @@ const DashboardHome: React.FC<DashboardHomeProps> = ({ onNavigate, balanceDispla
       isHidden={isHidden}
       toggleHidden={toggleHidden}
     />
-    <QuickActions onNavigate={onNavigate} />
     <div className="grid lg:grid-cols-2 gap-6 mt-6">
       <AssetsTable balanceDisplay={balanceDisplay} isLoading={isLoading} tokenBalances={tokenBalances} prices={prices} />
       <RecentActivity activities={recentActivities} onNavigate={onNavigate} />
