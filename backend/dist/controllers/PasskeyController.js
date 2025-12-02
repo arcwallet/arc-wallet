@@ -2,9 +2,10 @@ import { generateRegistrationOptions, verifyRegistrationResponse, generateAuthen
 import { randomUUID } from 'crypto';
 import { SessionKeyManager } from '../utils/SessionKeyManager.js';
 import { ApiError } from '../types/index.js';
-// Session cookie configuration (same as circleOtp.ts)
+// Session cookie configuration - Enterprise-friendly duration
 const SESSION_COOKIE_NAME = 'arcwallet_session';
-const SESSION_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days - enterprise wallet standard
+const SESSION_KEY_HOURS = 7 * 24; // 7 days in hours for session key generation
 const COOKIE_BASE_OPTIONS = (isProd) => ({
     httpOnly: true,
     secure: isProd,
@@ -229,7 +230,7 @@ export class PasskeyController {
             // Clean up challenge
             await this.db.deleteChallenge(challengeRecord.id);
             // Generate session key for the newly registered user
-            const sessionKey = await this.sessionKeyManager.generateSessionKey(user.id, 24); // 24 hours
+            const sessionKey = await this.sessionKeyManager.generateSessionKey(user.id, SESSION_KEY_HOURS);
             // Extract P256 public key coordinates for smart contract wallet
             let publicKeyX;
             let publicKeyY;
@@ -391,7 +392,7 @@ export class PasskeyController {
             // Reuse latest active session key if available, otherwise generate a new one
             let sessionKey = await this.sessionKeyManager.getLatestSessionKey(user.id);
             if (!sessionKey || sessionKey.expiresAt <= new Date()) {
-                sessionKey = await this.sessionKeyManager.generateSessionKey(user.id, 24); // 24 hours
+                sessionKey = await this.sessionKeyManager.generateSessionKey(user.id, SESSION_KEY_HOURS);
             }
             // Clean up challenge
             await this.db.deleteChallenge(challenge.id);

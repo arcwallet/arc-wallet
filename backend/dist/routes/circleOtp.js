@@ -18,15 +18,15 @@ import sgMail from '@sendgrid/mail';
 import { randomUUID } from 'crypto';
 import { rateLimitMiddleware } from '../middleware/security.js';
 const SESSION_COOKIE_NAME = 'arcwallet_session';
-const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
+const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days - enterprise wallet standard
 const OTP_EXPIRY_MS = 10 * 60 * 1000; // 10 minutes
 const MAX_OTP_ATTEMPTS = 5;
-const ACCOUNT_LOCKOUT_MS = 30 * 60 * 1000; // 30 minutes lockout after max attempts
+const ACCOUNT_LOCKOUT_MS = 15 * 60 * 1000; // 15 minutes lockout (reduced from 30 min)
 const COOKIE_BASE_OPTIONS = (isProd) => ({
     httpOnly: true,
     sameSite: (isProd ? 'none' : 'lax'),
     secure: isProd,
-    maxAge: 4 * 60 * 60 * 1000,
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     path: '/',
 });
 /**

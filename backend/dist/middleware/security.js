@@ -69,43 +69,44 @@ function generateRateLimitKey(req, userId) {
         .substring(0, 16);
     return `ip:${ip}:fp:${fingerprint}`;
 }
-// Rate limiting configuration with progressive penalties
+// Rate limiting configuration - Enterprise-friendly limits
+// Designed for normal user workflows without interruption
 const rateLimiters = {
-    // General API rate limiter
+    // General API rate limiter - generous for normal usage
     general: new RateLimiterMemory({
-        points: 100, // Number of requests
-        duration: 900, // Per 15 minutes
-        blockDuration: 60, // Block for 1 minute on limit
+        points: 300, // 300 requests
+        duration: 900, // Per 15 minutes (20 req/min average)
+        blockDuration: 30, // Block for 30 seconds on limit
     }),
-    // Strict rate limiter for authentication endpoints
+    // Authentication endpoints - allow multiple retries
     auth: new RateLimiterMemory({
-        points: 10, // Number of requests
+        points: 30, // 30 auth attempts
         duration: 900, // Per 15 minutes
-        blockDuration: 300, // Block for 5 minutes on limit
-    }),
-    // Rate limiter for registration/OTP
-    registration: new RateLimiterMemory({
-        points: 10, // Number of requests
-        duration: 300, // Per 5 minutes
         blockDuration: 60, // Block for 1 minute on limit
     }),
-    // Stricter rate limiter for recovery endpoints
+    // Registration/OTP - reasonable for user onboarding
+    registration: new RateLimiterMemory({
+        points: 20, // 20 attempts
+        duration: 300, // Per 5 minutes
+        blockDuration: 30, // Block for 30 seconds on limit
+    }),
+    // Recovery endpoints - slightly stricter for security
     recovery: new RateLimiterMemory({
-        points: 3, // Max 3 attempts
-        duration: 3600, // Per hour
-        blockDuration: 3600 // Block for 1 hour on limit
+        points: 5, // 5 recovery attempts
+        duration: 1800, // Per 30 minutes
+        blockDuration: 300 // Block for 5 minutes on limit
     }),
-    // Moderate rate limiter for bridge operations
+    // Bridge operations - generous for active users
     bridge: new RateLimiterMemory({
-        points: 20, // Number of requests
+        points: 50, // 50 bridge operations
         duration: 3600, // Per hour
-        blockDuration: 300, // Block for 5 minutes on limit
+        blockDuration: 60, // Block for 1 minute on limit
     }),
-    // Wallet operations - sensitive
+    // Wallet operations - generous for transaction flows
     wallet: new RateLimiterMemory({
-        points: 30,
-        duration: 3600,
-        blockDuration: 300,
+        points: 100, // 100 wallet operations
+        duration: 3600, // Per hour
+        blockDuration: 60, // Block for 1 minute on limit
     }),
 };
 // Track repeat offenders for progressive penalties
