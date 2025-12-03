@@ -13,6 +13,15 @@ import {
   SettingsIcon
 } from './Icons';
 
+// Treasury Icon
+const TreasuryNavIcon = ({ size = 20, className = '' }: { size?: number; className?: string }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M12 2L2 7l10 5 10-5-10-5z" />
+    <path d="M2 17l10 5 10-5" />
+    <path d="M2 12l10 5 10-5" />
+  </svg>
+);
+
 interface NavItemProps {
   icon: string;
   label: string;
@@ -31,6 +40,7 @@ const getIconComponent = (iconName: string) => {
     case 'link': return <BridgeIcon {...iconProps} />;
     case 'receipt_long': return <TransactionsIcon {...iconProps} />;
     case 'group': return <MultiSigIcon {...iconProps} />;
+    case 'treasury': return <TreasuryNavIcon {...iconProps} />;
     case 'water_drop': return <FaucetIcon {...iconProps} />;
     case 'verified': return <VerifiedIcon {...iconProps} />;
     case 'smart_toy': return <RobotIcon {...iconProps} />;
@@ -64,6 +74,7 @@ const SideNavBar: React.FC<SideNavBarProps> = ({ currentPage, onNavigate }) => {
     { id: 'Receive', icon: 'arrow_downward', label: 'Receive' },
     { id: 'Swap', icon: 'swap_horiz', label: 'Swap' },
     { id: 'Bridge', icon: 'link', label: 'Bridge' },
+    { id: 'Treasury', icon: 'treasury', label: 'Treasury' },
     { id: 'History', icon: 'receipt_long', label: 'History' },
     { id: 'Multi-Sig', icon: 'group', label: 'Multi-Sig' },
     { id: 'Agent', icon: 'smart_toy', label: 'AI Agent' },

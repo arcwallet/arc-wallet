@@ -258,6 +258,85 @@ export class Database {
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )
     `);
+        // Treasury policies table
+        await run(`
+      CREATE TABLE IF NOT EXISTS treasury_policies (
+        id TEXT PRIMARY KEY,
+        wallet_address TEXT UNIQUE NOT NULL,
+        daily_limit REAL NOT NULL DEFAULT 100000,
+        single_transaction_limit REAL NOT NULL DEFAULT 50000,
+        require_approval_above REAL NOT NULL DEFAULT 10000,
+        required_signatures INTEGER NOT NULL DEFAULT 2,
+        allowed_operations TEXT NOT NULL DEFAULT '["subscribe","redeem","transfer","rebalance"]',
+        cooldown_period INTEGER NOT NULL DEFAULT 60,
+        max_yield_allocation REAL NOT NULL DEFAULT 80,
+        emergency_pause_enabled BOOLEAN NOT NULL DEFAULT 0,
+        whitelisted_addresses TEXT NOT NULL DEFAULT '[]',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+        // Treasury transactions table
+        await run(`
+      CREATE TABLE IF NOT EXISTS treasury_transactions (
+        id TEXT PRIMARY KEY,
+        wallet_address TEXT NOT NULL,
+        operation_type TEXT NOT NULL,
+        amount TEXT NOT NULL,
+        token TEXT NOT NULL,
+        output_token TEXT,
+        expected_output TEXT,
+        submitted_by TEXT NOT NULL,
+        submitter_email TEXT NOT NULL,
+        submitter_role TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending_approval',
+        required_signatures INTEGER NOT NULL DEFAULT 2,
+        current_signatures INTEGER NOT NULL DEFAULT 0,
+        tx_hash TEXT,
+        error TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        expires_at DATETIME NOT NULL
+      )
+    `);
+        // Treasury signatures table
+        await run(`
+      CREATE TABLE IF NOT EXISTS treasury_signatures (
+        id TEXT PRIMARY KEY,
+        transaction_id TEXT NOT NULL,
+        signer_id TEXT NOT NULL,
+        signer_email TEXT NOT NULL,
+        signer_role TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'approved',
+        comment TEXT,
+        signed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (transaction_id) REFERENCES treasury_transactions (id) ON DELETE CASCADE
+      )
+    `);
+        // Treasury audit logs table
+        await run(`
+      CREATE TABLE IF NOT EXISTS treasury_audit_logs (
+        id TEXT PRIMARY KEY,
+        wallet_address TEXT NOT NULL,
+        action TEXT NOT NULL,
+        performed_by TEXT NOT NULL,
+        details TEXT,
+        transaction_id TEXT,
+        ip_address TEXT,
+        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+        // Treasury spending table (daily tracking)
+        await run(`
+      CREATE TABLE IF NOT EXISTS treasury_spending (
+        id TEXT PRIMARY KEY,
+        wallet_address TEXT NOT NULL,
+        date TEXT NOT NULL,
+        usdc_spent REAL NOT NULL DEFAULT 0,
+        usyc_spent REAL NOT NULL DEFAULT 0,
+        UNIQUE(wallet_address, date)
+      )
+    `);
         // Create indexes
         await run('CREATE INDEX IF NOT EXISTS idx_users_username ON users (username)');
         await run('CREATE INDEX IF NOT EXISTS idx_passkeys_user_id ON passkey_credentials (user_id)');
@@ -278,6 +357,12 @@ export class Database {
         await run('CREATE INDEX IF NOT EXISTS idx_multi_sig_signatures_transaction ON multi_sig_signatures (transaction_id)');
         await run('CREATE INDEX IF NOT EXISTS idx_token_metadata_address ON token_metadata (address)');
         await run('CREATE INDEX IF NOT EXISTS idx_token_metadata_chain ON token_metadata (chain_id)');
+        await run('CREATE INDEX IF NOT EXISTS idx_treasury_policies_wallet ON treasury_policies (wallet_address)');
+        await run('CREATE INDEX IF NOT EXISTS idx_treasury_transactions_wallet ON treasury_transactions (wallet_address)');
+        await run('CREATE INDEX IF NOT EXISTS idx_treasury_transactions_status ON treasury_transactions (status)');
+        await run('CREATE INDEX IF NOT EXISTS idx_treasury_signatures_transaction ON treasury_signatures (transaction_id)');
+        await run('CREATE INDEX IF NOT EXISTS idx_treasury_audit_logs_wallet ON treasury_audit_logs (wallet_address)');
+        await run('CREATE INDEX IF NOT EXISTS idx_treasury_spending_wallet ON treasury_spending (wallet_address)');
     }
     async waitForReady() {
         await this.ready;
@@ -1179,6 +1264,311 @@ export class Database {
             passkeys: passkeyCount?.count || 0,
             sessions: sessionCount?.count || 0,
             challenges: challengeCount?.count || 0
+        };
+    }
+    // ==================== Treasury Operations ====================
+    // Treasury Policy operations
+    async getTreasuryPolicy(walletAddress) {
+        await this.waitForReady();
+        const get = promisify(this.db.get.bind(this.db));
+        const row = await get('SELECT * FROM treasury_policies WHERE wallet_address = ?', [walletAddress]);
+        return row ? this.mapTreasuryPolicy(row) : null;
+    }
+    async createTreasuryPolicy(policy) {
+        await this.waitForReady();
+        const run = promisify(this.db.run.bind(this.db));
+        const get = promisify(this.db.get.bind(this.db));
+        const now = new Date().toISOString();
+        await run(`INSERT INTO treasury_policies (
+        id, wallet_address, daily_limit, single_transaction_limit, require_approval_above,
+        required_signatures, allowed_operations, cooldown_period, max_yield_allocation,
+        emergency_pause_enabled, whitelisted_addresses, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
+            policy.id,
+            policy.walletAddress,
+            policy.dailyLimit,
+            policy.singleTransactionLimit,
+            policy.requireApprovalAbove,
+            policy.requiredSignatures,
+            JSON.stringify(policy.allowedOperations),
+            policy.cooldownPeriod,
+            policy.maxYieldAllocation,
+            policy.emergencyPauseEnabled ? 1 : 0,
+            JSON.stringify(policy.whitelistedAddresses),
+            now,
+            now
+        ]);
+        const created = await get('SELECT * FROM treasury_policies WHERE id = ?', [policy.id]);
+        return this.mapTreasuryPolicy(created);
+    }
+    async updateTreasuryPolicy(walletAddress, updates) {
+        await this.waitForReady();
+        const run = promisify(this.db.run.bind(this.db));
+        const fields = [];
+        const values = [];
+        if (updates.dailyLimit !== undefined) {
+            fields.push('daily_limit = ?');
+            values.push(updates.dailyLimit);
+        }
+        if (updates.singleTransactionLimit !== undefined) {
+            fields.push('single_transaction_limit = ?');
+            values.push(updates.singleTransactionLimit);
+        }
+        if (updates.requireApprovalAbove !== undefined) {
+            fields.push('require_approval_above = ?');
+            values.push(updates.requireApprovalAbove);
+        }
+        if (updates.requiredSignatures !== undefined) {
+            fields.push('required_signatures = ?');
+            values.push(updates.requiredSignatures);
+        }
+        if (updates.allowedOperations !== undefined) {
+            fields.push('allowed_operations = ?');
+            values.push(JSON.stringify(updates.allowedOperations));
+        }
+        if (updates.cooldownPeriod !== undefined) {
+            fields.push('cooldown_period = ?');
+            values.push(updates.cooldownPeriod);
+        }
+        if (updates.maxYieldAllocation !== undefined) {
+            fields.push('max_yield_allocation = ?');
+            values.push(updates.maxYieldAllocation);
+        }
+        if (updates.emergencyPauseEnabled !== undefined) {
+            fields.push('emergency_pause_enabled = ?');
+            values.push(updates.emergencyPauseEnabled ? 1 : 0);
+        }
+        if (updates.whitelistedAddresses !== undefined) {
+            fields.push('whitelisted_addresses = ?');
+            values.push(JSON.stringify(updates.whitelistedAddresses));
+        }
+        if (fields.length > 0) {
+            fields.push('updated_at = ?');
+            values.push(new Date().toISOString());
+            values.push(walletAddress);
+            await run(`UPDATE treasury_policies SET ${fields.join(', ')} WHERE wallet_address = ?`, values);
+        }
+        const result = await this.getTreasuryPolicy(walletAddress);
+        return result;
+    }
+    mapTreasuryPolicy(row) {
+        return {
+            id: row.id,
+            walletAddress: row.wallet_address,
+            dailyLimit: row.daily_limit,
+            singleTransactionLimit: row.single_transaction_limit,
+            requireApprovalAbove: row.require_approval_above,
+            requiredSignatures: row.required_signatures,
+            allowedOperations: JSON.parse(row.allowed_operations || '[]'),
+            cooldownPeriod: row.cooldown_period,
+            maxYieldAllocation: row.max_yield_allocation,
+            emergencyPauseEnabled: Boolean(row.emergency_pause_enabled),
+            whitelistedAddresses: JSON.parse(row.whitelisted_addresses || '[]'),
+            createdAt: new Date(row.created_at),
+            updatedAt: new Date(row.updated_at)
+        };
+    }
+    // Treasury Transaction operations
+    async createTreasuryTransaction(tx) {
+        await this.waitForReady();
+        const run = promisify(this.db.run.bind(this.db));
+        const get = promisify(this.db.get.bind(this.db));
+        await run(`INSERT INTO treasury_transactions (
+        id, wallet_address, operation_type, amount, token, output_token, expected_output,
+        submitted_by, submitter_email, submitter_role, status, required_signatures,
+        current_signatures, tx_hash, error, created_at, updated_at, expires_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
+            tx.id,
+            tx.walletAddress,
+            tx.operationType,
+            tx.amount,
+            tx.token,
+            tx.outputToken || null,
+            tx.expectedOutput || null,
+            tx.submittedBy,
+            tx.submitterEmail,
+            tx.submitterRole,
+            tx.status,
+            tx.requiredSignatures,
+            tx.currentSignatures,
+            tx.txHash || null,
+            tx.error || null,
+            tx.createdAt.toISOString(),
+            tx.updatedAt.toISOString(),
+            tx.expiresAt.toISOString()
+        ]);
+        const created = await get('SELECT * FROM treasury_transactions WHERE id = ?', [tx.id]);
+        return this.mapTreasuryTransaction(created);
+    }
+    async getTreasuryTransaction(id) {
+        await this.waitForReady();
+        const get = promisify(this.db.get.bind(this.db));
+        const row = await get('SELECT * FROM treasury_transactions WHERE id = ?', [id]);
+        return row ? this.mapTreasuryTransaction(row) : null;
+    }
+    async getTreasuryTransactions(walletAddress, status) {
+        await this.waitForReady();
+        const all = promisify(this.db.all.bind(this.db));
+        let query = 'SELECT * FROM treasury_transactions WHERE wallet_address = ?';
+        const params = [walletAddress];
+        if (status) {
+            query += ' AND status = ?';
+            params.push(status);
+        }
+        query += ' ORDER BY created_at DESC';
+        const rows = await all(query, params);
+        return rows.map((row) => this.mapTreasuryTransaction(row));
+    }
+    async updateTreasuryTransaction(id, updates) {
+        await this.waitForReady();
+        const run = promisify(this.db.run.bind(this.db));
+        const fields = [];
+        const values = [];
+        if (updates.status !== undefined) {
+            fields.push('status = ?');
+            values.push(updates.status);
+        }
+        if (updates.currentSignatures !== undefined) {
+            fields.push('current_signatures = ?');
+            values.push(updates.currentSignatures);
+        }
+        if (updates.txHash !== undefined) {
+            fields.push('tx_hash = ?');
+            values.push(updates.txHash);
+        }
+        if (updates.error !== undefined) {
+            fields.push('error = ?');
+            values.push(updates.error);
+        }
+        if (fields.length > 0) {
+            fields.push('updated_at = ?');
+            values.push(new Date().toISOString());
+            values.push(id);
+            await run(`UPDATE treasury_transactions SET ${fields.join(', ')} WHERE id = ?`, values);
+        }
+    }
+    mapTreasuryTransaction(row) {
+        return {
+            id: row.id,
+            walletAddress: row.wallet_address,
+            operationType: row.operation_type,
+            amount: row.amount,
+            token: row.token,
+            outputToken: row.output_token,
+            expectedOutput: row.expected_output,
+            submittedBy: row.submitted_by,
+            submitterEmail: row.submitter_email,
+            submitterRole: row.submitter_role,
+            status: row.status,
+            requiredSignatures: row.required_signatures,
+            currentSignatures: row.current_signatures,
+            txHash: row.tx_hash,
+            error: row.error,
+            createdAt: new Date(row.created_at),
+            updatedAt: new Date(row.updated_at),
+            expiresAt: new Date(row.expires_at)
+        };
+    }
+    // Treasury Signature operations
+    async createTreasurySignature(sig) {
+        await this.waitForReady();
+        const run = promisify(this.db.run.bind(this.db));
+        const get = promisify(this.db.get.bind(this.db));
+        await run(`INSERT INTO treasury_signatures (
+        id, transaction_id, signer_id, signer_email, signer_role, status, comment, signed_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, [
+            sig.id,
+            sig.transactionId,
+            sig.signerId,
+            sig.signerEmail,
+            sig.signerRole,
+            sig.status,
+            sig.comment || null,
+            sig.signedAt.toISOString()
+        ]);
+        const created = await get('SELECT * FROM treasury_signatures WHERE id = ?', [sig.id]);
+        return this.mapTreasurySignature(created);
+    }
+    async getTreasurySignatures(transactionId) {
+        await this.waitForReady();
+        const all = promisify(this.db.all.bind(this.db));
+        const rows = await all('SELECT * FROM treasury_signatures WHERE transaction_id = ? ORDER BY signed_at ASC', [transactionId]);
+        return rows.map((row) => this.mapTreasurySignature(row));
+    }
+    mapTreasurySignature(row) {
+        return {
+            id: row.id,
+            transactionId: row.transaction_id,
+            signerId: row.signer_id,
+            signerEmail: row.signer_email,
+            signerRole: row.signer_role,
+            status: row.status,
+            comment: row.comment,
+            signedAt: new Date(row.signed_at)
+        };
+    }
+    // Treasury Audit Log operations
+    async createTreasuryAuditLog(log) {
+        await this.waitForReady();
+        const run = promisify(this.db.run.bind(this.db));
+        await run(`INSERT INTO treasury_audit_logs (
+        id, wallet_address, action, performed_by, details, transaction_id, ip_address, timestamp
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, [
+            log.id || `audit_${Date.now()}`,
+            log.walletAddress,
+            log.action,
+            log.performedBy,
+            log.details || null,
+            log.transactionId || null,
+            log.ipAddress || null,
+            log.timestamp.toISOString()
+        ]);
+    }
+    async getTreasuryAuditLogs(walletAddress, limit = 100, offset = 0) {
+        await this.waitForReady();
+        const all = promisify(this.db.all.bind(this.db));
+        const rows = await all('SELECT * FROM treasury_audit_logs WHERE wallet_address = ? ORDER BY timestamp DESC LIMIT ? OFFSET ?', [walletAddress, limit, offset]);
+        return rows.map((row) => ({
+            id: row.id,
+            walletAddress: row.wallet_address,
+            action: row.action,
+            performedBy: row.performed_by,
+            details: row.details,
+            transactionId: row.transaction_id,
+            ipAddress: row.ip_address,
+            timestamp: new Date(row.timestamp)
+        }));
+    }
+    // Treasury Spending operations
+    async recordTreasurySpending(walletAddress, token, amount) {
+        await this.waitForReady();
+        const run = promisify(this.db.run.bind(this.db));
+        const get = promisify(this.db.get.bind(this.db));
+        const today = new Date().toISOString().split('T')[0];
+        const column = token === 'USDC' ? 'usdc_spent' : 'usyc_spent';
+        // Try to update existing record
+        const existing = await get('SELECT * FROM treasury_spending WHERE wallet_address = ? AND date = ?', [walletAddress, today]);
+        if (existing) {
+            await run(`UPDATE treasury_spending SET ${column} = ${column} + ? WHERE wallet_address = ? AND date = ?`, [amount, walletAddress, today]);
+        }
+        else {
+            await run(`INSERT INTO treasury_spending (id, wallet_address, date, usdc_spent, usyc_spent) VALUES (?, ?, ?, ?, ?)`, [
+                `spending_${Date.now()}`,
+                walletAddress,
+                today,
+                token === 'USDC' ? amount : 0,
+                token === 'USYC' ? amount : 0
+            ]);
+        }
+    }
+    async getTodaySpending(walletAddress) {
+        await this.waitForReady();
+        const get = promisify(this.db.get.bind(this.db));
+        const today = new Date().toISOString().split('T')[0];
+        const row = await get('SELECT * FROM treasury_spending WHERE wallet_address = ? AND date = ?', [walletAddress, today]);
+        return {
+            usdcSpent: row?.usdc_spent || 0,
+            usycSpent: row?.usyc_spent || 0
         };
     }
 }

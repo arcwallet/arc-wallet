@@ -11,6 +11,7 @@ import SwapScreen from './SwapScreen';
 import Bridge from './Bridge';
 import History from './History';
 import AgentScreen, { WalletBalance } from './AgentScreen';
+import TreasuryScreen from './TreasuryScreen';
 import NetworkSelector from './NetworkSelector';
 import { Transaction } from '../types';
 import { usePasskeyAccount } from '../contexts/PasskeyAccountContext';
@@ -686,6 +687,8 @@ const WalletDashboard: React.FC = () => {
         );
       case 'Bridge':
         return <Bridge />;
+      case 'Treasury':
+        return <TreasuryScreen />;
       case 'History':
         return <History />;
       case 'Transactions':

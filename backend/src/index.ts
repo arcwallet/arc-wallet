@@ -12,6 +12,7 @@ import { createWalletRouter } from './routes/wallet.js';
 import { createWalletBackupRouter } from './routes/walletBackup.js';
 import { createBridgeRoutes } from './routes/bridge.js';
 import { createMultiSigRoutes } from './routes/multiSig.js';
+import { createTreasuryRoutes } from './routes/treasury.js';
 import { createOAuthRouter } from './routes/oauth.js';
 import paymasterRouter from './routes/paymaster.js';
 import { createHistoryRouter } from './routes/history.js';
@@ -128,6 +129,7 @@ app.use(createBridgeRoutes(db, {
 }, magicSessionStore));
 app.use('/auth', createOAuthRouter(db, config, magicSessionStore));
 app.use('/multisig', createMultiSigRoutes(db, config, magicSessionStore));
+app.use('/treasury', createTreasuryRoutes(db, config, magicSessionStore));
 app.use('/api/paymaster', paymasterRouter);
 app.use('/api/history', createHistoryRouter());
 app.use('/api/webhooks', createWebhookRouter());

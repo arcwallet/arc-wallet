@@ -1,4 +1,4 @@
-import { User, PasskeyCredential, SessionKey, WebAuthnChallenge, BridgeTransaction, MultiSigAccount, MultiSigMember, MultiSigTransaction, MultiSigSignature, OAuthAccount, OAuthState } from '../types/index.js';
+import { User, PasskeyCredential, SessionKey, WebAuthnChallenge, BridgeTransaction, MultiSigAccount, MultiSigMember, MultiSigTransaction, MultiSigSignature, OAuthAccount, OAuthState, TreasuryPolicy, TreasuryTransaction, TreasurySignature, TreasuryAuditLog } from '../types/index.js';
 export declare class Database {
     private db;
     private ready;
@@ -110,6 +110,27 @@ export declare class Database {
         passkeys: number;
         sessions: number;
         challenges: number;
+    }>;
+    getTreasuryPolicy(walletAddress: string): Promise<TreasuryPolicy | null>;
+    createTreasuryPolicy(policy: TreasuryPolicy): Promise<TreasuryPolicy>;
+    updateTreasuryPolicy(walletAddress: string, updates: Partial<TreasuryPolicy>): Promise<TreasuryPolicy>;
+    private mapTreasuryPolicy;
+    createTreasuryTransaction(tx: TreasuryTransaction): Promise<TreasuryTransaction>;
+    getTreasuryTransaction(id: string): Promise<TreasuryTransaction | null>;
+    getTreasuryTransactions(walletAddress: string, status?: string): Promise<TreasuryTransaction[]>;
+    updateTreasuryTransaction(id: string, updates: Partial<TreasuryTransaction>): Promise<void>;
+    private mapTreasuryTransaction;
+    createTreasurySignature(sig: TreasurySignature): Promise<TreasurySignature>;
+    getTreasurySignatures(transactionId: string): Promise<TreasurySignature[]>;
+    private mapTreasurySignature;
+    createTreasuryAuditLog(log: Omit<TreasuryAuditLog, 'id'> & {
+        id?: string;
+    }): Promise<void>;
+    getTreasuryAuditLogs(walletAddress: string, limit?: number, offset?: number): Promise<TreasuryAuditLog[]>;
+    recordTreasurySpending(walletAddress: string, token: 'USDC' | 'USYC', amount: number): Promise<void>;
+    getTodaySpending(walletAddress: string): Promise<{
+        usdcSpent: number;
+        usycSpent: number;
     }>;
 }
 //# sourceMappingURL=Database.d.ts.map

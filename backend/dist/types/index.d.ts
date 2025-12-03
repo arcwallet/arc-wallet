@@ -112,6 +112,70 @@ export interface OAuthState {
     createdAt: number;
     expiresAt: number;
 }
+export type TreasuryUserRole = 'admin' | 'treasury_manager' | 'approver' | 'viewer' | 'member';
+export type TreasuryOperationType = 'subscribe' | 'redeem' | 'transfer' | 'rebalance';
+export interface TreasuryPolicy {
+    id: string;
+    walletAddress: string;
+    dailyLimit: number;
+    singleTransactionLimit: number;
+    requireApprovalAbove: number;
+    requiredSignatures: number;
+    allowedOperations: TreasuryOperationType[];
+    cooldownPeriod: number;
+    maxYieldAllocation: number;
+    emergencyPauseEnabled: boolean;
+    whitelistedAddresses: string[];
+    createdAt: Date;
+    updatedAt: Date;
+}
+export interface TreasuryTransaction {
+    id: string;
+    walletAddress: string;
+    operationType: TreasuryOperationType;
+    amount: string;
+    token: 'USDC' | 'USYC';
+    outputToken?: 'USDC' | 'USYC';
+    expectedOutput?: string;
+    submittedBy: string;
+    submitterEmail: string;
+    submitterRole: TreasuryUserRole;
+    status: 'pending_approval' | 'approved' | 'executing' | 'executed' | 'rejected' | 'failed';
+    requiredSignatures: number;
+    currentSignatures: number;
+    txHash?: string;
+    error?: string;
+    createdAt: Date;
+    updatedAt: Date;
+    expiresAt: Date;
+}
+export interface TreasurySignature {
+    id: string;
+    transactionId: string;
+    signerId: string;
+    signerEmail: string;
+    signerRole: TreasuryUserRole;
+    status: 'approved' | 'rejected';
+    comment?: string;
+    signedAt: Date;
+}
+export interface TreasuryAuditLog {
+    id: string;
+    walletAddress: string;
+    action: string;
+    performedBy: string;
+    details: string;
+    transactionId?: string;
+    ipAddress?: string;
+    timestamp: Date;
+}
+export interface TreasurySpending {
+    id: string;
+    walletAddress: string;
+    date: string;
+    usdcSpent: number;
+    usycSpent: number;
+}
 export interface RegistrationStartRequest {
     username: string;
     displayName: string;
