@@ -312,10 +312,12 @@ const ApprovalThresholdsTab: React.FC<{ policy: TreasuryPolicy; onUpdate: () => 
           </thead>
           <tbody className="divide-y divide-slate-700/50">
             {thresholds.map((threshold, index) => {
-              const prevMax = index > 0 ? thresholds[index - 1].maxAmount : 0;
-              const rangeText = threshold.maxAmount === Infinity
-                ? `$${prevMax.toLocaleString()}+`
-                : `$${prevMax.toLocaleString()} - $${threshold.maxAmount.toLocaleString()}`;
+              if (!threshold) return null;
+              const prevMax = index > 0 ? (thresholds[index - 1]?.maxAmount ?? 0) : 0;
+              const maxAmount = threshold.maxAmount ?? Infinity;
+              const rangeText = maxAmount === Infinity
+                ? `$${(prevMax ?? 0).toLocaleString()}+`
+                : `$${(prevMax ?? 0).toLocaleString()} - $${(maxAmount ?? 0).toLocaleString()}`;
 
               return (
                 <tr key={index} className="hover:bg-slate-800/30">
@@ -330,7 +332,7 @@ const ApprovalThresholdsTab: React.FC<{ policy: TreasuryPolicy; onUpdate: () => 
                         threshold.requiredSignatures === 3 ? 'bg-orange-500/20 text-orange-400' :
                         'bg-red-500/20 text-red-400'
                       }`}>
-                        {threshold.requiredSignatures} Sig
+                        {threshold.requiredSignatures ?? 1} Sig
                       </span>
                     </div>
                   </td>
@@ -348,7 +350,7 @@ const ApprovalThresholdsTab: React.FC<{ policy: TreasuryPolicy; onUpdate: () => 
                     )}
                   </td>
                   <td className="px-4 py-4">
-                    <span className="text-slate-300">{threshold.timeoutHours} hours</span>
+                    <span className="text-slate-300">{threshold.timeoutHours ?? 24} hours</span>
                   </td>
                 </tr>
               );
@@ -363,22 +365,22 @@ const ApprovalThresholdsTab: React.FC<{ policy: TreasuryPolicy; onUpdate: () => 
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           <div className="bg-slate-900/50 rounded-lg p-4">
             <p className="text-slate-400 text-xs mb-1">Min Liquidity</p>
-            <p className="text-white font-semibold text-xl">{treasuryRules.minLiquidityPercent}%</p>
+            <p className="text-white font-semibold text-xl">{treasuryRules.minLiquidityPercent ?? 20}%</p>
             <p className="text-slate-500 text-xs mt-1">USDC required</p>
           </div>
           <div className="bg-slate-900/50 rounded-lg p-4">
             <p className="text-slate-400 text-xs mb-1">Max Single Subscribe</p>
-            <p className="text-white font-semibold text-xl">{treasuryRules.maxSingleSubscribePercent}%</p>
+            <p className="text-white font-semibold text-xl">{treasuryRules.maxSingleSubscribePercent ?? 50}%</p>
             <p className="text-slate-500 text-xs mt-1">of USDC</p>
           </div>
           <div className="bg-slate-900/50 rounded-lg p-4">
             <p className="text-slate-400 text-xs mb-1">Max Single Redeem</p>
-            <p className="text-white font-semibold text-xl">{treasuryRules.maxSingleRedeemPercent}%</p>
+            <p className="text-white font-semibold text-xl">{treasuryRules.maxSingleRedeemPercent ?? 80}%</p>
             <p className="text-slate-500 text-xs mt-1">of USYC</p>
           </div>
           <div className="bg-slate-900/50 rounded-lg p-4">
             <p className="text-slate-400 text-xs mb-1">Redeem Cooldown</p>
-            <p className="text-white font-semibold text-xl">{treasuryRules.redeemCooldownMs / (60 * 60 * 1000)} hours</p>
+            <p className="text-white font-semibold text-xl">{(treasuryRules.redeemCooldownMs ?? 86400000) / (60 * 60 * 1000)} hours</p>
             <p className="text-slate-500 text-xs mt-1">Wait period</p>
           </div>
           <div className="bg-slate-900/50 rounded-lg p-4">
