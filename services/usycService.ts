@@ -345,15 +345,15 @@ class USYCService {
     ]);
 
     console.log('[USYC] Approving USDC...');
-    const approveTxHash = await manager.executeTransaction(
+    const approveResult = await manager.executeTransaction(
       USYC_CONTRACTS.arcTestnet.usdc,
       0n,
       approveData
     );
-    console.log('[USYC] Approve tx:', approveTxHash);
+    console.log('[USYC] Approve tx:', approveResult.hash);
 
     // Wait for approval confirmation
-    await this.provider.waitForTransaction(approveTxHash, 1);
+    await this.provider.waitForTransaction(approveResult.hash, 1);
 
     // Step 2: Call deposit on Teller
     const depositData = this.tellerInterface.encodeFunctionData('deposit', [
@@ -362,14 +362,14 @@ class USYCService {
     ]);
 
     console.log('[USYC] Calling deposit...');
-    const depositTxHash = await manager.executeTransaction(
+    const depositResult = await manager.executeTransaction(
       USYC_CONTRACTS.arcTestnet.teller,
       0n,
       depositData
     );
-    console.log('[USYC] Deposit tx:', depositTxHash);
+    console.log('[USYC] Deposit tx:', depositResult.hash);
 
-    return depositTxHash;
+    return depositResult.hash;
   }
 
   /**
@@ -398,15 +398,15 @@ class USYCService {
     ]);
 
     console.log('[USYC] Approving USYC...');
-    const approveTxHash = await manager.executeTransaction(
+    const approveResult = await manager.executeTransaction(
       USYC_CONTRACTS.arcTestnet.usyc,
       0n,
       approveData
     );
-    console.log('[USYC] Approve tx:', approveTxHash);
+    console.log('[USYC] Approve tx:', approveResult.hash);
 
     // Wait for approval confirmation
-    await this.provider.waitForTransaction(approveTxHash, 1);
+    await this.provider.waitForTransaction(approveResult.hash, 1);
 
     // Step 2: Call redeem on Teller
     const redeemData = this.tellerInterface.encodeFunctionData('redeem', [
@@ -416,14 +416,14 @@ class USYCService {
     ]);
 
     console.log('[USYC] Calling redeem...');
-    const redeemTxHash = await manager.executeTransaction(
+    const redeemResult = await manager.executeTransaction(
       USYC_CONTRACTS.arcTestnet.teller,
       0n,
       redeemData
     );
-    console.log('[USYC] Redeem tx:', redeemTxHash);
+    console.log('[USYC] Redeem tx:', redeemResult.hash);
 
-    return redeemTxHash;
+    return redeemResult.hash;
   }
 
   /**
