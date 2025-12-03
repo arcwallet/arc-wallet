@@ -34,6 +34,7 @@ const CSRF_EXEMPT_ROUTES = [
     '/health',
     '/passkeys', // All passkey routes exempt (WebAuthn provides cryptographic security)
     '/api/passkeys', // Also exempt with /api prefix
+    '/api/passkey', // Singular form also exempt
 ];
 /**
  * Validates the CSRF token for state-changing methods (POST, PUT, DELETE, PATCH).
