@@ -122,7 +122,7 @@ export const SWAP_CONFIG: SwapConfig = {
       sepolia: '0x3bFA4769FB09eefC5a80d6E87c3B9C650f7Ae48E', // Uniswap V3 Router Sepolia
       baseSepolia: '0x94cC0AaC535CCDB3C01d6787D6413C739ae12bc4', // Uniswap V3 Router Base Sepolia
       avalancheFuji: '0x60aE616a2155Ee3d9A68541Ba4544862310933d4', // Trader Joe V2 Router Fuji
-      arcTestnet: '0x8954AfA98594b838bda56FE4C12a09D7739D179b', // Custom DEX router for Arc testnet
+      arcTestnet: '0xB9D1e7d5bCEAAEb8AA557dB4678E0211118A57f1', // UniswapV2Router02 on Arc testnet
     },
   },
   defaultSlippage: 0.5, // 0.5%

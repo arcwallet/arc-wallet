@@ -190,7 +190,7 @@ const SwapScreen: React.FC<SwapScreenProps> = ({ initialFromToken, initialToToke
                         </div>
                         <div className="flex justify-between text-slate-400 mb-1">
                             <span>Price Impact</span>
-                            <span className="text-green-400">{quote.priceImpact}</span>
+                            <span className="text-blue-400">{quote.priceImpact}</span>
                         </div>
                         <div className="flex justify-between text-slate-400">
                             <span>Minimum Received</span>
@@ -208,14 +208,14 @@ const SwapScreen: React.FC<SwapScreenProps> = ({ initialFromToken, initialToToke
 
                 {/* Success Message */}
                 {txHash && (
-                    <div className="mt-4 p-3 bg-green-500/10 border border-green-500/30 rounded-lg">
-                        <p className="text-sm text-green-400">
+                    <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+                        <p className="text-sm text-blue-400">
                             Swap successful!{' '}
                             <a
                                 href={`${TX_EXPLORER_URL}${txHash}`}
                                 target="_blank"
                                 rel="noreferrer"
-                                className="underline hover:text-green-300"
+                                className="underline hover:text-blue-300"
                             >
                                 View on Explorer
                             </a>
@@ -238,7 +238,7 @@ const SwapScreen: React.FC<SwapScreenProps> = ({ initialFromToken, initialToToke
 
             {/* Success Message */}
             {txHash && (
-                <div className="mt-4 p-4 bg-green-400/10 border border-green-400/20 rounded-lg text-green-400 text-center">
+                <div className="mt-4 p-4 bg-blue-400/10 border border-blue-400/20 rounded-lg text-blue-400 text-center">
                     <p className="font-bold">Swap Successful!</p>
                     <p className="text-xs mt-1 opacity-80">Tx: {txHash.slice(0, 10)}...</p>
                 </div>

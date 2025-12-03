@@ -27,15 +27,11 @@ const MEV_CONFIG = {
   HIGH_SLIPPAGE_WARNING: 2, // Warn user above 2%
 };
 
-// Uniswap V3 Router ABI (minimal)
-const UNISWAP_ROUTER_ABI = [
-  'function exactInputSingle((address tokenIn, address tokenOut, uint24 fee, address recipient, uint256 deadline, uint256 amountIn, uint256 amountOutMinimum, uint160 sqrtPriceLimitX96)) external payable returns (uint256 amountOut)',
-  'function quoteExactInputSingle((address tokenIn, address tokenOut, uint256 amountIn, uint24 fee, uint160 sqrtPriceLimitX96)) external returns (uint256 amountOut)',
-];
-
-// Uniswap V3 Quoter ABI
-const QUOTER_ABI = [
-  'function quoteExactInputSingle(address tokenIn, address tokenOut, uint24 fee, uint256 amountIn, uint160 sqrtPriceLimitX96) external returns (uint256 amountOut)',
+// Uniswap V2 Router ABI
+const UNISWAP_V2_ROUTER_ABI = [
+  'function swapExactTokensForTokens(uint256 amountIn, uint256 amountOutMin, address[] calldata path, address to, uint256 deadline) external returns (uint256[] memory amounts)',
+  'function getAmountsOut(uint256 amountIn, address[] calldata path) external view returns (uint256[] memory amounts)',
+  'function factory() external view returns (address)',
 ];
 
 // ERC20 ABI for approval
@@ -44,13 +40,6 @@ const ERC20_ABI = [
   'function allowance(address owner, address spender) view returns (uint256)',
   'function balanceOf(address owner) view returns (uint256)',
 ];
-
-// Uniswap V3 pool fee tiers
-const FEE_TIERS = {
-  LOW: 500,      // 0.05%
-  MEDIUM: 3000,  // 0.3%
-  HIGH: 10000,   // 1%
-};
 
 class SwapService {
   private provider: JsonRpcProvider;
@@ -161,7 +150,7 @@ class SwapService {
   }
 
   /**
-   * Execute a token swap with MEV protection
+   * Execute a token swap with MEV protection (UniswapV2)
    */
   async executeSwap(
     quote: Quote,
@@ -197,25 +186,14 @@ class SwapService {
       // Step 1: Check and approve token if needed
       await this.ensureTokenApproval(wallet, tokenInAddress, amountIn);
 
-      // Step 2: Execute swap
-      const router = new Contract(this.routerAddress, UNISWAP_ROUTER_ABI, wallet);
+      // Step 2: Execute swap using UniswapV2
+      const router = new Contract(this.routerAddress, UNISWAP_V2_ROUTER_ABI, wallet);
 
       // MEV Protection: Shorter deadline (5 min instead of 20)
       const deadline = Math.floor(Date.now() / 1000) + MEV_CONFIG.DEADLINE_SECONDS;
-      const fee = this.isStablecoinPair(quote.fromToken.symbol, quote.toToken.symbol)
-        ? FEE_TIERS.LOW
-        : FEE_TIERS.MEDIUM;
 
-      const params = {
-        tokenIn: tokenInAddress,
-        tokenOut: tokenOutAddress,
-        fee,
-        recipient: wallet.address,
-        deadline,
-        amountIn,
-        amountOutMinimum,
-        sqrtPriceLimitX96: 0, // No price limit
-      };
+      // UniswapV2 uses path array
+      const path = [tokenInAddress, tokenOutAddress];
 
       console.log('[SWAP] Executing swap with params:', {
         from: quote.fromToken.symbol,
@@ -223,14 +201,22 @@ class SwapService {
         amountIn: quote.fromAmount,
         minimumOut: quote.minimumReceived,
         router: this.routerAddress,
+        path,
       });
 
       const { maxFeePerGas, maxPriorityFeePerGas } = await getFeeSettings(this.provider);
 
-      const tx = await router.exactInputSingle(params, {
-        maxFeePerGas: maxFeePerGas || undefined,
-        maxPriorityFeePerGas: maxPriorityFeePerGas || undefined,
-      });
+      const tx = await router.swapExactTokensForTokens(
+        amountIn,
+        amountOutMinimum,
+        path,
+        wallet.address,
+        deadline,
+        {
+          maxFeePerGas: maxFeePerGas || undefined,
+          maxPriorityFeePerGas: maxPriorityFeePerGas || undefined,
+        }
+      );
 
       const receipt = await tx.wait();
       console.log('[SWAP] Swap successful! TxHash:', receipt.hash);
@@ -248,6 +234,8 @@ class SwapService {
         throw new Error('Price moved unfavorably. Please try again with higher slippage.');
       } else if (error?.message?.includes('STF')) {
         throw new Error('Swap transaction failed. Pool may have insufficient liquidity.');
+      } else if (error?.message?.includes('INSUFFICIENT_OUTPUT_AMOUNT')) {
+        throw new Error('Insufficient liquidity in pool. Try a smaller amount.');
       }
 
       throw new Error(error?.message || 'Swap failed. Please try again.');
@@ -256,6 +244,7 @@ class SwapService {
 
   /**
    * Execute a token swap using PasskeyAccount (ERC-4337 Smart Wallet)
+   * Uses UniswapV2 swapExactTokensForTokens
    * No private key required - uses passkey signing
    */
   async executeSwapWithPasskey(
@@ -309,25 +298,14 @@ class SwapService {
         console.log('[SWAP] Token approved via PasskeyAccount:', approveResult.hash);
       }
 
-      // Step 2: Execute swap via PasskeyAccount
-      const routerInterface = new Interface(UNISWAP_ROUTER_ABI);
+      // Step 2: Execute swap via PasskeyAccount using UniswapV2
+      const routerInterface = new Interface(UNISWAP_V2_ROUTER_ABI);
 
       // MEV Protection: Shorter deadline (5 min instead of 20)
       const deadline = Math.floor(Date.now() / 1000) + MEV_CONFIG.DEADLINE_SECONDS;
-      const fee = this.isStablecoinPair(quote.fromToken.symbol, quote.toToken.symbol)
-        ? FEE_TIERS.LOW
-        : FEE_TIERS.MEDIUM;
 
-      const params = {
-        tokenIn: tokenInAddress,
-        tokenOut: tokenOutAddress,
-        fee,
-        recipient: walletAddress,
-        deadline,
-        amountIn,
-        amountOutMinimum,
-        sqrtPriceLimitX96: 0, // No price limit
-      };
+      // UniswapV2 uses path array for swaps
+      const path = [tokenInAddress, tokenOutAddress];
 
       console.log('[SWAP] Executing swap via PasskeyAccount with params:', {
         from: quote.fromToken.symbol,
@@ -335,10 +313,17 @@ class SwapService {
         amountIn: quote.fromAmount,
         minimumOut: quote.minimumReceived,
         router: this.routerAddress,
+        path,
       });
 
-      // Encode the swap call
-      const swapData = routerInterface.encodeFunctionData('exactInputSingle', [params]);
+      // Encode the swap call for UniswapV2
+      const swapData = routerInterface.encodeFunctionData('swapExactTokensForTokens', [
+        amountIn,
+        amountOutMinimum,
+        path,
+        walletAddress,
+        deadline,
+      ]);
 
       // Execute via PasskeyAccount (UserOperation with passkey signature)
       const swapResult = await passkeyManager.executeTransaction(this.routerAddress, 0n, swapData);
@@ -358,6 +343,8 @@ class SwapService {
         throw new Error('Price moved unfavorably. Please try again with higher slippage.');
       } else if (error?.message?.includes('STF')) {
         throw new Error('Swap transaction failed. Pool may have insufficient liquidity.');
+      } else if (error?.message?.includes('INSUFFICIENT_OUTPUT_AMOUNT')) {
+        throw new Error('Insufficient liquidity in pool. Try a smaller amount.');
       }
 
       throw new Error(error?.message || 'Swap failed. Please try again.');
