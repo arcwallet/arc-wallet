@@ -112,7 +112,7 @@ const ApprovalCard: React.FC<ApprovalCardProps> = ({
           <div className="flex items-center gap-2">
             <span className={`px-2 py-0.5 rounded text-xs font-semibold ${
               transaction.operationType === 'subscribe'
-                ? 'bg-emerald-500/20 text-emerald-400'
+                ? 'bg-cyan-500/20 text-cyan-400'
                 : 'bg-blue-500/20 text-blue-400'
             }`}>
               {getOperationLabel(transaction.operationType)}
@@ -161,7 +161,7 @@ const ApprovalCard: React.FC<ApprovalCardProps> = ({
           <div
             className={`h-2 rounded-full transition-all ${
               transaction.currentSignatures >= transaction.requiredSignatures
-                ? 'bg-emerald-500'
+                ? 'bg-cyan-500'
                 : 'bg-blue-500'
             }`}
             style={{ width: `${(transaction.currentSignatures / transaction.requiredSignatures) * 100}%` }}
@@ -176,7 +176,7 @@ const ApprovalCard: React.FC<ApprovalCardProps> = ({
           {transaction.signatures.map((sig, idx) => (
             <div key={idx} className="flex items-center gap-2 text-sm">
               {sig.status === 'approved' ? (
-                <CheckIcon size={14} className="text-emerald-400" />
+                <CheckIcon size={14} className="text-cyan-400" />
               ) : (
                 <XIcon size={14} className="text-red-400" />
               )}
@@ -203,7 +203,7 @@ const ApprovalCard: React.FC<ApprovalCardProps> = ({
             <button
               onClick={() => onSign(transaction.id, true, comment || undefined)}
               disabled={isLoading}
-              className="flex-1 flex items-center justify-center gap-2 py-2 bg-emerald-500 hover:bg-emerald-400 text-white font-semibold rounded-lg transition-colors disabled:opacity-50"
+              className="flex-1 flex items-center justify-center gap-2 py-2 bg-cyan-600 hover:bg-cyan-500 text-white font-semibold rounded-lg transition-colors disabled:opacity-50"
             >
               {isLoading ? (
                 <SpinnerIcon size={16} />
@@ -234,9 +234,9 @@ const ApprovalCard: React.FC<ApprovalCardProps> = ({
 
       {/* Already Signed */}
       {hasUserSigned && (
-        <div className="flex items-center gap-2 p-2 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
-          <VerifiedIcon size={16} className="text-emerald-400" />
-          <span className="text-emerald-400 text-sm">You have already signed this transaction</span>
+        <div className="flex items-center gap-2 p-2 bg-cyan-500/10 border border-cyan-500/30 rounded-lg">
+          <VerifiedIcon size={16} className="text-cyan-400" />
+          <span className="text-cyan-400 text-sm">You have already signed this transaction</span>
         </div>
       )}
 

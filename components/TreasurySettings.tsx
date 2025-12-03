@@ -155,11 +155,11 @@ const SpendingLimitsTab: React.FC<{ policy: TreasuryPolicy; onUpdate: () => void
                 <div className="flex items-center gap-3">
                   <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
                     token === 'USDC' ? 'bg-blue-500/20' :
-                    token === 'USYC' ? 'bg-emerald-500/20' : 'bg-purple-500/20'
+                    token === 'USYC' ? 'bg-cyan-500/20' : 'bg-purple-500/20'
                   }`}>
                     <span className={`font-bold text-sm ${
                       token === 'USDC' ? 'text-blue-400' :
-                      token === 'USYC' ? 'text-emerald-400' : 'text-purple-400'
+                      token === 'USYC' ? 'text-cyan-400' : 'text-purple-400'
                     }`}>{token.slice(0, 2)}</span>
                   </div>
                   <div>
@@ -242,7 +242,7 @@ const SpendingLimitsTab: React.FC<{ policy: TreasuryPolicy; onUpdate: () => void
                             <div
                               className={`h-full rounded-full transition-all ${
                                 usedPercent > 80 ? 'bg-red-500' :
-                                usedPercent > 50 ? 'bg-amber-500' : 'bg-emerald-500'
+                                usedPercent > 50 ? 'bg-amber-500' : 'bg-cyan-500'
                               }`}
                               style={{ width: `${Math.min(usedPercent, 100)}%` }}
                             />
@@ -327,7 +327,7 @@ const ApprovalThresholdsTab: React.FC<{ policy: TreasuryPolicy; onUpdate: () => 
                   <td className="px-4 py-4">
                     <div className="flex items-center gap-2">
                       <span className={`px-2 py-1 rounded text-sm font-bold ${
-                        threshold.requiredSignatures === 1 ? 'bg-emerald-500/20 text-emerald-400' :
+                        threshold.requiredSignatures === 1 ? 'bg-cyan-500/20 text-cyan-400' :
                         threshold.requiredSignatures === 2 ? 'bg-amber-500/20 text-amber-400' :
                         threshold.requiredSignatures === 3 ? 'bg-orange-500/20 text-orange-400' :
                         'bg-red-500/20 text-red-400'
@@ -385,13 +385,13 @@ const ApprovalThresholdsTab: React.FC<{ policy: TreasuryPolicy; onUpdate: () => 
           </div>
           <div className="bg-slate-900/50 rounded-lg p-4">
             <p className="text-slate-400 text-xs mb-1">Subscribe Approval</p>
-            <p className={`font-semibold text-xl ${treasuryRules.subscribeRequiresApproval ? 'text-amber-400' : 'text-emerald-400'}`}>
+            <p className={`font-semibold text-xl ${treasuryRules.subscribeRequiresApproval ? 'text-amber-400' : 'text-cyan-400'}`}>
               {treasuryRules.subscribeRequiresApproval ? 'Required' : 'Not Required'}
             </p>
           </div>
           <div className="bg-slate-900/50 rounded-lg p-4">
             <p className="text-slate-400 text-xs mb-1">Redeem Approval</p>
-            <p className={`font-semibold text-xl ${treasuryRules.redeemRequiresApproval ? 'text-amber-400' : 'text-emerald-400'}`}>
+            <p className={`font-semibold text-xl ${treasuryRules.redeemRequiresApproval ? 'text-amber-400' : 'text-cyan-400'}`}>
               {treasuryRules.redeemRequiresApproval ? 'Required' : 'Not Required'}
             </p>
           </div>
@@ -440,7 +440,7 @@ const RolePermissionsTab: React.FC<{ policy: TreasuryPolicy }> = ({ policy }) =>
                   </span>
                 )}
                 {permission.maxTransferAmount === 0 && permission.role === 'admin' && (
-                  <span className="text-emerald-400 text-sm">Unlimited</span>
+                  <span className="text-cyan-400 text-sm">Unlimited</span>
                 )}
               </div>
             </div>
@@ -460,15 +460,15 @@ const RolePermissionsTab: React.FC<{ policy: TreasuryPolicy }> = ({ policy }) =>
                   <div
                     key={key}
                     className={`flex items-center gap-2 px-3 py-2 rounded-lg ${
-                      hasPermission ? 'bg-emerald-500/10' : 'bg-slate-900/50'
+                      hasPermission ? 'bg-cyan-500/10' : 'bg-slate-900/50'
                     }`}
                   >
                     {hasPermission ? (
-                      <CheckIcon size={14} className="text-emerald-400" />
+                      <CheckIcon size={14} className="text-cyan-400" />
                     ) : (
                       <XIcon size={14} className="text-slate-600" />
                     )}
-                    <span className={`text-xs ${hasPermission ? 'text-emerald-400' : 'text-slate-500'}`}>
+                    <span className={`text-xs ${hasPermission ? 'text-cyan-400' : 'text-slate-500'}`}>
                       {label}
                     </span>
                   </div>
@@ -533,7 +533,7 @@ const PendingApprovalsTab: React.FC<{
                   <div>
                     <div className="flex items-center gap-2 mb-1">
                       <span className={`px-2 py-0.5 rounded text-xs font-semibold uppercase ${
-                        approval.type === 'subscribe' ? 'bg-emerald-500/20 text-emerald-400' :
+                        approval.type === 'subscribe' ? 'bg-cyan-500/20 text-cyan-400' :
                         approval.type === 'redeem' ? 'bg-blue-500/20 text-blue-400' :
                         'bg-amber-500/20 text-amber-400'
                       }`}>
@@ -560,7 +560,7 @@ const PendingApprovalsTab: React.FC<{
                         key={idx}
                         className={`px-2 py-1 rounded text-xs ${
                           sig.approved
-                            ? 'bg-emerald-500/20 text-emerald-400'
+                            ? 'bg-cyan-500/20 text-cyan-400'
                             : 'bg-red-500/20 text-red-400'
                         }`}
                       >
@@ -580,7 +580,7 @@ const PendingApprovalsTab: React.FC<{
                   <div className="flex gap-2">
                     <button
                       onClick={() => onSign(approval.id, true)}
-                      className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-white rounded-lg font-medium"
+                      className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg font-medium"
                     >
                       <CheckIcon size={16} />
                       Approve
@@ -650,7 +650,7 @@ const AuditLogTab: React.FC<{ logs: AuditLogEntry[] }> = ({ logs }) => {
               <div key={log.id} className="px-4 py-3 border-b border-slate-700/30 hover:bg-slate-800/30">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className={`w-2 h-2 rounded-full ${log.success ? 'bg-emerald-400' : 'bg-red-400'}`} />
+                    <div className={`w-2 h-2 rounded-full ${log.success ? 'bg-cyan-400' : 'bg-red-400'}`} />
                     <span className="text-white font-medium">
                       {actionLabels[log.action] || log.action}
                     </span>
