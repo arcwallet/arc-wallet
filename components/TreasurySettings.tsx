@@ -96,13 +96,24 @@ const SpendingLimitsTab: React.FC<{ policy: TreasuryPolicy; onUpdate: () => void
   const [editValues, setEditValues] = useState({ daily: 0, weekly: 0, monthly: 0 });
 
   const tokens = ['USDC', 'USYC', 'EURC'] as const;
+  const spendingLimits = policy?.spendingLimits;
+
+  // Early return if no spending limits configured
+  if (!spendingLimits) {
+    return (
+      <div className="bg-slate-800/50 rounded-xl p-8 border border-slate-700/50 text-center">
+        <p className="text-slate-400">Spending limits not configured</p>
+      </div>
+    );
+  }
 
   const handleEdit = (token: string) => {
-    const limits = policy.spendingLimits[token as keyof typeof policy.spendingLimits];
+    const limits = spendingLimits[token as keyof typeof spendingLimits];
+    if (!limits) return;
     setEditValues({
-      daily: limits.daily.amount,
-      weekly: limits.weekly.amount,
-      monthly: limits.monthly.amount,
+      daily: limits.daily?.amount || 0,
+      weekly: limits.weekly?.amount || 0,
+      monthly: limits.monthly?.amount || 0,
     });
     setEditingToken(token);
   };
@@ -133,7 +144,8 @@ const SpendingLimitsTab: React.FC<{ policy: TreasuryPolicy; onUpdate: () => void
 
       <div className="grid gap-4">
         {tokens.map((token) => {
-          const limits = policy.spendingLimits[token];
+          const limits = spendingLimits[token];
+          if (!limits) return null;
           const remaining = treasuryPolicyService.getRemainingLimits(token);
           const isEditing = editingToken === token;
 
@@ -215,15 +227,16 @@ const SpendingLimitsTab: React.FC<{ policy: TreasuryPolicy; onUpdate: () => void
                 <div className="grid grid-cols-3 gap-4">
                   {(['daily', 'weekly', 'monthly'] as const).map((period) => {
                     const limit = limits[period];
-                    const remainingAmount = remaining?.[period] || 0;
-                    const usedPercent = (limit.used / limit.amount) * 100;
+                    if (!limit) return null;
+                    const remainingAmount = remaining?.[period] ?? 0;
+                    const usedPercent = limit.amount > 0 ? (limit.used / limit.amount) * 100 : 0;
 
                     return (
                       <div key={period} className="bg-slate-900/50 rounded-lg p-3">
                         <p className="text-slate-400 text-xs capitalize mb-1">
                           {period === 'daily' ? 'Daily' : period === 'weekly' ? 'Weekly' : 'Monthly'}
                         </p>
-                        <p className="text-white font-semibold">${limit.amount.toLocaleString()}</p>
+                        <p className="text-white font-semibold">${(limit.amount ?? 0).toLocaleString()}</p>
                         <div className="mt-2">
                           <div className="h-1.5 bg-slate-700 rounded-full overflow-hidden">
                             <div
@@ -235,7 +248,7 @@ const SpendingLimitsTab: React.FC<{ policy: TreasuryPolicy; onUpdate: () => void
                             />
                           </div>
                           <p className="text-slate-500 text-xs mt-1">
-                            Remaining: ${remainingAmount.toLocaleString()}
+                            Remaining: ${(remainingAmount ?? 0).toLocaleString()}
                           </p>
                         </div>
                       </div>
@@ -249,17 +262,19 @@ const SpendingLimitsTab: React.FC<{ policy: TreasuryPolicy; onUpdate: () => void
       </div>
 
       {/* Transaction Caps */}
+      {policy?.transactionCaps && (
       <div className="bg-slate-800/50 rounded-xl p-5 border border-slate-700/50">
         <h4 className="text-white font-semibold mb-4">Single Transaction Limits</h4>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           {Object.entries(policy.transactionCaps).map(([key, value]) => (
             <div key={key} className="bg-slate-900/50 rounded-lg p-3 text-center">
               <p className="text-slate-400 text-xs uppercase mb-1">{key}</p>
-              <p className="text-white font-semibold">${value.toLocaleString()}</p>
+              <p className="text-white font-semibold">${(value ?? 0).toLocaleString()}</p>
             </div>
           ))}
         </div>
       </div>
+      )}
     </div>
   );
 };
