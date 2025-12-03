@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import './styles/magic.css';
 import ErrorBoundary from './components/ErrorBoundary';
+import DesktopOnlyGuard from './components/DesktopOnlyGuard';
 import WalletDashboard from './components/WalletDashboard';
 import LoginPage from './pages/LoginPage';
 const PrivacyPolicy = React.lazy(() => import('./pages/PrivacyPolicy'));
@@ -78,25 +79,27 @@ const App: React.FC = () => {
 
   return (
     <ErrorBoundary>
-      <SessionProvider>
-        <NetworkProvider>
-          <PasskeyAccountProvider>
-            <ArcAccountProvider>
-              <ActivityProvider>
-                <PrivacyProvider>
-                  <MultiSigProvider>
-                    <div className="auth-wrapper">
-                      <React.Suspense fallback={null}>
-                        <RootView />
-                      </React.Suspense>
-                    </div>
-                  </MultiSigProvider>
-                </PrivacyProvider>
-              </ActivityProvider>
-            </ArcAccountProvider>
-          </PasskeyAccountProvider>
-        </NetworkProvider>
-      </SessionProvider>
+      <DesktopOnlyGuard>
+        <SessionProvider>
+          <NetworkProvider>
+            <PasskeyAccountProvider>
+              <ArcAccountProvider>
+                <ActivityProvider>
+                  <PrivacyProvider>
+                    <MultiSigProvider>
+                      <div className="auth-wrapper">
+                        <React.Suspense fallback={null}>
+                          <RootView />
+                        </React.Suspense>
+                      </div>
+                    </MultiSigProvider>
+                  </PrivacyProvider>
+                </ActivityProvider>
+              </ArcAccountProvider>
+            </PasskeyAccountProvider>
+          </NetworkProvider>
+        </SessionProvider>
+      </DesktopOnlyGuard>
     </ErrorBoundary>
   );
 };
