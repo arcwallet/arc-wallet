@@ -1285,6 +1285,37 @@ export class PasskeyController {
         console.log('[AdminRecover] Created admin user:', user.id);
       }
 
+      // Also register the passkey credential if we have the info
+      let passkeyRegistered = false;
+      if (adminConfig.credentialId && adminConfig.publicKeyX && adminConfig.publicKeyY) {
+        // Check if passkey already exists
+        const existingPasskeys = await this.db.getPasskeysByUserId(user.id);
+        const credentialExists = existingPasskeys.some(p => p.credentialID === adminConfig.credentialId);
+
+        if (!credentialExists) {
+          // Create passkey credential record - need to create a proper public key buffer
+          // For now, we'll create a minimal Uint8Array from the hex public key
+          const publicKeyHex = adminConfig.publicKeyX.slice(2) + adminConfig.publicKeyY.slice(2);
+          const publicKeyBytes = new Uint8Array(publicKeyHex.match(/.{1,2}/g)!.map(byte => parseInt(byte, 16)));
+
+          const passkeyId = randomUUID();
+          await this.db.createPasskeyCredential({
+            id: passkeyId,
+            credentialID: adminConfig.credentialId,
+            userId: user.id,
+            credentialPublicKey: publicKeyBytes,
+            counter: 0,
+            credentialDeviceType: 'multiDevice',
+            credentialBackedUp: true,
+            transports: ['internal']
+          });
+          console.log('[AdminRecover] Registered passkey credential:', adminConfig.credentialId);
+          passkeyRegistered = true;
+        } else {
+          console.log('[AdminRecover] Passkey already exists, skipping');
+        }
+      }
+
       return res.json({
         success: true,
         data: {
@@ -1292,6 +1323,7 @@ export class PasskeyController {
           email: normalizedEmail,
           walletAddress: adminConfig.walletAddress,
           userId: user.id,
+          passkeyRegistered,
           notes: adminConfig.notes
         }
       });

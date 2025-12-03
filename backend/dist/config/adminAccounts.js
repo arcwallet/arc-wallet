@@ -12,6 +12,7 @@ export const ADMIN_ACCOUNTS = [
         walletAddress: '0x72c90791145C55966903D661Fc286eBbbB47f151',
         publicKeyX: '0xa60c860ef7d5cc3a725eedcf05709c0793f1eb1c673e5a272edc5f8cde13eb08',
         publicKeyY: '0x9fbc5dd1b24f071d7eb13e78b55297ca7d88c5ce6932799ca247883214d2f88e',
+        credentialId: 'N1wTvQCqlG3jaUcpSxAsAQ',
         notes: 'Ana admin hesabı - Mac passkey ile oluşturuldu. Arc Testnet üzerinde deploy edilmiş cüzdan.'
     }
 ];

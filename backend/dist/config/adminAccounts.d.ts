@@ -11,6 +11,7 @@ export interface AdminAccountConfig {
     walletAddress: string;
     publicKeyX: string;
     publicKeyY: string;
+    credentialId?: string;
     notes: string;
 }
 export declare const ADMIN_ACCOUNTS: AdminAccountConfig[];
