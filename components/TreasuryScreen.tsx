@@ -440,8 +440,8 @@ const ActionPanel: React.FC<ActionPanelProps> = ({ type, balance, onSuccess, use
           !quote || executing || !isConnected || (policyValidation && !policyValidation.allowed)
             ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
             : isSubscribe
-            ? 'bg-emerald-500 hover:bg-emerald-400 text-white shadow-[0_0_20px_rgba(16,185,129,0.3)]'
-            : 'bg-blue-500 hover:bg-blue-400 text-white shadow-[0_0_20px_rgba(59,130,246,0.3)]'
+            ? 'bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white shadow-[0_0_20px_rgba(16,185,129,0.4)]'
+            : 'bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-400 hover:to-indigo-400 text-white shadow-[0_0_20px_rgba(59,130,246,0.4)]'
         }`}
       >
         {executing ? 'Processing...' :
