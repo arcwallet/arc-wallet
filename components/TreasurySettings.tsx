@@ -266,6 +266,18 @@ const SpendingLimitsTab: React.FC<{ policy: TreasuryPolicy; onUpdate: () => void
 
 // Approval Thresholds Tab
 const ApprovalThresholdsTab: React.FC<{ policy: TreasuryPolicy; onUpdate: () => void }> = ({ policy, onUpdate }) => {
+  // Null safety checks
+  const thresholds = policy?.approvalThresholds || [];
+  const treasuryRules = policy?.treasuryRules;
+
+  if (!treasuryRules) {
+    return (
+      <div className="bg-slate-800/50 rounded-xl p-8 border border-slate-700/50 text-center">
+        <p className="text-slate-400">Treasury rules not configured</p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -284,8 +296,8 @@ const ApprovalThresholdsTab: React.FC<{ policy: TreasuryPolicy; onUpdate: () => 
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-700/50">
-            {policy.approvalThresholds.map((threshold, index) => {
-              const prevMax = index > 0 ? policy.approvalThresholds[index - 1].maxAmount : 0;
+            {thresholds.map((threshold, index) => {
+              const prevMax = index > 0 ? thresholds[index - 1].maxAmount : 0;
               const rangeText = threshold.maxAmount === Infinity
                 ? `$${prevMax.toLocaleString()}+`
                 : `$${prevMax.toLocaleString()} - $${threshold.maxAmount.toLocaleString()}`;
@@ -336,34 +348,34 @@ const ApprovalThresholdsTab: React.FC<{ policy: TreasuryPolicy; onUpdate: () => 
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           <div className="bg-slate-900/50 rounded-lg p-4">
             <p className="text-slate-400 text-xs mb-1">Min Liquidity</p>
-            <p className="text-white font-semibold text-xl">{policy.treasuryRules.minLiquidityPercent}%</p>
+            <p className="text-white font-semibold text-xl">{treasuryRules.minLiquidityPercent}%</p>
             <p className="text-slate-500 text-xs mt-1">USDC required</p>
           </div>
           <div className="bg-slate-900/50 rounded-lg p-4">
             <p className="text-slate-400 text-xs mb-1">Max Single Subscribe</p>
-            <p className="text-white font-semibold text-xl">{policy.treasuryRules.maxSingleSubscribePercent}%</p>
+            <p className="text-white font-semibold text-xl">{treasuryRules.maxSingleSubscribePercent}%</p>
             <p className="text-slate-500 text-xs mt-1">of USDC</p>
           </div>
           <div className="bg-slate-900/50 rounded-lg p-4">
             <p className="text-slate-400 text-xs mb-1">Max Single Redeem</p>
-            <p className="text-white font-semibold text-xl">{policy.treasuryRules.maxSingleRedeemPercent}%</p>
+            <p className="text-white font-semibold text-xl">{treasuryRules.maxSingleRedeemPercent}%</p>
             <p className="text-slate-500 text-xs mt-1">of USYC</p>
           </div>
           <div className="bg-slate-900/50 rounded-lg p-4">
             <p className="text-slate-400 text-xs mb-1">Redeem Cooldown</p>
-            <p className="text-white font-semibold text-xl">{policy.treasuryRules.redeemCooldownMs / (60 * 60 * 1000)} hours</p>
+            <p className="text-white font-semibold text-xl">{treasuryRules.redeemCooldownMs / (60 * 60 * 1000)} hours</p>
             <p className="text-slate-500 text-xs mt-1">Wait period</p>
           </div>
           <div className="bg-slate-900/50 rounded-lg p-4">
             <p className="text-slate-400 text-xs mb-1">Subscribe Approval</p>
-            <p className={`font-semibold text-xl ${policy.treasuryRules.subscribeRequiresApproval ? 'text-amber-400' : 'text-emerald-400'}`}>
-              {policy.treasuryRules.subscribeRequiresApproval ? 'Required' : 'Not Required'}
+            <p className={`font-semibold text-xl ${treasuryRules.subscribeRequiresApproval ? 'text-amber-400' : 'text-emerald-400'}`}>
+              {treasuryRules.subscribeRequiresApproval ? 'Required' : 'Not Required'}
             </p>
           </div>
           <div className="bg-slate-900/50 rounded-lg p-4">
             <p className="text-slate-400 text-xs mb-1">Redeem Approval</p>
-            <p className={`font-semibold text-xl ${policy.treasuryRules.redeemRequiresApproval ? 'text-amber-400' : 'text-emerald-400'}`}>
-              {policy.treasuryRules.redeemRequiresApproval ? 'Required' : 'Not Required'}
+            <p className={`font-semibold text-xl ${treasuryRules.redeemRequiresApproval ? 'text-amber-400' : 'text-emerald-400'}`}>
+              {treasuryRules.redeemRequiresApproval ? 'Required' : 'Not Required'}
             </p>
           </div>
         </div>
