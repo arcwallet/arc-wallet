@@ -11,27 +11,47 @@ import { SpinnerIcon, RefreshIcon, VerifiedIcon, SettingsIcon } from './Icons';
 import TreasurySettings from './TreasurySettings';
 import TreasuryApprovals from './TreasuryApprovals';
 
-// Treasury Icon
+// Treasury Icon - Building/vault style
 const TreasuryIcon = ({ size = 24, className = '' }: { size?: number; className?: string }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-    <path d="M12 2L2 7l10 5 10-5-10-5z" />
-    <path d="M2 17l10 5 10-5" />
-    <path d="M2 12l10 5 10-5" />
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M3 21h18" />
+    <path d="M5 21V7l7-4 7 4v14" />
+    <path d="M9 21v-8h6v8" />
+    <path d="M10 9h4" />
+    <path d="M12 9v3" />
   </svg>
 );
 
-// Yield Icon
+// Yield Icon - Trending up style
 const YieldIcon = ({ size = 24, className = '' }: { size?: number; className?: string }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-    <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M23 6l-9.5 9.5-5-5L1 18" />
+    <path d="M17 6h6v6" />
   </svg>
 );
 
-// Chart Icon
+// Chart Icon - Pie chart style
 const ChartIcon = ({ size = 24, className = '' }: { size?: number; className?: string }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <circle cx="12" cy="12" r="10" />
+    <path d="M12 2v10l8.5 5" />
+  </svg>
+);
+
+// Info Icon
+const InfoIcon = ({ size = 16, className = '' }: { size?: number; className?: string }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <circle cx="12" cy="12" r="10" />
+    <path d="M12 16v-4" />
+    <path d="M12 8h.01" />
+  </svg>
+);
+
+// Arrow Icon
+const ArrowRightIcon = ({ size = 16, className = '' }: { size?: number; className?: string }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-    <path d="M21.21 15.89A10 10 0 1 1 8 2.83" />
-    <path d="M22 12A10 10 0 0 0 12 2v10z" />
+    <path d="M5 12h14" />
+    <path d="m12 5 7 7-7 7" />
   </svg>
 );
 
@@ -40,65 +60,126 @@ interface AllocationChartProps {
 }
 
 const AllocationChart: React.FC<AllocationChartProps> = ({ allocation }) => {
-  const liquidAngle = (allocation.liquid / 100) * 360;
-  const yieldAngle = (allocation.yield / 100) * 360;
-
-  // SVG arc calculation
-  const polarToCartesian = (cx: number, cy: number, r: number, angle: number) => {
-    const rad = ((angle - 90) * Math.PI) / 180;
-    return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
-  };
-
-  const describeArc = (cx: number, cy: number, r: number, startAngle: number, endAngle: number) => {
-    const start = polarToCartesian(cx, cy, r, endAngle);
-    const end = polarToCartesian(cx, cy, r, startAngle);
-    const largeArcFlag = endAngle - startAngle <= 180 ? '0' : '1';
-    return `M ${cx} ${cy} L ${start.x} ${start.y} A ${r} ${r} 0 ${largeArcFlag} 0 ${end.x} ${end.y} Z`;
-  };
+  // Calculate stroke dash values for donut chart segments
+  const radius = 42;
+  const circumference = 2 * Math.PI * radius;
+  const liquidLength = (allocation.liquid / 100) * circumference;
+  const yieldLength = (allocation.yield / 100) * circumference;
+  const liquidOffset = 0;
+  const yieldOffset = circumference - liquidLength;
 
   return (
-    <div className="flex items-center gap-6">
-      <div className="relative w-32 h-32">
-        <svg viewBox="0 0 100 100" className="w-full h-full">
-          {/* Background circle */}
-          <circle cx="50" cy="50" r="40" fill="#1e293b" />
-          {/* USDC (Liquid) - Blue */}
-          {allocation.liquid > 0 && (
-            <path
-              d={describeArc(50, 50, 40, 0, liquidAngle)}
-              fill="#3b82f6"
-              className="transition-all duration-500"
-            />
-          )}
-          {/* USYC (Yield) - Emerald */}
+    <div className="flex items-center gap-8">
+      {/* Professional Donut Chart */}
+      <div className="relative w-40 h-40">
+        <svg viewBox="0 0 100 100" className="w-full h-full transform -rotate-90">
+          <defs>
+            {/* Gradient for USDC */}
+            <linearGradient id="usdcGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#60a5fa" />
+              <stop offset="100%" stopColor="#3b82f6" />
+            </linearGradient>
+            {/* Gradient for USYC */}
+            <linearGradient id="usycGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#34d399" />
+              <stop offset="100%" stopColor="#10b981" />
+            </linearGradient>
+            {/* Shadow filter */}
+            <filter id="chartShadow" x="-20%" y="-20%" width="140%" height="140%">
+              <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor="#000" floodOpacity="0.3" />
+            </filter>
+          </defs>
+
+          {/* Background track */}
+          <circle
+            cx="50"
+            cy="50"
+            r={radius}
+            fill="none"
+            stroke="#1e293b"
+            strokeWidth="12"
+          />
+
+          {/* USYC Segment (Yield) - Draw first so USDC appears on top */}
           {allocation.yield > 0 && (
-            <path
-              d={describeArc(50, 50, 40, liquidAngle, liquidAngle + yieldAngle)}
-              fill="#10b981"
-              className="transition-all duration-500"
+            <circle
+              cx="50"
+              cy="50"
+              r={radius}
+              fill="none"
+              stroke="url(#usycGradient)"
+              strokeWidth="12"
+              strokeDasharray={`${yieldLength} ${circumference}`}
+              strokeDashoffset={-liquidLength}
+              strokeLinecap="round"
+              className="transition-all duration-700 ease-out"
+              filter="url(#chartShadow)"
             />
           )}
-          {/* Center hole */}
-          <circle cx="50" cy="50" r="25" fill="#0f172a" />
-          {/* Center text */}
-          <text x="50" y="47" textAnchor="middle" className="fill-white text-xs font-bold">
-            ${allocation.totalValue.toLocaleString()}
-          </text>
-          <text x="50" y="58" textAnchor="middle" className="fill-slate-400 text-[8px]">
-            Total Value
-          </text>
+
+          {/* USDC Segment (Liquid) */}
+          {allocation.liquid > 0 && (
+            <circle
+              cx="50"
+              cy="50"
+              r={radius}
+              fill="none"
+              stroke="url(#usdcGradient)"
+              strokeWidth="12"
+              strokeDasharray={`${liquidLength} ${circumference}`}
+              strokeDashoffset={liquidOffset}
+              strokeLinecap="round"
+              className="transition-all duration-700 ease-out"
+              filter="url(#chartShadow)"
+            />
+          )}
         </svg>
-      </div>
-      <div className="flex flex-col gap-3">
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-blue-500" />
-          <span className="text-slate-300 text-sm">USDC (Liquid)</span>
-          <span className="text-white font-semibold ml-auto">{allocation.liquid}%</span>
+
+        {/* Center content */}
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <span className="text-2xl font-bold text-white">
+            ${allocation.totalValue.toLocaleString()}
+          </span>
+          <span className="text-xs text-slate-400 mt-0.5">Total Value</span>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-emerald-500" />
-          <span className="text-slate-300 text-sm">USYC (Yield)</span>
-          <span className="text-white font-semibold ml-auto">{allocation.yield}%</span>
+      </div>
+
+      {/* Legend with progress bars */}
+      <div className="flex flex-col gap-4 flex-1 min-w-[160px]">
+        {/* USDC */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-gradient-to-br from-blue-400 to-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
+              <span className="text-slate-300 text-sm font-medium">USDC</span>
+            </div>
+            <span className="text-white font-bold">{allocation.liquid}%</span>
+          </div>
+          <div className="h-2 bg-slate-700/50 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-gradient-to-r from-blue-400 to-blue-500 rounded-full transition-all duration-700"
+              style={{ width: `${allocation.liquid}%` }}
+            />
+          </div>
+          <span className="text-xs text-slate-500">Liquid / Operational</span>
+        </div>
+
+        {/* USYC */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
+              <span className="text-slate-300 text-sm font-medium">USYC</span>
+            </div>
+            <span className="text-white font-bold">{allocation.yield}%</span>
+          </div>
+          <div className="h-2 bg-slate-700/50 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-gradient-to-r from-emerald-400 to-emerald-500 rounded-full transition-all duration-700"
+              style={{ width: `${allocation.yield}%` }}
+            />
+          </div>
+          <span className="text-xs text-slate-500">Yield-Bearing / Treasury</span>
         </div>
       </div>
     </div>
@@ -305,16 +386,16 @@ const ActionPanel: React.FC<ActionPanelProps> = ({ type, balance, onSuccess, use
       {/* Policy Validation */}
       {policyValidation && !policyValidation.allowed && (
         <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
-          <p className="text-sm text-red-400 font-semibold">Politika Uyarısı</p>
+          <p className="text-sm text-red-400 font-semibold">Policy Warning</p>
           <p className="text-sm text-red-400 mt-1">{policyValidation.reason}</p>
         </div>
       )}
 
       {policyValidation && policyValidation.allowed && policyValidation.requiresApproval && (
-        <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
-          <p className="text-sm text-yellow-400 font-semibold">Onay Gerekli</p>
-          <p className="text-sm text-yellow-400 mt-1">
-            Bu işlem {policyValidation.requiredSignatures} imza gerektiriyor.
+        <div className="mb-4 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+          <p className="text-sm text-amber-400 font-semibold">Approval Required</p>
+          <p className="text-sm text-amber-400/80 mt-1">
+            This transaction requires {policyValidation.requiredSignatures} signature(s).
           </p>
         </div>
       )}
@@ -363,8 +444,8 @@ const ActionPanel: React.FC<ActionPanelProps> = ({ type, balance, onSuccess, use
             : 'bg-blue-500 hover:bg-blue-400 text-white shadow-[0_0_20px_rgba(59,130,246,0.3)]'
         }`}
       >
-        {executing ? 'İşleniyor...' :
-         policyValidation?.requiresApproval ? `Onay Talebi Oluştur (${policyValidation.requiredSignatures} imza)` :
+        {executing ? 'Processing...' :
+         policyValidation?.requiresApproval ? `Create Approval Request (${policyValidation.requiredSignatures} sig)` :
          isSubscribe ? 'Subscribe to USYC' : 'Redeem to USDC'}
       </button>
     </div>
@@ -525,7 +606,7 @@ const TreasuryScreen: React.FC = () => {
             className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-300 transition-colors"
           >
             <SettingsIcon size={16} />
-            Ayarlar
+            Settings
           </button>
           <button
             onClick={handleRefresh}
@@ -540,9 +621,9 @@ const TreasuryScreen: React.FC = () => {
 
       {/* Allowlist Warning */}
       {isAllowlisted === false && (
-        <div className="mb-6 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-xl">
-          <p className="text-yellow-400 font-semibold">Allowlist Required</p>
-          <p className="text-yellow-400/80 text-sm mt-1">
+        <div className="mb-6 p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl">
+          <p className="text-amber-400 font-semibold">Allowlist Required</p>
+          <p className="text-amber-400/80 text-sm mt-1">
             Your wallet needs to be allowlisted to interact with USYC. Contact Circle/Hashnote support to request access.
           </p>
         </div>
@@ -668,7 +749,7 @@ const TreasuryScreen: React.FC = () => {
             <div className="p-6 border-b border-slate-700 flex items-center justify-between">
               <h2 className="text-xl font-bold text-white flex items-center gap-2">
                 <SettingsIcon size={24} className="text-slate-400" />
-                Treasury Politika Ayarları
+                Treasury Policy Settings
               </h2>
               <button
                 onClick={() => setShowSettings(false)}

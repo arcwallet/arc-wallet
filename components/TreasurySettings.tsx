@@ -1,6 +1,6 @@
 /**
  * Treasury Settings Component
- * Kurumsal treasury politikalarını yönetmek için ayarlar paneli
+ * Settings panel for managing corporate treasury policies
  */
 
 import React, { useState, useEffect } from 'react';
@@ -49,14 +49,6 @@ const ListIcon = ({ size = 24, className = '' }: { size?: number; className?: st
     <line x1="3" y1="6" x2="3.01" y2="6" />
     <line x1="3" y1="12" x2="3.01" y2="12" />
     <line x1="3" y1="18" x2="3.01" y2="18" />
-  </svg>
-);
-
-const AlertIcon = ({ size = 24, className = '' }: { size?: number; className?: string }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-    <line x1="12" y1="9" x2="12" y2="13" />
-    <line x1="12" y1="17" x2="12.01" y2="17" />
   </svg>
 );
 
@@ -134,8 +126,8 @@ const SpendingLimitsTab: React.FC<{ policy: TreasuryPolicy; onUpdate: () => void
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-semibold text-white">Harcama Limitleri</h3>
-          <p className="text-slate-400 text-sm mt-1">Token bazlı günlük, haftalık ve aylık limitler</p>
+          <h3 className="text-lg font-semibold text-white">Spending Limits</h3>
+          <p className="text-slate-400 text-sm mt-1">Token-based daily, weekly, and monthly limits</p>
         </div>
       </div>
 
@@ -160,7 +152,7 @@ const SpendingLimitsTab: React.FC<{ policy: TreasuryPolicy; onUpdate: () => void
                   </div>
                   <div>
                     <h4 className="text-white font-semibold">{token}</h4>
-                    <p className="text-slate-500 text-xs">Harcama Limitleri</p>
+                    <p className="text-slate-500 text-xs">Spending Limits</p>
                   </div>
                 </div>
                 {!isEditing && (
@@ -168,7 +160,7 @@ const SpendingLimitsTab: React.FC<{ policy: TreasuryPolicy; onUpdate: () => void
                     onClick={() => handleEdit(token)}
                     className="text-blue-400 hover:text-blue-300 text-sm font-medium"
                   >
-                    Düzenle
+                    Edit
                   </button>
                 )}
               </div>
@@ -177,7 +169,7 @@ const SpendingLimitsTab: React.FC<{ policy: TreasuryPolicy; onUpdate: () => void
                 <div className="space-y-4">
                   <div className="grid grid-cols-3 gap-4">
                     <div>
-                      <label className="text-slate-400 text-xs block mb-1">Günlük ($)</label>
+                      <label className="text-slate-400 text-xs block mb-1">Daily ($)</label>
                       <input
                         type="number"
                         value={editValues.daily}
@@ -186,7 +178,7 @@ const SpendingLimitsTab: React.FC<{ policy: TreasuryPolicy; onUpdate: () => void
                       />
                     </div>
                     <div>
-                      <label className="text-slate-400 text-xs block mb-1">Haftalık ($)</label>
+                      <label className="text-slate-400 text-xs block mb-1">Weekly ($)</label>
                       <input
                         type="number"
                         value={editValues.weekly}
@@ -195,7 +187,7 @@ const SpendingLimitsTab: React.FC<{ policy: TreasuryPolicy; onUpdate: () => void
                       />
                     </div>
                     <div>
-                      <label className="text-slate-400 text-xs block mb-1">Aylık ($)</label>
+                      <label className="text-slate-400 text-xs block mb-1">Monthly ($)</label>
                       <input
                         type="number"
                         value={editValues.monthly}
@@ -209,13 +201,13 @@ const SpendingLimitsTab: React.FC<{ policy: TreasuryPolicy; onUpdate: () => void
                       onClick={handleSave}
                       className="px-4 py-2 bg-blue-500 hover:bg-blue-400 text-white rounded-lg text-sm font-medium"
                     >
-                      Kaydet
+                      Save
                     </button>
                     <button
                       onClick={() => setEditingToken(null)}
                       className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm font-medium"
                     >
-                      İptal
+                      Cancel
                     </button>
                   </div>
                 </div>
@@ -229,7 +221,7 @@ const SpendingLimitsTab: React.FC<{ policy: TreasuryPolicy; onUpdate: () => void
                     return (
                       <div key={period} className="bg-slate-900/50 rounded-lg p-3">
                         <p className="text-slate-400 text-xs capitalize mb-1">
-                          {period === 'daily' ? 'Günlük' : period === 'weekly' ? 'Haftalık' : 'Aylık'}
+                          {period === 'daily' ? 'Daily' : period === 'weekly' ? 'Weekly' : 'Monthly'}
                         </p>
                         <p className="text-white font-semibold">${limit.amount.toLocaleString()}</p>
                         <div className="mt-2">
@@ -237,13 +229,13 @@ const SpendingLimitsTab: React.FC<{ policy: TreasuryPolicy; onUpdate: () => void
                             <div
                               className={`h-full rounded-full transition-all ${
                                 usedPercent > 80 ? 'bg-red-500' :
-                                usedPercent > 50 ? 'bg-yellow-500' : 'bg-emerald-500'
+                                usedPercent > 50 ? 'bg-amber-500' : 'bg-emerald-500'
                               }`}
                               style={{ width: `${Math.min(usedPercent, 100)}%` }}
                             />
                           </div>
                           <p className="text-slate-500 text-xs mt-1">
-                            Kalan: ${remainingAmount.toLocaleString()}
+                            Remaining: ${remainingAmount.toLocaleString()}
                           </p>
                         </div>
                       </div>
@@ -258,7 +250,7 @@ const SpendingLimitsTab: React.FC<{ policy: TreasuryPolicy; onUpdate: () => void
 
       {/* Transaction Caps */}
       <div className="bg-slate-800/50 rounded-xl p-5 border border-slate-700/50">
-        <h4 className="text-white font-semibold mb-4">Tek İşlem Limitleri</h4>
+        <h4 className="text-white font-semibold mb-4">Single Transaction Limits</h4>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           {Object.entries(policy.transactionCaps).map(([key, value]) => (
             <div key={key} className="bg-slate-900/50 rounded-lg p-3 text-center">
@@ -277,18 +269,18 @@ const ApprovalThresholdsTab: React.FC<{ policy: TreasuryPolicy; onUpdate: () => 
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="text-lg font-semibold text-white">Onay Eşikleri</h3>
-        <p className="text-slate-400 text-sm mt-1">Miktar bazlı çoklu imza gereksinimleri</p>
+        <h3 className="text-lg font-semibold text-white">Approval Thresholds</h3>
+        <p className="text-slate-400 text-sm mt-1">Amount-based multi-signature requirements</p>
       </div>
 
       <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden">
         <table className="w-full">
           <thead className="bg-slate-900/50">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Miktar Aralığı</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Gerekli İmza</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Gerekli Roller</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Zaman Aşımı</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Amount Range</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Required Signatures</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Required Roles</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Timeout</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-700/50">
@@ -307,11 +299,11 @@ const ApprovalThresholdsTab: React.FC<{ policy: TreasuryPolicy; onUpdate: () => 
                     <div className="flex items-center gap-2">
                       <span className={`px-2 py-1 rounded text-sm font-bold ${
                         threshold.requiredSignatures === 1 ? 'bg-emerald-500/20 text-emerald-400' :
-                        threshold.requiredSignatures === 2 ? 'bg-yellow-500/20 text-yellow-400' :
+                        threshold.requiredSignatures === 2 ? 'bg-amber-500/20 text-amber-400' :
                         threshold.requiredSignatures === 3 ? 'bg-orange-500/20 text-orange-400' :
                         'bg-red-500/20 text-red-400'
                       }`}>
-                        {threshold.requiredSignatures} İmza
+                        {threshold.requiredSignatures} Sig
                       </span>
                     </div>
                   </td>
@@ -325,11 +317,11 @@ const ApprovalThresholdsTab: React.FC<{ policy: TreasuryPolicy; onUpdate: () => 
                         ))}
                       </div>
                     ) : (
-                      <span className="text-slate-500 text-sm">Herhangi</span>
+                      <span className="text-slate-500 text-sm">Any</span>
                     )}
                   </td>
                   <td className="px-4 py-4">
-                    <span className="text-slate-300">{threshold.timeoutHours} saat</span>
+                    <span className="text-slate-300">{threshold.timeoutHours} hours</span>
                   </td>
                 </tr>
               );
@@ -340,38 +332,38 @@ const ApprovalThresholdsTab: React.FC<{ policy: TreasuryPolicy; onUpdate: () => 
 
       {/* Treasury Rules */}
       <div className="bg-slate-800/50 rounded-xl p-5 border border-slate-700/50">
-        <h4 className="text-white font-semibold mb-4">Treasury Kuralları</h4>
+        <h4 className="text-white font-semibold mb-4">Treasury Rules</h4>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           <div className="bg-slate-900/50 rounded-lg p-4">
-            <p className="text-slate-400 text-xs mb-1">Minimum Likidite</p>
-            <p className="text-white font-semibold text-xl">%{policy.treasuryRules.minLiquidityPercent}</p>
-            <p className="text-slate-500 text-xs mt-1">USDC tutulmalı</p>
+            <p className="text-slate-400 text-xs mb-1">Min Liquidity</p>
+            <p className="text-white font-semibold text-xl">{policy.treasuryRules.minLiquidityPercent}%</p>
+            <p className="text-slate-500 text-xs mt-1">USDC required</p>
           </div>
           <div className="bg-slate-900/50 rounded-lg p-4">
-            <p className="text-slate-400 text-xs mb-1">Max Tek Subscribe</p>
-            <p className="text-white font-semibold text-xl">%{policy.treasuryRules.maxSingleSubscribePercent}</p>
-            <p className="text-slate-500 text-xs mt-1">USDC'nin</p>
+            <p className="text-slate-400 text-xs mb-1">Max Single Subscribe</p>
+            <p className="text-white font-semibold text-xl">{policy.treasuryRules.maxSingleSubscribePercent}%</p>
+            <p className="text-slate-500 text-xs mt-1">of USDC</p>
           </div>
           <div className="bg-slate-900/50 rounded-lg p-4">
-            <p className="text-slate-400 text-xs mb-1">Max Tek Redeem</p>
-            <p className="text-white font-semibold text-xl">%{policy.treasuryRules.maxSingleRedeemPercent}</p>
-            <p className="text-slate-500 text-xs mt-1">USYC'nin</p>
+            <p className="text-slate-400 text-xs mb-1">Max Single Redeem</p>
+            <p className="text-white font-semibold text-xl">{policy.treasuryRules.maxSingleRedeemPercent}%</p>
+            <p className="text-slate-500 text-xs mt-1">of USYC</p>
           </div>
           <div className="bg-slate-900/50 rounded-lg p-4">
             <p className="text-slate-400 text-xs mb-1">Redeem Cooldown</p>
-            <p className="text-white font-semibold text-xl">{policy.treasuryRules.redeemCooldownMs / (60 * 60 * 1000)} saat</p>
-            <p className="text-slate-500 text-xs mt-1">Bekleme süresi</p>
+            <p className="text-white font-semibold text-xl">{policy.treasuryRules.redeemCooldownMs / (60 * 60 * 1000)} hours</p>
+            <p className="text-slate-500 text-xs mt-1">Wait period</p>
           </div>
           <div className="bg-slate-900/50 rounded-lg p-4">
-            <p className="text-slate-400 text-xs mb-1">Subscribe Onay</p>
-            <p className={`font-semibold text-xl ${policy.treasuryRules.subscribeRequiresApproval ? 'text-yellow-400' : 'text-emerald-400'}`}>
-              {policy.treasuryRules.subscribeRequiresApproval ? 'Gerekli' : 'Gerekli Değil'}
+            <p className="text-slate-400 text-xs mb-1">Subscribe Approval</p>
+            <p className={`font-semibold text-xl ${policy.treasuryRules.subscribeRequiresApproval ? 'text-amber-400' : 'text-emerald-400'}`}>
+              {policy.treasuryRules.subscribeRequiresApproval ? 'Required' : 'Not Required'}
             </p>
           </div>
           <div className="bg-slate-900/50 rounded-lg p-4">
-            <p className="text-slate-400 text-xs mb-1">Redeem Onay</p>
-            <p className={`font-semibold text-xl ${policy.treasuryRules.redeemRequiresApproval ? 'text-yellow-400' : 'text-emerald-400'}`}>
-              {policy.treasuryRules.redeemRequiresApproval ? 'Gerekli' : 'Gerekli Değil'}
+            <p className="text-slate-400 text-xs mb-1">Redeem Approval</p>
+            <p className={`font-semibold text-xl ${policy.treasuryRules.redeemRequiresApproval ? 'text-amber-400' : 'text-emerald-400'}`}>
+              {policy.treasuryRules.redeemRequiresApproval ? 'Required' : 'Not Required'}
             </p>
           </div>
         </div>
@@ -383,26 +375,26 @@ const ApprovalThresholdsTab: React.FC<{ policy: TreasuryPolicy; onUpdate: () => 
 // Role Permissions Tab
 const RolePermissionsTab: React.FC<{ policy: TreasuryPolicy }> = ({ policy }) => {
   const roleLabels: Record<UserRole, string> = {
-    admin: 'Yönetici',
-    treasury_manager: 'Treasury Yöneticisi',
-    operator: 'Operatör',
-    approver: 'Onaylayıcı',
-    viewer: 'İzleyici',
+    admin: 'Admin',
+    treasury_manager: 'Treasury Manager',
+    operator: 'Operator',
+    approver: 'Approver',
+    viewer: 'Viewer',
   };
 
   const roleColors: Record<UserRole, string> = {
     admin: 'bg-red-500/20 text-red-400 border-red-500/30',
     treasury_manager: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
     operator: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-    approver: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
+    approver: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
     viewer: 'bg-slate-500/20 text-slate-400 border-slate-500/30',
   };
 
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="text-lg font-semibold text-white">Rol Yetkileri</h3>
-        <p className="text-slate-400 text-sm mt-1">Her rol için izin ve kısıtlamalar</p>
+        <h3 className="text-lg font-semibold text-white">Role Permissions</h3>
+        <p className="text-slate-400 text-sm mt-1">Permissions and restrictions for each role</p>
       </div>
 
       <div className="grid gap-4">
@@ -419,20 +411,20 @@ const RolePermissionsTab: React.FC<{ policy: TreasuryPolicy }> = ({ policy }) =>
                   </span>
                 )}
                 {permission.maxTransferAmount === 0 && permission.role === 'admin' && (
-                  <span className="text-emerald-400 text-sm">Limitsiz</span>
+                  <span className="text-emerald-400 text-sm">Unlimited</span>
                 )}
               </div>
             </div>
 
             <div className="grid grid-cols-3 md:grid-cols-7 gap-3">
               {[
-                { key: 'canView', label: 'Görüntüle' },
+                { key: 'canView', label: 'View' },
                 { key: 'canTransfer', label: 'Transfer' },
                 { key: 'canSubscribe', label: 'Subscribe' },
                 { key: 'canRedeem', label: 'Redeem' },
-                { key: 'canApprove', label: 'Onay Ver' },
-                { key: 'canModifyPolicy', label: 'Politika' },
-                { key: 'canAddMembers', label: 'Üye Ekle' },
+                { key: 'canApprove', label: 'Approve' },
+                { key: 'canModifyPolicy', label: 'Policy' },
+                { key: 'canAddMembers', label: 'Add Members' },
               ].map(({ key, label }) => {
                 const hasPermission = permission[key as keyof RolePermission];
                 return (
@@ -473,32 +465,32 @@ const PendingApprovalsTab: React.FC<{
 
   const getTimeRemaining = (expiresAt: Date): string => {
     const remaining = expiresAt.getTime() - Date.now();
-    if (remaining <= 0) return 'Süresi doldu';
+    if (remaining <= 0) return 'Expired';
     const hours = Math.floor(remaining / (60 * 60 * 1000));
     const minutes = Math.floor((remaining % (60 * 60 * 1000)) / (60 * 1000));
-    return `${hours}s ${minutes}dk kaldı`;
+    return `${hours}h ${minutes}m remaining`;
   };
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-semibold text-white">Bekleyen Onaylar</h3>
-          <p className="text-slate-400 text-sm mt-1">Onay bekleyen işlemler</p>
+          <h3 className="text-lg font-semibold text-white">Pending Approvals</h3>
+          <p className="text-slate-400 text-sm mt-1">Transactions awaiting approval</p>
         </div>
         <button
           onClick={onRefresh}
           className="flex items-center gap-2 px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-300 text-sm"
         >
           <RefreshIcon size={14} />
-          Yenile
+          Refresh
         </button>
       </div>
 
       {pendingApprovals.length === 0 ? (
         <div className="bg-slate-800/50 rounded-xl p-8 border border-slate-700/50 text-center">
           <ClockIcon size={48} className="text-slate-600 mx-auto mb-3" />
-          <p className="text-slate-400">Bekleyen onay yok</p>
+          <p className="text-slate-400">No pending approvals</p>
         </div>
       ) : (
         <div className="space-y-4">
@@ -514,7 +506,7 @@ const PendingApprovalsTab: React.FC<{
                       <span className={`px-2 py-0.5 rounded text-xs font-semibold uppercase ${
                         approval.type === 'subscribe' ? 'bg-emerald-500/20 text-emerald-400' :
                         approval.type === 'redeem' ? 'bg-blue-500/20 text-blue-400' :
-                        'bg-yellow-500/20 text-yellow-400'
+                        'bg-amber-500/20 text-amber-400'
                       }`}>
                         {approval.type}
                       </span>
@@ -525,14 +517,14 @@ const PendingApprovalsTab: React.FC<{
                   <div className="text-right">
                     <p className="text-slate-400 text-sm">{getTimeRemaining(approval.expiresAt)}</p>
                     <p className="text-slate-500 text-xs mt-1">
-                      {approvedCount}/{approval.requiredSignatures} onay
+                      {approvedCount}/{approval.requiredSignatures} approvals
                     </p>
                   </div>
                 </div>
 
                 {/* Signatures */}
                 <div className="mb-4">
-                  <p className="text-slate-400 text-xs mb-2">İmzalar:</p>
+                  <p className="text-slate-400 text-xs mb-2">Signatures:</p>
                   <div className="flex flex-wrap gap-2">
                     {approval.currentSignatures.map((sig, idx) => (
                       <span
@@ -543,12 +535,12 @@ const PendingApprovalsTab: React.FC<{
                             : 'bg-red-500/20 text-red-400'
                         }`}
                       >
-                        {sig.signerEmail.split('@')[0]} ({sig.approved ? 'Onayladı' : 'Reddetti'})
+                        {sig.signerEmail.split('@')[0]} ({sig.approved ? 'Approved' : 'Rejected'})
                       </span>
                     ))}
                     {Array.from({ length: approval.requiredSignatures - approval.currentSignatures.length }).map((_, idx) => (
                       <span key={`empty-${idx}`} className="px-2 py-1 rounded text-xs bg-slate-700/50 text-slate-500">
-                        Bekleniyor
+                        Pending
                       </span>
                     ))}
                   </div>
@@ -562,21 +554,21 @@ const PendingApprovalsTab: React.FC<{
                       className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-white rounded-lg font-medium"
                     >
                       <CheckIcon size={16} />
-                      Onayla
+                      Approve
                     </button>
                     <button
                       onClick={() => onSign(approval.id, false)}
                       className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-red-500 hover:bg-red-400 text-white rounded-lg font-medium"
                     >
                       <XIcon size={16} />
-                      Reddet
+                      Reject
                     </button>
                   </div>
                 )}
                 {hasUserSigned && (
                   <div className="flex items-center justify-center gap-2 py-2 bg-slate-700/30 rounded-lg">
                     <VerifiedIcon size={16} className="text-slate-400" />
-                    <span className="text-slate-400 text-sm">Zaten oy verdiniz</span>
+                    <span className="text-slate-400 text-sm">You have already signed</span>
                   </div>
                 )}
               </div>
@@ -591,17 +583,17 @@ const PendingApprovalsTab: React.FC<{
 // Audit Log Tab
 const AuditLogTab: React.FC<{ logs: AuditLogEntry[] }> = ({ logs }) => {
   const actionLabels: Record<string, string> = {
-    policy_updated: 'Politika Güncellendi',
-    approval_created: 'Onay Talebi Oluşturuldu',
-    approval_signed: 'Onay İmzalandı',
-    approval_completed: 'Onay Tamamlandı',
-    approval_rejected: 'Onay Reddedildi',
-    whitelist_added: 'Whitelist\'e Eklendi',
-    whitelist_removed: 'Whitelist\'ten Çıkarıldı',
+    policy_updated: 'Policy Updated',
+    approval_created: 'Approval Request Created',
+    approval_signed: 'Approval Signed',
+    approval_completed: 'Approval Completed',
+    approval_rejected: 'Approval Rejected',
+    whitelist_added: 'Added to Whitelist',
+    whitelist_removed: 'Removed from Whitelist',
   };
 
   const formatDate = (date: Date): string => {
-    return new Intl.DateTimeFormat('tr-TR', {
+    return new Intl.DateTimeFormat('en-US', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
@@ -613,14 +605,14 @@ const AuditLogTab: React.FC<{ logs: AuditLogEntry[] }> = ({ logs }) => {
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="text-lg font-semibold text-white">Denetim Kaydı</h3>
-        <p className="text-slate-400 text-sm mt-1">Tüm treasury işlemlerinin kaydı</p>
+        <h3 className="text-lg font-semibold text-white">Audit Log</h3>
+        <p className="text-slate-400 text-sm mt-1">Record of all treasury operations</p>
       </div>
 
       {logs.length === 0 ? (
         <div className="bg-slate-800/50 rounded-xl p-8 border border-slate-700/50 text-center">
           <ListIcon size={48} className="text-slate-600 mx-auto mb-3" />
-          <p className="text-slate-400">Henüz kayıt yok</p>
+          <p className="text-slate-400">No records yet</p>
         </div>
       ) : (
         <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden">
@@ -655,13 +647,13 @@ const AuditLogTab: React.FC<{ logs: AuditLogEntry[] }> = ({ logs }) => {
 // ============================================
 
 interface TreasurySettingsProps {
-  userEmail: string;
+  userEmail?: string;
   userRole: UserRole;
   onClose?: () => void;
 }
 
 const TreasurySettings: React.FC<TreasurySettingsProps> = ({
-  userEmail,
+  userEmail = 'admin@arcwallet.network',
   userRole,
   onClose,
 }) => {
@@ -707,8 +699,8 @@ const TreasurySettings: React.FC<TreasurySettingsProps> = ({
             <SettingsIcon size={20} className="text-blue-400" />
           </div>
           <div>
-            <h2 className="text-xl font-bold text-white">Treasury Ayarları</h2>
-            <p className="text-slate-400 text-sm">Politika ve limit yönetimi</p>
+            <h2 className="text-xl font-bold text-white">Treasury Settings</h2>
+            <p className="text-slate-400 text-sm">Policy and limit management</p>
           </div>
         </div>
         {onClose && (
@@ -727,19 +719,19 @@ const TreasurySettings: React.FC<TreasurySettingsProps> = ({
           active={activeTab === 'limits'}
           onClick={() => setActiveTab('limits')}
           icon={<ShieldIcon size={18} />}
-          label="Limitler"
+          label="Limits"
         />
         <TabButton
           active={activeTab === 'thresholds'}
           onClick={() => setActiveTab('thresholds')}
           icon={<UsersIcon size={18} />}
-          label="Onay Eşikleri"
+          label="Thresholds"
         />
         <TabButton
           active={activeTab === 'roles'}
           onClick={() => setActiveTab('roles')}
           icon={<ShieldIcon size={18} />}
-          label="Roller"
+          label="Roles"
         />
         <TabButton
           active={activeTab === 'approvals'}
@@ -754,13 +746,13 @@ const TreasurySettings: React.FC<TreasurySettingsProps> = ({
               )}
             </div>
           }
-          label="Onaylar"
+          label="Approvals"
         />
         <TabButton
           active={activeTab === 'audit'}
           onClick={() => setActiveTab('audit')}
           icon={<ListIcon size={18} />}
-          label="Kayıtlar"
+          label="Audit Log"
         />
       </div>
 

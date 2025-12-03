@@ -1,12 +1,12 @@
 /**
  * Treasury Policy Service
- * Kurumsal cüzdan için merkezi politika yönetimi
+ * Central policy management for enterprise wallet
  *
- * Özellikler:
- * - Token bazlı harcama limitleri (günlük/haftalık/aylık)
- * - Miktar bazlı multi-sig onay eşikleri
- * - Rol tabanlı erişim kontrolü
- * - Treasury özel kuralları (likidite, cooldown, vb.)
+ * Features:
+ * - Token-based spending limits (daily/weekly/monthly)
+ * - Amount-based multi-sig approval thresholds
+ * - Role-based access control
+ * - Treasury-specific rules (liquidity, cooldown, etc.)
  * - Audit log
  */
 
@@ -21,26 +21,26 @@ export type TransactionType = 'transfer' | 'subscribe' | 'redeem' | 'swap';
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected' | 'expired' | 'executed';
 
 export interface SpendingLimit {
-  amount: number;        // Maksimum miktar (USD)
-  used: number;          // Kullanılan miktar
-  resetAt: Date;         // Sıfırlanma zamanı
+  amount: number;        // Maximum amount (USD)
+  used: number;          // Used amount
+  resetAt: Date;         // Reset time
   period: 'daily' | 'weekly' | 'monthly';
 }
 
 export interface ApprovalThreshold {
-  maxAmount: number;           // Bu eşiğe kadar geçerli
-  requiredSignatures: number;  // Gerekli imza sayısı
-  requiredRoles?: UserRole[];  // Belirli roller gerekebilir
-  timeoutHours: number;        // Onay zaman aşımı
+  maxAmount: number;           // Valid up to this threshold
+  requiredSignatures: number;  // Required signature count
+  requiredRoles?: UserRole[];  // Specific roles may be required
+  timeoutHours: number;        // Approval timeout
 }
 
 export interface TreasuryRule {
-  minLiquidityPercent: number;    // Minimum USDC yüzdesi
-  maxSingleSubscribePercent: number; // Tek seferde max subscribe %
-  maxSingleRedeemPercent: number;    // Tek seferde max redeem %
-  redeemCooldownMs: number;       // Redeem arası bekleme (ms)
-  subscribeRequiresApproval: boolean; // Subscribe için onay gerekli mi
-  redeemRequiresApproval: boolean;    // Redeem için onay gerekli mi
+  minLiquidityPercent: number;    // Minimum USDC percentage
+  maxSingleSubscribePercent: number; // Max subscribe % per transaction
+  maxSingleRedeemPercent: number;    // Max redeem % per transaction
+  redeemCooldownMs: number;       // Cooldown between redeems (ms)
+  subscribeRequiresApproval: boolean; // Subscribe requires approval
+  redeemRequiresApproval: boolean;    // Redeem requires approval
 }
 
 export interface RolePermission {
@@ -414,7 +414,7 @@ class TreasuryPolicyService {
         requiresApproval: false,
         requiredSignatures: 0,
         requiredRoles: [],
-        reason: 'Geçersiz rol',
+        reason: 'Invalid role',
         warnings: [],
       };
     }
@@ -426,7 +426,7 @@ class TreasuryPolicyService {
         requiresApproval: false,
         requiredSignatures: 0,
         requiredRoles: [],
-        reason: 'Transfer yetkisi yok',
+        reason: 'No transfer permission',
         warnings: [],
       };
     }
@@ -436,7 +436,7 @@ class TreasuryPolicyService {
         requiresApproval: false,
         requiredSignatures: 0,
         requiredRoles: [],
-        reason: 'Subscribe yetkisi yok',
+        reason: 'No subscribe permission',
         warnings: [],
       };
     }
@@ -446,7 +446,7 @@ class TreasuryPolicyService {
         requiresApproval: false,
         requiredSignatures: 0,
         requiredRoles: [],
-        reason: 'Redeem yetkisi yok',
+        reason: 'No redeem permission',
         warnings: [],
       };
     }
@@ -454,7 +454,7 @@ class TreasuryPolicyService {
     // 2. Rol bazlı miktar limiti
     if (rolePermission.maxTransferAmount > 0 && amount > rolePermission.maxTransferAmount) {
       requiresApproval = true;
-      warnings.push(`Rol limitinizi aşıyor ($${rolePermission.maxTransferAmount}). Onay gerekli.`);
+      warnings.push(`Exceeds your role limit ($${rolePermission.maxTransferAmount}). Approval required.`);
     }
 
     // 3. Tek işlem limiti kontrolü
@@ -466,7 +466,7 @@ class TreasuryPolicyService {
         requiresApproval: false,
         requiredSignatures: 0,
         requiredRoles: [],
-        reason: `Tek işlem limiti aşıldı. Maksimum: $${transactionCap.toLocaleString()}`,
+        reason: `Single transaction limit exceeded. Maximum: $${transactionCap.toLocaleString()}`,
         warnings: [],
       };
     }
@@ -484,15 +484,15 @@ class TreasuryPolicyService {
           requiresApproval: false,
           requiredSignatures: 0,
           requiredRoles: [],
-          reason: `Günlük ${token} limiti aşıldı. Kalan: $${(tokenLimits.daily.amount - tokenLimits.daily.used).toLocaleString()}`,
+          reason: `Daily ${token} limit exceeded. Remaining: $${(tokenLimits.daily.amount - tokenLimits.daily.used).toLocaleString()}`,
           warnings: [],
         };
       }
       if (tokenLimits.weekly.used + amount > tokenLimits.weekly.amount) {
-        warnings.push(`Haftalık limite yaklaşıyorsunuz`);
+        warnings.push(`Approaching weekly limit`);
       }
       if (tokenLimits.monthly.used + amount > tokenLimits.monthly.amount) {
-        warnings.push(`Aylık limite yaklaşıyorsunuz`);
+        warnings.push(`Approaching monthly limit`);
       }
     }
 
@@ -509,7 +509,7 @@ class TreasuryPolicyService {
           requiresApproval: false,
           requiredSignatures: 0,
           requiredRoles: [],
-          reason: `Minimum likidite kuralı: En az %${this.policy.treasuryRules.minLiquidityPercent} USDC tutulmalı`,
+          reason: `Minimum liquidity rule: At least ${this.policy.treasuryRules.minLiquidityPercent}% USDC must be maintained`,
           warnings: [],
         };
       }
@@ -518,7 +518,7 @@ class TreasuryPolicyService {
       const subscribePercent = (amount / currentUsdcBalance) * 100;
       if (subscribePercent > this.policy.treasuryRules.maxSingleSubscribePercent) {
         requiresApproval = true;
-        warnings.push(`USDC'nizin %${subscribePercent.toFixed(0)}'ini subscribe ediyorsunuz. Onay gerekli.`);
+        warnings.push(`You are subscribing ${subscribePercent.toFixed(0)}% of your USDC. Approval required.`);
       }
 
       if (this.policy.treasuryRules.subscribeRequiresApproval) {
@@ -538,7 +538,7 @@ class TreasuryPolicyService {
             requiresApproval: false,
             requiredSignatures: 0,
             requiredRoles: [],
-            reason: `Redeem cooldown aktif. ${remainingHours} saat bekleyin.`,
+            reason: `Redeem cooldown active. Please wait ${remainingHours} hour(s).`,
             warnings: [],
           };
         }
@@ -552,7 +552,7 @@ class TreasuryPolicyService {
           requiresApproval: false,
           requiredSignatures: 0,
           requiredRoles: [],
-          reason: `Tek seferde maksimum %${this.policy.treasuryRules.maxSingleRedeemPercent} USYC redeem edilebilir`,
+          reason: `Maximum ${this.policy.treasuryRules.maxSingleRedeemPercent}% USYC can be redeemed at once`,
           warnings: [],
         };
       }
@@ -573,7 +573,7 @@ class TreasuryPolicyService {
           requiresApproval: false,
           requiredSignatures: 0,
           requiredRoles: [],
-          reason: 'Alıcı adresi whitelist\'te değil',
+          reason: 'Recipient address is not whitelisted',
           warnings: [],
         };
       }
@@ -590,7 +590,7 @@ class TreasuryPolicyService {
     // 8. Büyük işlem bildirimi
     if (this.policy.settings.notifyOnLargeTransactions &&
         amount >= this.policy.settings.largeTransactionThreshold) {
-      warnings.push('Bu işlem büyük işlem olarak kaydedilecek');
+      warnings.push('This transaction will be logged as a large transaction');
     }
 
     return {
@@ -686,28 +686,28 @@ class TreasuryPolicyService {
     const approval = this.pendingApprovals.get(approvalId);
 
     if (!approval) {
-      return { success: false, executed: false, message: 'Onay talebi bulunamadı' };
+      return { success: false, executed: false, message: 'Approval request not found' };
     }
 
     if (approval.status !== 'pending') {
-      return { success: false, executed: false, message: `Talep zaten ${approval.status} durumunda` };
+      return { success: false, executed: false, message: `Request is already ${approval.status}` };
     }
 
     if (new Date() > approval.expiresAt) {
       approval.status = 'expired';
       this.saveApprovals();
-      return { success: false, executed: false, message: 'Onay süresi dolmuş' };
+      return { success: false, executed: false, message: 'Approval period has expired' };
     }
 
     // Daha önce imzalamış mı kontrol et
     if (approval.currentSignatures.some((s) => s.signerId === signerId)) {
-      return { success: false, executed: false, message: 'Zaten onay/red verdiniz' };
+      return { success: false, executed: false, message: 'You have already signed' };
     }
 
     // Rol yetkisi kontrol
     const rolePermission = this.getRolePermission(signerRole);
     if (!rolePermission?.canApprove) {
-      return { success: false, executed: false, message: 'Onay yetkiniz yok' };
+      return { success: false, executed: false, message: 'You do not have approval permission' };
     }
 
     // İmza ekle
@@ -727,7 +727,7 @@ class TreasuryPolicyService {
         approval.status = 'rejected';
         this.saveApprovals();
         this.logAuditEntry('approval_rejected', signerId, signerRole, { approvalId }, true);
-        return { success: true, executed: false, message: 'Talep reddedildi' };
+        return { success: true, executed: false, message: 'Request rejected' };
       }
     }
 
@@ -737,7 +737,7 @@ class TreasuryPolicyService {
       approval.status = 'approved';
       this.saveApprovals();
       this.logAuditEntry('approval_completed', signerId, signerRole, { approvalId }, true);
-      return { success: true, executed: false, message: 'Onay tamamlandı. İşlem hazır.' };
+      return { success: true, executed: false, message: 'Approval completed. Transaction ready.' };
     }
 
     this.saveApprovals();
@@ -746,7 +746,7 @@ class TreasuryPolicyService {
     return {
       success: true,
       executed: false,
-      message: `İmza eklendi. ${approvals}/${approval.requiredSignatures} onay`,
+      message: `Signature added. ${approvals}/${approval.requiredSignatures} approvals`,
     };
   }
 

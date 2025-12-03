@@ -49,19 +49,19 @@ const formatTimeRemaining = (expiresAt: Date): string => {
   const now = new Date();
   const diff = expiresAt.getTime() - now.getTime();
 
-  if (diff <= 0) return 'Süresi doldu';
+  if (diff <= 0) return 'Expired';
 
   const hours = Math.floor(diff / (1000 * 60 * 60));
   const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
 
   if (hours > 0) {
-    return `${hours}s ${minutes}dk kaldı`;
+    return `${hours}h ${minutes}m remaining`;
   }
-  return `${minutes}dk kaldı`;
+  return `${minutes}m remaining`;
 };
 
 const formatDate = (date: Date): string => {
-  return new Intl.DateTimeFormat('tr-TR', {
+  return new Intl.DateTimeFormat('en-US', {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
@@ -119,7 +119,7 @@ const ApprovalCard: React.FC<ApprovalCardProps> = ({
             </span>
             {isExpired && (
               <span className="px-2 py-0.5 rounded text-xs font-semibold bg-red-500/20 text-red-400">
-                Süresi Doldu
+                Expired
               </span>
             )}
           </div>
@@ -145,14 +145,14 @@ const ApprovalCard: React.FC<ApprovalCardProps> = ({
 
       {/* Submitter Info */}
       <div className="mb-3 p-2 bg-slate-900/50 rounded-lg">
-        <p className="text-slate-400 text-xs">Talep Eden</p>
+        <p className="text-slate-400 text-xs">Requested By</p>
         <p className="text-slate-300 text-sm">{transaction.submitterEmail}</p>
       </div>
 
       {/* Signatures Progress */}
       <div className="mb-3">
         <div className="flex items-center justify-between text-sm mb-1">
-          <span className="text-slate-400">Onay Durumu</span>
+          <span className="text-slate-400">Approval Status</span>
           <span className="text-white font-semibold">
             {transaction.currentSignatures} / {transaction.requiredSignatures}
           </span>
@@ -172,7 +172,7 @@ const ApprovalCard: React.FC<ApprovalCardProps> = ({
       {/* Signatures List */}
       {transaction.signatures.length > 0 && (
         <div className="mb-3 space-y-1">
-          <p className="text-slate-400 text-xs mb-1">İmzalar</p>
+          <p className="text-slate-400 text-xs mb-1">Signatures</p>
           {transaction.signatures.map((sig, idx) => (
             <div key={idx} className="flex items-center gap-2 text-sm">
               {sig.status === 'approved' ? (
@@ -195,7 +195,7 @@ const ApprovalCard: React.FC<ApprovalCardProps> = ({
               type="text"
               value={comment}
               onChange={(e) => setComment(e.target.value)}
-              placeholder="Yorum ekle (opsiyonel)"
+              placeholder="Add comment (optional)"
               className="w-full px-3 py-2 bg-slate-900/50 border border-slate-600/50 rounded-lg text-white text-sm placeholder:text-slate-500 outline-none focus:border-blue-500"
             />
           )}
@@ -210,7 +210,7 @@ const ApprovalCard: React.FC<ApprovalCardProps> = ({
               ) : (
                 <>
                   <CheckIcon size={16} />
-                  Onayla
+                  Approve
                 </>
               )}
             </button>
@@ -219,14 +219,14 @@ const ApprovalCard: React.FC<ApprovalCardProps> = ({
                 if (!showComment) {
                   setShowComment(true);
                 } else {
-                  onSign(transaction.id, false, comment || 'Reddedildi');
+                  onSign(transaction.id, false, comment || 'Rejected');
                 }
               }}
               disabled={isLoading}
               className="flex-1 flex items-center justify-center gap-2 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 font-semibold rounded-lg transition-colors disabled:opacity-50"
             >
               <XIcon size={16} />
-              {showComment ? 'Reddet' : 'Reddet'}
+              Reject
             </button>
           </div>
         </div>
@@ -236,15 +236,15 @@ const ApprovalCard: React.FC<ApprovalCardProps> = ({
       {hasUserSigned && (
         <div className="flex items-center gap-2 p-2 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
           <VerifiedIcon size={16} className="text-emerald-400" />
-          <span className="text-emerald-400 text-sm">Bu işlemi zaten imzaladınız</span>
+          <span className="text-emerald-400 text-sm">You have already signed this transaction</span>
         </div>
       )}
 
       {/* Cannot Sign */}
       {!canSign && !hasUserSigned && !isExpired && (
-        <div className="flex items-center gap-2 p-2 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
-          <AlertIcon size={16} className="text-yellow-400" />
-          <span className="text-yellow-400 text-sm">Bu işlemi onaylama yetkiniz yok</span>
+        <div className="flex items-center gap-2 p-2 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+          <AlertIcon size={16} className="text-amber-400" />
+          <span className="text-amber-400 text-sm">You do not have permission to approve this transaction</span>
         </div>
       )}
     </div>
@@ -296,7 +296,7 @@ const TreasuryApprovals: React.FC<TreasuryApprovalsProps> = ({
       onTransactionApproved?.();
     } catch (error: any) {
       console.error('Failed to sign transaction:', error);
-      alert(error.message || 'İmzalama başarısız');
+      alert(error.message || 'Signing failed');
     } finally {
       setSigningId(null);
     }
@@ -306,8 +306,8 @@ const TreasuryApprovals: React.FC<TreasuryApprovalsProps> = ({
     return (
       <div className="bg-slate-900/60 backdrop-blur-sm rounded-xl border border-slate-500/50 p-6">
         <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-          <ClockIcon size={20} className="text-yellow-400" />
-          Bekleyen Onaylar
+          <ClockIcon size={20} className="text-amber-400" />
+          Pending Approvals
         </h3>
         <div className="flex items-center justify-center py-8">
           <SpinnerIcon size={32} />
@@ -320,24 +320,24 @@ const TreasuryApprovals: React.FC<TreasuryApprovalsProps> = ({
     return (
       <div className="bg-slate-900/60 backdrop-blur-sm rounded-xl border border-slate-500/50 p-6">
         <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-          <ClockIcon size={20} className="text-yellow-400" />
-          Bekleyen Onaylar
+          <ClockIcon size={20} className="text-amber-400" />
+          Pending Approvals
         </h3>
         <div className="text-center py-6">
           <CheckIcon size={48} className="text-slate-600 mx-auto mb-3" />
-          <p className="text-slate-400">Bekleyen işlem yok</p>
-          <p className="text-slate-500 text-sm mt-1">Tüm işlemler onaylandı veya tamamlandı</p>
+          <p className="text-slate-400">No pending transactions</p>
+          <p className="text-slate-500 text-sm mt-1">All transactions have been approved or completed</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="bg-slate-900/60 backdrop-blur-sm rounded-xl border border-yellow-500/30 p-6">
+    <div className="bg-slate-900/60 backdrop-blur-sm rounded-xl border border-amber-500/30 p-6">
       <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-        <ClockIcon size={20} className="text-yellow-400" />
-        Bekleyen Onaylar
-        <span className="ml-auto px-2 py-0.5 bg-yellow-500/20 text-yellow-400 text-sm rounded-full">
+        <ClockIcon size={20} className="text-amber-400" />
+        Pending Approvals
+        <span className="ml-auto px-2 py-0.5 bg-amber-500/20 text-amber-400 text-sm rounded-full">
           {pendingTransactions.length}
         </span>
       </h3>

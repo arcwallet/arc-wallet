@@ -327,7 +327,10 @@ class USYCService {
     usdcAmount: string,
     manager: PasskeyAccountManager
   ): Promise<string> {
-    const walletAddress = await manager.getAddress();
+    const walletAddress = manager.getAccountAddress();
+    if (!walletAddress) {
+      throw new Error('Wallet not connected');
+    }
     const amountIn = parseUnits(usdcAmount, 6);
 
     console.log('[USYC] Starting subscribe:', {
@@ -342,7 +345,7 @@ class USYCService {
     ]);
 
     console.log('[USYC] Approving USDC...');
-    const approveTxHash = await manager.sendTransaction(
+    const approveTxHash = await manager.executeTransaction(
       USYC_CONTRACTS.arcTestnet.usdc,
       0n,
       approveData
@@ -359,7 +362,7 @@ class USYCService {
     ]);
 
     console.log('[USYC] Calling deposit...');
-    const depositTxHash = await manager.sendTransaction(
+    const depositTxHash = await manager.executeTransaction(
       USYC_CONTRACTS.arcTestnet.teller,
       0n,
       depositData
@@ -377,7 +380,10 @@ class USYCService {
     usycAmount: string,
     manager: PasskeyAccountManager
   ): Promise<string> {
-    const walletAddress = await manager.getAddress();
+    const walletAddress = manager.getAccountAddress();
+    if (!walletAddress) {
+      throw new Error('Wallet not connected');
+    }
     const amountIn = parseUnits(usycAmount, 6);
 
     console.log('[USYC] Starting redeem:', {
@@ -392,7 +398,7 @@ class USYCService {
     ]);
 
     console.log('[USYC] Approving USYC...');
-    const approveTxHash = await manager.sendTransaction(
+    const approveTxHash = await manager.executeTransaction(
       USYC_CONTRACTS.arcTestnet.usyc,
       0n,
       approveData
@@ -410,7 +416,7 @@ class USYCService {
     ]);
 
     console.log('[USYC] Calling redeem...');
-    const redeemTxHash = await manager.sendTransaction(
+    const redeemTxHash = await manager.executeTransaction(
       USYC_CONTRACTS.arcTestnet.teller,
       0n,
       redeemData
