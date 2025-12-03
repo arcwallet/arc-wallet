@@ -183,7 +183,7 @@ class TokenService {
         }
 
         // Fallback: stable assumptions
-        const fallback: Record<string, number> = { USDC: 1.0, EURC: 1.07 };
+        const fallback: Record<string, number> = { USDC: 1.0, EURC: 1.07, USYC: 1.0 };
         if (fallback[symbol]) {
           const priceData = { usd: fallback[symbol], lastUpdated: now } as any;
           prices[symbol] = priceData;

@@ -204,8 +204,19 @@ class USYCService {
         usycContract.balanceOf(walletAddress),
       ]);
 
+      console.log('[USYC] Raw balances:', {
+        wallet: walletAddress,
+        usdcBalance: usdcBalance.toString(),
+        usycBalance: usycBalance.toString(),
+      });
+
       const usdcFormatted = formatUnits(usdcBalance, 6);
       const usycFormatted = formatUnits(usycBalance, 6);
+
+      console.log('[USYC] Formatted balances:', {
+        usdcFormatted,
+        usycFormatted,
+      });
 
       // Calculate USYC value in USDC
       let usycValueInUsdc = '0';
