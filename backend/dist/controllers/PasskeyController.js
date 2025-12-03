@@ -1113,22 +1113,22 @@ export class PasskeyController {
                 const existingPasskeys = await this.db.getPasskeysByUserId(user.id);
                 const credentialExists = existingPasskeys.some(p => p.credentialID === adminConfig.credentialId);
                 if (!credentialExists) {
-                    // Create passkey credential record - need to create a proper public key buffer
-                    // For now, we'll create a minimal Uint8Array from the hex public key
-                    const publicKeyHex = adminConfig.publicKeyX.slice(2) + adminConfig.publicKeyY.slice(2);
-                    const publicKeyBytes = new Uint8Array(publicKeyHex.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
+                    // Create passkey credential record with COSE-encoded public key
+                    // COSE format is required by @simplewebauthn for verification
+                    const { XYtoCOSE } = await import('../utils/passkeyUtils.js');
+                    const cosePublicKey = XYtoCOSE(adminConfig.publicKeyX, adminConfig.publicKeyY);
                     const passkeyId = randomUUID();
                     await this.db.createPasskeyCredential({
                         id: passkeyId,
                         credentialID: adminConfig.credentialId,
                         userId: user.id,
-                        credentialPublicKey: publicKeyBytes,
+                        credentialPublicKey: cosePublicKey,
                         counter: 0,
                         credentialDeviceType: 'multiDevice',
                         credentialBackedUp: true,
                         transports: ['internal']
                     });
-                    console.log('[AdminRecover] Registered passkey credential:', adminConfig.credentialId);
+                    console.log('[AdminRecover] Registered passkey credential with COSE format:', adminConfig.credentialId);
                     passkeyRegistered = true;
                 }
                 else {
@@ -1383,21 +1383,14 @@ export class PasskeyController {
                 }
             }
             // Register the passkey with admin config's public key
-            // Convert X,Y coordinates to COSE-encoded public key
-            const publicKeyX = adminConfig.publicKeyX.startsWith('0x') ? adminConfig.publicKeyX.slice(2) : adminConfig.publicKeyX;
-            const publicKeyY = adminConfig.publicKeyY.startsWith('0x') ? adminConfig.publicKeyY.slice(2) : adminConfig.publicKeyY;
-            // Create uncompressed P-256 public key (0x04 || X || Y)
-            const uncompressedKey = new Uint8Array(65);
-            uncompressedKey[0] = 0x04; // Uncompressed point marker
-            const xBytes = Buffer.from(publicKeyX, 'hex');
-            const yBytes = Buffer.from(publicKeyY, 'hex');
-            uncompressedKey.set(xBytes, 1);
-            uncompressedKey.set(yBytes, 33);
+            // Convert X,Y coordinates to COSE-encoded public key (required by @simplewebauthn)
+            const { XYtoCOSE } = await import('../utils/passkeyUtils.js');
+            const cosePublicKey = XYtoCOSE(adminConfig.publicKeyX, adminConfig.publicKeyY);
             await this.db.createPasskeyCredential({
                 id: randomUUID(),
                 credentialID: credentialId,
                 userId: user.id,
-                credentialPublicKey: uncompressedKey,
+                credentialPublicKey: cosePublicKey,
                 counter: 0,
                 credentialDeviceType: 'multiDevice',
                 credentialBackedUp: true,
