@@ -383,14 +383,29 @@ export class BundlerService {
             }
 
         } catch (error: any) {
-            console.error('❌ Bundle failed:', error.message);
+            const errorMsg = error.message || '';
 
-            // Mark operations as failed
+            // Check if this is a retryable error
+            const isAlreadyKnown = errorMsg.includes('already known');
+            const isRateLimit = errorMsg.includes('request limit reached') || errorMsg.includes('rate limit');
+            const isRetryable = isAlreadyKnown || isRateLimit;
+
+            if (isRetryable) {
+                // Don't mark as failed - keep as pending for retry
+                console.log(`⏳ Bundle submission delayed: ${isAlreadyKnown ? 'transaction already in mempool' : 'rate limit hit'}`);
+                console.log(`   Will retry in next bundle cycle...`);
+                // Keep operations as pending - they will be retried
+                return;
+            }
+
+            console.error('❌ Bundle failed:', errorMsg);
+
+            // Mark operations as failed only for non-retryable errors
             for (const [hash, _] of pendingOps) {
                 const entry = this.mempool.get(hash);
                 if (entry) {
                     entry.status = 'failed';
-                    entry.error = error.message;
+                    entry.error = errorMsg;
                 }
             }
 
