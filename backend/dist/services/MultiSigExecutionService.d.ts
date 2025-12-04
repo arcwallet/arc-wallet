@@ -1,10 +1,12 @@
 /**
  * Multi-Sig On-Chain Execution Service
- * Executes approved multi-sig transactions on the blockchain
+ * Uses ERC-4337 UserOperations for gasless transaction execution
+ * No relayer private key needed - uses bundler + paymaster
  */
 export interface ExecutionResult {
     success: boolean;
     txHash?: string;
+    userOpHash?: string;
     error?: string;
     gasUsed?: string;
 }
@@ -16,27 +18,74 @@ export interface TransactionParams {
     tokenSymbol?: string;
     data?: string | null;
 }
+export interface UserOperationRequest {
+    accountAddress: string;
+    callData: string;
+    signatures: string[];
+}
+export interface PreparedUserOp {
+    sender: string;
+    nonce: string;
+    initCode: string;
+    callData: string;
+    callGasLimit: string;
+    verificationGasLimit: string;
+    preVerificationGas: string;
+    maxFeePerGas: string;
+    maxPriorityFeePerGas: string;
+    paymasterAndData: string;
+    userOpHash: string;
+}
 export declare class MultiSigExecutionService {
     private provider;
-    private relayerWallet;
     private chainId;
+    private entryPointAddress;
+    private bundlerUrl;
+    private paymasterUrl;
     constructor(rpcUrl: string, chainId?: number);
     /**
-     * Initialize with a relayer private key for gas sponsorship
+     * Prepare a UserOperation for multi-sig transaction
+     * Returns the UserOp that needs to be signed by passkeys
      */
-    initRelayer(privateKey: string): void;
+    prepareUserOperation(params: TransactionParams): Promise<PreparedUserOp | null>;
     /**
-     * Execute an approved multi-sig transaction
+     * Execute UserOperation with collected signatures
+     * Called after all required passkey signatures are collected
      */
-    executeTransaction(params: TransactionParams): Promise<ExecutionResult>;
+    executeUserOperation(preparedOp: PreparedUserOp, aggregatedSignature: string): Promise<ExecutionResult>;
     /**
-     * Execute batch transactions
+     * Simple execution using backend's stored signatures
+     * For when all signatures are already collected in DB
      */
-    executeBatch(accountAddress: string, transactions: {
-        target: string;
-        value: string;
-        data: string;
+    executeTransaction(params: TransactionParams, storedSignatures: {
+        publicKey: string;
+        signature: string;
     }[]): Promise<ExecutionResult>;
+    /**
+     * Build callData for execute function
+     */
+    private _buildCallData;
+    /**
+     * Get paymaster sponsorship data
+     */
+    private _getPaymasterData;
+    /**
+     * Calculate UserOp hash for signing
+     */
+    private _getUserOpHash;
+    /**
+     * Send UserOp to bundler
+     */
+    private _sendToBundler;
+    /**
+     * Wait for UserOp to be included in a block
+     */
+    private _waitForUserOpReceipt;
+    /**
+     * Aggregate P256 signatures for multi-sig
+     * Format: [keyIndex1][signature1][keyIndex2][signature2]...
+     */
+    private _aggregateSignatures;
     /**
      * Check if account has enough balance for transaction
      */

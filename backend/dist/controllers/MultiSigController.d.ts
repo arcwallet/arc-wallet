@@ -5,7 +5,8 @@ export declare class MultiSigController {
     constructor(db: Database);
     private _isMember;
     /**
-     * Execute approved transaction on-chain
+     * Execute approved transaction on-chain using ERC-4337 UserOperations
+     * Collects passkey signatures from DB and submits to bundler
      */
     private _executeOnChain;
     createAccount(req: Request, res: Response, next: NextFunction, authUserId?: string): Promise<void>;

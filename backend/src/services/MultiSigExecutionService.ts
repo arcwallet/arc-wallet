@@ -1,9 +1,10 @@
 /**
  * Multi-Sig On-Chain Execution Service
- * Executes approved multi-sig transactions on the blockchain
+ * Uses ERC-4337 UserOperations for gasless transaction execution
+ * No relayer private key needed - uses bundler + paymaster
  */
 
-import { ethers, JsonRpcProvider, Wallet, Contract, Interface } from 'ethers';
+import { ethers, JsonRpcProvider, Contract, Interface } from 'ethers';
 
 // ArcAccount ABI for execution
 const ARC_ACCOUNT_ABI = [
@@ -11,6 +12,7 @@ const ARC_ACCOUNT_ABI = [
   'function executeBatch(address[] targets, uint256[] values, bytes[] datas) returns (bytes[])',
   'function signatureThreshold() view returns (uint8)',
   'function activeKeyCount() view returns (uint8)',
+  'function getNonce() view returns (uint256)',
 ];
 
 // ERC20 ABI for token transfers
@@ -20,9 +22,16 @@ const ERC20_ABI = [
   'function decimals() view returns (uint8)',
 ];
 
+// EntryPoint ABI for UserOp submission
+const ENTRYPOINT_ABI = [
+  'function handleOps(tuple(address sender, uint256 nonce, bytes initCode, bytes callData, uint256 callGasLimit, uint256 verificationGasLimit, uint256 preVerificationGas, uint256 maxFeePerGas, uint256 maxPriorityFeePerGas, bytes paymasterAndData, bytes signature)[] ops, address beneficiary)',
+  'function getUserOpHash(tuple(address sender, uint256 nonce, bytes initCode, bytes callData, uint256 callGasLimit, uint256 verificationGasLimit, uint256 preVerificationGas, uint256 maxFeePerGas, uint256 maxPriorityFeePerGas, bytes paymasterAndData, bytes signature) userOp) view returns (bytes32)',
+];
+
 export interface ExecutionResult {
   success: boolean;
   txHash?: string;
+  userOpHash?: string;
   error?: string;
   gasUsed?: string;
 }
@@ -36,78 +45,158 @@ export interface TransactionParams {
   data?: string | null;
 }
 
+export interface UserOperationRequest {
+  accountAddress: string;
+  callData: string;
+  signatures: string[]; // P256 signatures from passkeys
+}
+
+export interface PreparedUserOp {
+  sender: string;
+  nonce: string;
+  initCode: string;
+  callData: string;
+  callGasLimit: string;
+  verificationGasLimit: string;
+  preVerificationGas: string;
+  maxFeePerGas: string;
+  maxPriorityFeePerGas: string;
+  paymasterAndData: string;
+  userOpHash: string;
+}
+
 export class MultiSigExecutionService {
   private provider: JsonRpcProvider;
-  private relayerWallet: Wallet | null = null;
   private chainId: number;
+  private entryPointAddress: string;
+  private bundlerUrl: string;
+  private paymasterUrl: string | null;
 
   constructor(rpcUrl: string, chainId: number = 5042002) {
     this.provider = new JsonRpcProvider(rpcUrl);
     this.chainId = chainId;
+    // Arc Testnet EntryPoint (ERC-4337 v0.6)
+    this.entryPointAddress = process.env.ENTRYPOINT_ADDRESS || '0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789';
+    this.bundlerUrl = process.env.BUNDLER_URL || rpcUrl; // Use RPC if no bundler
+    this.paymasterUrl = process.env.PAYMASTER_URL || null;
   }
 
   /**
-   * Initialize with a relayer private key for gas sponsorship
+   * Prepare a UserOperation for multi-sig transaction
+   * Returns the UserOp that needs to be signed by passkeys
    */
-  initRelayer(privateKey: string): void {
-    this.relayerWallet = new Wallet(privateKey, this.provider);
-  }
-
-  /**
-   * Execute an approved multi-sig transaction
-   */
-  async executeTransaction(params: TransactionParams): Promise<ExecutionResult> {
+  async prepareUserOperation(params: TransactionParams): Promise<PreparedUserOp | null> {
     try {
-      if (!this.relayerWallet) {
-        return { success: false, error: 'Relayer not initialized' };
-      }
-
       const { accountAddress, targetAddress, value, tokenAddress, data } = params;
 
-      // Connect to ArcAccount contract
-      const arcAccount = new Contract(accountAddress, ARC_ACCOUNT_ABI, this.relayerWallet);
+      // Build callData for execute function
+      const callData = await this._buildCallData(targetAddress, value, tokenAddress, data);
 
-      let txData: string;
-      let txValue: bigint;
+      // Get nonce from account
+      const arcAccount = new Contract(accountAddress, ARC_ACCOUNT_ABI, this.provider);
+      const nonce = await arcAccount.getNonce();
 
-      if (tokenAddress && tokenAddress !== '0x0000000000000000000000000000000000000000') {
-        // ERC20 token transfer
-        const erc20Interface = new Interface(ERC20_ABI);
+      // Get gas prices
+      const feeData = await this.provider.getFeeData();
+      const maxFeePerGas = feeData.maxFeePerGas || ethers.parseUnits('1', 'gwei');
+      const maxPriorityFeePerGas = feeData.maxPriorityFeePerGas || ethers.parseUnits('1', 'gwei');
 
-        // Get token decimals
-        const tokenContract = new Contract(tokenAddress, ERC20_ABI, this.provider);
-        const decimals = await tokenContract.decimals();
+      // Build UserOp (without signature)
+      const userOp = {
+        sender: accountAddress,
+        nonce: nonce.toString(),
+        initCode: '0x', // Account already deployed
+        callData,
+        callGasLimit: '500000',
+        verificationGasLimit: '500000',
+        preVerificationGas: '50000',
+        maxFeePerGas: maxFeePerGas.toString(),
+        maxPriorityFeePerGas: maxPriorityFeePerGas.toString(),
+        paymasterAndData: '0x', // Will be filled by paymaster or empty for self-pay
+        signature: '0x',
+      };
 
-        // Parse value with correct decimals
-        const tokenAmount = ethers.parseUnits(value, decimals);
-
-        // Encode transfer call
-        txData = erc20Interface.encodeFunctionData('transfer', [targetAddress, tokenAmount]);
-        txValue = 0n;
-
-        // Execute on token contract
-        const tx = await arcAccount.execute(tokenAddress, txValue, txData);
-        const receipt = await tx.wait();
-
-        return {
-          success: true,
-          txHash: receipt.hash,
-          gasUsed: receipt.gasUsed.toString(),
-        };
-      } else {
-        // Native ETH transfer
-        txData = data || '0x';
-        txValue = ethers.parseEther(value);
-
-        const tx = await arcAccount.execute(targetAddress, txValue, txData);
-        const receipt = await tx.wait();
-
-        return {
-          success: true,
-          txHash: receipt.hash,
-          gasUsed: receipt.gasUsed.toString(),
-        };
+      // Get paymaster data if available
+      if (this.paymasterUrl) {
+        const paymasterData = await this._getPaymasterData(userOp);
+        if (paymasterData) {
+          userOp.paymasterAndData = paymasterData;
+        }
       }
+
+      // Calculate userOpHash for signing
+      const userOpHash = await this._getUserOpHash(userOp);
+
+      return {
+        ...userOp,
+        userOpHash,
+      };
+    } catch (error) {
+      console.error('Failed to prepare UserOperation:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Execute UserOperation with collected signatures
+   * Called after all required passkey signatures are collected
+   */
+  async executeUserOperation(
+    preparedOp: PreparedUserOp,
+    aggregatedSignature: string
+  ): Promise<ExecutionResult> {
+    try {
+      const userOp = {
+        sender: preparedOp.sender,
+        nonce: preparedOp.nonce,
+        initCode: preparedOp.initCode,
+        callData: preparedOp.callData,
+        callGasLimit: preparedOp.callGasLimit,
+        verificationGasLimit: preparedOp.verificationGasLimit,
+        preVerificationGas: preparedOp.preVerificationGas,
+        maxFeePerGas: preparedOp.maxFeePerGas,
+        maxPriorityFeePerGas: preparedOp.maxPriorityFeePerGas,
+        paymasterAndData: preparedOp.paymasterAndData,
+        signature: aggregatedSignature,
+      };
+
+      // Send to bundler
+      const txHash = await this._sendToBundler(userOp);
+
+      return {
+        success: true,
+        txHash,
+        userOpHash: preparedOp.userOpHash,
+      };
+    } catch (error: any) {
+      console.error('UserOperation execution failed:', error);
+      return {
+        success: false,
+        error: error.message || 'Execution failed',
+      };
+    }
+  }
+
+  /**
+   * Simple execution using backend's stored signatures
+   * For when all signatures are already collected in DB
+   */
+  async executeTransaction(
+    params: TransactionParams,
+    storedSignatures: { publicKey: string; signature: string }[]
+  ): Promise<ExecutionResult> {
+    try {
+      // Prepare the UserOp
+      const preparedOp = await this.prepareUserOperation(params);
+      if (!preparedOp) {
+        return { success: false, error: 'Failed to prepare UserOperation' };
+      }
+
+      // Aggregate signatures into format expected by ArcAccount
+      const aggregatedSignature = this._aggregateSignatures(storedSignatures);
+
+      // Execute
+      return this.executeUserOperation(preparedOp, aggregatedSignature);
     } catch (error: any) {
       console.error('Transaction execution failed:', error);
       return {
@@ -118,38 +207,177 @@ export class MultiSigExecutionService {
   }
 
   /**
-   * Execute batch transactions
+   * Build callData for execute function
    */
-  async executeBatch(
-    accountAddress: string,
-    transactions: { target: string; value: string; data: string }[]
-  ): Promise<ExecutionResult> {
+  private async _buildCallData(
+    targetAddress: string,
+    value: string,
+    tokenAddress?: string | null,
+    data?: string | null
+  ): Promise<string> {
+    const arcAccountInterface = new Interface(ARC_ACCOUNT_ABI);
+
+    if (tokenAddress && tokenAddress !== '0x0000000000000000000000000000000000000000') {
+      // ERC20 token transfer
+      const erc20Interface = new Interface(ERC20_ABI);
+      const tokenContract = new Contract(tokenAddress, ERC20_ABI, this.provider);
+      const decimals = await tokenContract.decimals();
+      const tokenAmount = ethers.parseUnits(value, decimals);
+
+      const transferData = erc20Interface.encodeFunctionData('transfer', [targetAddress, tokenAmount]);
+
+      // execute(tokenAddress, 0, transferData)
+      return arcAccountInterface.encodeFunctionData('execute', [tokenAddress, 0n, transferData]);
+    } else {
+      // Native ETH transfer
+      const txValue = ethers.parseEther(value);
+      const txData = data || '0x';
+
+      return arcAccountInterface.encodeFunctionData('execute', [targetAddress, txValue, txData]);
+    }
+  }
+
+  /**
+   * Get paymaster sponsorship data
+   */
+  private async _getPaymasterData(userOp: any): Promise<string | null> {
+    if (!this.paymasterUrl) return null;
+
     try {
-      if (!this.relayerWallet) {
-        return { success: false, error: 'Relayer not initialized' };
+      const response = await fetch(this.paymasterUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'pm_sponsorUserOperation',
+          params: [userOp, this.entryPointAddress],
+        }),
+      });
+
+      const result = await response.json();
+      return result.result?.paymasterAndData || null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Calculate UserOp hash for signing
+   */
+  private async _getUserOpHash(userOp: any): Promise<string> {
+    // Pack UserOp fields and hash
+    const packed = ethers.AbiCoder.defaultAbiCoder().encode(
+      ['address', 'uint256', 'bytes32', 'bytes32', 'uint256', 'uint256', 'uint256', 'uint256', 'uint256', 'bytes32'],
+      [
+        userOp.sender,
+        userOp.nonce,
+        ethers.keccak256(userOp.initCode),
+        ethers.keccak256(userOp.callData),
+        userOp.callGasLimit,
+        userOp.verificationGasLimit,
+        userOp.preVerificationGas,
+        userOp.maxFeePerGas,
+        userOp.maxPriorityFeePerGas,
+        ethers.keccak256(userOp.paymasterAndData),
+      ]
+    );
+
+    const userOpHash = ethers.keccak256(packed);
+
+    // Add EntryPoint and chainId
+    const finalHash = ethers.keccak256(
+      ethers.AbiCoder.defaultAbiCoder().encode(
+        ['bytes32', 'address', 'uint256'],
+        [userOpHash, this.entryPointAddress, this.chainId]
+      )
+    );
+
+    return finalHash;
+  }
+
+  /**
+   * Send UserOp to bundler
+   */
+  private async _sendToBundler(userOp: any): Promise<string> {
+    const response = await fetch(this.bundlerUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'eth_sendUserOperation',
+        params: [userOp, this.entryPointAddress],
+      }),
+    });
+
+    const result = await response.json();
+
+    if (result.error) {
+      throw new Error(result.error.message || 'Bundler rejected UserOp');
+    }
+
+    // Wait for receipt
+    const userOpHash = result.result;
+    const txHash = await this._waitForUserOpReceipt(userOpHash);
+
+    return txHash;
+  }
+
+  /**
+   * Wait for UserOp to be included in a block
+   */
+  private async _waitForUserOpReceipt(userOpHash: string, timeout = 60000): Promise<string> {
+    const startTime = Date.now();
+
+    while (Date.now() - startTime < timeout) {
+      try {
+        const response = await fetch(this.bundlerUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: 1,
+            method: 'eth_getUserOperationReceipt',
+            params: [userOpHash],
+          }),
+        });
+
+        const result = await response.json();
+
+        if (result.result?.receipt?.transactionHash) {
+          return result.result.receipt.transactionHash;
+        }
+      } catch {
+        // Continue waiting
       }
 
-      const arcAccount = new Contract(accountAddress, ARC_ACCOUNT_ABI, this.relayerWallet);
-
-      const targets = transactions.map(t => t.target);
-      const values = transactions.map(t => ethers.parseEther(t.value));
-      const datas = transactions.map(t => t.data || '0x');
-
-      const tx = await arcAccount.executeBatch(targets, values, datas);
-      const receipt = await tx.wait();
-
-      return {
-        success: true,
-        txHash: receipt.hash,
-        gasUsed: receipt.gasUsed.toString(),
-      };
-    } catch (error: any) {
-      console.error('Batch execution failed:', error);
-      return {
-        success: false,
-        error: error.message || 'Batch execution failed',
-      };
+      await new Promise(resolve => setTimeout(resolve, 2000));
     }
+
+    throw new Error('UserOp confirmation timeout');
+  }
+
+  /**
+   * Aggregate P256 signatures for multi-sig
+   * Format: [keyIndex1][signature1][keyIndex2][signature2]...
+   */
+  private _aggregateSignatures(
+    signatures: { publicKey: string; signature: string }[]
+  ): string {
+    // Sort by public key to ensure deterministic ordering
+    const sorted = [...signatures].sort((a, b) => a.publicKey.localeCompare(b.publicKey));
+
+    // Concatenate signatures with key indices
+    let aggregated = '0x';
+    for (let i = 0; i < sorted.length; i++) {
+      // Each signature entry: [1 byte keyIndex][64 bytes signature]
+      const keyIndex = i.toString(16).padStart(2, '0');
+      const sig = sorted[i].signature.replace('0x', '');
+      aggregated += keyIndex + sig;
+    }
+
+    return aggregated;
   }
 
   /**
@@ -205,30 +433,20 @@ export class MultiSigExecutionService {
    */
   async estimateGas(params: TransactionParams): Promise<string | null> {
     try {
-      const { accountAddress, targetAddress, value, tokenAddress, data } = params;
+      const callData = await this._buildCallData(
+        params.targetAddress,
+        params.value,
+        params.tokenAddress,
+        params.data
+      );
 
-      const arcAccount = new Contract(accountAddress, ARC_ACCOUNT_ABI, this.provider);
+      // Estimate using eth_estimateGas on callData
+      const estimate = await this.provider.estimateGas({
+        to: params.accountAddress,
+        data: callData,
+      });
 
-      let txData: string;
-      let txValue: bigint;
-
-      if (tokenAddress && tokenAddress !== '0x0000000000000000000000000000000000000000') {
-        const erc20Interface = new Interface(ERC20_ABI);
-        const tokenContract = new Contract(tokenAddress, ERC20_ABI, this.provider);
-        const decimals = await tokenContract.decimals();
-        const tokenAmount = ethers.parseUnits(value, decimals);
-        txData = erc20Interface.encodeFunctionData('transfer', [targetAddress, tokenAmount]);
-        txValue = 0n;
-
-        const gasEstimate = await arcAccount.execute.estimateGas(tokenAddress, txValue, txData);
-        return gasEstimate.toString();
-      } else {
-        txData = data || '0x';
-        txValue = ethers.parseEther(value);
-
-        const gasEstimate = await arcAccount.execute.estimateGas(targetAddress, txValue, txData);
-        return gasEstimate.toString();
-      }
+      return estimate.toString();
     } catch {
       return null;
     }
@@ -243,12 +461,6 @@ export const getExecutionService = (): MultiSigExecutionService => {
     const rpcUrl = process.env.ARC_TESTNET_RPC || 'https://rpc.testnet.arc.network';
     const chainId = parseInt(process.env.ARC_CHAIN_ID || '5042002');
     executionServiceInstance = new MultiSigExecutionService(rpcUrl, chainId);
-
-    // Initialize relayer if private key is available
-    const relayerKey = process.env.RELAYER_PRIVATE_KEY;
-    if (relayerKey) {
-      executionServiceInstance.initRelayer(relayerKey);
-    }
   }
   return executionServiceInstance;
 };
