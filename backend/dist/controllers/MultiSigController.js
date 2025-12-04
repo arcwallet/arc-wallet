@@ -13,40 +13,42 @@ export class MultiSigController {
         return members.some(m => m.userId === userId && m.status === 'active' && roles.includes(m.role));
     }
     /**
-     * Execute approved transaction on-chain using ERC-4337 UserOperations
-     * Collects passkey signatures from DB and submits to bundler
+     * Check if transaction can be executed (balance check only)
+     * Real execution happens via executeTransaction endpoint with aggregated signature from frontend
      */
-    async _executeOnChain(transaction, account) {
+    async _canExecute(transaction, account) {
         try {
             // Check if account has contract address
             if (!account.address) {
-                return { success: false, error: 'Contract not deployed' };
+                return { canExecute: false, error: 'Contract not deployed' };
             }
             const executionService = getExecutionService();
             // Check balance before execution
             const hasBalance = await executionService.checkBalance(account.address, transaction.value, transaction.tokenAddress || undefined);
             if (!hasBalance) {
-                return { success: false, error: 'Insufficient balance' };
+                return { canExecute: false, error: 'Insufficient balance' };
             }
-            // Get approved signatures from DB
-            const signatures = await this.db.getMultiSigSignatures(transaction.id);
-            const approvedSignatures = signatures
-                .filter(s => s.status === 'approved' && s.signerAddress)
-                .map(s => ({
-                publicKey: s.signerAddress, // This should be the passkey public key
-                signature: s.signerAddress, // This should be the actual signature - TODO: store separately
-            }));
-            // For now, if signatures don't have proper passkey data, just log
-            // Real implementation needs frontend to pass actual passkey signatures
-            if (approvedSignatures.length < account.requiredSignatures) {
-                console.log('Multi-sig: Not enough valid signatures yet');
-                // Return success=false but don't block - signatures will be collected from frontend
-                return {
-                    success: false,
-                    error: 'Waiting for passkey signatures from frontend'
-                };
+            return { canExecute: true };
+        }
+        catch (error) {
+            console.error('Execution check failed:', error);
+            return { canExecute: false, error: error.message || 'Check failed' };
+        }
+    }
+    /**
+     * Execute transaction with aggregated passkey signature from frontend
+     */
+    async executeWithSignature(transactionId, aggregatedSignature) {
+        try {
+            const transaction = await this.db.getMultiSigTransaction(transactionId);
+            if (!transaction) {
+                return { success: false, error: 'Transaction not found' };
             }
-            // Execute the transaction with collected signatures
+            const account = await this.db.getMultiSigAccount(transaction.accountId);
+            if (!account || !account.address) {
+                return { success: false, error: 'Account not found or not deployed' };
+            }
+            const executionService = getExecutionService();
             const result = await executionService.executeTransaction({
                 accountAddress: account.address,
                 targetAddress: transaction.targetAddress,
@@ -54,7 +56,13 @@ export class MultiSigController {
                 tokenAddress: transaction.tokenAddress,
                 tokenSymbol: transaction.tokenSymbol,
                 data: transaction.data,
-            }, approvedSignatures);
+            }, aggregatedSignature);
+            if (result.success) {
+                await this.db.updateMultiSigTransaction(transactionId, {
+                    status: 'executed',
+                    txHash: result.txHash || null
+                });
+            }
             return result;
         }
         catch (error) {
@@ -364,28 +372,25 @@ export class MultiSigController {
                 signerAddress: '', // Will be set when they sign
                 status: 'approved'
             });
-            // Check if already has enough signatures (1-of-1 case)
+            // Check if already has enough signatures
             const approvalCount = await this.db.getApprovalCount(transaction.id);
+            let readyToExecute = false;
+            let canExecuteError;
             if (approvalCount >= account.requiredSignatures) {
-                // Execute transaction on-chain
-                const execResult = await this._executeOnChain(transaction, account);
-                if (execResult.success) {
-                    await this.db.updateMultiSigTransaction(transaction.id, {
-                        status: 'executed',
-                        txHash: execResult.txHash || null
-                    });
-                }
-                else {
-                    console.error('On-chain execution failed:', execResult.error);
-                    // Keep as pending if execution fails, user can retry
-                }
+                // Check if transaction can be executed (balance check)
+                const execCheck = await this._canExecute(transaction, account);
+                readyToExecute = execCheck.canExecute;
+                canExecuteError = execCheck.error;
+                // Note: Actual execution happens via frontend with aggregated passkey signature
             }
             res.status(201).json({
                 success: true,
                 data: {
                     transaction,
                     approvalCount,
-                    requiredSignatures: account.requiredSignatures
+                    requiredSignatures: account.requiredSignatures,
+                    readyToExecute,
+                    canExecuteError
                 }
             });
         }
@@ -504,31 +509,22 @@ export class MultiSigController {
             });
             const account = await this.db.getMultiSigAccount(transaction.accountId);
             const approvalCount = await this.db.getApprovalCount(transactionId);
-            let executed = false;
-            let txHash;
+            let readyToExecute = false;
+            let canExecuteError;
             if (account && approvalCount >= account.requiredSignatures) {
-                // Execute transaction on-chain
-                const execResult = await this._executeOnChain(transaction, account);
-                if (execResult.success) {
-                    await this.db.updateMultiSigTransaction(transactionId, {
-                        status: 'executed',
-                        txHash: execResult.txHash || null
-                    });
-                    executed = true;
-                    txHash = execResult.txHash;
-                }
-                else {
-                    console.error('On-chain execution failed:', execResult.error);
-                    // Keep as pending if execution fails
-                }
+                // Check if transaction can be executed (balance check)
+                const execCheck = await this._canExecute(transaction, account);
+                readyToExecute = execCheck.canExecute;
+                canExecuteError = execCheck.error;
+                // Note: Actual execution happens via frontend with aggregated passkey signature
             }
             res.json({
                 success: true,
                 data: {
                     approvalCount,
                     requiredSignatures: account?.requiredSignatures || 0,
-                    executed,
-                    txHash
+                    readyToExecute,
+                    canExecuteError
                 }
             });
         }

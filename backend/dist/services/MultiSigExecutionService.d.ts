@@ -1,7 +1,7 @@
 /**
  * Multi-Sig On-Chain Execution Service
- * Uses ERC-4337 UserOperations for gasless transaction execution
- * No relayer private key needed - uses bundler + paymaster
+ * Uses existing BundlerService for ERC-4337 UserOperation execution
+ * Integrates with Arc Wallet's passkey-based smart accounts
  */
 export interface ExecutionResult {
     success: boolean;
@@ -17,11 +17,6 @@ export interface TransactionParams {
     tokenAddress?: string | null;
     tokenSymbol?: string;
     data?: string | null;
-}
-export interface UserOperationRequest {
-    accountAddress: string;
-    callData: string;
-    signatures: string[];
 }
 export interface PreparedUserOp {
     sender: string;
@@ -40,52 +35,34 @@ export declare class MultiSigExecutionService {
     private provider;
     private chainId;
     private entryPointAddress;
-    private bundlerUrl;
-    private paymasterUrl;
     constructor(rpcUrl: string, chainId?: number);
     /**
      * Prepare a UserOperation for multi-sig transaction
-     * Returns the UserOp that needs to be signed by passkeys
+     * Returns the UserOp that needs to be signed by passkeys on frontend
      */
     prepareUserOperation(params: TransactionParams): Promise<PreparedUserOp | null>;
     /**
-     * Execute UserOperation with collected signatures
-     * Called after all required passkey signatures are collected
+     * Execute UserOperation via existing BundlerService
+     * Called after all required passkey signatures are collected on frontend
      */
     executeUserOperation(preparedOp: PreparedUserOp, aggregatedSignature: string): Promise<ExecutionResult>;
     /**
-     * Simple execution using backend's stored signatures
-     * For when all signatures are already collected in DB
+     * Simple execution for when signatures are ready
+     * Prepares and executes in one call
      */
-    executeTransaction(params: TransactionParams, storedSignatures: {
-        publicKey: string;
-        signature: string;
-    }[]): Promise<ExecutionResult>;
+    executeTransaction(params: TransactionParams, aggregatedSignature: string): Promise<ExecutionResult>;
     /**
      * Build callData for execute function
      */
     private _buildCallData;
     /**
-     * Get paymaster sponsorship data
-     */
-    private _getPaymasterData;
-    /**
      * Calculate UserOp hash for signing
      */
-    private _getUserOpHash;
+    private _calculateUserOpHash;
     /**
-     * Send UserOp to bundler
+     * Wait for UserOp receipt via bundler
      */
-    private _sendToBundler;
-    /**
-     * Wait for UserOp to be included in a block
-     */
-    private _waitForUserOpReceipt;
-    /**
-     * Aggregate P256 signatures for multi-sig
-     * Format: [keyIndex1][signature1][keyIndex2][signature2]...
-     */
-    private _aggregateSignatures;
+    private _waitForReceipt;
     /**
      * Check if account has enough balance for transaction
      */
@@ -98,10 +75,6 @@ export declare class MultiSigExecutionService {
         keyCount: number;
         balance: string;
     } | null>;
-    /**
-     * Estimate gas for transaction
-     */
-    estimateGas(params: TransactionParams): Promise<string | null>;
 }
 export declare const getExecutionService: () => MultiSigExecutionService;
 export default MultiSigExecutionService;
