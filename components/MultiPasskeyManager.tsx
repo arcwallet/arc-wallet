@@ -10,6 +10,7 @@ import {
   KeyRole,
   initMultiPasskeyService,
 } from '../services/multiPasskeyService';
+import { multiSigApi, MultiSigAccount, MultiSigMember, MultiSigTransaction } from '../services/multiSigApiService';
 import { SpinnerIcon } from './Icons';
 
 // Icons
@@ -84,6 +85,11 @@ const MultiPasskeyManager: React.FC<MultiPasskeyManagerProps> = ({
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
 
+  // Multi-sig account from backend
+  const [multiSigAccount, setMultiSigAccount] = useState<MultiSigAccount | null>(null);
+  const [members, setMembers] = useState<MultiSigMember[]>([]);
+  const [pendingTxs, setPendingTxs] = useState<MultiSigTransaction[]>([]);
+
   // Add new passkey form
   const [showAddForm, setShowAddForm] = useState(false);
   const [newKeyEmail, setNewKeyEmail] = useState('');
@@ -102,13 +108,14 @@ const MultiPasskeyManager: React.FC<MultiPasskeyManagerProps> = ({
     setService(svc);
   }, [walletAddress, rpcUrl, backendUrl]);
 
-  // Load keys
+  // Load keys from both on-chain and backend
   useEffect(() => {
     if (!service) return;
 
     const loadData = async () => {
       setLoading(true);
       try {
+        // Load on-chain data
         const [signingKeys, thresh, count] = await Promise.all([
           service.getSigningKeys(),
           service.getSignatureThreshold(),
@@ -117,6 +124,23 @@ const MultiPasskeyManager: React.FC<MultiPasskeyManagerProps> = ({
         setKeys(signingKeys);
         setThreshold(thresh);
         setActiveKeyCount(count);
+
+        // Load backend multi-sig accounts
+        try {
+          const accounts = await multiSigApi.getAccounts();
+          // Find account matching wallet address
+          const matchingAccount = accounts.find(a => a.address === walletAddress);
+          if (matchingAccount) {
+            setMultiSigAccount(matchingAccount);
+            // Load account details
+            const { members: accountMembers, transactions } = await multiSigApi.getAccount(matchingAccount.id);
+            setMembers(accountMembers);
+            setPendingTxs(transactions.filter(tx => tx.status === 'pending'));
+          }
+        } catch (backendError) {
+          // Backend may not have this account yet, which is fine
+          console.log('No multi-sig account found in backend');
+        }
       } catch (error) {
         console.error('Failed to load passkey data:', error);
       } finally {
@@ -125,7 +149,7 @@ const MultiPasskeyManager: React.FC<MultiPasskeyManagerProps> = ({
     };
 
     loadData();
-  }, [service]);
+  }, [service, walletAddress]);
 
   const handleAddPasskey = async () => {
     if (!service || !newKeyEmail || !newKeyDeviceName) return;
@@ -303,6 +327,80 @@ To add this passkey to the wallet, a transaction needs to be signed by an existi
           ))
         )}
       </div>
+
+      {/* Pending Transactions - Multi-sig Approval */}
+      {pendingTxs.length > 0 && (
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-slate-300">Pending Approvals</h3>
+            <span className="text-xs text-amber-400 bg-amber-500/20 px-2 py-0.5 rounded-full">
+              {pendingTxs.length} waiting
+            </span>
+          </div>
+          <div className="space-y-2">
+            {pendingTxs.map((tx) => (
+              <div
+                key={tx.id}
+                className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3"
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <div>
+                    <span className="text-white font-medium">
+                      {tx.description || `Send ${tx.value} ${tx.tokenSymbol}`}
+                    </span>
+                    <div className="text-xs text-slate-400">
+                      To: {tx.targetAddress.substring(0, 8)}...{tx.targetAddress.slice(-6)}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-amber-400 font-bold">
+                      {tx.approvalCount || 0}/{tx.requiredSignatures || threshold}
+                    </div>
+                    <div className="text-xs text-slate-500">signatures</div>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={async () => {
+                      try {
+                        const result = await multiSigApi.approveTransaction(tx.id);
+                        alert(`Approved! ${result.approvalCount}/${result.requiredSignatures} signatures`);
+                        // Refresh pending txs
+                        if (multiSigAccount) {
+                          const { transactions } = await multiSigApi.getAccount(multiSigAccount.id);
+                          setPendingTxs(transactions.filter(t => t.status === 'pending'));
+                        }
+                      } catch (err: any) {
+                        alert(`Failed: ${err.message}`);
+                      }
+                    }}
+                    className="flex-1 py-1.5 bg-green-600 hover:bg-green-500 text-white text-sm font-semibold rounded transition-colors"
+                  >
+                    Approve
+                  </button>
+                  <button
+                    onClick={async () => {
+                      try {
+                        await multiSigApi.rejectTransaction(tx.id);
+                        alert('Transaction rejected');
+                        if (multiSigAccount) {
+                          const { transactions } = await multiSigApi.getAccount(multiSigAccount.id);
+                          setPendingTxs(transactions.filter(t => t.status === 'pending'));
+                        }
+                      } catch (err: any) {
+                        alert(`Failed: ${err.message}`);
+                      }
+                    }}
+                    className="px-4 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm rounded transition-colors"
+                  >
+                    Reject
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Add Passkey Form */}
       {showAddForm ? (
