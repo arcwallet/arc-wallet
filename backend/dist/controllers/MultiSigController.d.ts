@@ -4,6 +4,10 @@ export declare class MultiSigController {
     private db;
     constructor(db: Database);
     private _isMember;
+    /**
+     * Execute approved transaction on-chain
+     */
+    private _executeOnChain;
     createAccount(req: Request, res: Response, next: NextFunction, authUserId?: string): Promise<void>;
     getAccounts(req: Request, res: Response, next: NextFunction, authUserId?: string): Promise<void>;
     getAccount(req: Request, res: Response, next: NextFunction, authUserId?: string): Promise<void>;

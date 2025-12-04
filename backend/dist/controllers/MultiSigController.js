@@ -1,6 +1,8 @@
 import { v4 as uuidv4 } from 'uuid';
 import { ethers } from 'ethers';
 import { ApiError } from '../types/index.js';
+import { getExecutionService } from '../services/MultiSigExecutionService.js';
+import { getEmailService } from '../services/EmailService.js';
 export class MultiSigController {
     db;
     constructor(db) {
@@ -9,6 +11,37 @@ export class MultiSigController {
     async _isMember(accountId, userId, roles = ['owner', 'signer', 'viewer']) {
         const members = await this.db.getMultiSigMembers(accountId);
         return members.some(m => m.userId === userId && m.status === 'active' && roles.includes(m.role));
+    }
+    /**
+     * Execute approved transaction on-chain
+     */
+    async _executeOnChain(transaction, account) {
+        try {
+            // Check if account has contract address
+            if (!account.address) {
+                return { success: false, error: 'Contract not deployed' };
+            }
+            const executionService = getExecutionService();
+            // Check balance before execution
+            const hasBalance = await executionService.checkBalance(account.address, transaction.value, transaction.tokenAddress || undefined);
+            if (!hasBalance) {
+                return { success: false, error: 'Insufficient balance' };
+            }
+            // Execute the transaction
+            const result = await executionService.executeTransaction({
+                accountAddress: account.address,
+                targetAddress: transaction.targetAddress,
+                value: transaction.value,
+                tokenAddress: transaction.tokenAddress,
+                tokenSymbol: transaction.tokenSymbol,
+                data: transaction.data,
+            });
+            return result;
+        }
+        catch (error) {
+            console.error('On-chain execution failed:', error);
+            return { success: false, error: error.message || 'Execution failed' };
+        }
     }
     // Create a new multi-sig account
     async createAccount(req, res, next, authUserId) {
@@ -205,7 +238,17 @@ export class MultiSigController {
                 role: role || 'signer',
                 status: 'pending'
             });
-            // TODO: Send invitation email
+            // Send invitation email
+            const emailService = getEmailService();
+            const appUrl = process.env.APP_URL || 'https://arcwallet.network';
+            const inviteLink = `${appUrl}/invite/${newMember.id}`;
+            await emailService.sendInvitation({
+                toEmail: email,
+                inviterName: 'Team Admin', // Could fetch actual user name
+                accountName: account.name,
+                role: role || 'signer',
+                inviteLink,
+            });
             res.status(201).json({
                 success: true,
                 data: newMember
@@ -305,8 +348,18 @@ export class MultiSigController {
             // Check if already has enough signatures (1-of-1 case)
             const approvalCount = await this.db.getApprovalCount(transaction.id);
             if (approvalCount >= account.requiredSignatures) {
-                // TODO: Execute transaction on-chain
-                await this.db.updateMultiSigTransaction(transaction.id, { status: 'executed' });
+                // Execute transaction on-chain
+                const execResult = await this._executeOnChain(transaction, account);
+                if (execResult.success) {
+                    await this.db.updateMultiSigTransaction(transaction.id, {
+                        status: 'executed',
+                        txHash: execResult.txHash || null
+                    });
+                }
+                else {
+                    console.error('On-chain execution failed:', execResult.error);
+                    // Keep as pending if execution fails, user can retry
+                }
             }
             res.status(201).json({
                 success: true,
@@ -433,17 +486,30 @@ export class MultiSigController {
             const account = await this.db.getMultiSigAccount(transaction.accountId);
             const approvalCount = await this.db.getApprovalCount(transactionId);
             let executed = false;
+            let txHash;
             if (account && approvalCount >= account.requiredSignatures) {
-                // TODO: Execute transaction on-chain
-                await this.db.updateMultiSigTransaction(transactionId, { status: 'executed' });
-                executed = true;
+                // Execute transaction on-chain
+                const execResult = await this._executeOnChain(transaction, account);
+                if (execResult.success) {
+                    await this.db.updateMultiSigTransaction(transactionId, {
+                        status: 'executed',
+                        txHash: execResult.txHash || null
+                    });
+                    executed = true;
+                    txHash = execResult.txHash;
+                }
+                else {
+                    console.error('On-chain execution failed:', execResult.error);
+                    // Keep as pending if execution fails
+                }
             }
             res.json({
                 success: true,
                 data: {
                     approvalCount,
                     requiredSignatures: account?.requiredSignatures || 0,
-                    executed
+                    executed,
+                    txHash
                 }
             });
         }
