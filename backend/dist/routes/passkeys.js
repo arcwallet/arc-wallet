@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { PasskeyController } from '../controllers/PasskeyController.js';
-import { rateLimitMiddleware, validateRequestBody, sanitizeInput } from '../middleware/security.js';
+import { rateLimitMiddleware, validateRequestBody, sanitizeInput, adminAuthMiddleware } from '../middleware/security.js';
 import { authMiddleware } from '../middleware/auth.js';
 export function createPasskeyRoutes(db, config, sessionStore) {
     const router = Router();
@@ -34,9 +34,9 @@ export function createPasskeyRoutes(db, config, sessionStore) {
     /**
      * POST /passkeys/auth/start
      * Start passkey authentication process
-     * Note: No rate limit - WebAuthn provides cryptographic security
+     * SECURITY: Rate limited to prevent enumeration attacks
      */
-    router.post('/auth/start', async (req, res, next) => {
+    router.post('/auth/start', rateLimitMiddleware('auth'), async (req, res, next) => {
         try {
             await passkeyController.authenticationStart(req, res);
         }
@@ -47,9 +47,9 @@ export function createPasskeyRoutes(db, config, sessionStore) {
     /**
      * POST /passkeys/auth/finish
      * Complete passkey authentication
-     * Note: No rate limit - WebAuthn provides cryptographic security
+     * SECURITY: Rate limited to prevent brute force attacks
      */
-    router.post('/auth/finish', validateRequestBody(['credential']), async (req, res, next) => {
+    router.post('/auth/finish', rateLimitMiddleware('auth'), validateRequestBody(['credential']), async (req, res, next) => {
         try {
             await passkeyController.authenticationFinish(req, res);
         }
@@ -182,17 +182,8 @@ export function createPasskeyRoutes(db, config, sessionStore) {
      * Admin endpoint to reset user passkeys (bypasses rate limit)
      * Requires ADMIN_SECRET in request body
      */
-    router.post('/admin/reset-user', validateRequestBody(['email', 'adminSecret']), async (req, res, next) => {
+    router.post('/admin/reset-user', validateRequestBody(['email', 'adminSecret']), adminAuthMiddleware(), async (req, res, next) => {
         try {
-            const { adminSecret } = req.body;
-            const expectedSecret = process.env.ADMIN_SECRET || 'arc-admin-2024-secret';
-            if (adminSecret !== expectedSecret) {
-                return res.status(403).json({
-                    success: false,
-                    error: 'Invalid admin secret',
-                    code: 'UNAUTHORIZED'
-                });
-            }
             // Set confirmReset to required value for admin requests
             req.body.confirmReset = 'DELETE_ALL_PASSKEYS';
             await passkeyController.resetUserPasskeys(req, res);
@@ -218,7 +209,7 @@ export function createPasskeyRoutes(db, config, sessionStore) {
      * Admin endpoint to manually register a passkey credential
      * Used for recovery when passkey exists on device but not in server DB
      */
-    router.post('/admin/register-credential', validateRequestBody(['adminSecret', 'email', 'credentialId', 'publicKeyX', 'publicKeyY']), async (req, res, next) => {
+    router.post('/admin/register-credential', validateRequestBody(['adminSecret', 'email', 'credentialId', 'publicKeyX', 'publicKeyY']), adminAuthMiddleware(), async (req, res, next) => {
         try {
             await passkeyController.adminRegisterCredential(req, res);
         }
@@ -231,7 +222,7 @@ export function createPasskeyRoutes(db, config, sessionStore) {
      * Admin endpoint to reset ALL user data (for testing)
      * WARNING: This deletes all users, passkeys, sessions, etc.
      */
-    router.post('/admin/reset-all', validateRequestBody(['adminSecret']), async (req, res, next) => {
+    router.post('/admin/reset-all', validateRequestBody(['adminSecret']), adminAuthMiddleware(), async (req, res, next) => {
         try {
             await passkeyController.adminResetAll(req, res);
         }
@@ -243,7 +234,7 @@ export function createPasskeyRoutes(db, config, sessionStore) {
      * POST /passkeys/admin/debug-passkey
      * Admin endpoint to debug passkey data for a user
      */
-    router.post('/admin/debug-passkey', validateRequestBody(['adminSecret', 'email']), async (req, res, next) => {
+    router.post('/admin/debug-passkey', validateRequestBody(['adminSecret', 'email']), adminAuthMiddleware(), async (req, res, next) => {
         try {
             await passkeyController.adminDebugPasskey(req, res);
         }
@@ -255,7 +246,7 @@ export function createPasskeyRoutes(db, config, sessionStore) {
      * POST /passkeys/admin/update-public-key
      * Admin endpoint to update passkey public key
      */
-    router.post('/admin/update-public-key', validateRequestBody(['adminSecret', 'email', 'credentialId', 'publicKeyX', 'publicKeyY']), async (req, res, next) => {
+    router.post('/admin/update-public-key', validateRequestBody(['adminSecret', 'email', 'credentialId', 'publicKeyX', 'publicKeyY']), adminAuthMiddleware(), async (req, res, next) => {
         try {
             await passkeyController.adminUpdatePublicKey(req, res);
         }
@@ -268,7 +259,7 @@ export function createPasskeyRoutes(db, config, sessionStore) {
      * Admin endpoint to update user's wallet address
      * Used for recovery when database has incorrect wallet address
      */
-    router.post('/admin/update-wallet-address', validateRequestBody(['adminSecret', 'email', 'walletAddress']), async (req, res, next) => {
+    router.post('/admin/update-wallet-address', validateRequestBody(['adminSecret', 'email', 'walletAddress']), adminAuthMiddleware(), async (req, res, next) => {
         try {
             await passkeyController.adminUpdateWalletAddress(req, res);
         }
@@ -281,7 +272,7 @@ export function createPasskeyRoutes(db, config, sessionStore) {
      * Admin endpoint to recover admin account from config
      * Creates user with wallet address from adminAccounts.ts
      */
-    router.post('/admin/recover-account', validateRequestBody(['adminSecret', 'email']), async (req, res, next) => {
+    router.post('/admin/recover-account', validateRequestBody(['adminSecret', 'email']), adminAuthMiddleware(), async (req, res, next) => {
         try {
             await passkeyController.adminRecoverAccount(req, res);
         }
@@ -293,7 +284,7 @@ export function createPasskeyRoutes(db, config, sessionStore) {
      * POST /passkeys/admin/get-account-info
      * Admin endpoint to get admin account info from config and database
      */
-    router.post('/admin/get-account-info', validateRequestBody(['adminSecret', 'email']), async (req, res, next) => {
+    router.post('/admin/get-account-info', validateRequestBody(['adminSecret', 'email']), adminAuthMiddleware(), async (req, res, next) => {
         try {
             await passkeyController.adminGetAccountInfo(req, res);
         }
@@ -305,7 +296,7 @@ export function createPasskeyRoutes(db, config, sessionStore) {
      * POST /passkeys/admin/link-passkey/start
      * Admin endpoint to start passkey linking (discoverable credential mode)
      */
-    router.post('/admin/link-passkey/start', validateRequestBody(['adminSecret', 'email']), async (req, res, next) => {
+    router.post('/admin/link-passkey/start', validateRequestBody(['adminSecret', 'email']), adminAuthMiddleware(), async (req, res, next) => {
         try {
             await passkeyController.adminLinkPasskeyStart(req, res);
         }
@@ -317,7 +308,7 @@ export function createPasskeyRoutes(db, config, sessionStore) {
      * POST /passkeys/admin/link-passkey/finish
      * Admin endpoint to finish passkey linking and register credential
      */
-    router.post('/admin/link-passkey/finish', validateRequestBody(['adminSecret', 'email', 'credential']), async (req, res, next) => {
+    router.post('/admin/link-passkey/finish', validateRequestBody(['adminSecret', 'email', 'credential']), adminAuthMiddleware(), async (req, res, next) => {
         try {
             await passkeyController.adminLinkPasskeyFinish(req, res);
         }

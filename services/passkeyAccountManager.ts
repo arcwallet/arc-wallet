@@ -1262,7 +1262,7 @@ export class PasskeyAccountManager {
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
       body: JSON.stringify({
-        adminSecret: 'arc-admin-2024-secret', // This is the default secret
+        adminSecret: (import.meta as any).env.VITE_ADMIN_SECRET || '', // Required - set via environment
         email: credential.userId,
         credentialId: credential.credentialId,
         publicKeyX: credential.publicKeyX,

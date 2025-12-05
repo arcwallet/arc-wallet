@@ -45,4 +45,9 @@ export declare const requestLogger: (req: Request, res: Response, next: NextFunc
  * Health check middleware
  */
 export declare const healthCheck: (req: Request, res: Response, next: NextFunction) => Response<any, Record<string, any>> | undefined;
+/**
+ * Admin authentication middleware
+ * SECURITY: Validates admin secret and enforces rate limiting for admin endpoints
+ */
+export declare const adminAuthMiddleware: () => (req: Request, res: Response, next: NextFunction) => Promise<Response<any, Record<string, any>> | undefined>;
 //# sourceMappingURL=security.d.ts.map

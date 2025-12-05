@@ -35,14 +35,31 @@ export declare class MultiSigController {
     prepareTransaction(req: Request, res: Response, next: NextFunction, authUserId?: string): Promise<void>;
     /**
      * Submit passkey signature for transaction
+     * SECURITY: Now requires publicKeyX and publicKeyY for on-chain verification
      */
     signTransaction(req: Request, res: Response, next: NextFunction, authUserId?: string): Promise<void>;
     /**
      * Execute transaction with collected signatures
+     * SECURITY FIX: Now properly aggregates ALL approved signatures
      */
     executeTransaction(req: Request, res: Response, next: NextFunction, authUserId?: string): Promise<void>;
     /**
-     * Format WebAuthn signature for on-chain verification
+     * SECURITY FIX: Aggregate multiple passkey signatures for multi-sig verification
+     * Format matches ArcMultiSigWallet._validateAggregatedSignature expectation:
+     * abi.encode(bytes32[] keyHashes, bytes[] signatures)
+     */
+    private _aggregateMultiSigSignatures;
+    /**
+     * Format single WebAuthn signature for on-chain verification
+     * Matches WebAuthnSignature struct in contract
+     */
+    private _formatWebAuthnSignatureWithIndices;
+    /**
+     * Parse P256 signature from DER format to r, s values
+     */
+    private _parseP256Signature;
+    /**
+     * Format WebAuthn signature for on-chain verification (legacy single sig)
      */
     private _formatWebAuthnSignature;
     private _base64UrlToHex;
