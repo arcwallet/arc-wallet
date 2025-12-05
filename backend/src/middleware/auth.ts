@@ -10,10 +10,13 @@ declare global {
   }
 }
 
+// Session cookie name - must match the cookie set by CircleOTP, MagicLink, and PasskeyController
+const SESSION_COOKIE_NAME = 'arcwallet_session';
+
 /**
  * Auth middleware that supports both:
  * 1. Bearer JWT token in Authorization header
- * 2. Cookie-based session (magic_session cookie)
+ * 2. Cookie-based session (arcwallet_session cookie)
  */
 export const authMiddleware = (secret: string, sessionStore?: MagicSessionStore) => {
   return (req: Request, res: Response, next: NextFunction) => {
@@ -31,8 +34,8 @@ export const authMiddleware = (secret: string, sessionStore?: MagicSessionStore)
       }
     }
 
-    // Try cookie-based session
-    const sessionId = req.cookies?.magic_session;
+    // Try cookie-based session (check both cookie names for backwards compatibility)
+    const sessionId = req.cookies?.[SESSION_COOKIE_NAME] || req.cookies?.magic_session;
     if (sessionId && sessionStore) {
       const session = sessionStore.get(sessionId);
       if (session) {
