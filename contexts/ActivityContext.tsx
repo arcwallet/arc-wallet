@@ -22,7 +22,12 @@ interface ActivityContextValue {
   clear: () => void;
 }
 
-const STORAGE_KEY = 'arcwallet:activity-log';
+const STORAGE_KEY_PREFIX = 'arcwallet:activity-log:';
+
+const getStorageKey = (address: string | null): string => {
+  if (!address) return `${STORAGE_KEY_PREFIX}anonymous`;
+  return `${STORAGE_KEY_PREFIX}${address.toLowerCase()}`;
+};
 
 const ActivityContext = createContext<ActivityContextValue | undefined>(undefined);
 
@@ -124,54 +129,69 @@ const deserialise = (data: StoredTransaction[]): Transaction[] =>
     date: new Date(tx.date),
   }));
 
-const usePersistedActivities = (): [Transaction[], React.Dispatch<React.SetStateAction<Transaction[]>>] => {
-  const [activities, setActivities] = useState<Transaction[]>(() => {
-    if (typeof window === 'undefined') {
-      return [];
-    }
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      return [];
-    }
-    try {
-      const parsed = JSON.parse(raw) as StoredTransaction[];
-      return deserialise(parsed);
-    } catch (error) {
-      console.warn('Failed to parse stored activity log', error);
-      window.localStorage.removeItem(STORAGE_KEY);
-      return [];
-    }
-  });
+const loadActivitiesFromStorage = (address: string | null): Transaction[] => {
+  if (typeof window === 'undefined') return [];
 
-  useEffect(() => {
-    if (typeof window === 'undefined') {
-      return;
-    }
-    try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(serialise(activities)));
-    } catch (error) {
-      console.warn('Failed to persist activity log', error);
-    }
-  }, [activities]);
+  const key = getStorageKey(address);
+  const raw = window.localStorage.getItem(key);
+  if (!raw) return [];
 
-  return [activities, setActivities];
+  try {
+    const parsed = JSON.parse(raw) as StoredTransaction[];
+    return deserialise(parsed);
+  } catch (error) {
+    console.warn('Failed to parse stored activity log', error);
+    window.localStorage.removeItem(key);
+    return [];
+  }
+};
+
+const saveActivitiesToStorage = (address: string | null, activities: Transaction[]): void => {
+  if (typeof window === 'undefined') return;
+
+  const key = getStorageKey(address);
+  try {
+    window.localStorage.setItem(key, JSON.stringify(serialise(activities)));
+  } catch (error) {
+    console.warn('Failed to persist activity log', error);
+  }
 };
 
 export const ActivityProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const { address } = usePasskeyAccount();
-  const [activities, setActivities] = usePersistedActivities();
+  const [activities, setActivities] = useState<Transaction[]>([]);
   const pendingRef = useRef(new Set<string>());
   const [cooldownUntil, setCooldownUntil] = useState<number | null>(null);
   const cooldownRef = useRef<number | null>(null);
+  const prevAddressRef = useRef<string | null>(null);
 
   useEffect(() => {
     cooldownRef.current = cooldownUntil;
   }, [cooldownUntil]);
 
+  // Load activities from localStorage when address changes
+  useEffect(() => {
+    // Load from storage for this address
+    const storedActivities = loadActivitiesFromStorage(address);
+    setActivities(storedActivities);
+    pendingRef.current = new Set(
+      storedActivities
+        .filter((tx) => tx.status === TransactionStatus.Pending)
+        .map((tx) => tx.hash)
+    );
+    prevAddressRef.current = address;
+  }, [address]);
+
+  // Save to localStorage whenever activities change
+  useEffect(() => {
+    if (prevAddressRef.current !== null || address !== null) {
+      saveActivitiesToStorage(address, activities);
+    }
+  }, [activities, address]);
+
+  // Fetch activities from blockchain API
   useEffect(() => {
     if (!address) {
-      setActivities([]);
-      pendingRef.current.clear();
       return;
     }
 
@@ -217,7 +237,7 @@ export const ActivityProvider: React.FC<{ children: ReactNode }> = ({ children }
       cancelled = true;
       window.clearInterval(interval);
     };
-  }, [address, setActivities]);
+  }, [address]);
 
   useEffect(() => {
     // Filter pending transactions but exclude bridge transactions (they're cross-chain)
