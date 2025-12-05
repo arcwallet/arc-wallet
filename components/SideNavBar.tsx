@@ -77,7 +77,8 @@ const SideNavBar: React.FC<SideNavBarProps> = ({ currentPage, onNavigate }) => {
     { id: 'Treasury', icon: 'treasury', label: 'Treasury' },
     { id: 'History', icon: 'receipt_long', label: 'History' },
     { id: 'Multi-Sig', icon: 'group', label: 'Multi-Sig' },
-    { id: 'Agent', icon: 'smart_toy', label: 'AI Agent' },
+    // Agent tab temporarily disabled - will integrate new AI solution
+    // { id: 'Agent', icon: 'smart_toy', label: 'AI Agent' },
     { id: 'Faucet', icon: 'water_drop', label: 'Faucet' },
   ];
 

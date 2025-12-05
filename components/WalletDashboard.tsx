@@ -10,7 +10,13 @@ import Faucet from './Faucet';
 import SwapScreen from './SwapScreen';
 import Bridge from './Bridge';
 import History from './History';
-import AgentScreen, { WalletBalance } from './AgentScreen';
+// AgentScreen temporarily disabled - will integrate new AI solution
+// import AgentScreen, { WalletBalance } from './AgentScreen';
+export interface WalletBalance {
+    token: string;
+    balance: string;
+    formattedBalance: string;
+}
 import TreasuryScreen from './TreasuryScreen';
 import NetworkSelector from './NetworkSelector';
 import { Transaction } from '../types';
@@ -697,15 +703,16 @@ const WalletDashboard: React.FC = () => {
         return <MultiSigDashboard />;
       case 'Faucet':
         return <Faucet />;
-      case 'Agent':
-        return (
-          <AgentScreen
-            onExecuteIntent={handleAgentIntent}
-            walletAddress={address}
-            balances={agentBalances}
-            totalBalance={totalBalance || undefined}
-          />
-        );
+      // Agent temporarily disabled - will integrate new AI solution
+      // case 'Agent':
+      //   return (
+      //     <AgentScreen
+      //       onExecuteIntent={handleAgentIntent}
+      //       walletAddress={address}
+      //       balances={agentBalances}
+      //       totalBalance={totalBalance || undefined}
+      //     />
+      //   );
       case 'Settings':
         return <Settings />;
       default:

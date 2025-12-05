@@ -6,19 +6,19 @@ class OAuthService {
         this.initializeProviders();
     }
     initializeProviders() {
-        // Google OAuth
-        if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
-            this.providers.set('google', {
-                name: 'google',
-                clientId: process.env.GOOGLE_CLIENT_ID,
-                clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-                redirectUri: `${process.env.OAUTH_REDIRECT_BASE_URL || 'http://localhost:3001'}/auth/google/callback`,
-                authorizationUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
-                tokenUrl: 'https://oauth2.googleapis.com/token',
-                userInfoUrl: 'https://www.googleapis.com/oauth2/v2/userinfo',
-                scopes: ['openid', 'profile', 'email'],
-            });
-        }
+        // Google OAuth - temporarily disabled, will integrate new solution
+        // if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+        //     this.providers.set('google', {
+        //         name: 'google',
+        //         clientId: process.env.GOOGLE_CLIENT_ID,
+        //         clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+        //         redirectUri: `${process.env.OAUTH_REDIRECT_BASE_URL || 'http://localhost:3001'}/auth/google/callback`,
+        //         authorizationUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
+        //         tokenUrl: 'https://oauth2.googleapis.com/token',
+        //         userInfoUrl: 'https://www.googleapis.com/oauth2/v2/userinfo',
+        //         scopes: ['openid', 'profile', 'email'],
+        //     });
+        // }
         // Apple OAuth
         if (process.env.APPLE_CLIENT_ID && process.env.APPLE_TEAM_ID) {
             this.providers.set('apple', {

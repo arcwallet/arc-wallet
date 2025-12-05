@@ -26,8 +26,9 @@ import { getSepoliaBundlerService } from './services/sepoliaBundlerService.js';
 import { webhookService } from './services/webhookService.js';
 import { initIndexerDB } from './db/indexer.js';
 import { MagicSessionStore } from './magicLink/SessionStore.js';
-import agentRouter from './controllers/agentController.js';
-import { initializeAgentDatabase } from './database/agentDatabase.js';
+// Agent temporarily disabled - will integrate new AI solution
+// import agentRouter from './controllers/agentController.js';
+// import { initializeAgentDatabase } from './database/agentDatabase.js';
 import { loadConfig, validateConfig } from './utils/config.js';
 import { cookieMiddleware } from './middleware/cookies.js';
 import { setCsrfCookie, validateCsrfToken } from './middleware/csrf.js';
@@ -117,13 +118,14 @@ app.use('/api/webhooks', createWebhookRouter());
 app.use('/api/gas-station', createGasStationRouter());
 app.use('/api/bundler', createBundlerRouter());
 app.use('/api/bundler/sepolia', createSepoliaBundlerRouter());
-app.use('/api/agent', agentRouter);
+// Agent temporarily disabled - will integrate new AI solution
+// app.use('/api/agent', agentRouter);
 // Initialize indexer database
 console.log('🔧 Initializing indexer database...');
 initIndexerDB();
-// Initialize agent database
-console.log('🔧 Initializing agent database...');
-initializeAgentDatabase();
+// Agent database temporarily disabled - will integrate new AI solution
+// console.log('🔧 Initializing agent database...');
+// initializeAgentDatabase();
 // Initialize and start indexer service (optional - can be disabled via env)
 const INDEXER_ENABLED = process.env.INDEXER_ENABLED !== 'false';
 if (INDEXER_ENABLED) {
