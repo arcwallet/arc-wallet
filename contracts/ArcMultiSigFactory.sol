@@ -2,37 +2,71 @@
 pragma solidity ^0.8.19;
 
 import "./ArcMultiSigWallet.sol";
+import "@account-abstraction/contracts/interfaces/IEntryPoint.sol";
 
 /**
  * @title ArcMultiSigFactory
- * @notice Factory contract for deploying ArcMultiSigWallet instances
+ * @notice Factory contract for deploying passkey-based ArcMultiSigWallet instances
+ * @dev Creates multi-sig wallets where signers are identified by P256 public keys
  */
 contract ArcMultiSigFactory {
-    // Events
+    // ============================================
+    // EVENTS
+    // ============================================
+
     event WalletCreated(
         address indexed wallet,
         address indexed creator,
-        address[] signers,
+        bytes32[] signerKeyHashes,
         uint256 requiredSignatures
     );
 
-    // State
+    // ============================================
+    // STATE
+    // ============================================
+
+    /// @notice ERC-4337 EntryPoint
+    IEntryPoint public immutable entryPoint;
+
+    /// @notice All deployed wallets
     address[] public deployedWallets;
-    mapping(address => address[]) public userWallets;
+
+    /// @notice Wallets by signer key hash
+    mapping(bytes32 => address[]) public signerWallets;
+
+    /// @notice Check if address is a deployed wallet
     mapping(address => bool) public isDeployedWallet;
 
+    // ============================================
+    // CONSTRUCTOR
+    // ============================================
+
+    constructor(IEntryPoint _entryPoint) {
+        entryPoint = _entryPoint;
+    }
+
+    // ============================================
+    // WALLET CREATION
+    // ============================================
+
     /**
-     * @notice Create a new multi-sig wallet
-     * @param _signers List of initial signers
+     * @notice Create a new passkey multi-sig wallet
+     * @param _signerXs X coordinates of signer public keys
+     * @param _signerYs Y coordinates of signer public keys
      * @param _requiredSignatures Number of required signatures (threshold)
      * @return wallet Address of the new wallet
      */
     function createWallet(
-        address[] calldata _signers,
+        uint256[] calldata _signerXs,
+        uint256[] calldata _signerYs,
         uint256 _requiredSignatures
     ) external returns (address wallet) {
+        require(_signerXs.length == _signerYs.length, "Mismatched key arrays");
+
         ArcMultiSigWallet newWallet = new ArcMultiSigWallet(
-            _signers,
+            entryPoint,
+            _signerXs,
+            _signerYs,
             _requiredSignatures
         );
 
@@ -40,31 +74,38 @@ contract ArcMultiSigFactory {
         deployedWallets.push(wallet);
         isDeployedWallet[wallet] = true;
 
-        // Track wallet for each signer
-        for (uint256 i = 0; i < _signers.length; i++) {
-            userWallets[_signers[i]].push(wallet);
+        // Track wallet for each signer by key hash
+        bytes32[] memory keyHashes = new bytes32[](_signerXs.length);
+        for (uint256 i = 0; i < _signerXs.length; i++) {
+            bytes32 keyHash = keccak256(abi.encodePacked(_signerXs[i], _signerYs[i]));
+            keyHashes[i] = keyHash;
+            signerWallets[keyHash].push(wallet);
         }
 
-        emit WalletCreated(wallet, msg.sender, _signers, _requiredSignatures);
+        emit WalletCreated(wallet, msg.sender, keyHashes, _requiredSignatures);
 
         return wallet;
     }
 
     /**
      * @notice Create wallet with deterministic address using CREATE2
-     * @param _signers List of initial signers
+     * @param _signerXs X coordinates of signer public keys
+     * @param _signerYs Y coordinates of signer public keys
      * @param _requiredSignatures Number of required signatures
      * @param _salt Salt for deterministic address
      * @return wallet Address of the new wallet
      */
     function createWalletDeterministic(
-        address[] calldata _signers,
+        uint256[] calldata _signerXs,
+        uint256[] calldata _signerYs,
         uint256 _requiredSignatures,
         bytes32 _salt
     ) external returns (address wallet) {
+        require(_signerXs.length == _signerYs.length, "Mismatched key arrays");
+
         bytes memory bytecode = abi.encodePacked(
             type(ArcMultiSigWallet).creationCode,
-            abi.encode(_signers, _requiredSignatures)
+            abi.encode(entryPoint, _signerXs, _signerYs, _requiredSignatures)
         );
 
         assembly {
@@ -76,31 +117,36 @@ contract ArcMultiSigFactory {
         deployedWallets.push(wallet);
         isDeployedWallet[wallet] = true;
 
-        // Track wallet for each signer
-        for (uint256 i = 0; i < _signers.length; i++) {
-            userWallets[_signers[i]].push(wallet);
+        // Track wallet for each signer by key hash
+        bytes32[] memory keyHashes = new bytes32[](_signerXs.length);
+        for (uint256 i = 0; i < _signerXs.length; i++) {
+            bytes32 keyHash = keccak256(abi.encodePacked(_signerXs[i], _signerYs[i]));
+            keyHashes[i] = keyHash;
+            signerWallets[keyHash].push(wallet);
         }
 
-        emit WalletCreated(wallet, msg.sender, _signers, _requiredSignatures);
+        emit WalletCreated(wallet, msg.sender, keyHashes, _requiredSignatures);
 
         return wallet;
     }
 
     /**
      * @notice Compute deterministic wallet address
-     * @param _signers List of initial signers
+     * @param _signerXs X coordinates of signer public keys
+     * @param _signerYs Y coordinates of signer public keys
      * @param _requiredSignatures Number of required signatures
      * @param _salt Salt for deterministic address
      * @return predicted Predicted wallet address
      */
     function computeWalletAddress(
-        address[] calldata _signers,
+        uint256[] calldata _signerXs,
+        uint256[] calldata _signerYs,
         uint256 _requiredSignatures,
         bytes32 _salt
     ) external view returns (address predicted) {
         bytes memory bytecode = abi.encodePacked(
             type(ArcMultiSigWallet).creationCode,
-            abi.encode(_signers, _requiredSignatures)
+            abi.encode(entryPoint, _signerXs, _signerYs, _requiredSignatures)
         );
 
         bytes32 hash = keccak256(
@@ -114,6 +160,10 @@ contract ArcMultiSigFactory {
 
         return address(uint160(uint256(hash)));
     }
+
+    // ============================================
+    // VIEW FUNCTIONS
+    // ============================================
 
     /**
      * @notice Get total number of deployed wallets
@@ -130,11 +180,30 @@ contract ArcMultiSigFactory {
     }
 
     /**
-     * @notice Get wallets for a specific user
-     * @param _user User address
+     * @notice Get wallets for a specific signer by key hash
+     * @param _keyHash Signer's key hash (keccak256(x, y))
      */
-    function getUserWallets(address _user) external view returns (address[] memory) {
-        return userWallets[_user];
+    function getSignerWallets(bytes32 _keyHash) external view returns (address[] memory) {
+        return signerWallets[_keyHash];
+    }
+
+    /**
+     * @notice Get wallets for a specific signer by public key coordinates
+     * @param _x Public key X coordinate
+     * @param _y Public key Y coordinate
+     */
+    function getWalletsByPublicKey(uint256 _x, uint256 _y) external view returns (address[] memory) {
+        bytes32 keyHash = keccak256(abi.encodePacked(_x, _y));
+        return signerWallets[keyHash];
+    }
+
+    /**
+     * @notice Compute key hash from P256 coordinates
+     * @param _x Public key X coordinate
+     * @param _y Public key Y coordinate
+     */
+    function computeKeyHash(uint256 _x, uint256 _y) external pure returns (bytes32) {
+        return keccak256(abi.encodePacked(_x, _y));
     }
 
     /**

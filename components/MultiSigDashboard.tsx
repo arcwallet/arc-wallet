@@ -39,6 +39,8 @@ const MultiSigDashboard: React.FC = () => {
     createTransaction,
     approveTransaction,
     rejectTransaction,
+    signWithPasskey,
+    executeTransaction,
     updateAccount,
     clearError,
   } = useMultiSig();
@@ -472,13 +474,23 @@ const MultiSigDashboard: React.FC = () => {
 
                 {tx.status === 'pending' && (
                   <div className="tx-actions">
-                    <button
-                      className="btn-small btn-success"
-                      onClick={() => approveTransaction(tx.id)}
-                      disabled={isLoading}
-                    >
-                      Approve
-                    </button>
+                    {tx.approvalCount >= (tx.requiredSignatures || 1) ? (
+                      <button
+                        className="btn-small btn-primary"
+                        onClick={() => executeTransaction(tx.id)}
+                        disabled={isLoading}
+                      >
+                        Execute
+                      </button>
+                    ) : (
+                      <button
+                        className="btn-small btn-success"
+                        onClick={() => signWithPasskey(tx.id)}
+                        disabled={isLoading}
+                      >
+                        Sign with Passkey
+                      </button>
+                    )}
                     <button
                       className="btn-small btn-danger"
                       onClick={() => rejectTransaction(tx.id)}

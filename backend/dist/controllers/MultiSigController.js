@@ -623,5 +623,200 @@ export class MultiSigController {
             next(error);
         }
     }
+    /**
+     * Prepare transaction for signing - returns userOpHash
+     */
+    async prepareTransaction(req, res, next, authUserId) {
+        try {
+            const { transactionId } = req.params;
+            if (!authUserId) {
+                throw new ApiError('User not authenticated', 401, 'UNAUTHORIZED');
+            }
+            const transaction = await this.db.getMultiSigTransaction(transactionId);
+            if (!transaction) {
+                throw new ApiError('Transaction not found', 404, 'NOT_FOUND');
+            }
+            // Authorization check
+            if (!await this._isMember(transaction.accountId, authUserId, ['owner', 'signer'])) {
+                throw new ApiError('You do not have permission to sign transactions', 403, 'FORBIDDEN');
+            }
+            const account = await this.db.getMultiSigAccount(transaction.accountId);
+            if (!account || !account.address) {
+                throw new ApiError('Account not found or contract not deployed', 404, 'NOT_FOUND');
+            }
+            const executionService = getExecutionService();
+            const userOp = await executionService.prepareUserOperation({
+                accountAddress: account.address,
+                targetAddress: transaction.targetAddress,
+                value: transaction.value,
+                tokenAddress: transaction.tokenAddress,
+                tokenSymbol: transaction.tokenSymbol,
+                data: transaction.data,
+            });
+            if (!userOp) {
+                throw new ApiError('Failed to prepare UserOperation', 500, 'PREPARE_FAILED');
+            }
+            res.json({
+                success: true,
+                data: {
+                    userOp,
+                    transaction,
+                }
+            });
+        }
+        catch (error) {
+            next(error);
+        }
+    }
+    /**
+     * Submit passkey signature for transaction
+     */
+    async signTransaction(req, res, next, authUserId) {
+        try {
+            const { transactionId } = req.params;
+            const { signature, authenticatorData, clientDataJSON, credentialId } = req.body;
+            if (!authUserId) {
+                throw new ApiError('User not authenticated', 401, 'UNAUTHORIZED');
+            }
+            if (!signature || !authenticatorData || !clientDataJSON) {
+                throw new ApiError('Missing signature data', 400, 'INVALID_REQUEST');
+            }
+            const transaction = await this.db.getMultiSigTransaction(transactionId);
+            if (!transaction) {
+                throw new ApiError('Transaction not found', 404, 'NOT_FOUND');
+            }
+            if (transaction.status !== 'pending') {
+                throw new ApiError(`Transaction is ${transaction.status}`, 400, 'INVALID_STATUS');
+            }
+            // Authorization check
+            if (!await this._isMember(transaction.accountId, authUserId, ['owner', 'signer'])) {
+                throw new ApiError('You do not have permission to sign transactions', 403, 'FORBIDDEN');
+            }
+            // Check if already signed
+            const existingSignatures = await this.db.getMultiSigSignatures(transactionId);
+            if (existingSignatures.some(s => s.signerId === authUserId)) {
+                throw new ApiError('You have already signed this transaction', 400, 'ALREADY_SIGNED');
+            }
+            // Store the passkey signature data
+            // Format: JSON string with all WebAuthn data for later aggregation
+            const passkeySignature = JSON.stringify({
+                signature,
+                authenticatorData,
+                clientDataJSON,
+                credentialId,
+            });
+            await this.db.addMultiSigSignature({
+                id: uuidv4(),
+                transactionId,
+                signerId: authUserId,
+                signerAddress: passkeySignature, // Store passkey data in signerAddress field
+                status: 'approved'
+            });
+            const account = await this.db.getMultiSigAccount(transaction.accountId);
+            const approvalCount = await this.db.getApprovalCount(transactionId);
+            const readyToExecute = account ? approvalCount >= account.requiredSignatures : false;
+            res.json({
+                success: true,
+                data: {
+                    approvalCount,
+                    requiredSignatures: account?.requiredSignatures || 0,
+                    readyToExecute,
+                }
+            });
+        }
+        catch (error) {
+            next(error);
+        }
+    }
+    /**
+     * Execute transaction with collected signatures
+     */
+    async executeTransaction(req, res, next, authUserId) {
+        try {
+            const { transactionId } = req.params;
+            if (!authUserId) {
+                throw new ApiError('User not authenticated', 401, 'UNAUTHORIZED');
+            }
+            const transaction = await this.db.getMultiSigTransaction(transactionId);
+            if (!transaction) {
+                throw new ApiError('Transaction not found', 404, 'NOT_FOUND');
+            }
+            if (transaction.status !== 'pending') {
+                throw new ApiError(`Transaction is ${transaction.status}`, 400, 'INVALID_STATUS');
+            }
+            // Authorization check
+            if (!await this._isMember(transaction.accountId, authUserId, ['owner', 'signer'])) {
+                throw new ApiError('You do not have permission to execute transactions', 403, 'FORBIDDEN');
+            }
+            const account = await this.db.getMultiSigAccount(transaction.accountId);
+            if (!account || !account.address) {
+                throw new ApiError('Account not found or contract not deployed', 404, 'NOT_FOUND');
+            }
+            // Check threshold met
+            const approvalCount = await this.db.getApprovalCount(transactionId);
+            if (approvalCount < account.requiredSignatures) {
+                throw new ApiError(`Not enough approvals: ${approvalCount}/${account.requiredSignatures}`, 400, 'THRESHOLD_NOT_MET');
+            }
+            // Get all approved signatures
+            const signatures = await this.db.getMultiSigSignatures(transactionId);
+            const approvedSignatures = signatures.filter(s => s.status === 'approved');
+            // Aggregate passkey signatures into single signature for UserOp
+            // For now, use first signature (single-key verification)
+            // TODO: Implement proper multi-sig aggregation when contract supports it
+            let aggregatedSignature = '0x';
+            if (approvedSignatures.length > 0 && approvedSignatures[0].signerAddress) {
+                try {
+                    const sigData = JSON.parse(approvedSignatures[0].signerAddress);
+                    // Format signature for WebAuthn verification on-chain
+                    // This format is compatible with P256 signature verification
+                    aggregatedSignature = this._formatWebAuthnSignature(sigData);
+                }
+                catch {
+                    // If not JSON, use as-is (backwards compatibility)
+                    aggregatedSignature = approvedSignatures[0].signerAddress || '0x';
+                }
+            }
+            // Execute via bundler
+            const result = await this.executeWithSignature(transactionId, aggregatedSignature);
+            if (result.success) {
+                // Send notification emails to all members
+                const emailService = getEmailService();
+                const members = await this.db.getMultiSigMembers(transaction.accountId);
+                for (const member of members) {
+                    if (member.email && member.status === 'active') {
+                        await emailService.sendTransactionExecuted(member.email, account.name, result.txHash || 'pending', transaction.value, transaction.tokenSymbol);
+                    }
+                }
+            }
+            res.json({
+                success: true,
+                data: result
+            });
+        }
+        catch (error) {
+            next(error);
+        }
+    }
+    /**
+     * Format WebAuthn signature for on-chain verification
+     */
+    _formatWebAuthnSignature(sigData) {
+        // Encode WebAuthn signature components for on-chain verification
+        // Format: abi.encode(authenticatorData, clientDataJSON, signature)
+        const abiCoder = new ethers.AbiCoder();
+        // Decode base64url to bytes
+        const authData = this._base64UrlToHex(sigData.authenticatorData);
+        const clientData = this._base64UrlToHex(sigData.clientDataJSON);
+        const sig = this._base64UrlToHex(sigData.signature);
+        return abiCoder.encode(['bytes', 'bytes', 'bytes'], [authData, clientData, sig]);
+    }
+    _base64UrlToHex(base64url) {
+        const base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
+        const pad = base64.length % 4;
+        const padded = base64 + (pad ? '='.repeat(4 - pad) : '');
+        // Decode base64 to bytes
+        const binary = Buffer.from(padded, 'base64');
+        return '0x' + binary.toString('hex');
+    }
 }
 //# sourceMappingURL=MultiSigController.js.map

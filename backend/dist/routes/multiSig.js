@@ -24,6 +24,10 @@ export function createMultiSigRoutes(db, config, sessionStore) {
     router.get('/accounts/:accountId/transactions', asyncHandler((req, res, next, authUserId) => controller.getTransactions(req, res, next, authUserId)));
     router.post('/transactions/:transactionId/approve', asyncHandler((req, res, next, authUserId) => controller.approveTransaction(req, res, next, authUserId)));
     router.post('/transactions/:transactionId/reject', asyncHandler((req, res, next, authUserId) => controller.rejectTransaction(req, res, next, authUserId)));
+    // Passkey signing & execution routes
+    router.post('/transactions/:transactionId/prepare', asyncHandler((req, res, next, authUserId) => controller.prepareTransaction(req, res, next, authUserId)));
+    router.post('/transactions/:transactionId/sign', asyncHandler((req, res, next, authUserId) => controller.signTransaction(req, res, next, authUserId)));
+    router.post('/transactions/:transactionId/execute', asyncHandler((req, res, next, authUserId) => controller.executeTransaction(req, res, next, authUserId)));
     return router;
 }
 //# sourceMappingURL=multiSig.js.map

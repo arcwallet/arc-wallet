@@ -427,6 +427,75 @@ export const healthCheck = (req: Request, res: Response, next: NextFunction) => 
   next();
 };
 
+/**
+ * Admin authentication middleware
+ * SECURITY: Validates admin secret and enforces rate limiting for admin endpoints
+ */
+export const adminAuthMiddleware = () => {
+  // Admin-specific rate limiter - stricter than general
+  const adminRateLimiter = new RateLimiterMemory({
+    points: 10,         // Only 10 admin requests
+    duration: 300,      // Per 5 minutes
+    blockDuration: 600, // Block for 10 minutes on limit
+  });
+
+  return async (req: Request, res: Response, next: NextFunction) => {
+    const { adminSecret } = req.body;
+    const expectedSecret = process.env.ADMIN_SECRET;
+
+    // SECURITY: Require ADMIN_SECRET to be explicitly set
+    if (!expectedSecret) {
+      console.error('[SECURITY] ADMIN_SECRET environment variable not set!');
+      return res.status(500).json({
+        success: false,
+        error: 'Admin functionality not configured',
+        code: 'ADMIN_NOT_CONFIGURED'
+      });
+    }
+
+    // Rate limit admin requests by IP
+    const clientIp = getClientIp(req);
+    try {
+      await adminRateLimiter.consume(clientIp);
+    } catch (rejRes: any) {
+      console.warn(`[SECURITY] Admin rate limit exceeded for IP: ${clientIp.replace(/\.\d+$/, '.xxx')}`);
+      return res.status(429).json({
+        success: false,
+        error: 'Too many admin requests. Please try again later.',
+        code: 'ADMIN_RATE_LIMIT_EXCEEDED',
+        retryAfter: Math.round(rejRes.msBeforeNext / 1000)
+      });
+    }
+
+    // Validate admin secret with timing-safe comparison
+    if (!adminSecret || typeof adminSecret !== 'string') {
+      return res.status(403).json({
+        success: false,
+        error: 'Admin secret required',
+        code: 'UNAUTHORIZED'
+      });
+    }
+
+    // Timing-safe comparison to prevent timing attacks
+    const secretBuffer = Buffer.from(adminSecret);
+    const expectedBuffer = Buffer.from(expectedSecret);
+
+    if (secretBuffer.length !== expectedBuffer.length ||
+        !crypto.timingSafeEqual(secretBuffer, expectedBuffer)) {
+      console.warn(`[SECURITY] Invalid admin secret attempt from IP: ${clientIp.replace(/\.\d+$/, '.xxx')}`);
+      return res.status(403).json({
+        success: false,
+        error: 'Invalid admin secret',
+        code: 'UNAUTHORIZED'
+      });
+    }
+
+    // Mark request as admin-authenticated
+    (req as any).isAdmin = true;
+    next();
+  };
+};
+
 // Utility functions
 function sanitizeObject(obj: any): any {
   if (typeof obj !== 'object' || obj === null) {

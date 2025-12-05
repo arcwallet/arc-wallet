@@ -7,6 +7,7 @@ import {
   AccountWithDetails,
   TransactionWithDetails,
 } from '../services/multiSigClient';
+import { multiSigSigningService } from '../services/multiSigSigningService';
 import { usePasskeyAccount } from './PasskeyAccountContext';
 import { useSession } from './SessionContext';
 
@@ -52,6 +53,8 @@ interface MultiSigContextType {
   }) => Promise<MultiSigTransaction>;
   approveTransaction: (transactionId: string) => Promise<{ executed: boolean }>;
   rejectTransaction: (transactionId: string) => Promise<{ rejected: boolean }>;
+  signWithPasskey: (transactionId: string) => Promise<{ readyToExecute: boolean }>;
+  executeTransaction: (transactionId: string) => Promise<{ success: boolean; txHash?: string }>;
 
   // Utility
   clearError: () => void;
@@ -395,6 +398,64 @@ export const MultiSigProvider: React.FC<{ children: React.ReactNode }> = ({
     [userId, walletAddress, selectedAccount, loadTransactions]
   );
 
+  // Sign transaction with passkey
+  const signWithPasskey = useCallback(
+    async (transactionId: string) => {
+      if (!userId) throw new Error('Not authenticated');
+
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        // Use the signing service to handle passkey flow
+        const result = await multiSigSigningService.approveWithPasskey(
+          transactionId,
+          userId
+        );
+
+        // Reload transactions
+        if (selectedAccount) {
+          await loadTransactions(selectedAccount.id);
+        }
+
+        return { readyToExecute: result.readyToExecute };
+      } catch (err: any) {
+        setError(err.message || 'Failed to sign with passkey');
+        throw err;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [userId, selectedAccount, loadTransactions]
+  );
+
+  // Execute transaction on-chain
+  const executeTransaction = useCallback(
+    async (transactionId: string) => {
+      if (!userId) throw new Error('Not authenticated');
+
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const result = await multiSigSigningService.executeMultiSigTransaction(transactionId);
+
+        // Reload transactions
+        if (selectedAccount) {
+          await loadTransactions(selectedAccount.id);
+        }
+
+        return result;
+      } catch (err: any) {
+        setError(err.message || 'Failed to execute transaction');
+        throw err;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [userId, selectedAccount, loadTransactions]
+  );
+
   // Load accounts when user changes
   useEffect(() => {
     if (userId) {
@@ -423,6 +484,8 @@ export const MultiSigProvider: React.FC<{ children: React.ReactNode }> = ({
     createTransaction,
     approveTransaction,
     rejectTransaction,
+    signWithPasskey,
+    executeTransaction,
     clearError,
   };
 

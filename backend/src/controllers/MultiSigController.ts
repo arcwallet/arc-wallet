@@ -721,6 +721,408 @@ export class MultiSigController {
       next(error);
     }
   }
+
+  /**
+   * Prepare transaction for signing - returns userOpHash
+   */
+  async prepareTransaction(req: Request, res: Response, next: NextFunction, authUserId?: string): Promise<void> {
+    try {
+      const { transactionId } = req.params;
+      if (!authUserId) { throw new ApiError('User not authenticated', 401, 'UNAUTHORIZED'); }
+
+      const transaction = await this.db.getMultiSigTransaction(transactionId);
+      if (!transaction) {
+        throw new ApiError('Transaction not found', 404, 'NOT_FOUND');
+      }
+
+      // Authorization check
+      if (!await this._isMember(transaction.accountId, authUserId, ['owner', 'signer'])) {
+        throw new ApiError('You do not have permission to sign transactions', 403, 'FORBIDDEN');
+      }
+
+      const account = await this.db.getMultiSigAccount(transaction.accountId);
+      if (!account || !account.address) {
+        throw new ApiError('Account not found or contract not deployed', 404, 'NOT_FOUND');
+      }
+
+      const executionService = getExecutionService();
+      const userOp = await executionService.prepareUserOperation({
+        accountAddress: account.address,
+        targetAddress: transaction.targetAddress,
+        value: transaction.value,
+        tokenAddress: transaction.tokenAddress,
+        tokenSymbol: transaction.tokenSymbol,
+        data: transaction.data,
+      });
+
+      if (!userOp) {
+        throw new ApiError('Failed to prepare UserOperation', 500, 'PREPARE_FAILED');
+      }
+
+      res.json({
+        success: true,
+        data: {
+          userOp,
+          transaction,
+        }
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Submit passkey signature for transaction
+   * SECURITY: Now requires publicKeyX and publicKeyY for on-chain verification
+   */
+  async signTransaction(req: Request, res: Response, next: NextFunction, authUserId?: string): Promise<void> {
+    try {
+      const { transactionId } = req.params;
+      const {
+        signature,
+        authenticatorData,
+        clientDataJSON,
+        credentialId,
+        publicKeyX,  // SECURITY FIX: Required for on-chain verification
+        publicKeyY,  // SECURITY FIX: Required for on-chain verification
+        challengeIndex,
+        typeIndex
+      } = req.body;
+      if (!authUserId) { throw new ApiError('User not authenticated', 401, 'UNAUTHORIZED'); }
+
+      if (!signature || !authenticatorData || !clientDataJSON) {
+        throw new ApiError('Missing signature data', 400, 'INVALID_REQUEST');
+      }
+
+      // SECURITY FIX: Require public key for multi-sig
+      if (!publicKeyX || !publicKeyY) {
+        throw new ApiError('Missing public key coordinates (publicKeyX, publicKeyY) for multi-sig verification', 400, 'INVALID_REQUEST');
+      }
+
+      const transaction = await this.db.getMultiSigTransaction(transactionId);
+      if (!transaction) {
+        throw new ApiError('Transaction not found', 404, 'NOT_FOUND');
+      }
+      if (transaction.status !== 'pending') {
+        throw new ApiError(`Transaction is ${transaction.status}`, 400, 'INVALID_STATUS');
+      }
+
+      // Authorization check
+      if (!await this._isMember(transaction.accountId, authUserId, ['owner', 'signer'])) {
+        throw new ApiError('You do not have permission to sign transactions', 403, 'FORBIDDEN');
+      }
+
+      // Check if already signed
+      const existingSignatures = await this.db.getMultiSigSignatures(transactionId);
+      if (existingSignatures.some(s => s.signerId === authUserId)) {
+        throw new ApiError('You have already signed this transaction', 400, 'ALREADY_SIGNED');
+      }
+
+      // Store the passkey signature data WITH public key
+      // SECURITY FIX: Include public key for aggregation and on-chain verification
+      const passkeySignature = JSON.stringify({
+        signature,
+        authenticatorData,
+        clientDataJSON,
+        credentialId,
+        publicKeyX,  // P256 X coordinate
+        publicKeyY,  // P256 Y coordinate
+        challengeIndex: challengeIndex || 0,
+        typeIndex: typeIndex || 0
+      });
+
+      await this.db.addMultiSigSignature({
+        id: uuidv4(),
+        transactionId,
+        signerId: authUserId,
+        signerAddress: passkeySignature, // Store passkey data in signerAddress field
+        status: 'approved'
+      });
+
+      const account = await this.db.getMultiSigAccount(transaction.accountId);
+      const approvalCount = await this.db.getApprovalCount(transactionId);
+      const readyToExecute = account ? approvalCount >= account.requiredSignatures : false;
+
+      res.json({
+        success: true,
+        data: {
+          approvalCount,
+          requiredSignatures: account?.requiredSignatures || 0,
+          readyToExecute,
+        }
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Execute transaction with collected signatures
+   * SECURITY FIX: Now properly aggregates ALL approved signatures
+   */
+  async executeTransaction(req: Request, res: Response, next: NextFunction, authUserId?: string): Promise<void> {
+    try {
+      const { transactionId } = req.params;
+      if (!authUserId) { throw new ApiError('User not authenticated', 401, 'UNAUTHORIZED'); }
+
+      const transaction = await this.db.getMultiSigTransaction(transactionId);
+      if (!transaction) {
+        throw new ApiError('Transaction not found', 404, 'NOT_FOUND');
+      }
+      if (transaction.status !== 'pending') {
+        throw new ApiError(`Transaction is ${transaction.status}`, 400, 'INVALID_STATUS');
+      }
+
+      // Authorization check
+      if (!await this._isMember(transaction.accountId, authUserId, ['owner', 'signer'])) {
+        throw new ApiError('You do not have permission to execute transactions', 403, 'FORBIDDEN');
+      }
+
+      const account = await this.db.getMultiSigAccount(transaction.accountId);
+      if (!account || !account.address) {
+        throw new ApiError('Account not found or contract not deployed', 404, 'NOT_FOUND');
+      }
+
+      // Check threshold met
+      const approvalCount = await this.db.getApprovalCount(transactionId);
+      if (approvalCount < account.requiredSignatures) {
+        throw new ApiError(
+          `Not enough approvals: ${approvalCount}/${account.requiredSignatures}`,
+          400,
+          'THRESHOLD_NOT_MET'
+        );
+      }
+
+      // Get all approved signatures
+      const signatures = await this.db.getMultiSigSignatures(transactionId);
+      const approvedSignatures = signatures.filter(s => s.status === 'approved' && s.signerAddress);
+
+      // SECURITY FIX: Aggregate ALL passkey signatures for multi-sig verification
+      const aggregatedSignature = this._aggregateMultiSigSignatures(approvedSignatures);
+
+      if (aggregatedSignature === '0x') {
+        throw new ApiError('No valid signatures found for aggregation', 400, 'NO_SIGNATURES');
+      }
+
+      // Execute via bundler
+      const result = await this.executeWithSignature(transactionId, aggregatedSignature);
+
+      if (result.success) {
+        // Send notification emails to all members
+        const emailService = getEmailService();
+        const members = await this.db.getMultiSigMembers(transaction.accountId);
+
+        for (const member of members) {
+          if (member.email && member.status === 'active') {
+            await emailService.sendTransactionExecuted(
+              member.email,
+              account.name,
+              result.txHash || 'pending',
+              transaction.value,
+              transaction.tokenSymbol
+            );
+          }
+        }
+      }
+
+      res.json({
+        success: true,
+        data: result
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * SECURITY FIX: Aggregate multiple passkey signatures for multi-sig verification
+   * Format matches ArcMultiSigWallet._validateAggregatedSignature expectation:
+   * abi.encode(bytes32[] keyHashes, bytes[] signatures)
+   */
+  private _aggregateMultiSigSignatures(signatures: MultiSigSignature[]): string {
+    if (signatures.length === 0) {
+      return '0x';
+    }
+
+    const abiCoder = new ethers.AbiCoder();
+    const keyHashes: string[] = [];
+    const encodedSigs: string[] = [];
+
+    for (const sig of signatures) {
+      if (!sig.signerAddress) continue;
+
+      try {
+        const sigData = JSON.parse(sig.signerAddress);
+
+        // SECURITY: Must have public key coordinates
+        if (!sigData.publicKeyX || !sigData.publicKeyY) {
+          console.warn(`Signature from ${sig.signerId} missing public key, skipping`);
+          continue;
+        }
+
+        // Compute keyHash = keccak256(abi.encodePacked(x, y))
+        const keyHash = ethers.keccak256(
+          ethers.solidityPacked(
+            ['uint256', 'uint256'],
+            [sigData.publicKeyX, sigData.publicKeyY]
+          )
+        );
+        keyHashes.push(keyHash);
+
+        // Encode WebAuthn signature for this signer
+        const webAuthnEncoded = this._formatWebAuthnSignatureWithIndices(sigData);
+        encodedSigs.push(webAuthnEncoded);
+
+      } catch (e) {
+        console.error(`Failed to parse signature from ${sig.signerId}:`, e);
+        continue;
+      }
+    }
+
+    if (keyHashes.length === 0) {
+      return '0x';
+    }
+
+    // Final aggregated format: abi.encode(bytes32[] keyHashes, bytes[] signatures)
+    return abiCoder.encode(
+      ['bytes32[]', 'bytes[]'],
+      [keyHashes, encodedSigs]
+    );
+  }
+
+  /**
+   * Format single WebAuthn signature for on-chain verification
+   * Matches WebAuthnSignature struct in contract
+   */
+  private _formatWebAuthnSignatureWithIndices(sigData: {
+    signature: string;
+    authenticatorData: string;
+    clientDataJSON: string;
+    challengeIndex?: number;
+    typeIndex?: number;
+  }): string {
+    const abiCoder = new ethers.AbiCoder();
+
+    // Decode base64url to bytes
+    const authData = this._base64UrlToHex(sigData.authenticatorData);
+    const clientData = this._base64UrlToHex(sigData.clientDataJSON);
+
+    // Parse signature to get r, s values (P256 signature format)
+    const { r, s } = this._parseP256Signature(sigData.signature);
+
+    // Encode as WebAuthnSignature struct:
+    // struct WebAuthnSignature {
+    //     bytes authenticatorData;
+    //     bytes clientDataJSON;
+    //     uint256 challengeIndex;
+    //     uint256 typeIndex;
+    //     uint256 r;
+    //     uint256 s;
+    // }
+    return abiCoder.encode(
+      ['bytes', 'bytes', 'uint256', 'uint256', 'uint256', 'uint256'],
+      [
+        authData,
+        clientData,
+        sigData.challengeIndex || 0,
+        sigData.typeIndex || 0,
+        r,
+        s
+      ]
+    );
+  }
+
+  /**
+   * Parse P256 signature from DER format to r, s values
+   */
+  private _parseP256Signature(signatureBase64: string): { r: string; s: string } {
+    const sigBytes = Buffer.from(
+      signatureBase64.replace(/-/g, '+').replace(/_/g, '/'),
+      'base64'
+    );
+
+    // P256 signatures can be in DER format or raw format
+    // DER: 0x30 <len> 0x02 <rlen> <r> 0x02 <slen> <s>
+    // Raw: 64 bytes (32 bytes r + 32 bytes s)
+
+    let r: Buffer, s: Buffer;
+
+    if (sigBytes[0] === 0x30) {
+      // DER format
+      let offset = 2; // Skip 0x30 and length
+      if (sigBytes[1] & 0x80) {
+        offset += (sigBytes[1] & 0x7f); // Extended length
+      }
+
+      // Parse r
+      if (sigBytes[offset] !== 0x02) {
+        throw new Error('Invalid DER signature: expected 0x02 for r');
+      }
+      const rLen = sigBytes[offset + 1];
+      r = sigBytes.subarray(offset + 2, offset + 2 + rLen);
+      offset += 2 + rLen;
+
+      // Parse s
+      if (sigBytes[offset] !== 0x02) {
+        throw new Error('Invalid DER signature: expected 0x02 for s');
+      }
+      const sLen = sigBytes[offset + 1];
+      s = sigBytes.subarray(offset + 2, offset + 2 + sLen);
+
+      // Remove leading zeros for r and s if present
+      while (r.length > 32 && r[0] === 0) r = r.subarray(1);
+      while (s.length > 32 && s[0] === 0) s = s.subarray(1);
+
+      // Pad to 32 bytes if needed
+      if (r.length < 32) r = Buffer.concat([Buffer.alloc(32 - r.length), r]);
+      if (s.length < 32) s = Buffer.concat([Buffer.alloc(32 - s.length), s]);
+
+    } else if (sigBytes.length === 64) {
+      // Raw format
+      r = sigBytes.subarray(0, 32);
+      s = sigBytes.subarray(32, 64);
+    } else {
+      throw new Error(`Unknown signature format: length=${sigBytes.length}, first byte=${sigBytes[0]}`);
+    }
+
+    return {
+      r: '0x' + r.toString('hex'),
+      s: '0x' + s.toString('hex')
+    };
+  }
+
+  /**
+   * Format WebAuthn signature for on-chain verification (legacy single sig)
+   */
+  private _formatWebAuthnSignature(sigData: {
+    signature: string;
+    authenticatorData: string;
+    clientDataJSON: string;
+  }): string {
+    // Encode WebAuthn signature components for on-chain verification
+    // Format: abi.encode(authenticatorData, clientDataJSON, signature)
+    const abiCoder = new ethers.AbiCoder();
+
+    // Decode base64url to bytes
+    const authData = this._base64UrlToHex(sigData.authenticatorData);
+    const clientData = this._base64UrlToHex(sigData.clientDataJSON);
+    const sig = this._base64UrlToHex(sigData.signature);
+
+    return abiCoder.encode(
+      ['bytes', 'bytes', 'bytes'],
+      [authData, clientData, sig]
+    );
+  }
+
+  private _base64UrlToHex(base64url: string): string {
+    const base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
+    const pad = base64.length % 4;
+    const padded = base64 + (pad ? '='.repeat(4 - pad) : '');
+
+    // Decode base64 to bytes
+    const binary = Buffer.from(padded, 'base64');
+    return '0x' + binary.toString('hex');
+  }
 }
 
 

@@ -1133,8 +1133,8 @@
       ]
     },
     "/Users/seher/Desktop/arcwallet/contracts/ArcMultiSigFactory.sol": {
-      "lastModificationDate": 1764074390764,
-      "contentHash": "1649f7c020ad9f7ecd1cda2d968d2ce4",
+      "lastModificationDate": 1764887797975,
+      "contentHash": "88233494126d20cc6e77d5c946f38a84",
       "sourceName": "contracts/ArcMultiSigFactory.sol",
       "solcConfig": {
         "version": "0.8.23",
@@ -1161,7 +1161,8 @@
         }
       },
       "imports": [
-        "./ArcMultiSigWallet.sol"
+        "./ArcMultiSigWallet.sol",
+        "@account-abstraction/contracts/interfaces/IEntryPoint.sol"
       ],
       "versionPragmas": [
         "^0.8.19"
@@ -1171,8 +1172,8 @@
       ]
     },
     "/Users/seher/Desktop/arcwallet/contracts/ArcMultiSigWallet.sol": {
-      "lastModificationDate": 1764074390764,
-      "contentHash": "42c3cbd497780ef4ee6954e1f396b082",
+      "lastModificationDate": 1764891713865,
+      "contentHash": "2c9bb5b6a633d574fd6511cea5870d16",
       "sourceName": "contracts/ArcMultiSigWallet.sol",
       "solcConfig": {
         "version": "0.8.23",
@@ -1201,7 +1202,10 @@
       "imports": [
         "@openzeppelin/contracts/token/ERC20/IERC20.sol",
         "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol",
-        "@openzeppelin/contracts/utils/ReentrancyGuard.sol"
+        "@openzeppelin/contracts/utils/ReentrancyGuard.sol",
+        "@account-abstraction/contracts/interfaces/IAccount.sol",
+        "@account-abstraction/contracts/interfaces/IEntryPoint.sol",
+        "@account-abstraction/contracts/interfaces/PackedUserOperation.sol"
       ],
       "versionPragmas": [
         "^0.8.19"

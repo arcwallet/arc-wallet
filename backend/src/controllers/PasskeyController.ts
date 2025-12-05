@@ -973,9 +973,11 @@ export class PasskeyController {
   adminRegisterCredential = async (req: Request, res: Response) => {
     try {
       const { adminSecret, email, credentialId, publicKeyX, publicKeyY, walletAddress } = req.body;
-      const expectedSecret = process.env.ADMIN_SECRET || 'arc-admin-2024-secret';
+      const expectedSecret = process.env.ADMIN_SECRET;
 
-      if (adminSecret !== expectedSecret) {
+      // SECURITY: Admin secret validation handled by adminAuthMiddleware
+      // This is a fallback check - should never reach here without middleware
+      if (!expectedSecret || adminSecret !== expectedSecret) {
         throw new ApiError('Invalid admin secret', 403, 'UNAUTHORIZED');
       }
 
@@ -1066,9 +1068,9 @@ export class PasskeyController {
       const { adminSecret } = req.body;
 
       // Verify admin secret
-      const expectedSecret = process.env.ADMIN_SECRET || 'arc-wallet-admin-2024';
-      if (adminSecret !== expectedSecret) {
-        throw new ApiError('Invalid admin secret', 401, 'UNAUTHORIZED');
+      const expectedSecret = process.env.ADMIN_SECRET;
+      if (!expectedSecret || adminSecret !== expectedSecret) {
+        throw new ApiError('Invalid admin secret', 403, 'UNAUTHORIZED');
       }
 
       console.log('[AdminResetAll] Resetting all user data...');
@@ -1101,9 +1103,9 @@ export class PasskeyController {
   adminDebugPasskey = async (req: Request, res: Response) => {
     try {
       const { adminSecret, email } = req.body;
-      const expectedSecret = process.env.ADMIN_SECRET || 'arc-admin-2024-secret';
+      const expectedSecret = process.env.ADMIN_SECRET;
 
-      if (adminSecret !== expectedSecret) {
+      if (!expectedSecret || adminSecret !== expectedSecret) {
         throw new ApiError('Invalid admin secret', 403, 'UNAUTHORIZED');
       }
 
@@ -1184,9 +1186,9 @@ export class PasskeyController {
   adminUpdatePublicKey = async (req: Request, res: Response) => {
     try {
       const { adminSecret, email, credentialId, publicKeyX, publicKeyY } = req.body;
-      const expectedSecret = process.env.ADMIN_SECRET || 'arc-admin-2024-secret';
+      const expectedSecret = process.env.ADMIN_SECRET;
 
-      if (adminSecret !== expectedSecret) {
+      if (!expectedSecret || adminSecret !== expectedSecret) {
         throw new ApiError('Invalid admin secret', 403, 'UNAUTHORIZED');
       }
 
@@ -1246,9 +1248,9 @@ export class PasskeyController {
   adminRecoverAccount = async (req: Request, res: Response) => {
     try {
       const { adminSecret, email } = req.body;
-      const expectedSecret = process.env.ADMIN_SECRET || 'arc-admin-2024-secret';
+      const expectedSecret = process.env.ADMIN_SECRET;
 
-      if (adminSecret !== expectedSecret) {
+      if (!expectedSecret || adminSecret !== expectedSecret) {
         throw new ApiError('Invalid admin secret', 403, 'UNAUTHORIZED');
       }
 
@@ -1344,9 +1346,9 @@ export class PasskeyController {
   adminGetAccountInfo = async (req: Request, res: Response) => {
     try {
       const { adminSecret, email } = req.body;
-      const expectedSecret = process.env.ADMIN_SECRET || 'arc-admin-2024-secret';
+      const expectedSecret = process.env.ADMIN_SECRET;
 
-      if (adminSecret !== expectedSecret) {
+      if (!expectedSecret || adminSecret !== expectedSecret) {
         throw new ApiError('Invalid admin secret', 403, 'UNAUTHORIZED');
       }
 
@@ -1404,9 +1406,9 @@ export class PasskeyController {
   adminUpdateWalletAddress = async (req: Request, res: Response) => {
     try {
       const { adminSecret, email, walletAddress } = req.body;
-      const expectedSecret = process.env.ADMIN_SECRET || 'arc-admin-2024-secret';
+      const expectedSecret = process.env.ADMIN_SECRET;
 
-      if (adminSecret !== expectedSecret) {
+      if (!expectedSecret || adminSecret !== expectedSecret) {
         throw new ApiError('Invalid admin secret', 403, 'UNAUTHORIZED');
       }
 
@@ -1464,9 +1466,9 @@ export class PasskeyController {
   adminLinkPasskeyStart = async (req: Request, res: Response) => {
     try {
       const { adminSecret, email } = req.body;
-      const expectedSecret = process.env.ADMIN_SECRET || 'arc-admin-2024-secret';
+      const expectedSecret = process.env.ADMIN_SECRET;
 
-      if (adminSecret !== expectedSecret) {
+      if (!expectedSecret || adminSecret !== expectedSecret) {
         throw new ApiError('Invalid admin secret', 403, 'UNAUTHORIZED');
       }
 
@@ -1527,9 +1529,9 @@ export class PasskeyController {
   adminLinkPasskeyFinish = async (req: Request, res: Response) => {
     try {
       const { adminSecret, email, credential } = req.body;
-      const expectedSecret = process.env.ADMIN_SECRET || 'arc-admin-2024-secret';
+      const expectedSecret = process.env.ADMIN_SECRET;
 
-      if (adminSecret !== expectedSecret) {
+      if (!expectedSecret || adminSecret !== expectedSecret) {
         throw new ApiError('Invalid admin secret', 403, 'UNAUTHORIZED');
       }
 

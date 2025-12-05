@@ -29,5 +29,22 @@ export declare class MultiSigController {
     approveTransaction(req: Request, res: Response, next: NextFunction, authUserId?: string): Promise<void>;
     rejectTransaction(req: Request, res: Response, next: NextFunction, authUserId?: string): Promise<void>;
     deployContract(req: Request, res: Response, next: NextFunction, authUserId?: string): Promise<void>;
+    /**
+     * Prepare transaction for signing - returns userOpHash
+     */
+    prepareTransaction(req: Request, res: Response, next: NextFunction, authUserId?: string): Promise<void>;
+    /**
+     * Submit passkey signature for transaction
+     */
+    signTransaction(req: Request, res: Response, next: NextFunction, authUserId?: string): Promise<void>;
+    /**
+     * Execute transaction with collected signatures
+     */
+    executeTransaction(req: Request, res: Response, next: NextFunction, authUserId?: string): Promise<void>;
+    /**
+     * Format WebAuthn signature for on-chain verification
+     */
+    private _formatWebAuthnSignature;
+    private _base64UrlToHex;
 }
 //# sourceMappingURL=MultiSigController.d.ts.map
