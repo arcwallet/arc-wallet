@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useMultiSig } from '../contexts/MultiSigContext';
 import { useSession } from '../contexts/SessionContext';
+import { usePasskeyAccount } from '../contexts/PasskeyAccountContext';
 import { formatUnits, parseUnits } from 'ethers';
+import MultiPasskeyManager from './MultiPasskeyManager';
 import '../styles/multisig.css';
 
 // Token addresses
@@ -25,6 +27,7 @@ interface Member {
 
 const MultiSigDashboard: React.FC = () => {
   const { email: currentEmail } = useSession();
+  const { address: walletAddress } = usePasskeyAccount();
   const {
     accounts,
     selectedAccount,
@@ -63,6 +66,7 @@ const MultiSigDashboard: React.FC = () => {
 
   // State for settings
   const [showSettings, setShowSettings] = useState(false);
+  const [showPasskeyManager, setShowPasskeyManager] = useState(false);
   const [addingMember, setAddingMember] = useState(false);
   const [addMemberEmail, setAddMemberEmail] = useState('');
   const [addMemberRole, setAddMemberRole] = useState<'signer' | 'viewer'>('signer');
@@ -168,12 +172,21 @@ const MultiSigDashboard: React.FC = () => {
       <div className="multisig-panel">
         <div className="panel-header">
           <h3>Multi-Sig Wallets</h3>
-          <button
-            className="btn-primary"
-            onClick={() => setShowCreateForm(true)}
-          >
-            + New Wallet
-          </button>
+          <div className="header-actions">
+            <button
+              className="btn-icon"
+              onClick={() => setShowPasskeyManager(true)}
+              title="Multi-Passkey Security"
+            >
+              🔐
+            </button>
+            <button
+              className="btn-primary"
+              onClick={() => setShowCreateForm(true)}
+            >
+              + New Wallet
+            </button>
+          </div>
         </div>
 
         {error && (
@@ -505,6 +518,23 @@ const MultiSigDashboard: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Multi-Passkey Manager Modal */}
+      {showPasskeyManager && walletAddress && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <MultiPasskeyManager
+              walletAddress={walletAddress}
+              backendUrl={import.meta.env.VITE_BACKEND_URL || 'https://arcwallet-backend.onrender.com'}
+              rpcUrl={import.meta.env.VITE_ARC_RPC_URL || 'https://rpc.arc.network'}
+              onClose={() => setShowPasskeyManager(false)}
+              onPasskeyAdded={() => {
+                // Refresh data after passkey added
+              }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };
