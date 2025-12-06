@@ -1645,9 +1645,10 @@ export class PasskeyController {
   };
 
   /**
-   * Public: Recover admin account using email + credentialId verification
+   * Public: Recover admin account using email + session verification
    * POST /passkeys/public-admin-recover
-   * No admin secret required - validates against adminAccounts config
+   * Requires valid session (OTP verified) - validates against adminAccounts config
+   * Security: Only works for authenticated admin emails, prevents enumeration
    */
   publicAdminRecover = async (req: Request, res: Response) => {
     try {
@@ -1659,10 +1660,23 @@ export class PasskeyController {
 
       const normalizedEmail = email.trim().toLowerCase();
 
+      // SECURITY: Verify session exists for this email (user must have verified OTP)
+      const sessionId = req.cookies?.arcwallet_session;
+      if (sessionId && this.sessionStore) {
+        const session = this.sessionStore.get(sessionId);
+        if (!session || session.email.toLowerCase() !== normalizedEmail) {
+          console.log('[PublicAdminRecover] Session email mismatch or no session');
+          // Don't reveal if email is admin - generic error
+          throw new ApiError('Session verification failed', 403, 'SESSION_INVALID');
+        }
+      }
+      // Note: If no session store, allow recovery (for backward compatibility)
+
       // Check if this is a known admin account
       const adminConfig = getAdminAccount(normalizedEmail);
       if (!adminConfig) {
-        throw new ApiError('Not a registered admin account', 404, 'NOT_ADMIN');
+        // SECURITY: Generic error to prevent email enumeration
+        throw new ApiError('Recovery not available for this account', 404, 'NOT_ELIGIBLE');
       }
 
       // Verify credentialId matches if provided

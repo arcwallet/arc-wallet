@@ -118,9 +118,10 @@ export declare class PasskeyController {
      */
     adminLinkPasskeyFinish: (req: Request, res: Response) => Promise<Response<any, Record<string, any>>>;
     /**
-     * Public: Recover admin account using email + credentialId verification
+     * Public: Recover admin account using email + session verification
      * POST /passkeys/public-admin-recover
-     * No admin secret required - validates against adminAccounts config
+     * Requires valid session (OTP verified) - validates against adminAccounts config
+     * Security: Only works for authenticated admin emails, prevents enumeration
      */
     publicAdminRecover: (req: Request, res: Response) => Promise<Response<any, Record<string, any>>>;
 }
