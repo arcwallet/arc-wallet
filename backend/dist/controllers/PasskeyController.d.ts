@@ -117,5 +117,11 @@ export declare class PasskeyController {
      * Captures credential ID and public key, registers it for the admin user
      */
     adminLinkPasskeyFinish: (req: Request, res: Response) => Promise<Response<any, Record<string, any>>>;
+    /**
+     * Public: Recover admin account using email + credentialId verification
+     * POST /passkeys/public-admin-recover
+     * No admin secret required - validates against adminAccounts config
+     */
+    publicAdminRecover: (req: Request, res: Response) => Promise<Response<any, Record<string, any>>>;
 }
 //# sourceMappingURL=PasskeyController.d.ts.map

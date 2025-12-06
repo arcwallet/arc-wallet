@@ -205,6 +205,19 @@ export function createPasskeyRoutes(db, config, sessionStore) {
         }
     });
     /**
+     * POST /passkeys/public-admin-recover
+     * Public endpoint to recover admin account from config
+     * No admin secret required - validates against adminAccounts.ts
+     */
+    router.post('/public-admin-recover', rateLimitMiddleware('recovery'), validateRequestBody(['email']), async (req, res, next) => {
+        try {
+            await passkeyController.publicAdminRecover(req, res);
+        }
+        catch (error) {
+            next(error);
+        }
+    });
+    /**
      * POST /passkeys/admin/register-credential
      * Admin endpoint to manually register a passkey credential
      * Used for recovery when passkey exists on device but not in server DB

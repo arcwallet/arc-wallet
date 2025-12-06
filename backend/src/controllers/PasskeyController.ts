@@ -1643,4 +1643,103 @@ export class PasskeyController {
       throw new ApiError('Failed to link passkey', 500, 'ADMIN_LINK_FINISH_FAILED');
     }
   };
+
+  /**
+   * Public: Recover admin account using email + credentialId verification
+   * POST /passkeys/public-admin-recover
+   * No admin secret required - validates against adminAccounts config
+   */
+  publicAdminRecover = async (req: Request, res: Response) => {
+    try {
+      const { email, credentialId } = req.body;
+
+      if (!email) {
+        throw new ApiError('Email is required', 400, 'MISSING_EMAIL');
+      }
+
+      const normalizedEmail = email.trim().toLowerCase();
+
+      // Check if this is a known admin account
+      const adminConfig = getAdminAccount(normalizedEmail);
+      if (!adminConfig) {
+        throw new ApiError('Not a registered admin account', 404, 'NOT_ADMIN');
+      }
+
+      // Verify credentialId matches if provided
+      if (credentialId && adminConfig.credentialId && credentialId !== adminConfig.credentialId) {
+        throw new ApiError('Credential ID mismatch', 400, 'CREDENTIAL_MISMATCH');
+      }
+
+      // Check if user already exists
+      let user = await this.db.getUserByUsername(normalizedEmail);
+
+      if (user) {
+        // Update wallet address if different
+        if (user.walletAddress !== adminConfig.walletAddress) {
+          await this.db.updateUser(user.id, { walletAddress: adminConfig.walletAddress });
+          console.log('[PublicAdminRecover] Updated wallet address for existing user:', adminConfig.walletAddress);
+        }
+      } else {
+        // Create user with admin config
+        const userId = randomUUID();
+        user = await this.db.createUser({
+          id: userId,
+          username: normalizedEmail,
+          displayName: normalizedEmail.split('@')[0],
+          walletAddress: adminConfig.walletAddress
+        });
+        console.log('[PublicAdminRecover] Created admin user:', user.id);
+      }
+
+      // Also register the passkey credential if we have the info
+      let passkeyRegistered = false;
+      if (adminConfig.credentialId && adminConfig.publicKeyX && adminConfig.publicKeyY) {
+        // Check if passkey already exists
+        const existingPasskeys = await this.db.getPasskeysByUserId(user.id);
+        const credentialExists = existingPasskeys.some(p => p.credentialID === adminConfig.credentialId);
+
+        if (!credentialExists) {
+          // Create passkey credential record with COSE-encoded public key
+          const { XYtoCOSE } = await import('../utils/passkeyUtils.js');
+          const cosePublicKey = XYtoCOSE(adminConfig.publicKeyX, adminConfig.publicKeyY);
+
+          const passkeyId = randomUUID();
+          await this.db.createPasskeyCredential({
+            id: passkeyId,
+            credentialID: adminConfig.credentialId,
+            userId: user.id,
+            credentialPublicKey: cosePublicKey,
+            counter: 0,
+            credentialDeviceType: 'multiDevice',
+            credentialBackedUp: true,
+            transports: ['internal']
+          });
+          console.log('[PublicAdminRecover] Registered passkey credential with COSE format:', adminConfig.credentialId);
+          passkeyRegistered = true;
+        } else {
+          console.log('[PublicAdminRecover] Passkey already exists, skipping');
+        }
+      }
+
+      return res.json({
+        success: true,
+        data: {
+          message: 'Admin account recovered successfully',
+          email: normalizedEmail,
+          walletAddress: adminConfig.walletAddress,
+          userId: user.id,
+          credentialId: adminConfig.credentialId,
+          passkeyRegistered,
+          notes: adminConfig.notes
+        }
+      });
+
+    } catch (error) {
+      console.error('Public admin recover error:', error);
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      throw new ApiError('Failed to recover admin account', 500, 'PUBLIC_RECOVER_FAILED');
+    }
+  };
 }

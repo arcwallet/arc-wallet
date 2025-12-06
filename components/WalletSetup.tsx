@@ -16,6 +16,28 @@ import { WaveBackground } from './WaveBackground';
 import arcLogo from '../assets/arclogo.png';
 import { Footer } from './Footer';
 
+// Known admin accounts for wallet recovery
+// These are used when backend DB loses passkey but wallet exists on chain
+const KNOWN_WALLETS: Record<string, {
+  address: string;
+  publicKeyX: string;
+  publicKeyY: string;
+  credentialId: string;
+}> = {
+  'sehereroglu786@gmail.com': {
+    address: '0x72c90791145C55966903D661Fc286eBbbB47f151',
+    publicKeyX: '0xa60c860ef7d5cc3a725eedcf05709c0793f1eb1c673e5a272edc5f8cde13eb08',
+    publicKeyY: '0x9fbc5dd1b24f071d7eb13e78b55297ca7d88c5ce6932799ca247883214d2f88e',
+    credentialId: 'N1wTvQCqlG3jaUcpSxAsAQ',
+  },
+  'seher@arcwallet.network': {
+    address: '0x72c90791145C55966903D661Fc286eBbbB47f151',
+    publicKeyX: '0xa60c860ef7d5cc3a725eedcf05709c0793f1eb1c673e5a272edc5f8cde13eb08',
+    publicKeyY: '0x9fbc5dd1b24f071d7eb13e78b55297ca7d88c5ce6932799ca247883214d2f88e',
+    credentialId: 'N1wTvQCqlG3jaUcpSxAsAQ',
+  },
+};
+
 interface WalletSetupProps {
   onComplete: () => void;
 }
@@ -36,6 +58,9 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
 
   // State to track if user has passkey on server
   const [hasServerPasskey, setHasServerPasskey] = useState<boolean | null>(null);
+
+  // Check if this is a known admin wallet that needs recovery
+  const knownWallet = currentEmail ? KNOWN_WALLETS[currentEmail.toLowerCase()] : null;
 
   // Detect legacy wallet migration scenario
   const hasLegacyWallet = hasExistingWallet && existingWalletAddress && !hasServerPasskey;
@@ -71,6 +96,47 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
     setIsCreating(true);
 
     try {
+      // FIRST: Check if this is a known wallet that needs recovery (PRIORITY)
+      // This must come before other checks to ensure admin wallets are always recovered
+      // NOTE: We check knownWallet regardless of hasServerPasskey value
+      if (knownWallet) {
+        console.log('[WalletSetup] Known wallet detected!', {
+          email: currentEmail,
+          address: knownWallet.address,
+          hasServerPasskey,
+        });
+
+        // If server has passkey, try normal connect first
+        if (hasServerPasskey === true) {
+          console.log('[WalletSetup] Server has passkey, will try normal connect');
+          // Continue to normal connect flow below
+        } else {
+          // Server doesn't have passkey OR we don't know yet - restore from hardcoded data
+          console.log('[WalletSetup] Restoring known wallet from hardcoded data:', knownWallet.address);
+          setStatusMessage(`Reconnecting to your wallet ${knownWallet.address.slice(0, 8)}...`);
+
+          // Save credential to localStorage so PasskeyAccountContext can restore it
+          const credData = {
+            credentialId: knownWallet.credentialId,
+            userId: currentEmail,
+            publicKeyX: knownWallet.publicKeyX,
+            publicKeyY: knownWallet.publicKeyY,
+            address: knownWallet.address,
+          };
+          localStorage.setItem('arcwallet:passkey:current', knownWallet.credentialId);
+          localStorage.setItem(`arcwallet:passkey:${knownWallet.credentialId}`, JSON.stringify(credData));
+          localStorage.setItem('arcwallet:lastAuthTime', Date.now().toString());
+
+          console.log('[WalletSetup] Restored known wallet to localStorage:', credData);
+          setStatusMessage('Wallet restored! Loading dashboard...');
+
+          // Call onComplete to go to dashboard directly
+          setIsCreating(false);
+          onComplete();
+          return;
+        }
+      }
+
       // CRITICAL: If user already has a wallet but no passkey, DON'T create new wallet!
       // This protects users who lost their passkey but still have funds in their wallet
       if (hasExistingWallet && existingWalletAddress && hasServerPasskey === false) {
@@ -184,7 +250,7 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
     } finally {
       setIsCreating(false);
     }
-  }, [createAccount, connect, onComplete, currentEmail, hasServerPasskey, hasExistingWallet, existingWalletAddress]);
+  }, [createAccount, connect, onComplete, currentEmail, hasServerPasskey, hasExistingWallet, existingWalletAddress, knownWallet]);
 
   // Auto-start wallet access when email is verified
   // Skip auto-start if user has legacy wallet without passkey (show warning first)
