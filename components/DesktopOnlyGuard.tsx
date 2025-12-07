@@ -34,10 +34,6 @@ const DesktopOnlyGuard: React.FC<DesktopOnlyGuardProps> = ({ children }) => {
     const checkDevice = () => {
       // Check screen width (mobile/tablet threshold: 1024px)
       const isSmallScreen = window.innerWidth < 1024;
-
-      // Also check for touch device as secondary indicator
-      const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-
       // Consider mobile if screen is small (primary check)
       // Touch alone doesn't make it mobile (laptops have touch too)
       setIsMobile(isSmallScreen);

@@ -108,6 +108,7 @@ export const PasskeyAccountProvider: React.FC<PasskeyAccountProviderProps> = ({ 
 
   // Restore credential from localStorage when currentEmail changes
   // IMPORTANT: Only restore if the stored credential belongs to current user
+  // ALSO: Check backend if localStorage has no credential for this user
   useEffect(() => {
     const restoreCredential = async () => {
       if (!manager || !currentEmail) {
@@ -133,51 +134,79 @@ export const PasskeyAccountProvider: React.FC<PasskeyAccountProviderProps> = ({ 
           // CRITICAL: Check if stored credential belongs to current user
           if (storedCred.userId !== currentEmail) {
             console.log('[PasskeyAccount] Stored credential belongs to different user:', storedCred.userId, '!= ', currentEmail);
-            // Clear state - this user doesn't have a passkey yet
+            // Don't clear hasAccount yet - check backend first
+          } else {
+            setHasAccount(true);
+            setCredential(storedCred);
+            console.log('[PasskeyAccount] Found existing credential for current user:', storedCred);
+
+            // Restore address from stored credential
+            if (storedCred.publicKeyX && storedCred.publicKeyY && storedCred.userId) {
+              try {
+                const restoredAddress = await manager.restoreFromCredential(storedCred);
+                setAddress(restoredAddress);
+
+                // Check if last auth was within 15 minutes - auto-connect if so
+                const SESSION_DURATION = 15 * 60 * 1000; // 15 minutes
+                const lastAuthTime = localStorage.getItem('arcwallet:lastAuthTime');
+                const isSessionValid = lastAuthTime && (Date.now() - parseInt(lastAuthTime)) < SESSION_DURATION;
+
+                if (isSessionValid) {
+                  setIsConnected(true);
+                  console.log('[PasskeyAccount] Session valid, auto-connected:', restoredAddress);
+                } else {
+                  setIsConnected(false);
+                  console.log('[PasskeyAccount] Session expired, requires passkey auth:', restoredAddress);
+                }
+              } catch (err) {
+                console.error('[PasskeyAccount] Failed to restore address:', err);
+              }
+            }
+            return; // Credential found and restored, no need to check backend
+          }
+        }
+      }
+
+      // No valid localStorage credential for this user - check backend
+      console.log('[PasskeyAccount] No localStorage credential, checking backend for:', currentEmail);
+      try {
+        const backendUrl = (import.meta as any).env.VITE_PASSKEY_API_URL || 'https://arcwallet-backend.onrender.com';
+        const response = await fetch(`${backendUrl}/passkeys/check-user`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: currentEmail }),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.data?.hasPasskey) {
+            console.log('[PasskeyAccount] Backend confirms passkey exists for user, passkeyCount:', data.data.passkeyCount, 'walletAddress:', data.data.walletAddress);
+            // User has passkey on backend but not in localStorage
+            // Set hasAccount to true so they can use "connect" flow
+            setHasAccount(true);
             setIsConnected(false);
+            // Set wallet address from backend so ActivityContext can fetch history
+            setAddress(data.data.walletAddress || null);
+            setCredential(null);
+          } else {
+            console.log('[PasskeyAccount] Backend confirms no passkey for user');
             setHasAccount(false);
+            setIsConnected(false);
             setAddress(null);
             setCredential(null);
-            return;
-          }
-
-          setHasAccount(true);
-          setCredential(storedCred);
-          console.log('[PasskeyAccount] Found existing credential for current user:', storedCred);
-
-          // Restore address from stored credential
-          if (storedCred.publicKeyX && storedCred.publicKeyY && storedCred.userId) {
-            try {
-              const restoredAddress = await manager.restoreFromCredential(storedCred);
-              setAddress(restoredAddress);
-
-              // Check if last auth was within 15 minutes - auto-connect if so
-              const SESSION_DURATION = 15 * 60 * 1000; // 15 minutes
-              const lastAuthTime = localStorage.getItem('arcwallet:lastAuthTime');
-              const isSessionValid = lastAuthTime && (Date.now() - parseInt(lastAuthTime)) < SESSION_DURATION;
-
-              if (isSessionValid) {
-                setIsConnected(true);
-                console.log('[PasskeyAccount] Session valid, auto-connected:', restoredAddress);
-              } else {
-                setIsConnected(false);
-                console.log('[PasskeyAccount] Session expired, requires passkey auth:', restoredAddress);
-              }
-            } catch (err) {
-              console.error('[PasskeyAccount] Failed to restore address:', err);
-            }
           }
         } else {
-          // No stored credential for this user
-          setIsConnected(false);
+          console.warn('[PasskeyAccount] Backend check failed, assuming no account');
           setHasAccount(false);
+          setIsConnected(false);
           setAddress(null);
           setCredential(null);
         }
-      } else {
-        // No stored credential at all
-        setIsConnected(false);
+      } catch (err) {
+        console.error('[PasskeyAccount] Backend check error:', err);
+        // On error, default to no account (safe fallback)
         setHasAccount(false);
+        setIsConnected(false);
         setAddress(null);
         setCredential(null);
       }

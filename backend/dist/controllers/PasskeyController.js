@@ -816,7 +816,8 @@ export class PasskeyController {
                 data: {
                     hasPasskey: passkeys.length > 0,
                     passkeyCount: passkeys.length,
-                    userId: user.id
+                    userId: user.id,
+                    walletAddress: user.walletAddress || null
                 }
             });
         }

@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AddIcon, TrashIcon } from './Icons';
-import { parseUnits } from 'ethers';
 
 interface Transaction {
     to: string;

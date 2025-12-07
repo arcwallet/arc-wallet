@@ -1,7 +1,6 @@
 import React from 'react';
 import { WaveBackground } from '../components/WaveBackground';
 import arcLogo from '../assets/arclogo.png';
-import { ArrowUpRightIcon } from '../components/Icons';
 
 const PrivacyPolicy: React.FC = () => {
     const handleBack = () => {
