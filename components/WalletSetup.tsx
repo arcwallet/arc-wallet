@@ -48,6 +48,9 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
   // Known wallet data fetched from backend for recovery
   const [knownWallet, setKnownWallet] = useState<KnownWalletData | null>(null);
 
+  // Show link existing passkey option
+  const [showLinkOption, setShowLinkOption] = useState(false);
+
   // Detect legacy wallet migration scenario
   const hasLegacyWallet = hasExistingWallet && existingWalletAddress && !hasServerPasskey;
 
@@ -246,6 +249,40 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
     }
   }, [createAccount, connect, onComplete, currentEmail, hasServerPasskey, hasExistingWallet, existingWalletAddress, knownWallet]);
 
+  // Link existing passkey from device (for users who have passkey but lost server data)
+  const handleLinkExistingPasskey = useCallback(async () => {
+    if (!currentEmail) {
+      setError('Please verify your email first.');
+      return;
+    }
+
+    setIsCreating(true);
+    setError(null);
+    setStatusMessage('Looking for your existing passkey...');
+
+    try {
+      // Try to connect with passkey - this will prompt the user to select their existing passkey
+      const result = await connect();
+      console.log('[WalletSetup] Successfully linked existing passkey:', result.address);
+      setStatusMessage('Passkey linked successfully! Loading dashboard...');
+      onComplete();
+    } catch (err: any) {
+      console.error('[WalletSetup] Link passkey failed:', err);
+      const errorMessage = err.message?.toLowerCase() || '';
+
+      if (errorMessage.includes('cancelled') || errorMessage.includes('canceled') || errorMessage.includes('not allowed')) {
+        setError(null);
+        setStatusMessage('Passkey selection cancelled. Try again when ready.');
+      } else if (errorMessage.includes('no credential') || errorMessage.includes('not found')) {
+        setError('No passkey found on this device. Please use the device where you created your passkey.');
+      } else {
+        setError(`Failed to link passkey: ${err.message}`);
+      }
+    } finally {
+      setIsCreating(false);
+    }
+  }, [connect, currentEmail, onComplete]);
+
   // Auto-start wallet access when email is verified
   // Skip auto-start if user has legacy wallet without passkey (show warning first)
   useEffect(() => {
@@ -360,6 +397,25 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
                 </>
               )}
             </button>
+
+            {/* Link Existing Passkey Option - for users who have passkey on device but not on server */}
+            {hasServerPasskey === false && !isCreating && (
+              <div className="pt-4 border-t border-slate-700/50">
+                <p className="text-xs text-center text-slate-400 mb-3">
+                  Already have a passkey for Arc Wallet on this device?
+                </p>
+                <button
+                  onClick={handleLinkExistingPasskey}
+                  disabled={isConnecting || isCreating || !currentEmail}
+                  className="w-full bg-transparent hover:bg-slate-800/50 text-slate-300 hover:text-white font-medium py-3 rounded-lg transition-all duration-200 border border-slate-600/50 hover:border-slate-500 flex items-center justify-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                  </svg>
+                  Link Existing Passkey
+                </button>
+              </div>
+            )}
 
             {/* Info text */}
             <p className="text-xs text-center text-slate-500">
