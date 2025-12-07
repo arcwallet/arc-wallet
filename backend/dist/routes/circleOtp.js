@@ -29,6 +29,17 @@ const COOKIE_BASE_OPTIONS = (isProd) => ({
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     path: '/',
 });
+// BETA ACCESS: Only allow specific emails until public launch
+// Set ALLOWED_EMAILS env var or use default whitelist
+const ALLOWED_EMAILS = process.env.ALLOWED_EMAILS
+    ? process.env.ALLOWED_EMAILS.split(',').map(e => e.trim().toLowerCase())
+    : ['sehereroglu786@gmail.com'];
+const isEmailAllowed = (email) => {
+    // If no whitelist configured (empty), allow all emails
+    if (ALLOWED_EMAILS.length === 0)
+        return true;
+    return ALLOWED_EMAILS.includes(email.toLowerCase());
+};
 /**
  * Mask email for logging (PII protection)
  * example@domain.com -> e***e@d***.com
@@ -137,6 +148,14 @@ export const createCircleOtpRouter = (config, db, sessionStore) => {
         const email = sanitizeEmail(req.body?.email);
         if (!email) {
             return res.status(400).json({ success: false, error: 'Please provide a valid email address.' });
+        }
+        // BETA ACCESS: Check if email is in whitelist
+        if (!isEmailAllowed(email)) {
+            console.log(`[OTP] Beta access denied for: ${maskEmail(email)}`);
+            return res.status(403).json({
+                success: false,
+                error: 'Arc Wallet is currently in private beta. Please join our waitlist for early access.',
+            });
         }
         if (!sendgridApiKey) {
             return res.status(500).json({ success: false, error: 'Email service not configured' });
