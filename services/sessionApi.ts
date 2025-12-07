@@ -4,14 +4,11 @@ const resolveUrl = (path: string) => `${API_BASE}${path}`;
 import { getCsrfToken, refreshCsrfToken } from './csrfService';
 
 // Admin emails get extended timeouts (5 minutes instead of 30 seconds)
-// These accounts are used for testing and development
-const ADMIN_EMAILS = [
-  'sehereroglu786@gmail.com',
-  'seher@arc.network',
-  'admin@arcwallet.network',
-  'test@arcwallet.network',
-  ((import.meta as any).env.VITE_ADMIN_EMAIL || '').toLowerCase(),
-].filter(Boolean);
+// Configure via VITE_ADMIN_EMAILS env variable (comma-separated list)
+const ADMIN_EMAILS = ((import.meta as any).env.VITE_ADMIN_EMAILS || '')
+  .split(',')
+  .map((email: string) => email.trim().toLowerCase())
+  .filter(Boolean);
 
 const ADMIN_TIMEOUT_MS = 300000; // 5 minutes for admin accounts
 const DEFAULT_TIMEOUT_MS = 30000; // 30 seconds for regular users

@@ -463,5 +463,25 @@ export function createPasskeyRoutes(db: Database, config: EnvConfig, sessionStor
     }
   );
 
+  /**
+   * POST /passkeys/sync-credential
+   * Public endpoint to sync credential from frontend to backend
+   * Used when frontend recovered credential from chain or localStorage
+   * Requires valid session (user must be authenticated)
+   */
+  router.post(
+    '/sync-credential',
+    authMiddleware(config.JWT_SECRET, sessionStore),
+    rateLimitMiddleware('general'),
+    validateRequestBody(['email', 'credentialId', 'publicKeyX', 'publicKeyY', 'walletAddress']),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        await passkeyController.syncCredential(req, res);
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
+
   return router;
 }

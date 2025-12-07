@@ -5,8 +5,8 @@
  */
 
 import { Contract, Interface, parseUnits, formatUnits } from 'ethers';
-import { getProvider } from './transactionService';
-import type { PasskeyAccountManager } from './passkeyAccountService';
+import { getProvider } from './rpcProvider';
+import type { PasskeyAccountManager } from './passkeyAccountManager';
 
 // Arc Testnet Contract Addresses (Verified on Blockscout)
 export const USYC_CONTRACTS = {

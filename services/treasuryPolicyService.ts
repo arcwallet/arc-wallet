@@ -14,9 +14,9 @@
 // TYPES & INTERFACES
 // ============================================
 
-export type UserRole = 'admin' | 'treasury_manager' | 'operator' | 'viewer' | 'approver';
+export type UserRole = 'admin' | 'treasury_manager' | 'operator' | 'viewer' | 'approver' | 'member';
 
-export type TransactionType = 'transfer' | 'subscribe' | 'redeem' | 'swap';
+export type TransactionType = 'transfer' | 'subscribe' | 'redeem' | 'swap' | 'rebalance';
 
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected' | 'expired' | 'executed';
 

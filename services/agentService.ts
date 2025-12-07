@@ -1,7 +1,7 @@
 // Frontend service to communicate with Arc Agent backend
 
 // Base URL for backend API (can be overridden via VITE env variable)
-const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || 'https://arcwallet-backend.onrender.com';
+const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:4000';
 
 export interface AgentResponse {
     message: string;

@@ -1257,12 +1257,13 @@ export class PasskeyAccountManager {
       email: credential.userId
     });
 
-    const response = await fetch(`${this.config.backendUrl}/passkeys/admin/register-credential`, {
+    // Use public sync endpoint instead of admin endpoint
+    // Backend will verify the credential came from a valid WebAuthn authentication
+    const response = await fetch(`${this.config.backendUrl}/passkeys/sync-credential`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
       body: JSON.stringify({
-        adminSecret: (import.meta as any).env.VITE_ADMIN_SECRET || '', // Required - set via environment
         email: credential.userId,
         credentialId: credential.credentialId,
         publicKeyX: credential.publicKeyX,

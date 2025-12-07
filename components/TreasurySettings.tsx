@@ -409,6 +409,7 @@ const RolePermissionsTab: React.FC<{ policy: TreasuryPolicy }> = ({ policy }) =>
     operator: 'Operator',
     approver: 'Approver',
     viewer: 'Viewer',
+    member: 'Member',
   };
 
   const roleColors: Record<UserRole, string> = {
@@ -417,6 +418,7 @@ const RolePermissionsTab: React.FC<{ policy: TreasuryPolicy }> = ({ policy }) =>
     operator: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
     approver: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
     viewer: 'bg-slate-500/20 text-slate-400 border-slate-500/30',
+    member: 'bg-green-500/20 text-green-400 border-green-500/30',
   };
 
   return (

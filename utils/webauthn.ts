@@ -76,6 +76,7 @@ export async function createRegistrationCredential(options: PublicKeyCredentialC
     user: {
       ...options.user,
       id: base64UrlToBuffer(options.user.id),
+      displayName: options.user.displayName || options.user.name,
     },
     excludeCredentials: options.excludeCredentials?.map((credential) => ({
       ...credential,

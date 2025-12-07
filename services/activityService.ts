@@ -1,5 +1,5 @@
 import { formatEther, formatUnits, Interface } from 'ethers';
-import { getProvider } from './transactionService';
+import { getProvider } from './rpcProvider';
 import type { Transaction } from '../types';
 import { TransactionStatus, TransactionType } from '../types';
 import { API_ENDPOINTS, BLOCKSCOUT_API_URL } from '../config/app.config';

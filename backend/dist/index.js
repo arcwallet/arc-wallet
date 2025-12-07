@@ -19,6 +19,7 @@ import { createWebhookRouter } from './routes/webhooks.js';
 import { createGasStationRouter } from './routes/gasStation.js';
 import { createBundlerRouter } from './routes/bundler.js';
 import { createSepoliaBundlerRouter } from './routes/sepoliaBundler.js';
+import { createRecoveryRoutes } from './routes/recovery.js';
 import { WalletBackupService } from './services/walletBackupService.js';
 import { IndexerService } from './services/indexerService.js';
 import { getBundlerService } from './services/bundlerService.js';
@@ -118,6 +119,7 @@ app.use('/api/webhooks', createWebhookRouter());
 app.use('/api/gas-station', createGasStationRouter());
 app.use('/api/bundler', createBundlerRouter());
 app.use('/api/bundler/sepolia', createSepoliaBundlerRouter());
+app.use('/api/recovery', createRecoveryRoutes(db, config, magicSessionStore));
 // Agent temporarily disabled - will integrate new AI solution
 // app.use('/api/agent', agentRouter);
 // Initialize indexer database

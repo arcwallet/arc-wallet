@@ -7,6 +7,7 @@ import { WalletIcon, CopyIcon, AddIcon, LaptopIcon, PhoneIcon, ChevronDownIcon, 
 
 import WebhookManager from './WebhookManager';
 import NotificationManager from './NotificationManager';
+import BackupKeyManager from './BackupKeyManager';
 
 import { ARC_TESTNET_CONTRACTS, KEY_TYPE } from '../config/contracts';
 
@@ -331,6 +332,68 @@ const SmartWalletSection: React.FC = () => {
     );
 };
 
+// Backup Key Recovery Section for individual users
+const BackupKeyRecoverySection: React.FC = () => {
+    const { address } = usePasskeyAccount();
+    const [showBackupManager, setShowBackupManager] = useState(false);
+
+    if (!address) {
+        return null;
+    }
+
+    return (
+        <div className="flex flex-col gap-4 rounded-xl bg-slate-900/60 backdrop-blur-sm border border-slate-500/50 p-5 sm:p-6">
+            <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
+                <div className="flex flex-col gap-1">
+                    <h3 className="text-lg font-semibold text-slate-100 flex items-center gap-2">
+                        <LockIcon size={20} className="text-amber-400" />
+                        Wallet Recovery
+                    </h3>
+                    <p className="text-sm text-slate-400">Add backup devices for instant wallet recovery</p>
+                </div>
+                <button
+                    onClick={() => setShowBackupManager(!showBackupManager)}
+                    className="flex h-10 items-center justify-center rounded-lg bg-amber-600 hover:bg-amber-500 px-4 text-sm font-medium text-white transition-all"
+                >
+                    {showBackupManager ? 'Hide' : 'Manage Backup Keys'}
+                </button>
+            </div>
+
+            {!showBackupManager && (
+                <div className="rounded-lg border border-slate-600/30 bg-slate-800/30 p-4">
+                    <div className="flex items-start gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-amber-500/20 flex items-center justify-center flex-shrink-0">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-amber-400">
+                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                            </svg>
+                        </div>
+                        <div>
+                            <p className="text-sm text-slate-300 mb-2">
+                                <strong className="text-white">Lost your passkey?</strong> Recover your wallet instantly using a backup device.
+                            </p>
+                            <ul className="text-xs text-slate-400 space-y-1">
+                                <li>• Add up to 3 backup devices (iPhone, iPad, Mac)</li>
+                                <li>• Instant recovery - no waiting period</li>
+                                <li>• Each backup device can restore full wallet access</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {showBackupManager && (
+                <BackupKeyManager
+                    walletAddress={address}
+                    rpcUrl="https://rpc-testnet.arc.network"
+                    onBackupKeyAdded={() => console.log('Backup key added')}
+                    onRecoveryComplete={() => console.log('Recovery complete')}
+                    onClose={() => setShowBackupManager(false)}
+                />
+            )}
+        </div>
+    );
+};
+
 const SessionInfoSection: React.FC = () => {
     const { email, logout: sessionLogout } = useSession();
     const { disconnect } = usePasskeyAccount();
@@ -380,6 +443,8 @@ const Settings: React.FC = () => {
                 {/* Settings Sections */}
                 <div className="flex flex-col gap-8">
                     <SecuritySection />
+
+                    <BackupKeyRecoverySection />
 
                     <SmartWalletSection />
 

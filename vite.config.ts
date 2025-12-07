@@ -56,6 +56,33 @@ export default defineConfig(({ mode }) => {
       commonjsOptions: {
         transformMixedEsModules: true,
       },
+      // Remove console.log in production builds
+      minify: 'esbuild',
+      // Code splitting for better bundle size
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            // Separate ethers into its own chunk (largest dependency)
+            if (id.includes('node_modules/ethers')) {
+              return 'vendor-ethers';
+            }
+            // React core libraries
+            if (id.includes('node_modules/react') || id.includes('node_modules/react-dom') || id.includes('node_modules/react-router')) {
+              return 'vendor-react';
+            }
+            // UI libraries
+            if (id.includes('node_modules/framer-motion') || id.includes('node_modules/lucide-react') || id.includes('node_modules/react-hot-toast')) {
+              return 'vendor-ui';
+            }
+          },
+        },
+      },
+      // Increase chunk size warning limit (ethers is large)
+      chunkSizeWarningLimit: 600,
+    },
+    esbuild: {
+      // Drop console.log and debugger in production
+      drop: isProd ? ['console', 'debugger'] : [],
     },
   };
 });

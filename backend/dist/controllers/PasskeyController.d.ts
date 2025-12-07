@@ -124,5 +124,11 @@ export declare class PasskeyController {
      * Security: Only works for authenticated admin emails, prevents enumeration
      */
     publicAdminRecover: (req: Request, res: Response) => Promise<Response<any, Record<string, any>>>;
+    /**
+     * Sync credential from frontend to backend
+     * Used when frontend recovered credential from chain or localStorage
+     * Requires valid session - user must be authenticated via JWT
+     */
+    syncCredential: (req: Request, res: Response) => Promise<Response<any, Record<string, any>> | undefined>;
 }
 //# sourceMappingURL=PasskeyController.d.ts.map

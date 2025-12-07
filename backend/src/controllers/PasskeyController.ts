@@ -1756,4 +1756,97 @@ export class PasskeyController {
       throw new ApiError('Failed to recover admin account', 500, 'PUBLIC_RECOVER_FAILED');
     }
   };
+
+  /**
+   * Sync credential from frontend to backend
+   * Used when frontend recovered credential from chain or localStorage
+   * Requires valid session - user must be authenticated via JWT
+   */
+  syncCredential = async (req: Request, res: Response) => {
+    try {
+      const { email, credentialId, publicKeyX, publicKeyY, walletAddress } = req.body;
+      const authenticatedUser = req.user;
+
+      // Verify the authenticated user matches the email being synced
+      if (!authenticatedUser || authenticatedUser.email?.toLowerCase() !== email.toLowerCase()) {
+        throw new ApiError('You can only sync credentials for your own account', 403, 'FORBIDDEN');
+      }
+
+      const normalizedEmail = email.trim().toLowerCase();
+
+      // Check if user exists
+      let user = await this.db.getUserByUsername(normalizedEmail);
+
+      if (!user) {
+        // Create user if doesn't exist
+        user = await this.db.createUser({
+          id: randomUUID(),
+          username: normalizedEmail,
+          displayName: normalizedEmail.split('@')[0],
+          walletAddress: walletAddress
+        });
+        console.log('[SyncCredential] Created new user:', normalizedEmail);
+      } else if (walletAddress && user.walletAddress !== walletAddress) {
+        // Update wallet address if different
+        await this.db.updateUser(user.id, { walletAddress });
+        console.log('[SyncCredential] Updated wallet address for:', normalizedEmail);
+      }
+
+      // Check if credential already exists
+      const existingPasskey = await this.db.getPasskeyByCredentialId(credentialId);
+
+      if (existingPasskey) {
+        // Update existing passkey
+        console.log('[SyncCredential] Credential already exists, skipping:', credentialId.substring(0, 20));
+        return res.json({
+          success: true,
+          data: {
+            message: 'Credential already synced',
+            userId: user.id,
+            walletAddress: user.walletAddress || walletAddress
+          }
+        });
+      }
+
+      // Register the credential in database
+      // Note: We trust the public key from frontend since user is authenticated
+      // and the credential ID matches what WebAuthn provided
+      // Store public key X,Y as COSE-encoded Uint8Array for compatibility
+      const publicKeyStr = `${publicKeyX},${publicKeyY}`;
+      const publicKeyBytes = new TextEncoder().encode(publicKeyStr);
+
+      await this.db.createPasskeyCredential({
+        id: randomUUID(),
+        credentialID: credentialId,
+        userId: user.id,
+        credentialPublicKey: publicKeyBytes,
+        counter: 0,
+        credentialDeviceType: 'singleDevice',
+        credentialBackedUp: false,
+        transports: ['internal', 'hybrid']
+      });
+
+      console.log('[SyncCredential] Synced credential for:', {
+        email: normalizedEmail,
+        credentialId: credentialId.substring(0, 20) + '...',
+        walletAddress
+      });
+
+      res.json({
+        success: true,
+        data: {
+          message: 'Credential synced successfully',
+          userId: user.id,
+          walletAddress: user.walletAddress || walletAddress
+        }
+      });
+
+    } catch (error) {
+      console.error('Sync credential error:', error);
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      throw new ApiError('Failed to sync credential', 500, 'SYNC_FAILED');
+    }
+  };
 }

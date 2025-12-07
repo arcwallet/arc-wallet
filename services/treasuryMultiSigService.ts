@@ -140,6 +140,8 @@ class TreasuryMultiSigService {
         allowed: true,
         requiresApproval: apiTx.requiredSignatures > 1,
         requiredSignatures: apiTx.requiredSignatures,
+        requiredRoles: [],
+        warnings: [],
       },
       createdAt: new Date(apiTx.createdAt),
       updatedAt: new Date(apiTx.updatedAt),

@@ -1,6 +1,6 @@
-import { Contract, JsonRpcProvider, Wallet, parseUnits, formatUnits, Interface } from 'ethers';
+import { JsonRpcProvider, parseUnits, formatUnits, Interface } from 'ethers';
 import { TokenInfo, getTokenContractAddress, SWAP_CONFIG } from '../config/tokens';
-import { getProvider, getFeeSettings } from './transactionService';
+import { getProvider, getFeeSettings } from './rpcProvider';
 import type { PasskeyAccountManager } from './passkeyAccountManager';
 
 export interface Quote {
@@ -25,6 +25,14 @@ const MEV_CONFIG = {
   MAX_SLIPPAGE: 5, // 5% max slippage to prevent sandwich attacks
   MIN_SLIPPAGE: 0.1, // 0.1% minimum
   HIGH_SLIPPAGE_WARNING: 2, // Warn user above 2%
+};
+
+// Uniswap V3 Fee Tiers (in hundredths of a bip, i.e. 1e-6)
+const FEE_TIERS = {
+  LOWEST: 100,   // 0.01% - very stable pairs
+  LOW: 500,      // 0.05% - stable pairs
+  MEDIUM: 3000,  // 0.30% - most pairs
+  HIGH: 10000,   // 1.00% - exotic pairs
 };
 
 // Uniswap V2 Router ABI
@@ -150,99 +158,6 @@ class SwapService {
   }
 
   /**
-   * Execute a token swap with MEV protection (UniswapV2)
-   */
-  async executeSwap(
-    quote: Quote,
-    privateKey: string
-  ): Promise<string> {
-    try {
-      // MEV Protection: Check quote expiration
-      if (this.isQuoteExpired(quote)) {
-        throw new Error('Quote expired. Please get a fresh quote to avoid unfavorable pricing.');
-      }
-
-      const wallet = new Wallet(privateKey, this.provider);
-      const tokenInAddress = getTokenContractAddress(quote.fromToken.symbol, 'testnet', 'arcTestnet');
-      const tokenOutAddress = getTokenContractAddress(quote.toToken.symbol, 'testnet', 'arcTestnet');
-
-      if (!tokenInAddress || !tokenOutAddress) {
-        throw new Error('Token addresses not found');
-      }
-
-      const amountIn = parseUnits(quote.fromAmount, quote.fromToken.decimals);
-
-      // MEV Protection: Re-quote if quote is stale
-      let amountOutMinimum: bigint;
-      if (!this.isQuoteFresh(quote)) {
-        console.log('[SWAP] Quote stale, re-quoting for current price...');
-        const freshQuote = await this.getQuote(quote.fromToken, quote.toToken, quote.fromAmount);
-        amountOutMinimum = parseUnits(freshQuote.minimumReceived, quote.toToken.decimals);
-        console.log('[SWAP] Fresh minimum received:', freshQuote.minimumReceived);
-      } else {
-        amountOutMinimum = parseUnits(quote.minimumReceived, quote.toToken.decimals);
-      }
-
-      // Step 1: Check and approve token if needed
-      await this.ensureTokenApproval(wallet, tokenInAddress, amountIn);
-
-      // Step 2: Execute swap using UniswapV2
-      const router = new Contract(this.routerAddress, UNISWAP_V2_ROUTER_ABI, wallet);
-
-      // MEV Protection: Shorter deadline (5 min instead of 20)
-      const deadline = Math.floor(Date.now() / 1000) + MEV_CONFIG.DEADLINE_SECONDS;
-
-      // UniswapV2 uses path array
-      const path = [tokenInAddress, tokenOutAddress];
-
-      console.log('[SWAP] Executing swap with params:', {
-        from: quote.fromToken.symbol,
-        to: quote.toToken.symbol,
-        amountIn: quote.fromAmount,
-        minimumOut: quote.minimumReceived,
-        router: this.routerAddress,
-        path,
-      });
-
-      const { maxFeePerGas, maxPriorityFeePerGas } = await getFeeSettings(this.provider);
-
-      const tx = await router.swapExactTokensForTokens(
-        amountIn,
-        amountOutMinimum,
-        path,
-        wallet.address,
-        deadline,
-        {
-          maxFeePerGas: maxFeePerGas || undefined,
-          maxPriorityFeePerGas: maxPriorityFeePerGas || undefined,
-        }
-      );
-
-      const receipt = await tx.wait();
-      console.log('[SWAP] Swap successful! TxHash:', receipt.hash);
-
-      return receipt.hash;
-    } catch (error: any) {
-      console.error('[SWAP] Swap execution failed:', error);
-
-      // Enhanced error messages
-      if (error?.message?.includes('insufficient allowance')) {
-        throw new Error('Token approval failed. Please try again.');
-      } else if (error?.message?.includes('insufficient balance')) {
-        throw new Error('Insufficient token balance for swap.');
-      } else if (error?.message?.includes('Too little received')) {
-        throw new Error('Price moved unfavorably. Please try again with higher slippage.');
-      } else if (error?.message?.includes('STF')) {
-        throw new Error('Swap transaction failed. Pool may have insufficient liquidity.');
-      } else if (error?.message?.includes('INSUFFICIENT_OUTPUT_AMOUNT')) {
-        throw new Error('Insufficient liquidity in pool. Try a smaller amount.');
-      }
-
-      throw new Error(error?.message || 'Swap failed. Please try again.');
-    }
-  }
-
-  /**
    * Execute a token swap using PasskeyAccount (ERC-4337 Smart Wallet)
    * Uses UniswapV2 swapExactTokensForTokens
    * No private key required - uses passkey signing
@@ -348,33 +263,6 @@ class SwapService {
       }
 
       throw new Error(error?.message || 'Swap failed. Please try again.');
-    }
-  }
-
-  /**
-   * Ensure token is approved for router
-   */
-  private async ensureTokenApproval(
-    wallet: Wallet,
-    tokenAddress: string,
-    amount: bigint
-  ): Promise<void> {
-    const token = new Contract(tokenAddress, ERC20_ABI, wallet);
-
-    // Check current allowance
-    const allowance = await token.allowance(wallet.address, this.routerAddress);
-
-    if (allowance < amount) {
-      console.log('[SWAP] Approving token...');
-      const { maxFeePerGas, maxPriorityFeePerGas } = await getFeeSettings(this.provider);
-
-      // Approve max amount to avoid repeated approvals
-      const approveTx = await token.approve(this.routerAddress, amount * 2n, {
-        maxFeePerGas: maxFeePerGas || undefined,
-        maxPriorityFeePerGas: maxPriorityFeePerGas || undefined,
-      });
-      await approveTx.wait();
-      console.log('[SWAP] Token approved');
     }
   }
 

@@ -11,7 +11,7 @@ import React, {
 import { JsonRpcProvider, formatUnits } from 'ethers';
 import type { Transaction } from '../types';
 import { TransactionStatus, TransactionType } from '../types';
-import { RPC_URL } from '../services/transactionService';
+import { RPC_URL } from '../services/rpcProvider';
 import { fetchRecentTransactions, RateLimitError } from '../services/activityService';
 import { usePasskeyAccount } from './PasskeyAccountContext';
 import { API_ENDPOINTS } from '../config/app.config';

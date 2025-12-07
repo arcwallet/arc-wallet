@@ -6,7 +6,7 @@
 import { BACKEND_URL } from '../config/app.config';
 
 // Types
-export type TreasuryUserRole = 'admin' | 'treasury_manager' | 'approver' | 'viewer' | 'member';
+export type TreasuryUserRole = 'admin' | 'treasury_manager' | 'operator' | 'approver' | 'viewer' | 'member';
 export type TreasuryOperationType = 'subscribe' | 'redeem' | 'transfer' | 'rebalance';
 
 export interface TreasuryPolicy {
