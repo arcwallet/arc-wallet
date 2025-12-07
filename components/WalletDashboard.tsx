@@ -65,7 +65,9 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ isOpen, onC
   // Create notifications from recent activities and system events
   const notifications = useMemo(() => {
     const activityNotifications = activities.slice(0, 3).map((activity, index) => {
-      const timeAgo = new Date().getTime() - activity.date.getTime();
+      // Safe null check for activity.date
+      const activityDate = activity.date instanceof Date ? activity.date : new Date(activity.date || Date.now());
+      const timeAgo = Date.now() - activityDate.getTime();
       const timeString = timeAgo < 60000 ? 'Just now' :
         timeAgo < 3600000 ? `${Math.floor(timeAgo / 60000)} min ago` :
           timeAgo < 86400000 ? `${Math.floor(timeAgo / 3600000)} hours ago` :

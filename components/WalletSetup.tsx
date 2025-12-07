@@ -16,27 +16,13 @@ import { WaveBackground } from './WaveBackground';
 import arcLogo from '../assets/arclogo.png';
 import { Footer } from './Footer';
 
-// Known admin accounts for wallet recovery
-// These are used when backend DB loses passkey but wallet exists on chain
-const KNOWN_WALLETS: Record<string, {
+// Known wallet type for recovery (fetched from backend)
+interface KnownWalletData {
   address: string;
   publicKeyX: string;
   publicKeyY: string;
   credentialId: string;
-}> = {
-  'sehereroglu786@gmail.com': {
-    address: '0x72c90791145C55966903D661Fc286eBbbB47f151',
-    publicKeyX: '0xa60c860ef7d5cc3a725eedcf05709c0793f1eb1c673e5a272edc5f8cde13eb08',
-    publicKeyY: '0x9fbc5dd1b24f071d7eb13e78b55297ca7d88c5ce6932799ca247883214d2f88e',
-    credentialId: 'N1wTvQCqlG3jaUcpSxAsAQ',
-  },
-  'seher@arcwallet.network': {
-    address: '0x72c90791145C55966903D661Fc286eBbbB47f151',
-    publicKeyX: '0xa60c860ef7d5cc3a725eedcf05709c0793f1eb1c673e5a272edc5f8cde13eb08',
-    publicKeyY: '0x9fbc5dd1b24f071d7eb13e78b55297ca7d88c5ce6932799ca247883214d2f88e',
-    credentialId: 'N1wTvQCqlG3jaUcpSxAsAQ',
-  },
-};
+}
 
 interface WalletSetupProps {
   onComplete: () => void;
@@ -59,27 +45,35 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
   // State to track if user has passkey on server
   const [hasServerPasskey, setHasServerPasskey] = useState<boolean | null>(null);
 
-  // Check if this is a known admin wallet that needs recovery
-  const knownWallet = currentEmail ? KNOWN_WALLETS[currentEmail.toLowerCase()] : null;
+  // Known wallet data fetched from backend for recovery
+  const [knownWallet, setKnownWallet] = useState<KnownWalletData | null>(null);
 
   // Detect legacy wallet migration scenario
   const hasLegacyWallet = hasExistingWallet && existingWalletAddress && !hasServerPasskey;
 
-  // Check server for existing passkey on mount
+  // Check server for existing passkey and known wallet recovery data on mount
   useEffect(() => {
-    const checkServerPasskey = async () => {
+    const checkServerData = async () => {
       if (!currentEmail) return;
       try {
+        // Check if user has passkey on server
         const response = await passkeyClient.checkUserPasskeys(currentEmail);
         const hasPasskey = response.data?.hasPasskey ?? false;
         console.log('[WalletSetup] Server passkey check:', { email: currentEmail, hasPasskey });
         setHasServerPasskey(hasPasskey);
+
+        // Check for known wallet recovery data (admin wallets)
+        // This data comes from backend /recovery/known-wallet endpoint
+        if (!hasPasskey && response.data?.knownWallet) {
+          console.log('[WalletSetup] Known wallet recovery data found');
+          setKnownWallet(response.data.knownWallet);
+        }
       } catch (error) {
         console.error('[WalletSetup] Failed to check server passkey:', error);
         setHasServerPasskey(false);
       }
     };
-    checkServerPasskey();
+    checkServerData();
   }, [currentEmail]);
 
   // Handle wallet creation or connection with passkey

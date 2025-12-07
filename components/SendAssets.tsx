@@ -591,15 +591,16 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
         <div className="mt-2 rounded-lg border border-slate-500/50 bg-slate-900/60 backdrop-blur-sm p-4">
           <h3 className="text-sm font-medium text-text-secondary mb-3">Transaction Summary</h3>
 
-          {/* Privacy Mode Indicator */}
+          {/* Privacy Mode Indicator - Currently Simulation Only */}
           {isPrivacyMode && (
-            <div className="mb-3 rounded-lg bg-blue-500/10 border border-blue-500/30 p-3">
+            <div className="mb-3 rounded-lg bg-amber-500/10 border border-amber-500/30 p-3">
               <div className="flex items-center gap-2 mb-2">
-                <LockIcon size={16} className="text-blue-400" />
-                <span className="text-sm font-semibold text-blue-400">Private Transaction</span>
+                <LockIcon size={16} className="text-amber-400" />
+                <span className="text-sm font-semibold text-amber-400">Privacy Mode (Coming Soon)</span>
               </div>
-              <p className="text-xs text-blue-300/80">
-                Transaction amount will be encrypted on-chain
+              <p className="text-xs text-amber-300/80">
+                TEE-based private transactions will be available when Arc Network's privacy module launches.
+                This transaction will be sent normally.
               </p>
             </div>
           )}
@@ -614,14 +615,7 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
             <div className="flex justify-between">
               <span className="text-text-secondary">Sending</span>
               <span className="text-text-primary font-medium">
-                {isPrivacyMode && amountNumber > 0 ? (
-                  <span className="flex items-center gap-1.5">
-                    <LockIcon size={12} className="text-blue-400" />
-                    <span className="text-blue-400">Encrypted</span>
-                  </span>
-                ) : (
-                  amountNumber > 0 ? `${amountNumber} USDC` : '-'
-                )}
+                {amountNumber > 0 ? `${amountNumber} ${selectedToken.symbol}` : '-'}
               </span>
             </div>
             <div className="flex justify-between">
