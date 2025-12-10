@@ -10,7 +10,8 @@ import {
   FaucetIcon,
   VerifiedIcon,
   RobotIcon,
-  SettingsIcon
+  SettingsIcon,
+  InsightIcon
 } from './Icons';
 
 // Treasury Icon
@@ -44,6 +45,7 @@ const getIconComponent = (iconName: string) => {
     case 'water_drop': return <FaucetIcon {...iconProps} />;
     case 'verified': return <VerifiedIcon {...iconProps} />;
     case 'smart_toy': return <RobotIcon {...iconProps} />;
+    case 'insight': return <InsightIcon {...iconProps} />;
     case 'settings': return <SettingsIcon {...iconProps} />;
     default: return <DashboardIcon {...iconProps} />;
   }
@@ -77,6 +79,7 @@ const SideNavBar: React.FC<SideNavBarProps> = ({ currentPage, onNavigate }) => {
     { id: 'Treasury', icon: 'treasury', label: 'Treasury' },
     { id: 'History', icon: 'receipt_long', label: 'History' },
     { id: 'Multi-Sig', icon: 'group', label: 'Multi-Sig' },
+    { id: 'InsightCoins', icon: 'insight', label: 'Insight Coins' },
     // Agent tab temporarily disabled - will integrate new AI solution
     // { id: 'Agent', icon: 'smart_toy', label: 'AI Agent' },
     { id: 'Faucet', icon: 'water_drop', label: 'Faucet' },
@@ -84,9 +87,8 @@ const SideNavBar: React.FC<SideNavBarProps> = ({ currentPage, onNavigate }) => {
 
   return (
     <aside className="hidden md:flex w-64 flex-col border-r border-slate-500/30 bg-slate-900/80 backdrop-blur-md">
-      <div className="flex items-center gap-3 p-6 border-b border-slate-500/30">
-        <img src="/arcwalletlogo.png" alt="Arc Wallet" className="h-16 w-16 object-contain" />
-        <h1 className="text-white text-lg font-bold tracking-wide">Arc Wallet</h1>
+      <div className="flex items-center justify-center p-6 border-b border-slate-500/30">
+        <img src="/arclogo.png" alt="Arc Wallet" className="h-20 w-auto object-contain" />
       </div>
       <nav className="mt-6 flex flex-1 flex-col gap-1">
         {navItems.map(item => (
