@@ -10,7 +10,6 @@ import Faucet from './Faucet';
 import SwapScreen from './SwapScreen';
 import Bridge from './Bridge';
 import History from './History';
-import InsightCoins from './InsightCoins';
 // AgentScreen temporarily disabled - will integrate new AI solution
 // import AgentScreen, { WalletBalance } from './AgentScreen';
 export interface WalletBalance {
@@ -704,8 +703,6 @@ const WalletDashboard: React.FC = () => {
         return null;
       case 'Multi-Sig':
         return <MultiSigDashboard />;
-      case 'InsightCoins':
-        return <InsightCoins />;
       case 'Faucet':
         return <Faucet />;
       // Agent temporarily disabled - will integrate new AI solution

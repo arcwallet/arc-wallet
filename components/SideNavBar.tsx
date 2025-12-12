@@ -10,8 +10,7 @@ import {
   FaucetIcon,
   VerifiedIcon,
   RobotIcon,
-  SettingsIcon,
-  InsightIcon
+  SettingsIcon
 } from './Icons';
 
 // Treasury Icon
@@ -45,7 +44,6 @@ const getIconComponent = (iconName: string) => {
     case 'water_drop': return <FaucetIcon {...iconProps} />;
     case 'verified': return <VerifiedIcon {...iconProps} />;
     case 'smart_toy': return <RobotIcon {...iconProps} />;
-    case 'insight': return <InsightIcon {...iconProps} />;
     case 'settings': return <SettingsIcon {...iconProps} />;
     default: return <DashboardIcon {...iconProps} />;
   }
@@ -79,7 +77,6 @@ const SideNavBar: React.FC<SideNavBarProps> = ({ currentPage, onNavigate }) => {
     { id: 'Treasury', icon: 'treasury', label: 'Treasury' },
     { id: 'History', icon: 'receipt_long', label: 'History' },
     { id: 'Multi-Sig', icon: 'group', label: 'Multi-Sig' },
-    { id: 'InsightCoins', icon: 'insight', label: 'Insight Coins' },
     // Agent tab temporarily disabled - will integrate new AI solution
     // { id: 'Agent', icon: 'smart_toy', label: 'AI Agent' },
     { id: 'Faucet', icon: 'water_drop', label: 'Faucet' },
