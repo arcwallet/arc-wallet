@@ -19,6 +19,7 @@ import {
   CCTP_ATTESTATION,
   CCTP_FEES,
   TOKEN_MESSENGER_ABI,
+  MESSAGE_TRANSMITTER_ABI,
   ERC20_ABI,
   addressToBytes32,
   getChainConfig,
@@ -53,6 +54,7 @@ export interface BridgeTransaction {
   burnTxHash?: string;
   mintTxHash?: string;
   messageHash?: string;
+  message?: string; // CCTP message bytes for receiveMessage
   attestation?: string;
   nonce?: bigint;
   createdAt: Date;
@@ -447,7 +449,8 @@ class BridgeServiceImpl {
   }
 
   /**
-   * Poll for attestation from Circle's Iris service
+   * Poll for attestation from Circle's Iris service (V2)
+   * After receiving attestation, automatically claims on destination chain
    */
   private async pollForAttestation(txId: string): Promise<void> {
     const tx = this.transactions.get(txId);
@@ -455,38 +458,56 @@ class BridgeServiceImpl {
       return;
     }
 
-    const maxAttempts = 60; // ~20 minutes with 20s interval
-    const interval = 20000; // 20 seconds
+    const sourceChain = getChainConfig(tx.sourceChainId);
+    if (!sourceChain) {
+      logger.error('Invalid source chain config', { component: 'BridgeService', txId });
+      return;
+    }
 
-    logger.info('Starting attestation polling', {
+    const maxAttempts = 60; // ~5 minutes with 5s interval
+    const interval = 5000; // 5 seconds (V2 attestation is faster)
+
+    logger.info('Starting attestation polling (V2)', {
       component: 'BridgeService',
       txId,
       burnTxHash: tx.burnTxHash,
+      sourceDomain: sourceChain.domain,
     });
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       try {
-        // Query Circle attestation API
-        const attestation = await this.fetchAttestation(tx.burnTxHash);
+        // Query Circle V2 attestation API
+        const result = await this.fetchAttestationV2(tx.burnTxHash, sourceChain.domain);
 
-        if (attestation) {
-          tx.attestation = attestation.attestation;
-          tx.messageHash = attestation.messageHash;
+        if (result) {
+          tx.attestation = result.attestation;
+          tx.message = result.message;
+          tx.messageHash = result.messageHash;
           tx.status = 'attestation_received';
           tx.updatedAt = new Date();
           this.saveHistory();
 
-          logger.info('Attestation received', {
+          logger.info('Attestation received, starting claim on destination', {
             component: 'BridgeService',
             txId,
-            messageHash: attestation.messageHash,
+            messageHash: result.messageHash,
           });
 
-          // Attestation received - user can now claim on destination
-          // Or a relayer will do it automatically
+          // Auto-claim on destination chain
+          await this.claimOnDestination(txId);
           return;
         }
-      } catch (err) {
+      } catch (err: any) {
+        // If it's a fatal error (like insufficient fee), stop polling
+        if (err.message?.includes('insufficient')) {
+          tx.status = 'failed';
+          tx.error = err.message;
+          tx.updatedAt = new Date();
+          this.saveHistory();
+          logger.error('Bridge failed - insufficient fee', { component: 'BridgeService', txId });
+          return;
+        }
+
         logger.warn('Attestation fetch failed, retrying...', {
           component: 'BridgeService',
           txId,
@@ -506,14 +527,93 @@ class BridgeServiceImpl {
   }
 
   /**
-   * Fetch attestation from Circle's Iris API
+   * Claim USDC on destination chain by calling receiveMessage
    */
-  private async fetchAttestation(
-    txHash: string
-  ): Promise<{ attestation: string; messageHash: string } | null> {
+  private async claimOnDestination(txId: string): Promise<void> {
+    const tx = this.transactions.get(txId);
+    if (!tx || !tx.attestation || !tx.message) {
+      logger.error('Cannot claim: missing attestation or message', { component: 'BridgeService', txId });
+      return;
+    }
+
+    tx.status = 'minting';
+    tx.updatedAt = new Date();
+    this.saveHistory();
+
+    logger.info('Claiming USDC on destination chain', {
+      component: 'BridgeService',
+      txId,
+      destinationChainId: tx.destinationChainId,
+    });
+
     try {
-      // Circle's attestation API endpoint
-      const url = `${CCTP_ATTESTATION.testnet}/${txHash}`;
+      // Encode receiveMessage call
+      const receiveMessageData = encodeFunctionData({
+        abi: MESSAGE_TRANSMITTER_ABI,
+        functionName: 'receiveMessage',
+        args: [tx.message as Hex, tx.attestation as Hex],
+      });
+
+      const call = {
+        to: CCTP_CONTRACTS.MessageTransmitterV2 as Address,
+        data: receiveMessageData as Hex,
+      };
+
+      let mintTxHash: string;
+
+      // Execute on appropriate chain
+      if (tx.destinationChainId === 5042002) {
+        // Destination is Arc - use default bundler
+        mintTxHash = await circleWalletService.sendBatchTransactions([call]);
+      } else {
+        // Destination is Sepolia/Base - use chain-specific bundler
+        mintTxHash = await circleWalletService.sendBatchTransactionsOnChain(tx.destinationChainId, [call]);
+      }
+
+      tx.mintTxHash = mintTxHash;
+      tx.status = 'completed';
+      tx.updatedAt = new Date();
+      this.saveHistory();
+
+      logger.info('Bridge completed successfully', {
+        component: 'BridgeService',
+        txId,
+        burnTxHash: tx.burnTxHash,
+        mintTxHash,
+      });
+    } catch (err: any) {
+      tx.status = 'failed';
+      tx.error = `Claim failed: ${err.message}`;
+      tx.updatedAt = new Date();
+      this.saveHistory();
+
+      logger.error('Failed to claim on destination', {
+        component: 'BridgeService',
+        txId,
+        error: err.message,
+      });
+    }
+  }
+
+  /**
+   * Fetch attestation from Circle's Iris API (V2)
+   * V2 uses /v2/messages/{sourceDomain}?transactionHash={txHash}
+   */
+  private async fetchAttestationV2(
+    txHash: string,
+    sourceDomain: number
+  ): Promise<{ attestation: string; message: string; messageHash: string } | null> {
+    try {
+      // Circle's V2 attestation API endpoint
+      const baseUrl = CCTP_ATTESTATION.testnet.replace('/v2/attestations', '');
+      const url = `${baseUrl}/v2/messages/${sourceDomain}?transactionHash=${txHash}`;
+
+      logger.info('Fetching attestation from V2 API', {
+        component: 'BridgeService',
+        url,
+        txHash,
+        sourceDomain,
+      });
 
       const response = await fetch(url);
 
@@ -527,11 +627,35 @@ class BridgeServiceImpl {
 
       const data = await response.json();
 
-      if (data.status === 'complete' && data.attestation) {
-        return {
-          attestation: data.attestation,
-          messageHash: data.messageHash || data.message_hash,
-        };
+      // V2 returns { messages: [...] } array
+      if (data.messages && data.messages.length > 0) {
+        const msg = data.messages[0];
+
+        // Check for insufficient fee error
+        if (msg.delayReason === 'insufficient_fee') {
+          throw new Error('Bridge fee was insufficient. Please contact support.');
+        }
+
+        // Success case
+        if (msg.status === 'complete' && msg.attestation && msg.message) {
+          logger.info('Attestation received from V2 API', {
+            component: 'BridgeService',
+            status: msg.status,
+            eventNonce: msg.eventNonce,
+          });
+
+          return {
+            attestation: msg.attestation,
+            message: msg.message,
+            messageHash: msg.eventNonce || '',
+          };
+        }
+
+        logger.info('Attestation not ready yet', {
+          component: 'BridgeService',
+          status: msg.status,
+          delayReason: msg.delayReason,
+        });
       }
 
       return null;
@@ -541,7 +665,7 @@ class BridgeServiceImpl {
         txHash,
         error: err instanceof Error ? err.message : 'Unknown',
       });
-      return null;
+      throw err;
     }
   }
 
