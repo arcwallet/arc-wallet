@@ -182,8 +182,13 @@
 }
 
 .setup-icon {
-  font-size: 3rem;
   margin-bottom: 16px;
+  color: var(--ms-accent-light);
+}
+
+.setup-icon svg {
+  width: 48px;
+  height: 48px;
 }
 
 .setup-card h4 {
@@ -627,6 +632,29 @@
 .btn-danger:hover {
   background: rgba(255, 107, 129, 0.1);
   border-color: rgba(255, 107, 129, 0.5);
+}
+
+.btn-setup {
+  padding: 12px 28px;
+  background: var(--ms-gradient);
+  border: none;
+  border-radius: 10px;
+  color: white;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 15px rgba(108, 124, 255, 0.25);
+  margin-top: 8px;
+}
+
+.btn-setup:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(108, 124, 255, 0.35);
+}
+
+.btn-setup:active {
+  transform: translateY(0);
 }
 
 /* Modal */
