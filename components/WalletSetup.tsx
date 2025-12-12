@@ -1,11 +1,10 @@
 /**
  * Wallet Setup Component - Circle Modular Wallet Edition
  *
- * ARCHITECTURE:
- * - Uses Circle's Modular Smart Contract Account (MSCA)
- * - Passkey (P256) authentication via Circle's infrastructure
- * - ERC-4337 + ERC-6900 compliant smart accounts
- * - Same passkey = Same wallet address (deterministic)
+ * FLOW:
+ * 1. Email verified -> Auto-trigger passkey login
+ * 2. If passkey exists -> Connect directly
+ * 3. If no passkey found -> Show "Create Wallet" option
  */
 
 import React, { useCallback, useEffect, useState } from 'react';
@@ -19,8 +18,9 @@ interface WalletSetupProps {
   onComplete: () => void;
 }
 
+type SetupState = 'checking' | 'no_wallet' | 'connecting' | 'creating' | 'error';
+
 const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
-  // Use Circle Wallet (Modular Smart Contract Account)
   const {
     createWallet,
     login,
@@ -33,11 +33,10 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
   } = useCircleWallet();
 
   const { currentEmail } = useSession();
+  const [setupState, setSetupState] = useState<SetupState>('checking');
   const [error, setError] = useState<string | null>(null);
-  const [statusMessage, setStatusMessage] = useState<string>('Waiting for verified email...');
-  const [isCreating, setIsCreating] = useState(false);
-  const [mode, setMode] = useState<'initial' | 'create' | 'connect'>('initial');
-  const [autoReconnectAttempted, setAutoReconnectAttempted] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<string>('');
+  const [checkAttempted, setCheckAttempted] = useState(false);
 
   // Update error from context
   useEffect(() => {
@@ -53,169 +52,228 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
     }
   }, [isConnected, onComplete]);
 
-  // Auto-connect on page load - directly trigger passkey if email is verified
+  // Auto-check for existing wallet on page load
   useEffect(() => {
-    if (autoReconnectAttempted || isConnected || isConnecting || isReconnecting) {
+    if (checkAttempted || isConnected || isConnecting || isReconnecting || !currentEmail) {
       return;
     }
 
-    // If we have a verified email, try to connect with passkey immediately
-    if (currentEmail) {
-      setAutoReconnectAttempted(true);
-      setMode('connect');
-      setStatusMessage('Connecting to your wallet...');
+    const checkExistingWallet = async () => {
+      setCheckAttempted(true);
+      setSetupState('checking');
+      setStatusMessage('Checking for existing wallet...');
 
-      // Small delay to show UI, then trigger passkey
-      const timer = setTimeout(async () => {
-        try {
-          // Try stored session first (faster, no passkey prompt if valid)
-          if (hasStoredSession) {
-            const success = await tryReconnect();
-            if (success) return;
-          }
-
-          // No valid session - trigger passkey login directly
-          await login();
-        } catch (err: any) {
-          console.log('[WalletSetup] Auto-connect failed:', err.message);
-          // Show options if auto-connect fails
-          setMode('initial');
-          setStatusMessage('');
+      try {
+        // First try stored session (faster, no passkey prompt)
+        if (hasStoredSession) {
+          setStatusMessage('Reconnecting to your wallet...');
+          const success = await tryReconnect();
+          if (success) return; // Will trigger onComplete via isConnected
         }
-      }, 300);
 
-      return () => clearTimeout(timer);
-    }
-  }, [currentEmail, autoReconnectAttempted, isConnected, isConnecting, isReconnecting, hasStoredSession, tryReconnect, login]);
+        // Try to login with existing passkey
+        setStatusMessage('Looking for your passkey...');
+        await login();
+        // If successful, isConnected will become true and trigger onComplete
 
-  // Handle wallet creation with new passkey
+      } catch (err: any) {
+        const errorMessage = err.message?.toLowerCase() || '';
+
+        // Check if error indicates no passkey found
+        if (
+          errorMessage.includes('no credential') ||
+          errorMessage.includes('credential not found') ||
+          errorMessage.includes('not found') ||
+          errorMessage.includes('no passkey') ||
+          errorMessage.includes('no authenticator') ||
+          errorMessage.includes('the operation either timed out or was not allowed')
+        ) {
+          // No existing wallet - show create option
+          console.log('[WalletSetup] No existing passkey found, showing create option');
+          setSetupState('no_wallet');
+          setStatusMessage('');
+          setError(null);
+        } else if (
+          errorMessage.includes('cancelled') ||
+          errorMessage.includes('canceled') ||
+          errorMessage.includes('user refused') ||
+          errorMessage.includes('aborted')
+        ) {
+          // User cancelled - show create option (they might not have a wallet)
+          console.log('[WalletSetup] User cancelled passkey check');
+          setSetupState('no_wallet');
+          setStatusMessage('');
+          setError(null);
+        } else {
+          // Other error
+          console.error('[WalletSetup] Wallet check error:', err.message);
+          setSetupState('error');
+          setError(err.message || 'Connection failed. Please try again.');
+        }
+      }
+    };
+
+    // Small delay for UI
+    const timer = setTimeout(checkExistingWallet, 500);
+    return () => clearTimeout(timer);
+  }, [currentEmail, checkAttempted, isConnected, isConnecting, isReconnecting, hasStoredSession, tryReconnect, login]);
+
+  // Handle wallet creation
   const handleCreateWallet = useCallback(async () => {
-    setError(null);
-
     if (!currentEmail) {
       setError('Please verify your email first.');
       return;
     }
 
-    setIsCreating(true);
-    setStatusMessage('Creating your wallet with passkey...');
+    setSetupState('creating');
+    setError(null);
+    setStatusMessage('Creating your wallet...');
 
     try {
       await createWallet();
       setStatusMessage('Wallet created successfully!');
-      // onComplete will be called via useEffect when isConnected becomes true
     } catch (err: any) {
       console.error('[WalletSetup] Create wallet failed:', err);
-      handleError(err);
-    } finally {
-      setIsCreating(false);
+      const errorMessage = err.message?.toLowerCase() || '';
+
+      if (errorMessage.includes('cancelled') || errorMessage.includes('canceled')) {
+        setSetupState('no_wallet');
+        setStatusMessage('');
+        setError(null);
+      } else {
+        setSetupState('error');
+        setError(err.message || 'Failed to create wallet. Please try again.');
+      }
     }
   }, [createWallet, currentEmail]);
 
-  // Handle wallet connection with existing passkey
-  const handleConnectWallet = useCallback(async () => {
+  // Handle retry connection
+  const handleRetryConnect = useCallback(async () => {
+    setSetupState('connecting');
     setError(null);
-    setIsCreating(true);
     setStatusMessage('Connecting to your wallet...');
 
     try {
       await login();
-      setStatusMessage('Connected successfully!');
-      // onComplete will be called via useEffect when isConnected becomes true
     } catch (err: any) {
-      console.error('[WalletSetup] Connect wallet failed:', err);
-      handleError(err);
-    } finally {
-      setIsCreating(false);
+      const errorMessage = err.message?.toLowerCase() || '';
+
+      if (
+        errorMessage.includes('no credential') ||
+        errorMessage.includes('not found') ||
+        errorMessage.includes('cancelled') ||
+        errorMessage.includes('canceled')
+      ) {
+        setSetupState('no_wallet');
+        setStatusMessage('');
+        setError(null);
+      } else {
+        setSetupState('error');
+        setError(err.message || 'Connection failed.');
+      }
     }
   }, [login]);
 
-  // Handle errors with user-friendly messages
-  const handleError = (err: any) => {
-    const errorMessage = err.message?.toLowerCase() || '';
-
-    if (errorMessage.includes('cancelled') || errorMessage.includes('canceled') || errorMessage.includes('user refused')) {
-      setError(null);
-      setStatusMessage('Authentication cancelled. Try again when ready.');
-    } else if (errorMessage.includes('timed out') || errorMessage.includes('not allowed')) {
-      setError(null);
-      setStatusMessage('Authentication was dismissed. Tap the button when ready.');
-    } else if (errorMessage.includes('not supported')) {
-      setError('Your device does not support passkey authentication.');
-    } else if (errorMessage.includes('not available')) {
-      setError('Passkey authentication is not available. Please check your device settings.');
-    } else if (errorMessage.includes('failed to fetch') || errorMessage.includes('network')) {
-      setError('Connection error. Please check your internet and try again.');
-    } else if (errorMessage.includes('credential not found') || errorMessage.includes('no credential')) {
-      setError('No passkey found. Please create a new wallet or use the device where you created your passkey.');
-    } else if (errorMessage.includes('invalid') || errorMessage.includes('configuration')) {
-      setError('Configuration error. Please contact support.');
-    } else {
-      setError(`Error: ${err.message || 'Something went wrong. Please try again.'}`);
-    }
-  };
-
-  // Show initial choice screen
-  const renderInitialChoice = () => (
+  // Render checking state
+  const renderChecking = () => (
     <div className="space-y-6">
-      {/* Create New Wallet */}
+      <div className="w-full bg-slate-800/60 text-slate-200 font-medium text-lg py-4 rounded-lg flex items-center justify-center gap-3">
+        <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+        </svg>
+        <span>{statusMessage || 'Checking...'}</span>
+      </div>
+    </div>
+  );
+
+  // Render no wallet state (create new)
+  const renderNoWallet = () => (
+    <div className="space-y-6">
+      <div className="text-center mb-4">
+        <p className="text-slate-400 text-sm">
+          No wallet found for this email. Create one to get started.
+        </p>
+      </div>
+
       <button
-        onClick={() => {
-          setMode('create');
-          handleCreateWallet();
-        }}
-        disabled={isConnecting || isCreating || !currentEmail}
-        className="w-full bg-slate-200 hover:bg-white text-slate-900 font-medium text-lg py-4 rounded-lg transition-all duration-200 shadow-[0_0_20px_rgba(255,255,255,0.1)] hover:shadow-[0_0_30px_rgba(255,255,255,0.2)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+        onClick={handleCreateWallet}
+        disabled={isConnecting || !currentEmail}
+        className="w-full bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-400 hover:to-cyan-400 text-white font-semibold text-lg py-4 rounded-lg transition-all duration-200 shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+      >
+        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+        </svg>
+        <span>Create Wallet</span>
+      </button>
+
+      <p className="text-center text-slate-500 text-xs">
+        A passkey will be created on your device
+      </p>
+    </div>
+  );
+
+  // Render creating state
+  const renderCreating = () => (
+    <div className="space-y-6">
+      <div className="w-full bg-gradient-to-r from-blue-500/80 to-cyan-500/80 text-white font-medium text-lg py-4 rounded-lg flex items-center justify-center gap-3">
+        <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+        </svg>
+        <span>Creating your wallet...</span>
+      </div>
+
+      <p className="text-center text-slate-400 text-sm">
+        Please complete the passkey authentication on your device
+      </p>
+    </div>
+  );
+
+  // Render error state
+  const renderError = () => (
+    <div className="space-y-6">
+      <button
+        onClick={handleRetryConnect}
+        disabled={isConnecting}
+        className="w-full bg-slate-200 hover:bg-white text-slate-900 font-medium text-lg py-4 rounded-lg transition-all duration-200 shadow-[0_0_20px_rgba(255,255,255,0.1)] hover:shadow-[0_0_30px_rgba(255,255,255,0.2)] disabled:opacity-50 flex items-center justify-center gap-2"
+      >
+        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+        </svg>
+        <span>Try Again</span>
+      </button>
+
+      <button
+        onClick={handleCreateWallet}
+        disabled={isConnecting}
+        className="w-full bg-transparent hover:bg-slate-800/50 text-slate-300 hover:text-white font-medium py-4 rounded-lg transition-all duration-200 border border-slate-600/50 hover:border-slate-500 flex items-center justify-center gap-2"
       >
         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
         </svg>
         <span>Create New Wallet</span>
       </button>
-
-      {/* Connect Existing Wallet */}
-      <button
-        onClick={() => {
-          setMode('connect');
-          handleConnectWallet();
-        }}
-        disabled={isConnecting || isCreating || !currentEmail}
-        className="w-full bg-transparent hover:bg-slate-800/50 text-slate-300 hover:text-white font-medium py-4 rounded-lg transition-all duration-200 border border-slate-600/50 hover:border-slate-500 flex items-center justify-center gap-2"
-      >
-        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-        </svg>
-        <span>Connect Existing Wallet</span>
-      </button>
     </div>
   );
 
-  // Show loading/processing state
-  const renderProcessing = () => (
-    <div className="space-y-6">
-      <button
-        disabled
-        className="w-full bg-slate-200 text-slate-900 font-medium text-lg py-4 rounded-lg opacity-80 flex items-center justify-center gap-2"
-      >
-        <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-        </svg>
-        <span>{mode === 'create' ? 'Creating wallet...' : 'Connecting...'}</span>
-      </button>
-
-      <button
-        onClick={() => {
-          setMode('initial');
-          setError(null);
-          setStatusMessage('');
-        }}
-        className="w-full text-slate-400 hover:text-slate-200 text-sm py-2 transition-colors"
-      >
-        Cancel
-      </button>
-    </div>
-  );
+  // Get header text
+  const getHeaderText = () => {
+    switch (setupState) {
+      case 'checking':
+        return 'Connecting';
+      case 'no_wallet':
+        return 'Welcome';
+      case 'creating':
+        return 'Creating Wallet';
+      case 'connecting':
+        return 'Connecting';
+      case 'error':
+        return 'Connection Issue';
+      default:
+        return 'Welcome';
+    }
+  };
 
   return (
     <div className="fixed inset-0 w-full h-full flex flex-col items-center justify-center overflow-hidden bg-transparent">
@@ -239,7 +297,7 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
           {/* Header */}
           <div className="text-center space-y-4">
             <h2 className="text-4xl font-light text-slate-100 tracking-tight drop-shadow-lg">
-              {mode === 'create' ? 'Creating Wallet' : mode === 'connect' ? 'Connecting' : 'Welcome'}
+              {getHeaderText()}
             </h2>
             <p className="text-sm text-slate-400">
               Secure Smart Contract Wallet with Passkey
@@ -263,15 +321,18 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
               </div>
             )}
 
-            {/* Status Message */}
-            {statusMessage && !error && (isCreating || isConnecting) && (
+            {/* Status Message for checking/connecting */}
+            {statusMessage && !error && (setupState === 'checking' || setupState === 'connecting') && (
               <div className="p-3 rounded-lg backdrop-blur-sm border bg-blue-900/20 border-blue-500/40 text-blue-200 text-center text-sm">
                 {statusMessage}
               </div>
             )}
 
             {/* Render appropriate UI based on state */}
-            {isCreating || isConnecting ? renderProcessing() : renderInitialChoice()}
+            {setupState === 'checking' || setupState === 'connecting' ? renderChecking() : null}
+            {setupState === 'no_wallet' ? renderNoWallet() : null}
+            {setupState === 'creating' ? renderCreating() : null}
+            {setupState === 'error' ? renderError() : null}
 
             {/* Circle Badge */}
             <div className="flex items-center justify-center gap-2 pt-2">
@@ -286,20 +347,12 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
 
       <style>{`
         @keyframes fade-in {
-          from {
-            opacity: 0;
-          }
-          to {
-            opacity: 1;
-          }
+          from { opacity: 0; }
+          to { opacity: 1; }
         }
         @keyframes zoom-in {
-          from {
-            transform: scale(0.95);
-          }
-          to {
-            transform: scale(1);
-          }
+          from { transform: scale(0.95); }
+          to { transform: scale(1); }
         }
         .animate-in {
           animation: fade-in 0.7s ease-out, zoom-in 0.7s ease-out;
