@@ -448,6 +448,9 @@ class CircleWalletServiceImpl {
         txHash: receipt.receipt.transactionHash,
       });
 
+      // Refresh session timestamp on successful transaction
+      this.refreshSessionTimestamp();
+
       return receipt.receipt.transactionHash;
     } catch (err: any) {
       logger.error('Transaction failed', {
@@ -526,6 +529,9 @@ class CircleWalletServiceImpl {
         txHash: receipt.receipt.transactionHash,
       });
 
+      // Refresh session timestamp on successful transaction
+      this.refreshSessionTimestamp();
+
       return receipt.receipt.transactionHash;
     } catch (err: any) {
       logger.error('Token transfer failed', {
@@ -575,6 +581,9 @@ class CircleWalletServiceImpl {
         component: 'CircleWalletService',
         txHash: receipt.receipt.transactionHash,
       });
+
+      // Refresh session timestamp on successful transaction
+      this.refreshSessionTimestamp();
 
       return receipt.receipt.transactionHash;
     } catch (err: any) {
@@ -671,8 +680,8 @@ class CircleWalletServiceImpl {
       const stored = localStorage.getItem('circle_wallet_state');
       if (stored) {
         const data = JSON.parse(stored);
-        // Check if session is not too old (24 hours)
-        const maxAge = 24 * 60 * 60 * 1000;
+        // Check if session is not too old (10 minutes)
+        const maxAge = 10 * 60 * 1000; // 10 minutes
         if (data.timestamp && Date.now() - data.timestamp < maxAge) {
           return {
             username: data.username || null,
@@ -694,6 +703,22 @@ class CircleWalletServiceImpl {
 
     try {
       localStorage.removeItem('circle_wallet_state');
+    } catch (e) {
+      // Ignore storage errors
+    }
+  }
+
+  // Refresh session timestamp to extend the 10-minute window
+  private refreshSessionTimestamp(): void {
+    if (typeof window === 'undefined' || !this.account) return;
+
+    try {
+      const stored = localStorage.getItem('circle_wallet_state');
+      if (stored) {
+        const data = JSON.parse(stored);
+        data.timestamp = Date.now();
+        localStorage.setItem('circle_wallet_state', JSON.stringify(data));
+      }
     } catch (e) {
       // Ignore storage errors
     }

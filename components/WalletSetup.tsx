@@ -26,6 +26,9 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
     login,
     isConnecting,
     isConnected,
+    isReconnecting,
+    hasStoredSession,
+    tryReconnect,
     error: contextError,
   } = useCircleWallet();
 
@@ -34,6 +37,7 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
   const [statusMessage, setStatusMessage] = useState<string>('Waiting for verified email...');
   const [isCreating, setIsCreating] = useState(false);
   const [mode, setMode] = useState<'initial' | 'create' | 'connect'>('initial');
+  const [autoReconnectAttempted, setAutoReconnectAttempted] = useState(false);
 
   // Update error from context
   useEffect(() => {
@@ -48,6 +52,32 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
       onComplete();
     }
   }, [isConnected, onComplete]);
+
+  // Auto-reconnect on page load if there's a stored session
+  useEffect(() => {
+    if (autoReconnectAttempted || isConnected || isReconnecting) {
+      return;
+    }
+
+    if (hasStoredSession && currentEmail) {
+      setAutoReconnectAttempted(true);
+      setMode('connect');
+      setStatusMessage('Reconnecting to your wallet...');
+
+      // Small delay to show UI, then trigger passkey
+      const timer = setTimeout(() => {
+        tryReconnect().then((success) => {
+          if (!success) {
+            // Auto-reconnect failed, show login options
+            setMode('initial');
+            setStatusMessage('');
+          }
+        });
+      }, 500);
+
+      return () => clearTimeout(timer);
+    }
+  }, [hasStoredSession, currentEmail, autoReconnectAttempted, isConnected, isReconnecting, tryReconnect]);
 
   // Handle wallet creation with new passkey
   const handleCreateWallet = useCallback(async () => {
