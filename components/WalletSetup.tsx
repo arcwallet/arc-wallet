@@ -53,31 +53,40 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
     }
   }, [isConnected, onComplete]);
 
-  // Auto-reconnect on page load if there's a stored session
+  // Auto-connect on page load - directly trigger passkey if email is verified
   useEffect(() => {
-    if (autoReconnectAttempted || isConnected || isReconnecting) {
+    if (autoReconnectAttempted || isConnected || isConnecting || isReconnecting) {
       return;
     }
 
-    if (hasStoredSession && currentEmail) {
+    // If we have a verified email, try to connect with passkey immediately
+    if (currentEmail) {
       setAutoReconnectAttempted(true);
       setMode('connect');
-      setStatusMessage('Reconnecting to your wallet...');
+      setStatusMessage('Connecting to your wallet...');
 
       // Small delay to show UI, then trigger passkey
-      const timer = setTimeout(() => {
-        tryReconnect().then((success) => {
-          if (!success) {
-            // Auto-reconnect failed, show login options
-            setMode('initial');
-            setStatusMessage('');
+      const timer = setTimeout(async () => {
+        try {
+          // Try stored session first (faster, no passkey prompt if valid)
+          if (hasStoredSession) {
+            const success = await tryReconnect();
+            if (success) return;
           }
-        });
-      }, 500);
+
+          // No valid session - trigger passkey login directly
+          await login();
+        } catch (err: any) {
+          console.log('[WalletSetup] Auto-connect failed:', err.message);
+          // Show options if auto-connect fails
+          setMode('initial');
+          setStatusMessage('');
+        }
+      }, 300);
 
       return () => clearTimeout(timer);
     }
-  }, [hasStoredSession, currentEmail, autoReconnectAttempted, isConnected, isReconnecting, tryReconnect]);
+  }, [currentEmail, autoReconnectAttempted, isConnected, isConnecting, isReconnecting, hasStoredSession, tryReconnect, login]);
 
   // Handle wallet creation with new passkey
   const handleCreateWallet = useCallback(async () => {
