@@ -9,7 +9,12 @@ import OtpInput from '../components/OtpInput';
 
 const API_BASE = ((import.meta as any).env.VITE_PASSKEY_API_URL || 'https://arcwallet-backend.onrender.com').replace(/\/$/, '');
 
-type LoginStep = 'email' | 'otp' | 'passkey' | 'verifying' | 'creating_passkey';
+// Whitelist - only these emails can login
+const ALLOWED_EMAILS = [
+  'sehereroglu786@gmail.com',
+];
+
+type LoginStep = 'email' | 'otp' | 'passkey' | 'verifying' | 'creating_passkey' | 'waitlist';
 
 const LoginPage: React.FC = () => {
   const { refresh } = useSession();
@@ -113,6 +118,14 @@ const LoginPage: React.FC = () => {
 
     setSubmitting(true);
     setMessage(null);
+
+    // Check whitelist
+    const normalizedEmail = email.toLowerCase().trim();
+    if (!ALLOWED_EMAILS.map(e => e.toLowerCase()).includes(normalizedEmail)) {
+      setStep('waitlist');
+      setSubmitting(false);
+      return;
+    }
 
     try {
       // First check if user has passkeys
@@ -429,6 +442,31 @@ const LoginPage: React.FC = () => {
     </div>
   );
 
+  const renderWaitlistStep = () => (
+    <div className="flex flex-col items-center gap-6">
+      <div className="w-20 h-20 rounded-full bg-amber-500/20 flex items-center justify-center">
+        <svg className="w-10 h-10 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      </div>
+      <div className="text-center">
+        <h2 className="text-2xl font-medium text-white mb-3">You're on the waitlist!</h2>
+        <p className="text-slate-400 mb-2">
+          Arc Wallet is currently in private beta.
+        </p>
+        <p className="text-slate-500 text-sm">
+          We'll notify you at <span className="text-slate-300">{email}</span> when access is available.
+        </p>
+      </div>
+      <button
+        onClick={handleBackToEmail}
+        className="mt-4 text-sm text-slate-400 hover:text-white transition-colors"
+      >
+        Try a different email
+      </button>
+    </div>
+  );
+
   return (
     <div className="fixed inset-0 w-full h-full flex flex-col items-center justify-center overflow-hidden bg-transparent">
       {/* Background Pattern */}
@@ -444,7 +482,7 @@ const LoginPage: React.FC = () => {
       {/* Login Container */}
       <div className="relative z-20 w-full max-w-md px-4 animate-in fade-in zoom-in duration-700">
         <h1 className="text-5xl font-light text-center mb-12 text-slate-100 tracking-tight drop-shadow-lg">
-          {step === 'otp' || step === 'verifying' ? 'Verify email' : step === 'creating_passkey' ? 'Setup passkey' : 'Sign in'}
+          {step === 'waitlist' ? 'Waitlist' : step === 'otp' || step === 'verifying' ? 'Verify email' : step === 'creating_passkey' ? 'Setup passkey' : 'Sign in'}
         </h1>
 
         {step === 'email' && renderEmailStep()}
@@ -452,6 +490,7 @@ const LoginPage: React.FC = () => {
         {step === 'passkey' && renderPasskeyStep()}
         {step === 'verifying' && renderVerifyingStep()}
         {step === 'creating_passkey' && renderCreatingPasskeyStep()}
+        {step === 'waitlist' && renderWaitlistStep()}
 
         {/* Status Messages (not for OTP step - handled by OtpInput) */}
         {message && step !== 'otp' && step !== 'verifying' && (
