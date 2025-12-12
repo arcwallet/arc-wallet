@@ -78,3 +78,14 @@ export interface FaucetTransaction {
   amount: number;
   timestamp: string;
 }
+
+// Type for NFTs
+export interface Nft {
+  id: string;
+  name: string;
+  description?: string;
+  image: string;
+  contractAddress: string;
+  tokenId: string;
+  collection?: string;
+}

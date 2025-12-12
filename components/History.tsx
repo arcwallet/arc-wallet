@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useActivity } from '../contexts/ActivityContext';
-import { usePasskeyAccount } from '../contexts/PasskeyAccountContext';
+import { useCircleWallet } from '../contexts/CircleWalletContext';
 import { TransactionStatus, TransactionType } from '../types';
 import { TX_EXPLORER_URL } from '../config/app.config';
 import {
@@ -16,7 +16,7 @@ type TimeFilter = 'all' | 'today' | 'week' | 'month';
 
 const History: React.FC = () => {
   const { activities } = useActivity();
-  const { address } = usePasskeyAccount();
+  const { address } = useCircleWallet();
   const [filterType, setFilterType] = useState<FilterType>('all');
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('all');
   const [searchQuery, setSearchQuery] = useState('');

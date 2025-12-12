@@ -50,15 +50,6 @@ export const ARC_GAS_CONFIG = {
     usesNativeGas: true,
 } as const;
 
-// ERC-4337 Bundler Config
-// Arc Network uses its own bundler - no external service needed
-export const BUNDLER_CONFIG = {
-    // Arc bundler endpoint (same as backend)
-    bundlerUrl: `${BACKEND_URL}/api/bundler/rpc`,
-    entryPoint: ENTRY_POINT,
-    enabled: true,
-} as const;
-
 // Gas Sponsorship Configuration (Legacy - Arc uses native USDC gas)
 // Kept for backwards compatibility
 export const GAS_SPONSORSHIP = {
@@ -159,7 +150,6 @@ export const config = {
     rpcUrl: RPC_URL,
     entryPoint: ENTRY_POINT,
     chain: ARC_TESTNET,
-    bundler: BUNDLER_CONFIG,
     gasSponsorship: GAS_SPONSORSHIP,
     explorer: {
         base: EXPLORER_BASE_URL,

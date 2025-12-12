@@ -1,7 +1,10 @@
 import { JsonRpcProvider, parseUnits, formatUnits, Interface } from 'ethers';
 import { TokenInfo, getTokenContractAddress, SWAP_CONFIG } from '../config/tokens';
 import { getProvider, getFeeSettings } from './rpcProvider';
-import type { PasskeyAccountManager } from './passkeyAccountManager';
+import { circleWalletService } from './circleWalletService';
+
+// Transaction execution function type
+export type ExecuteTransactionFn = (to: string, value: bigint, data: string) => Promise<string>;
 
 export interface Quote {
   fromToken: TokenInfo;
@@ -158,13 +161,13 @@ class SwapService {
   }
 
   /**
-   * Execute a token swap using PasskeyAccount (ERC-4337 Smart Wallet)
+   * Execute a token swap using Circle Modular Wallet (ERC-4337 Smart Wallet)
    * Uses UniswapV2 swapExactTokensForTokens
    * No private key required - uses passkey signing
    */
-  async executeSwapWithPasskey(
+  async executeSwap(
     quote: Quote,
-    passkeyManager: PasskeyAccountManager
+    walletAddress: string
   ): Promise<string> {
     try {
       // MEV Protection: Check quote expiration
@@ -172,9 +175,8 @@ class SwapService {
         throw new Error('Quote expired. Please get a fresh quote to avoid unfavorable pricing.');
       }
 
-      const walletAddress = passkeyManager.getAccountAddress();
       if (!walletAddress) {
-        throw new Error('PasskeyAccount not connected');
+        throw new Error('Wallet not connected');
       }
 
       const tokenInAddress = getTokenContractAddress(quote.fromToken.symbol, 'testnet', 'arcTestnet');
@@ -207,10 +209,14 @@ class SwapService {
       const currentAllowance = BigInt(allowanceResult);
 
       if (currentAllowance < amountIn) {
-        console.log('[SWAP] Approving token via PasskeyAccount...');
+        console.log('[SWAP] Approving token via Circle Wallet...');
         const approveData = erc20Interface.encodeFunctionData('approve', [this.routerAddress, amountIn * 2n]);
-        const approveResult = await passkeyManager.executeTransaction(tokenInAddress, 0n, approveData);
-        console.log('[SWAP] Token approved via PasskeyAccount:', approveResult.hash);
+        const approveHash = await circleWalletService.sendTransaction({
+          to: tokenInAddress,
+          value: 0n,
+          data: approveData as `0x${string}`,
+        });
+        console.log('[SWAP] Token approved via Circle Wallet:', approveHash);
       }
 
       // Step 2: Execute swap via PasskeyAccount using UniswapV2
@@ -222,7 +228,7 @@ class SwapService {
       // UniswapV2 uses path array for swaps
       const path = [tokenInAddress, tokenOutAddress];
 
-      console.log('[SWAP] Executing swap via PasskeyAccount with params:', {
+      console.log('[SWAP] Executing swap via Circle Wallet with params:', {
         from: quote.fromToken.symbol,
         to: quote.toToken.symbol,
         amountIn: quote.fromAmount,
@@ -240,14 +246,18 @@ class SwapService {
         deadline,
       ]);
 
-      // Execute via PasskeyAccount (UserOperation with passkey signature)
-      const swapResult = await passkeyManager.executeTransaction(this.routerAddress, 0n, swapData);
+      // Execute via Circle Wallet (UserOperation with passkey signature)
+      const txHash = await circleWalletService.sendTransaction({
+        to: this.routerAddress,
+        value: 0n,
+        data: swapData as `0x${string}`,
+      });
 
-      console.log('[SWAP] Swap successful via PasskeyAccount! TxHash:', swapResult.hash);
+      console.log('[SWAP] Swap successful via Circle Wallet! TxHash:', txHash);
 
-      return swapResult.hash || '';
+      return txHash;
     } catch (error: any) {
-      console.error('[SWAP] Swap execution via PasskeyAccount failed:', error);
+      console.error('[SWAP] Swap execution via Circle Wallet failed:', error);
 
       // Enhanced error messages
       if (error?.message?.includes('insufficient allowance')) {

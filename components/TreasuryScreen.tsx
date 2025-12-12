@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { usePasskeyAccount } from '../contexts/PasskeyAccountContext';
+import { useCircleWallet } from '../contexts/CircleWalletContext';
 import { useActivity } from '../contexts/ActivityContext';
 import { useSession } from '../contexts/SessionContext';
 import { usycService, USYCBalance, USYCQuote, TreasuryAllocation } from '../services/usycService';
@@ -106,7 +106,7 @@ interface ActionPanelProps {
 }
 
 const ActionPanel: React.FC<ActionPanelProps> = ({ type, balance, onSuccess, userEmail, userRole }) => {
-  const { manager: passkeyManager, address: walletAddress, isConnected } = usePasskeyAccount();
+  const { sendTransaction, address: walletAddress, isConnected } = useCircleWallet();
   const { addActivity } = useActivity();
 
   const [amount, setAmount] = useState('');
@@ -167,7 +167,7 @@ const ActionPanel: React.FC<ActionPanelProps> = ({ type, balance, onSuccess, use
   };
 
   const handleExecute = async () => {
-    if (!quote || !passkeyManager || !walletAddress || !isConnected) {
+    if (!quote || !walletAddress || !isConnected) {
       setError('Wallet not connected');
       return;
     }
@@ -178,8 +178,8 @@ const ActionPanel: React.FC<ActionPanelProps> = ({ type, balance, onSuccess, use
 
     try {
       const hash = isSubscribe
-        ? await usycService.subscribe(amount, passkeyManager)
-        : await usycService.redeem(amount, passkeyManager);
+        ? await usycService.subscribe(amount, walletAddress)
+        : await usycService.redeem(amount, walletAddress);
 
       setTxHash(hash);
 
@@ -362,7 +362,7 @@ const TreasuryHistory: React.FC<{ activities: any[] }> = ({ activities }) => {
 };
 
 const TreasuryScreen: React.FC = () => {
-  const { address: walletAddress, isConnected } = usePasskeyAccount();
+  const { address: walletAddress, isConnected } = useCircleWallet();
   const { activities } = useActivity();
   const { currentEmail, userId } = useSession();
 

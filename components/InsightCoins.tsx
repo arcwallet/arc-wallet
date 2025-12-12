@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { usePasskeyAccount } from '../contexts/PasskeyAccountContext';
+import { useCircleWallet } from '../contexts/CircleWalletContext';
 import {
   marketDataService,
   watchlistService,

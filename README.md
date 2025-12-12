@@ -5,76 +5,92 @@
 </p>
 
 <p align="center">
-  <strong>Next-Generation Self-Custodial Smart Contract Wallet</strong>
+  <strong>Enterprise-Grade Smart Contract Wallet for Arc Network</strong>
+</p>
+
+<p align="center">
+  Built on <a href="https://developers.circle.com/wallets/modular">Circle Modular Wallet</a> • ERC-4337 Account Abstraction • ERC-6900 Modular Accounts
 </p>
 
 <p align="center">
   <a href="https://app.arcwallet.network">Live App</a> •
   <a href="#features">Features</a> •
   <a href="#architecture">Architecture</a> •
-  <a href="#getting-started">Getting Started</a> •
-  <a href="#documentation">Documentation</a>
+  <a href="#getting-started">Getting Started</a>
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/License-Proprietary-red.svg" alt="License">
+  <img src="https://img.shields.io/badge/Circle-Modular%20Wallet-00D632?logo=circle" alt="Circle">
+  <img src="https://img.shields.io/badge/ERC--4337-Account%20Abstraction-blueviolet" alt="ERC-4337">
+  <img src="https://img.shields.io/badge/ERC--6900-Modular%20Accounts-blue" alt="ERC-6900">
   <img src="https://img.shields.io/badge/React-19.2.0-61DAFB?logo=react" alt="React">
   <img src="https://img.shields.io/badge/TypeScript-5.8-3178C6?logo=typescript" alt="TypeScript">
-  <img src="https://img.shields.io/badge/Solidity-0.8.23-363636?logo=solidity" alt="Solidity">
-  <img src="https://img.shields.io/badge/ERC--4337-Account%20Abstraction-blueviolet" alt="ERC-4337">
+  <img src="https://img.shields.io/badge/License-Proprietary-red.svg" alt="License">
 </p>
 
 ---
 
 ## Overview
 
-Arc Wallet is an enterprise-grade, self-custodial Web3 wallet built for Arc Network. It leverages **passkey authentication** (WebAuthn) as the primary signing mechanism, eliminating the need for seed phrases or private key management. The wallet implements **ERC-4337 Account Abstraction** with on-chain P256 signature verification using **RIP-7212 precompile**.
+Arc Wallet is an enterprise-grade, self-custodial Web3 wallet built on **Circle Modular Wallet SDK**. It leverages **passkey authentication** (WebAuthn) for seamless, passwordless access without seed phrases. The wallet is fully compliant with **ERC-4337** (Account Abstraction) and **ERC-6900** (Modular Smart Contract Accounts).
 
-### Key Differentiators
+### Why Circle Modular Wallet?
 
-| Feature | Traditional Wallets | Arc Wallet |
-|---------|---------------------|------------|
-| Authentication | Seed phrase / Private key | Passkey (WebAuthn P256) |
-| Key Storage | User responsibility | Device secure enclave |
-| Signature Verification | Off-chain (ECDSA) | On-chain (P256 precompile) |
-| Account Type | EOA | Smart Contract (ERC-4337) |
-| Gas Payment | User pays in native token | USDC as gas (via Paymaster) |
+| Feature | Traditional Wallets | Arc Wallet (Circle Modular) |
+|---------|---------------------|----------------------------|
+| Authentication | Seed phrase / Private key | Passkey (Face ID / Touch ID) |
+| Key Storage | User responsibility | Device Secure Enclave |
+| Account Type | EOA (Externally Owned) | Smart Contract Account (SCA) |
+| Signature Curve | secp256k1 | secp256r1 (P256/WebAuthn) |
+| Gas Payment | Native token only | USDC as gas (Paymaster) |
 | Recovery | Seed phrase backup | Multi-device passkey sync |
+| Extensibility | None | ERC-6900 Modular Plugins |
+| Multi-Sig | Separate contracts | Native weighted multi-sig |
+| Audited Infrastructure | Varies | Circle-audited contracts |
 
 ---
 
 ## Features
 
-### Core Wallet Features
+### Core Wallet (Circle Modular Wallet SDK)
 
-- **Passkey-First Authentication** - No seed phrases, no passwords. Your passkey IS your wallet key.
-- **Smart Contract Accounts** - ERC-4337 compliant accounts with native P256 signature support
-- **Multi-Token Support** - Native ARC, USDC, EURC, and custom token support
-- **Real-Time Balances** - Live balance updates via Blockscout API
+- **Passkey-First Authentication** - No seed phrases, no passwords. Biometric authentication via WebAuthn.
+- **Smart Contract Accounts** - ERC-4337 compliant accounts with native P256 signature verification.
+- **Gas Sponsorship** - Pay transaction fees with USDC via Circle's Paymaster infrastructure.
+- **Lazy Deployment** - Account deployed on first transaction, reducing onboarding friction.
+- **Session Persistence** - Auto-reconnect with stored passkey credentials.
 
-### Advanced Features
+### Cross-Chain Bridge (Circle CCTP V2)
 
-- **Cross-Chain Bridging** - Circle CCTP integration for USDC/EURC bridging between Arc Network and Ethereum
-- **Gas Sponsorship** - Paymaster integration for gasless transactions (USDC as gas)
-- **Batch Operations** - Execute multiple transactions in a single UserOperation
-- **Multi-Signature Wallets** - Create and manage multi-sig accounts with approval workflows
-- **Token Swaps** - In-app token swap functionality
-- **Faucet Integration** - Test token faucet for Arc Testnet
+- **Native USDC Bridging** - Transfer USDC across chains using Circle's Cross-Chain Transfer Protocol.
+- **Supported Routes**:
+  - Arc Testnet ↔ Ethereum Sepolia
+  - Arc Testnet ↔ Base Sepolia
+- **Fast Transfer** - ~30 seconds on supported chains.
+- **Standard Transfer** - ~15-20 minutes with Circle attestation.
+- **No Wrapped Tokens** - Native burn-and-mint mechanism, 1:1 capital efficiency.
 
-### Security Features
+### Enterprise Multi-Sig (ERC-6900)
 
-- **On-Chain P256 Verification** - Signatures verified directly on-chain via RIP-7212 precompile
-- **No Private Key Storage** - Keys never leave device secure enclave
-- **Session Management** - 15-minute session persistence with automatic re-authentication
-- **Multi-Device Passkey Support** - Manage multiple passkeys across devices
+- **Weighted Signatures** - Different signers can have different weights (CEO=2, CFO=2, CTO=1).
+- **Threshold Approvals** - Require minimum combined weight for transaction approval.
+- **Native Plugin** - Uses Circle's WeightedWebauthnMultisigPlugin (ERC-6900 compliant).
+- **Passkey Owners** - Add multiple passkey-based owners without EOA dependencies.
+- **Audited Contracts** - Circle's enterprise-grade, audited infrastructure.
 
-### Enterprise Features
+### Treasury Management
 
-- **Treasury Management** - Daily limits, approval workflows, spending tracking
-- **Multi-Passkey Management** - Add/remove passkeys for account recovery
-- **Backup Key System** - On-chain backup keys for account recovery
-- **Address Book** - Save and manage frequent addresses
-- **Transaction History** - Complete activity log via Blockscout
+- **USYC Integration** - Hashnote's US Yield Coin for treasury yield.
+- **Spending Limits** - Configure daily/monthly limits by token.
+- **Batch Transactions** - Execute multiple operations in single UserOperation.
+- **Allowance Optimization** - Smart approval management to minimize transactions.
+
+### Additional Features
+
+- **Token Swaps** - In-app swap functionality.
+- **Transaction History** - Complete activity tracking.
+- **Faucet Integration** - Test token faucet for Arc Testnet.
+- **Multi-Token Support** - USDC (native), EURC, USYC, and custom tokens.
 
 ---
 
@@ -84,85 +100,139 @@ Arc Wallet is an enterprise-grade, self-custodial Web3 wallet built for Arc Netw
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                           CLIENT LAYER                               │
+│                        ARC WALLET ARCHITECTURE                       │
 ├─────────────────────────────────────────────────────────────────────┤
-│  React Frontend          │  Passkey Manager         │  WebAuthn     │
-│  (TypeScript + Vite)     │  (services/)             │  (Passkeys)   │
-└──────────┬───────────────┴──────────┬───────────────┴───────┬───────┘
-           │                          │                       │
-           ▼                          ▼                       ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                           BACKEND LAYER                              │
-├─────────────────────────────────────────────────────────────────────┤
-│  Express.js API Server (Render)                                      │
-│  ├── Authentication (Circle OTP + WebAuthn)                          │
-│  ├── Bundler Service (UserOperation submission)                      │
-│  ├── Paymaster Service (Gas sponsorship)                             │
-│  ├── Bridge Service (Circle CCTP)                                    │
-│  ├── Treasury Service (Spending limits & approvals)                  │
-│  └── Multi-Sig Service (Multi-signature wallets)                     │
-└──────────┬──────────────────────────────────────────────────────────┘
-           │
-           ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                         BLOCKCHAIN LAYER                             │
-├─────────────────────────────────────────────────────────────────────┤
-│  Arc Testnet (Chain ID: 5042002)                                     │
-│  ├── PasskeyAccount.sol     → P256 signature verification            │
-│  ├── PasskeyAccountFactory  → CREATE2 account deployment             │
-│  ├── ArcPaymaster.sol       → USDC gas sponsorship                   │
-│  ├── P256Verifier.sol       → RIP-7212 precompile wrapper            │
-│  └── EntryPoint (v0.6)      → ERC-4337 entry point                   │
+│                                                                     │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │                     FRONTEND (React + Vite)                  │   │
+│  │  ┌─────────────┐ ┌─────────────┐ ┌─────────────────────────┐│   │
+│  │  │ WalletSetup │ │  Dashboard  │ │   Bridge / Treasury     ││   │
+│  │  └──────┬──────┘ └──────┬──────┘ └───────────┬─────────────┘│   │
+│  │         │               │                     │              │   │
+│  │         └───────────────┼─────────────────────┘              │   │
+│  │                         ▼                                    │   │
+│  │  ┌─────────────────────────────────────────────────────────┐│   │
+│  │  │              CONTEXTS (React State Management)           ││   │
+│  │  │  CircleWalletContext │ BridgeContext │ ERC6900MultiSig  ││   │
+│  │  └──────────────────────┴───────────────┴──────────────────┘│   │
+│  │                         │                                    │   │
+│  │                         ▼                                    │   │
+│  │  ┌─────────────────────────────────────────────────────────┐│   │
+│  │  │                    SERVICES LAYER                        ││   │
+│  │  │  circleWalletService │ bridgeService │ erc6900MultiSig  ││   │
+│  │  └──────────────────────┴───────────────┴──────────────────┘│   │
+│  └─────────────────────────────────────────────────────────────┘   │
+│                              │                                      │
+│                              ▼                                      │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │               CIRCLE MODULAR WALLET SDK                      │   │
+│  │  ┌─────────────────┐ ┌─────────────────┐ ┌────────────────┐ │   │
+│  │  │ toPasskeyTransport│ │toModularTransport│ │toCircleSmartAcc│ │   │
+│  │  └────────┬────────┘ └────────┬────────┘ └───────┬────────┘ │   │
+│  │           │                   │                   │          │   │
+│  │           ▼                   ▼                   ▼          │   │
+│  │  ┌─────────────────────────────────────────────────────────┐│   │
+│  │  │              BUNDLER CLIENT (viem/account-abstraction)   ││   │
+│  │  │                    sendUserOperation()                   ││   │
+│  │  └──────────────────────────────────────────────────────────┘│   │
+│  └─────────────────────────────────────────────────────────────┘   │
+│                              │                                      │
+│                              ▼                                      │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │                    BLOCKCHAIN LAYER                          │   │
+│  │                                                              │   │
+│  │  Arc Testnet (Chain ID: 5042002)                            │   │
+│  │  ├── EntryPoint v0.7 (ERC-4337)                             │   │
+│  │  ├── Circle MSCA Factory (ERC-6900)                         │   │
+│  │  ├── WeightedWebauthnMultisigPlugin                         │   │
+│  │  ├── TokenMessengerV2 (CCTP)                                │   │
+│  │  ├── MessageTransmitterV2 (CCTP)                            │   │
+│  │  └── USDC (Native Gas Token)                                │   │
+│  │                                                              │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+│                                                                     │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
 ### Authentication Flow
 
 ```
-┌──────────┐     ┌──────────┐     ┌──────────┐     ┌──────────────┐
-│  User    │────▶│  Email   │────▶│  OTP     │────▶│  Passkey     │
-│  Login   │     │  Input   │     │  Verify  │     │  Auth/Create │
-└──────────┘     └──────────┘     └──────────┘     └──────┬───────┘
-                                                          │
-                                                          ▼
-┌──────────────────────────────────────────────────────────────────┐
-│                    PASSKEY AUTHENTICATION                         │
-├──────────────────────────────────────────────────────────────────┤
-│  1. Browser prompts for passkey (Face ID / Touch ID / PIN)        │
-│  2. Device signs challenge with P256 private key                  │
-│  3. Public key (x, y coordinates) extracted                       │
-│  4. Smart contract address derived from public key via CREATE2    │
-│  5. Session established (15-minute persistence)                   │
-└──────────────────────────────────────────────────────────────────┘
+┌──────────┐     ┌──────────┐     ┌───────────────┐     ┌──────────────┐
+│  User    │────▶│  Email   │────▶│  Circle OTP   │────▶│   Passkey    │
+│  Login   │     │  Input   │     │  Verification │     │  Auth/Create │
+└──────────┘     └──────────┘     └───────────────┘     └──────┬───────┘
+                                                               │
+                                                               ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│                    CIRCLE MODULAR WALLET FLOW                         │
+├──────────────────────────────────────────────────────────────────────┤
+│  1. toPasskeyTransport() - Initialize passkey communication          │
+│  2. toWebAuthnCredential() - Register/Login with WebAuthn            │
+│  3. toWebAuthnAccount() - Create viem account from credential        │
+│  4. toCircleSmartAccount() - Create Circle MSCA (ERC-6900)          │
+│  5. createBundlerClient() - Initialize UserOp submission client      │
+│  6. Session stored locally for auto-reconnect                        │
+└──────────────────────────────────────────────────────────────────────┘
 ```
 
 ### Transaction Flow (ERC-4337)
 
 ```
-┌─────────┐    ┌─────────────┐    ┌──────────┐    ┌───────────┐
-│  User   │───▶│  Build      │───▶│  Sign    │───▶│  Submit   │
-│  Intent │    │  UserOp     │    │  (P256)  │    │  to Chain │
-└─────────┘    └─────────────┘    └──────────┘    └─────┬─────┘
-                                                        │
-                    ┌───────────────────────────────────┘
+┌─────────┐    ┌─────────────┐    ┌──────────────┐    ┌───────────────┐
+│  User   │───▶│  Build Tx   │───▶│  Passkey     │───▶│  Submit       │
+│  Action │    │  Calls      │    │  Sign (P256) │    │  UserOperation│
+└─────────┘    └─────────────┘    └──────────────┘    └───────┬───────┘
+                                                              │
+                    ┌─────────────────────────────────────────┘
                     ▼
-┌──────────────────────────────────────────────────────────────────┐
-│                      ON-CHAIN VERIFICATION                        │
-├──────────────────────────────────────────────────────────────────┤
-│  EntryPoint.handleOps()                                           │
-│       │                                                           │
-│       ▼                                                           │
-│  PasskeyAccount.validateUserOp()                                  │
-│       │                                                           │
-│       ▼                                                           │
-│  P256Verifier.verify(message, r, s, x, y)                        │
-│       │                                                           │
-│       ▼                                                           │
-│  RIP-7212 Precompile (0xc2b78104907F722DABAc4C69f826a522B2754De4) │
-│       │                                                           │
-│       ▼                                                           │
-│  ✓ Signature Valid → Execute Transaction                         │
-└──────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────┐
+│                      BUNDLER → ENTRYPOINT                             │
+├──────────────────────────────────────────────────────────────────────┤
+│  bundlerClient.sendUserOperation({                                    │
+│    account: circleSmartAccount,                                       │
+│    calls: [                                                           │
+│      { to: "0x...", data: "0x...", value: 0n },  // Call 1           │
+│      { to: "0x...", data: "0x...", value: 0n },  // Call 2 (batch)   │
+│    ],                                                                 │
+│    paymaster: true,  // Gas paid by Circle Paymaster                 │
+│  })                                                                   │
+│                              │                                        │
+│                              ▼                                        │
+│  EntryPoint.handleOps() → MSCA.validateUserOp() → Execute Calls      │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+### CCTP Bridge Flow
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│                    CCTP BRIDGE (Arc → Sepolia)                        │
+├──────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  Source Chain (Arc Testnet):                                         │
+│  ┌────────────────────────────────────────────────────────────────┐ │
+│  │  sendBatchTransactions([                                        │ │
+│  │    USDC.approve(TokenMessenger, amount),                        │ │
+│  │    TokenMessenger.depositForBurn(amount, destDomain, recipient) │ │
+│  │  ])                                                             │ │
+│  │                        │                                        │ │
+│  │                        ▼                                        │ │
+│  │  Single UserOperation → Bundler → EntryPoint → Execute          │ │
+│  └────────────────────────────────────────────────────────────────┘ │
+│                              │                                       │
+│                              ▼                                       │
+│  Circle Attestation Service (Iris) - ~15-20 minutes                 │
+│                              │                                       │
+│                              ▼                                       │
+│  Destination Chain (Sepolia):                                        │
+│  ┌────────────────────────────────────────────────────────────────┐ │
+│  │  MessageTransmitter.receiveMessage(message, attestation)        │ │
+│  │                        │                                        │ │
+│  │                        ▼                                        │ │
+│  │  USDC minted to recipient (same Smart Account address)          │ │
+│  └────────────────────────────────────────────────────────────────┘ │
+│                                                                      │
+└──────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -176,52 +246,59 @@ Arc Wallet is an enterprise-grade, self-custodial Web3 wallet built for Arc Netw
 | React | 19.2.0 | UI Framework |
 | TypeScript | 5.8.2 | Type Safety |
 | Vite | 6.4.1 | Build Tool |
-| ethers.js | 6.15.0 | Blockchain Interaction |
-| @simplewebauthn/browser | 13.2.2 | WebAuthn Client |
+| viem | 2.x | Blockchain Interaction |
+| @circle-fin/modular-wallets-core | latest | Circle Modular Wallet SDK |
 | Tailwind CSS | 3.x | Styling |
-| Framer Motion | 12.23.24 | Animations |
 
-### Backend
+### Circle SDK Components
 
-| Technology | Version | Purpose |
-|------------|---------|---------|
-| Node.js | 18+ | Runtime |
-| Express.js | 4.19.2 | API Server |
-| SQLite3 | 5.1.6 | Database |
-| @simplewebauthn/server | 10.0.0 | WebAuthn Server |
-| Helmet | 7.1.0 | Security Headers |
+| Package | Purpose |
+|---------|---------|
+| `@circle-fin/modular-wallets-core` | Core SDK for passkey and smart accounts |
+| `toPasskeyTransport` | WebAuthn communication layer |
+| `toModularTransport` | On-chain operation transport |
+| `toCircleSmartAccount` | ERC-6900 MSCA creation |
+| `toWebAuthnCredential` | Passkey registration/login |
 
-### Smart Contracts
+### Blockchain Standards
 
-| Contract | Purpose |
-|----------|---------|
-| PasskeyAccount.sol | P256-based smart account with backup keys |
-| PasskeyAccountFactory.sol | CREATE2 deterministic deployment |
-| ArcAccount.sol | Multi-key hybrid account |
-| ArcPaymaster.sol | USDC gas sponsorship |
-| P256Verifier.sol | RIP-7212 wrapper |
-| ArcMultiSigWallet.sol | Multi-signature wallet |
-| ArcMultiSigFactory.sol | Multi-sig factory |
+| Standard | Implementation |
+|----------|---------------|
+| ERC-4337 | Account Abstraction via UserOperations |
+| ERC-6900 | Modular Smart Contract Accounts |
+| WebAuthn | Passkey authentication (P256/secp256r1) |
+| CCTP V2 | Cross-Chain Transfer Protocol |
 
 ---
 
-## Smart Contract Addresses
+## Contract Addresses
 
 ### Arc Testnet (Chain ID: 5042002)
 
 | Contract | Address |
 |----------|---------|
-| EntryPoint (v0.6) | `0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789` |
-| PasskeyAccountFactory | `0x38bdac0eA9FFA6cE260370D98Fd2b89a3257A9c8` |
-| P256Verifier (Precompile) | `0xc2b78104907F722DABAc4C69f826a522B2754De4` |
-| USDC | `0x3d44ABb9cfE1C53Da7174C436Ce0030D15867Cef` |
-| EURC | `0x0B8829d31FD0E8D2d8EAaE9aE7868f0b9c67BB42` |
+| USDC (Native) | `0x3600000000000000000000000000000000000000` |
+| EURC | `0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a` |
+| USYC | `0xe9185F0c5F296Ed1797AaE4238D26CCaBEadb86C` |
+| TokenMessengerV2 (CCTP) | `0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA` |
+| MessageTransmitterV2 (CCTP) | `0xE737e5cEBEEBa77EFE34D4aa090756590b1CE275` |
+| TokenMinterV2 (CCTP) | `0xb43db544E2c27092c107639Ad201b3dEfAbcF192` |
 
 ### Ethereum Sepolia (Chain ID: 11155111)
 
 | Contract | Address |
 |----------|---------|
-| PasskeyAccountFactory | `0x38bdac0eA9FFA6cE260370D98Fd2b89a3257A9c8` |
+| USDC | `0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238` |
+| TokenMessengerV2 (CCTP) | `0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA` |
+| MessageTransmitterV2 (CCTP) | `0xE737e5cEBEEBa77EFE34D4aa090756590b1CE275` |
+
+### CCTP Domain IDs
+
+| Chain | Domain ID |
+|-------|-----------|
+| Ethereum | 0 |
+| Arc Testnet | 26 |
+| Base | 6 |
 
 ---
 
@@ -229,58 +306,44 @@ Arc Wallet is an enterprise-grade, self-custodial Web3 wallet built for Arc Netw
 
 ```
 arcwallet/
-├── components/          # React components (33 files)
-│   ├── Bridge.tsx           # Cross-chain bridging UI
-│   ├── SendAssets.tsx       # Token transfer UI
-│   ├── SwapScreen.tsx       # Token swap interface
-│   ├── History.tsx          # Transaction history
-│   ├── Settings.tsx         # User settings
-│   ├── MultiSigDashboard.tsx # Multi-sig management
-│   ├── Faucet.tsx           # Test token faucet
+├── components/              # React UI components
+│   ├── Bridge.tsx               # CCTP cross-chain bridge
+│   ├── ERC6900MultiSigPanel.tsx # Enterprise multi-sig UI
+│   ├── MultiSigDashboard.tsx    # Multi-sig management
+│   ├── SendAssets.tsx           # Token transfers
+│   ├── SwapScreen.tsx           # Token swaps
+│   ├── TreasuryScreen.tsx       # Treasury management
+│   ├── WalletDashboard.tsx      # Main dashboard
+│   ├── WalletSetup.tsx          # Onboarding flow
 │   └── ...
 │
-├── contexts/            # React context providers (7 files)
-│   ├── PasskeyAccountContext.tsx  # Passkey wallet state
-│   ├── SessionContext.tsx         # User session management
-│   ├── ActivityContext.tsx        # Transaction activity
-│   ├── NetworkContext.tsx         # Network selection
+├── contexts/                # React state management
+│   ├── CircleWalletContext.tsx  # Circle Modular Wallet state
+│   ├── BridgeContext.tsx        # CCTP bridge state
+│   ├── ERC6900MultiSigContext.tsx # Multi-sig state
+│   ├── SessionContext.tsx       # User session
 │   └── ...
 │
-├── services/            # API and blockchain services (24 files)
-│   ├── passkeyAccountManager.ts   # Core passkey wallet logic
-│   ├── passkeyClient.ts           # WebAuthn client
-│   ├── passkeyBridgeService.ts    # Bridge operations
-│   ├── tokenService.ts            # Token operations
-│   ├── swapService.ts             # Token swaps
+├── services/                # Business logic
+│   ├── circleWalletService.ts   # Core wallet operations
+│   ├── bridgeService.ts         # CCTP bridge logic
+│   ├── erc6900MultiSigService.ts # Multi-sig operations
+│   ├── usycService.ts           # Treasury/USYC
 │   └── ...
 │
-├── hooks/               # Custom React hooks (4 files)
-├── pages/               # Page components
-├── config/              # Configuration files
-├── utils/               # Utility functions
+├── config/                  # Configuration
+│   ├── circle.ts               # Circle SDK config
+│   ├── cctp.ts                 # CCTP addresses & ABIs
+│   └── chains/                 # Chain definitions
 │
-├── backend/
-│   └── src/
-│       ├── controllers/     # API controllers
-│       ├── routes/          # Express routes (17 files)
-│       │   ├── passkeys.ts      # Passkey authentication
-│       │   ├── circleOtp.ts     # Email OTP
-│       │   ├── bundler.ts       # UserOp submission
-│       │   ├── paymaster.ts     # Gas sponsorship
-│       │   ├── bridge.ts        # CCTP bridge
-│       │   ├── treasury.ts      # Treasury management
-│       │   └── ...
-│       ├── services/        # Business logic
-│       └── models/          # Database models
-│
-├── contracts/           # Solidity smart contracts (9 files)
-│   ├── PasskeyAccount.sol
-│   ├── ArcPaymaster.sol
-│   ├── ArcMultiSigWallet.sol
+├── pages/                   # Page components
+│   ├── LoginPage.tsx           # Email OTP login
+│   ├── PrivacyPolicy.tsx       # Legal pages
 │   └── ...
 │
-└── tests/               # Test suites
-    └── e2e/             # Playwright E2E tests
+├── styles/                  # CSS styles
+├── App.tsx                  # Root component with providers
+└── index.tsx                # Entry point
 ```
 
 ---
@@ -291,73 +354,47 @@ arcwallet/
 
 - Node.js 18+
 - npm or yarn
-- A modern browser with WebAuthn support
+- Modern browser with WebAuthn support (Chrome, Safari, Firefox, Edge)
+- Circle Developer Account (for API keys)
+
+### Environment Variables
+
+Create a `.env` file:
+
+```env
+# Circle Modular Wallet
+VITE_CIRCLE_CLIENT_URL=https://modular-sdk.circle.com/v1/rpc/w3s/buidl
+VITE_CIRCLE_CLIENT_KEY=your_circle_client_key
+VITE_CIRCLE_CHAIN_PATH=/arc
+
+# Arc Network
+VITE_ARC_RPC_URL=https://rpc.testnet.arc.network
+VITE_EXPLORER_URL=https://testnet.arcscan.app
+```
 
 ### Installation
 
 ```bash
-# Clone the repository
-git clone https://github.com/arcwallet/arc-wallet.git
-cd arc-wallet
+# Clone repository
+git clone https://github.com/your-org/arcwallet.git
+cd arcwallet
 
-# Install frontend dependencies
+# Install dependencies
 npm install
 
-# Install backend dependencies
-cd backend && npm install
-```
-
-### Development
-
-```bash
-# Start frontend dev server
+# Start development server
 npm run dev
 
-# Start backend (in another terminal)
-cd backend && npm run dev
-```
-
-### Build
-
-```bash
-# Build frontend
+# Build for production
 npm run build
-
-# Build backend
-cd backend && npm run build
 ```
 
-### Testing
+### Circle Developer Setup
 
-```bash
-# Run unit tests
-npm run test
-
-# Run E2E tests
-npm run test:e2e
-
-# Run contract tests
-npm run test:hardhat
-```
-
----
-
-## Environment Variables
-
-Create a `.env` file in the root directory:
-
-```env
-# Blockchain RPC
-VITE_ARC_RPC_URL=https://rpc.testnet.arc.network
-VITE_SEPOLIA_RPC_URL=https://ethereum-sepolia-rpc.publicnode.com
-
-# Backend URL
-VITE_BACKEND_URL=https://arcwallet-backend.onrender.com
-VITE_PASSKEY_API_URL=https://arcwallet-backend.onrender.com
-
-# Factory Addresses (CREATE2 - same on all chains)
-VITE_PASSKEY_FACTORY_ADDRESS=0x38bdac0eA9FFA6cE260370D98Fd2b89a3257A9c8
-```
+1. Create account at [Circle Developer Console](https://console.circle.com)
+2. Create a new Modular Wallet project
+3. Add Arc Testnet to supported networks
+4. Copy Client Key to `.env`
 
 ---
 
@@ -365,95 +402,55 @@ VITE_PASSKEY_FACTORY_ADDRESS=0x38bdac0eA9FFA6cE260370D98Fd2b89a3257A9c8
 
 ### Security Model
 
-Arc Wallet implements a **passkey-first security model**:
+Arc Wallet implements a **passkey-first, non-custodial security model**:
 
-1. **No Seed Phrases** - Private keys never leave the device secure enclave
-2. **On-Chain Verification** - P256 signatures verified on-chain, not by a centralized server
-3. **Multi-Device Support** - Passkeys sync across devices via platform (iCloud Keychain, Google Password Manager)
-4. **Session Isolation** - Each user session is isolated by email
+1. **No Seed Phrases** - Private keys never leave device secure enclave
+2. **WebAuthn P256** - Industry-standard passkey authentication
+3. **On-Chain Verification** - Signatures verified by smart contract
+4. **Circle Infrastructure** - Audited, enterprise-grade contracts
+5. **ERC-6900 Modular** - Extensible security via plugins
 
-### Security Measures
+### Key Security Features
 
-- **AES-256-GCM** encryption for sensitive data at rest
-- **Helmet.js** for HTTP security headers
-- **CSRF Protection** with double-submit cookie pattern
-- **Rate Limiting** on all API endpoints
-- **Input Validation** with express-validator
+- **Biometric Auth** - Face ID, Touch ID, Windows Hello
+- **Multi-Device Sync** - Passkeys sync via iCloud Keychain / Google Password Manager
+- **No Server-Side Keys** - Circle never has access to signing keys
+- **Deterministic Addresses** - Same address across all EVM chains (CREATE2)
 
 ### Reporting Vulnerabilities
 
 Please report security vulnerabilities to: **security@arcwallet.network**
 
-See [SECURITY.md](./SECURITY.md) for our full security policy.
-
 ---
 
-## API Reference
+## Resources
 
-### Authentication Endpoints
+### Circle Documentation
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/circle-otp/request` | Request email OTP |
-| POST | `/api/circle-otp/verify` | Verify OTP |
-| POST | `/passkeys/register/start` | Start passkey registration |
-| POST | `/passkeys/register/finish` | Complete passkey registration |
-| POST | `/passkeys/auth/start` | Start passkey authentication |
-| POST | `/passkeys/auth/finish` | Complete passkey authentication |
-| POST | `/passkeys/check-user` | Check if user has passkey |
+- [Modular Wallets Overview](https://developers.circle.com/wallets/modular)
+- [Web SDK Reference](https://developers.circle.com/wallets/modular/web-sdk)
+- [Passkey Authentication](https://developers.circle.com/wallets/modular/passkeys)
+- [CCTP Documentation](https://developers.circle.com/cctp)
 
-### Wallet Endpoints
+### Standards
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/bundler/rpc` | Submit UserOperation |
-| POST | `/api/paymaster/rpc` | Get paymaster signature |
-| GET | `/api/history/:address` | Get transaction history |
+- [ERC-4337: Account Abstraction](https://eips.ethereum.org/EIPS/eip-4337)
+- [ERC-6900: Modular Smart Contract Accounts](https://eips.ethereum.org/EIPS/eip-6900)
+- [WebAuthn Specification](https://www.w3.org/TR/webauthn-2/)
 
-### Bridge Endpoints
+### Arc Network
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/bridge/start` | Initiate bridge transfer |
-| GET | `/api/bridge/status/:txId` | Get bridge status |
-
-### Treasury Endpoints
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/treasury/policy/:address` | Get spending policy |
-| PUT | `/api/treasury/policy/:address` | Update spending policy |
-| GET | `/api/treasury/transactions/:address` | Get treasury transactions |
-
----
-
-## Deployment
-
-### Frontend (Vercel)
-
-The frontend is automatically deployed to Vercel on push to `main` branch.
-
-### Backend (Render)
-
-The backend is automatically deployed to Render on push to `main` branch.
-
-### Smart Contracts
-
-Smart contracts are deployed using Hardhat:
-
-```bash
-npx hardhat run scripts/deploy.ts --network arc-testnet
-```
+- [Arc Network Website](https://arc.network)
+- [Arc Testnet Explorer](https://testnet.arcscan.app)
+- [Arc Documentation](https://docs.arc.network)
 
 ---
 
 ## License
 
-Copyright © 2025 Arc Wallet. All rights reserved.
+Copyright 2025 Arc Wallet. All rights reserved.
 
 This is proprietary software. Unauthorized copying, distribution, modification, or use is strictly prohibited.
-
-See [LICENSE](./LICENSE) for full terms.
 
 ---
 
@@ -477,9 +474,13 @@ Arc Wallet is not responsible for any loss of funds due to user error, security 
 ---
 
 <p align="center">
-  <strong>Built with passion by Arc Wallet Team</strong>
+  <strong>Built on Circle Modular Wallet</strong>
 </p>
 
 <p align="center">
-  © 2025 Arc Wallet. All rights reserved.
+  <img src="https://img.shields.io/badge/Powered%20by-Circle-00D632?logo=circle" alt="Powered by Circle">
+</p>
+
+<p align="center">
+  2025 Arc Wallet. All rights reserved.
 </p>

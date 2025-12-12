@@ -1,10 +1,12 @@
 /**
  * Multi-Sig On-Chain Execution Service
- * Uses existing BundlerService for ERC-4337 UserOperation execution
- * Integrates with Arc Wallet's passkey-based smart accounts
+ *
+ * NOTE: This legacy service used the old backend bundler.
+ * Now using Circle Modular Wallet SDK with ERC-6900 multi-sig on frontend.
+ * This file is kept for backwards compatibility but execution methods are disabled.
+ * Use ERC6900MultiSigContext and Circle SDK for multi-sig operations.
  */
-import { ethers, JsonRpcProvider, Contract, Interface } from 'ethers';
-import { getBundlerService } from './bundlerService.js';
+import { ethers, JsonRpcProvider, Contract } from 'ethers';
 // ArcAccount ABI for execution
 const ARC_ACCOUNT_ABI = [
     'function execute(address target, uint256 value, bytes data) returns (bytes)',
@@ -30,165 +32,42 @@ export class MultiSigExecutionService {
     }
     /**
      * Prepare a UserOperation for multi-sig transaction
-     * Returns the UserOp that needs to be signed by passkeys on frontend
+     * @deprecated Use Circle Modular Wallet SDK (ERC6900MultiSigContext) instead
      */
-    async prepareUserOperation(params) {
-        try {
-            const { accountAddress, targetAddress, value, tokenAddress, data } = params;
-            // Build callData for execute function
-            const callData = await this._buildCallData(targetAddress, value, tokenAddress, data);
-            // Get nonce from EntryPoint (standard ERC-4337 way)
-            const entryPoint = new Contract(this.entryPointAddress, ['function getNonce(address sender, uint192 key) view returns (uint256)'], this.provider);
-            const nonce = await entryPoint.getNonce(accountAddress, 0);
-            // Get gas prices
-            const feeData = await this.provider.getFeeData();
-            const maxFeePerGas = feeData.maxFeePerGas || ethers.parseUnits('1', 'gwei');
-            const maxPriorityFeePerGas = feeData.maxPriorityFeePerGas || ethers.parseUnits('0.1', 'gwei');
-            // Use bundler service for gas estimation
-            const bundler = getBundlerService();
-            const gasEstimates = await bundler.estimateUserOperationGas({ sender: accountAddress, callData, initCode: '0x' }, this.entryPointAddress);
-            // Build UserOp (without signature - frontend will sign with passkeys)
-            const userOp = {
-                sender: accountAddress,
-                nonce: nonce.toString(),
-                initCode: '0x', // Account already deployed for multi-sig
-                callData,
-                callGasLimit: gasEstimates.callGasLimit,
-                verificationGasLimit: gasEstimates.verificationGasLimit,
-                preVerificationGas: gasEstimates.preVerificationGas,
-                maxFeePerGas: maxFeePerGas.toString(),
-                maxPriorityFeePerGas: maxPriorityFeePerGas.toString(),
-                paymasterAndData: '0x', // No paymaster for now
-                signature: '0x',
-            };
-            // Calculate userOpHash for signing
-            const userOpHash = this._calculateUserOpHash(userOp);
-            return {
-                ...userOp,
-                userOpHash,
-            };
-        }
-        catch (error) {
-            console.error('Failed to prepare UserOperation:', error);
-            return null;
-        }
+    async prepareUserOperation(_params) {
+        console.warn('prepareUserOperation is deprecated. Use Circle SDK with ERC6900MultiSigContext.');
+        // Legacy bundler removed - use Circle SDK on frontend
+        return null;
     }
     /**
      * Execute UserOperation via existing BundlerService
-     * Called after all required passkey signatures are collected on frontend
+     * @deprecated Use Circle Modular Wallet SDK (ERC6900MultiSigContext) instead
      */
-    async executeUserOperation(preparedOp, aggregatedSignature) {
-        try {
-            const bundler = getBundlerService();
-            // Create full UserOperation with signature
-            const userOp = {
-                sender: preparedOp.sender,
-                nonce: preparedOp.nonce,
-                initCode: preparedOp.initCode,
-                callData: preparedOp.callData,
-                callGasLimit: preparedOp.callGasLimit,
-                verificationGasLimit: preparedOp.verificationGasLimit,
-                preVerificationGas: preparedOp.preVerificationGas,
-                maxFeePerGas: preparedOp.maxFeePerGas,
-                maxPriorityFeePerGas: preparedOp.maxPriorityFeePerGas,
-                paymasterAndData: preparedOp.paymasterAndData,
-                signature: aggregatedSignature,
-            };
-            // Send to bundler
-            const userOpHash = await bundler.sendUserOperation(userOp, this.entryPointAddress);
-            // Wait for receipt (with timeout)
-            const receipt = await this._waitForReceipt(userOpHash, 60000);
-            return {
-                success: true,
-                txHash: receipt?.receipt?.transactionHash,
-                userOpHash,
-            };
-        }
-        catch (error) {
-            console.error('UserOperation execution failed:', error);
-            return {
-                success: false,
-                error: error.message || 'Execution failed',
-            };
-        }
+    async executeUserOperation(_preparedOp, _aggregatedSignature) {
+        console.warn('executeUserOperation is deprecated. Use Circle SDK with ERC6900MultiSigContext.');
+        return {
+            success: false,
+            error: 'Legacy bundler removed. Use Circle SDK on frontend for multi-sig execution.',
+        };
     }
     /**
      * Simple execution for when signatures are ready
-     * Prepares and executes in one call
+     * @deprecated Use Circle Modular Wallet SDK (ERC6900MultiSigContext) instead
      */
-    async executeTransaction(params, aggregatedSignature) {
-        try {
-            // Prepare the UserOp
-            const preparedOp = await this.prepareUserOperation(params);
-            if (!preparedOp) {
-                return { success: false, error: 'Failed to prepare UserOperation' };
-            }
-            // Execute with signature
-            return this.executeUserOperation(preparedOp, aggregatedSignature);
-        }
-        catch (error) {
-            console.error('Transaction execution failed:', error);
-            return {
-                success: false,
-                error: error.message || 'Execution failed',
-            };
-        }
+    async executeTransaction(_params, _aggregatedSignature) {
+        console.warn('executeTransaction is deprecated. Use Circle SDK with ERC6900MultiSigContext.');
+        return {
+            success: false,
+            error: 'Legacy bundler removed. Use Circle SDK on frontend for multi-sig execution.',
+        };
     }
-    /**
-     * Build callData for execute function
-     */
-    async _buildCallData(targetAddress, value, tokenAddress, data) {
-        const arcAccountInterface = new Interface(ARC_ACCOUNT_ABI);
-        if (tokenAddress && tokenAddress !== '0x0000000000000000000000000000000000000000') {
-            // ERC20 token transfer
-            const erc20Interface = new Interface(ERC20_ABI);
-            const tokenContract = new Contract(tokenAddress, ERC20_ABI, this.provider);
-            const decimals = await tokenContract.decimals();
-            const tokenAmount = ethers.parseUnits(value, decimals);
-            const transferData = erc20Interface.encodeFunctionData('transfer', [targetAddress, tokenAmount]);
-            // execute(tokenAddress, 0, transferData)
-            return arcAccountInterface.encodeFunctionData('execute', [tokenAddress, 0n, transferData]);
-        }
-        else {
-            // Native ETH transfer
-            const txValue = ethers.parseEther(value);
-            const txData = data || '0x';
-            return arcAccountInterface.encodeFunctionData('execute', [targetAddress, txValue, txData]);
-        }
-    }
-    /**
-     * Calculate UserOp hash for signing
-     */
-    _calculateUserOpHash(userOp) {
-        const packed = ethers.AbiCoder.defaultAbiCoder().encode(['address', 'uint256', 'bytes32', 'bytes32', 'uint256', 'uint256', 'uint256', 'uint256', 'uint256', 'bytes32'], [
-            userOp.sender,
-            userOp.nonce,
-            ethers.keccak256(userOp.initCode || '0x'),
-            ethers.keccak256(userOp.callData),
-            userOp.callGasLimit,
-            userOp.verificationGasLimit,
-            userOp.preVerificationGas,
-            userOp.maxFeePerGas,
-            userOp.maxPriorityFeePerGas,
-            ethers.keccak256(userOp.paymasterAndData || '0x'),
-        ]);
-        const userOpHash = ethers.keccak256(packed);
-        const finalHash = ethers.keccak256(ethers.AbiCoder.defaultAbiCoder().encode(['bytes32', 'address', 'uint256'], [userOpHash, this.entryPointAddress, this.chainId]));
-        return finalHash;
-    }
+    // Legacy helper methods removed - use Circle SDK on frontend
     /**
      * Wait for UserOp receipt via bundler
+     * @deprecated Legacy bundler removed
      */
-    async _waitForReceipt(userOpHash, timeout = 60000) {
-        const bundler = getBundlerService();
-        const startTime = Date.now();
-        while (Date.now() - startTime < timeout) {
-            const receipt = await bundler.getUserOperationReceipt(userOpHash);
-            if (receipt && receipt.receipt) {
-                return receipt;
-            }
-            await new Promise(resolve => setTimeout(resolve, 2000));
-        }
+    async _waitForReceipt(_userOpHash, _timeout = 60000) {
+        // Legacy bundler removed - use Circle SDK on frontend
         return null;
     }
     /**

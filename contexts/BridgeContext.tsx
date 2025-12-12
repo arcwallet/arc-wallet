@@ -1,0 +1,222 @@
+/**
+ * Bridge Context
+ *
+ * React context for CCTP bridge functionality.
+ * Provides cross-chain USDC transfer capabilities using Circle's CCTP V2.
+ */
+
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  useEffect,
+  type ReactNode,
+} from 'react';
+import {
+  bridgeService,
+  type BridgeTransaction,
+  type BridgeEstimate,
+  type BridgeStatus,
+} from '../services/bridgeService';
+import { type BridgeChainConfig } from '../config/cctp';
+import { useCircleWallet } from './CircleWalletContext';
+import { logger } from '../services/logger';
+
+// Context value type
+interface BridgeContextValue {
+  // State
+  isLoading: boolean;
+  error: string | null;
+  transactions: BridgeTransaction[];
+  pendingTransactions: BridgeTransaction[];
+  currentEstimate: BridgeEstimate | null;
+
+  // Chain info
+  destinationChains: BridgeChainConfig[];
+  selectedDestination: BridgeChainConfig | null;
+
+  // Actions
+  selectDestination: (chainId: number) => void;
+  estimateBridge: (amount: string, destinationChainId: number) => Promise<BridgeEstimate>;
+  executeBridge: (amount: string, destinationChainId: number) => Promise<BridgeTransaction>;
+  getTransaction: (txId: string) => BridgeTransaction | undefined;
+  refreshTransactions: () => void;
+  clearError: () => void;
+}
+
+// Create context
+const BridgeContext = createContext<BridgeContextValue | undefined>(undefined);
+
+// Provider props
+interface BridgeProviderProps {
+  children: ReactNode;
+}
+
+/**
+ * Bridge Provider Component
+ */
+export const BridgeProvider: React.FC<BridgeProviderProps> = ({ children }) => {
+  const { isConnected, address } = useCircleWallet();
+
+  // State
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [transactions, setTransactions] = useState<BridgeTransaction[]>([]);
+  const [currentEstimate, setCurrentEstimate] = useState<BridgeEstimate | null>(null);
+  const [selectedDestination, setSelectedDestination] = useState<BridgeChainConfig | null>(null);
+
+  // Get destination chains (excluding Arc Testnet as source)
+  const destinationChains = bridgeService.getDestinationChains(5042002);
+
+  // Load transactions on mount and when wallet connects
+  useEffect(() => {
+    if (isConnected) {
+      refreshTransactions();
+    }
+  }, [isConnected, address]);
+
+  // Refresh transactions from service
+  const refreshTransactions = useCallback(() => {
+    const allTx = bridgeService.getAllTransactions();
+    setTransactions(allTx);
+  }, []);
+
+  // Get pending transactions
+  const pendingTransactions = transactions.filter(
+    tx => !['completed', 'failed'].includes(tx.status)
+  );
+
+  // Select destination chain
+  const selectDestination = useCallback((chainId: number) => {
+    const chain = bridgeService.getChainConfig(chainId);
+    setSelectedDestination(chain || null);
+    setCurrentEstimate(null);
+  }, []);
+
+  // Estimate bridge
+  const estimateBridge = useCallback(async (
+    amount: string,
+    destinationChainId: number
+  ): Promise<BridgeEstimate> => {
+    setError(null);
+
+    try {
+      const estimate = await bridgeService.estimateBridge(amount, destinationChainId);
+      setCurrentEstimate(estimate);
+      return estimate;
+    } catch (err: any) {
+      const message = err.message || 'Failed to estimate bridge';
+      setError(message);
+      throw err;
+    }
+  }, []);
+
+  // Execute bridge
+  const executeBridge = useCallback(async (
+    amount: string,
+    destinationChainId: number
+  ): Promise<BridgeTransaction> => {
+    if (!isConnected) {
+      throw new Error('Wallet not connected');
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      logger.info('Executing bridge from context', {
+        component: 'BridgeContext',
+        amount,
+        destinationChainId,
+      });
+
+      const tx = await bridgeService.bridge(amount, destinationChainId);
+
+      // Refresh transactions list
+      refreshTransactions();
+
+      logger.info('Bridge initiated successfully', {
+        component: 'BridgeContext',
+        txId: tx.id,
+        status: tx.status,
+      });
+
+      return tx;
+    } catch (err: any) {
+      const message = err.message || 'Bridge failed';
+      setError(message);
+
+      logger.error('Bridge failed', {
+        component: 'BridgeContext',
+        error: message,
+      });
+
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [isConnected, refreshTransactions]);
+
+  // Get single transaction
+  const getTransaction = useCallback((txId: string): BridgeTransaction | undefined => {
+    return bridgeService.getTransaction(txId);
+  }, []);
+
+  // Clear error
+  const clearError = useCallback(() => {
+    setError(null);
+  }, []);
+
+  // Poll for transaction updates
+  useEffect(() => {
+    if (pendingTransactions.length === 0) return;
+
+    const interval = setInterval(() => {
+      refreshTransactions();
+    }, 10000); // Poll every 10 seconds
+
+    return () => clearInterval(interval);
+  }, [pendingTransactions.length, refreshTransactions]);
+
+  // Context value
+  const value: BridgeContextValue = {
+    // State
+    isLoading,
+    error,
+    transactions,
+    pendingTransactions,
+    currentEstimate,
+
+    // Chain info
+    destinationChains,
+    selectedDestination,
+
+    // Actions
+    selectDestination,
+    estimateBridge,
+    executeBridge,
+    getTransaction,
+    refreshTransactions,
+    clearError,
+  };
+
+  return (
+    <BridgeContext.Provider value={value}>
+      {children}
+    </BridgeContext.Provider>
+  );
+};
+
+/**
+ * Hook to use Bridge context
+ */
+export const useBridge = (): BridgeContextValue => {
+  const context = useContext(BridgeContext);
+  if (!context) {
+    throw new Error('useBridge must be used within a BridgeProvider');
+  }
+  return context;
+};
+
+export default BridgeContext;

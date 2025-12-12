@@ -2,7 +2,7 @@
 import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { isAddress, parseUnits, Interface } from 'ethers';
 import { useArcAccount } from '../contexts/ArcAccountContext';
-import { usePasskeyAccount } from '../contexts/PasskeyAccountContext';
+import { useCircleWallet } from '../contexts/CircleWalletContext';
 import { useActivity } from '../contexts/ActivityContext';
 import { usePrivacy } from '../contexts/PrivacyContext';
 import { preparePrivateTransaction } from '../services/teeService';
@@ -25,12 +25,14 @@ interface SendAssetsProps {
 const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialRecipient = '', initialToken }) => {
   const { isLoading } = useArcAccount();
 
-  // PasskeyAccount - Smart Wallet with P256 signing (NO private key)
+  // Circle Modular Wallet - Smart Wallet with Passkey signing (NO private key)
   const {
     isConnected: passkeyConnected,
     address: passkeyAddress,
-    manager: passkeyManager,
-  } = usePasskeyAccount();
+    sendTransaction,
+    sendTokenTransfer,
+    refreshBalance,
+  } = useCircleWallet();
 
   const { addActivity } = useActivity();
   const { isPrivacyMode } = usePrivacy();
@@ -43,9 +45,8 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
     console.log('[SEND] Wallet Info:', {
       passkeyAddress,
       passkeyConnected,
-      hasManager: !!passkeyManager,
     });
-  }, [passkeyAddress, passkeyConnected, passkeyManager]);
+  }, [passkeyAddress, passkeyConnected]);
   const [amount, setAmount] = useState(initialAmount);
   const [recipient, setRecipient] = useState(initialRecipient);
   const [selectedToken, setSelectedToken] = useState<TokenInfo>(() => {
@@ -192,14 +193,14 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
 
 
   const isRecipientValid = recipient ? isAddress(recipient) : false;
-  // PasskeyAccount - only need wallet connected
-  const canSubmit = passkeyConnected && passkeyManager && isRecipientValid && amountNumber > 0 && amountNumber <= balance && !isSubmitting;
+  // Circle Wallet - only need wallet connected
+  const canSubmit = passkeyConnected && isRecipientValid && amountNumber > 0 && amountNumber <= balance && !isSubmitting;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     // Validation
-    if (!passkeyConnected || !passkeyManager) {
+    if (!passkeyConnected) {
       setSubmitError('Please connect your passkey wallet.');
       return;
     }
@@ -272,11 +273,26 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
         value = parseUnits(amount, selectedToken.decimals).toString();
       }
 
-      console.log('[SEND] Executing via PasskeyAccount:', { to, value, data: data.slice(0, 20) + '...' });
+      console.log('[SEND] Executing via Circle Modular Wallet:', { to, value, data: data.slice(0, 20) + '...' });
 
-      // Execute transaction via passkey manager (uses ERC-4337 bundler)
-      const result = await passkeyManager.executeTransaction(to, BigInt(value), data);
-      const hash = result.hash || '';
+      // Execute transaction via Circle Modular Wallet (uses ERC-4337 bundler)
+      let hash: string;
+      if (selectedToken.symbol !== 'ETH') {
+        // ERC20 transfer via sendTokenTransfer
+        const tokenAddress = getTokenContractAddress(selectedToken.symbol, 'testnet', 'arcTestnet');
+        hash = await sendTokenTransfer({
+          tokenAddress: tokenAddress!,
+          to: recipient,
+          amount: amount,
+          decimals: selectedToken.decimals,
+        });
+      } else {
+        // Native transfer via sendTransaction
+        hash = await sendTransaction({
+          to: recipient,
+          value: BigInt(value),
+        });
+      }
 
       console.log('[SEND] Transaction submitted:', hash);
 
@@ -285,6 +301,9 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
 
       // Record recipient in address book
       addressBookService.recordRecipient(recipient, amount, selectedToken.symbol);
+
+      // Refresh balance after successful transaction
+      refreshBalance();
 
       // Add to activity
       addActivity({

@@ -1,7 +1,10 @@
 /**
  * Multi-Sig On-Chain Execution Service
- * Uses existing BundlerService for ERC-4337 UserOperation execution
- * Integrates with Arc Wallet's passkey-based smart accounts
+ *
+ * NOTE: This legacy service used the old backend bundler.
+ * Now using Circle Modular Wallet SDK with ERC-6900 multi-sig on frontend.
+ * This file is kept for backwards compatibility but execution methods are disabled.
+ * Use ERC6900MultiSigContext and Circle SDK for multi-sig operations.
  */
 export interface ExecutionResult {
     success: boolean;
@@ -38,29 +41,22 @@ export declare class MultiSigExecutionService {
     constructor(rpcUrl: string, chainId?: number);
     /**
      * Prepare a UserOperation for multi-sig transaction
-     * Returns the UserOp that needs to be signed by passkeys on frontend
+     * @deprecated Use Circle Modular Wallet SDK (ERC6900MultiSigContext) instead
      */
-    prepareUserOperation(params: TransactionParams): Promise<PreparedUserOp | null>;
+    prepareUserOperation(_params: TransactionParams): Promise<PreparedUserOp | null>;
     /**
      * Execute UserOperation via existing BundlerService
-     * Called after all required passkey signatures are collected on frontend
+     * @deprecated Use Circle Modular Wallet SDK (ERC6900MultiSigContext) instead
      */
-    executeUserOperation(preparedOp: PreparedUserOp, aggregatedSignature: string): Promise<ExecutionResult>;
+    executeUserOperation(_preparedOp: PreparedUserOp, _aggregatedSignature: string): Promise<ExecutionResult>;
     /**
      * Simple execution for when signatures are ready
-     * Prepares and executes in one call
+     * @deprecated Use Circle Modular Wallet SDK (ERC6900MultiSigContext) instead
      */
-    executeTransaction(params: TransactionParams, aggregatedSignature: string): Promise<ExecutionResult>;
-    /**
-     * Build callData for execute function
-     */
-    private _buildCallData;
-    /**
-     * Calculate UserOp hash for signing
-     */
-    private _calculateUserOpHash;
+    executeTransaction(_params: TransactionParams, _aggregatedSignature: string): Promise<ExecutionResult>;
     /**
      * Wait for UserOp receipt via bundler
+     * @deprecated Legacy bundler removed
      */
     private _waitForReceipt;
     /**

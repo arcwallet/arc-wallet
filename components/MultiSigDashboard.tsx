@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useMultiSig } from '../contexts/MultiSigContext';
 import { useSession } from '../contexts/SessionContext';
-import { usePasskeyAccount } from '../contexts/PasskeyAccountContext';
+import { useCircleWallet } from '../contexts/CircleWalletContext';
+import { useERC6900MultiSig } from '../contexts/ERC6900MultiSigContext';
 import { formatUnits, parseUnits } from 'ethers';
-import MultiPasskeyManager from './MultiPasskeyManager';
+import ERC6900MultiSigPanel from './ERC6900MultiSigPanel';
 import '../styles/multisig.css';
 
 // Token addresses
@@ -27,7 +28,12 @@ interface Member {
 
 const MultiSigDashboard: React.FC = () => {
   const { email: currentEmail } = useSession();
-  const { address: walletAddress } = usePasskeyAccount();
+  const { address: walletAddress } = useCircleWallet();
+  const { isMultiSigEnabled } = useERC6900MultiSig();
+
+  // State for view mode
+  const [useERC6900, setUseERC6900] = useState(true); // Default to ERC-6900
+
   const {
     accounts,
     selectedAccount,
@@ -66,7 +72,6 @@ const MultiSigDashboard: React.FC = () => {
 
   // State for settings
   const [showSettings, setShowSettings] = useState(false);
-  const [showPasskeyManager, setShowPasskeyManager] = useState(false);
   const [addingMember, setAddingMember] = useState(false);
   const [addMemberEmail, setAddMemberEmail] = useState('');
   const [addMemberRole, setAddMemberRole] = useState<'signer' | 'viewer'>('signer');
@@ -166,7 +171,12 @@ const MultiSigDashboard: React.FC = () => {
     selectAccount('').catch(() => { });
   };
 
-  // Account list view
+  // Use ERC-6900 native multi-sig (recommended for enterprise)
+  if (useERC6900) {
+    return <ERC6900MultiSigPanel />;
+  }
+
+  // Legacy account list view (fallback)
   if (!selectedAccount) {
     return (
       <div className="multisig-panel">
@@ -175,8 +185,8 @@ const MultiSigDashboard: React.FC = () => {
           <div className="header-actions">
             <button
               className="btn-icon"
-              onClick={() => setShowPasskeyManager(true)}
-              title="Multi-Passkey Security"
+              onClick={() => setUseERC6900(true)}
+              title="Switch to ERC-6900 (Recommended)"
             >
               🔐
             </button>
@@ -519,22 +529,7 @@ const MultiSigDashboard: React.FC = () => {
         )}
       </div>
 
-      {/* Multi-Passkey Manager Modal */}
-      {showPasskeyManager && walletAddress && (
-        <div className="modal-overlay">
-          <div className="modal-content">
-            <MultiPasskeyManager
-              walletAddress={walletAddress}
-              backendUrl={import.meta.env.VITE_BACKEND_URL || 'https://arcwallet-backend.onrender.com'}
-              rpcUrl={import.meta.env.VITE_ARC_RPC_URL || 'https://rpc.arc.network'}
-              onClose={() => setShowPasskeyManager(false)}
-              onPasskeyAdded={() => {
-                // Refresh data after passkey added
-              }}
-            />
-          </div>
-        </div>
-      )}
+      {/* Multi-Passkey Manager removed - Circle Modular Wallet handles passkeys */}
     </div>
   );
 };

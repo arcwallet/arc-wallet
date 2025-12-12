@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useSession } from '../contexts/SessionContext';
-import { usePasskeyAccount } from '../contexts/PasskeyAccountContext';
+import { useCircleWallet } from '../contexts/CircleWalletContext';
 
 import { passkeyClient, type SessionKeySummary } from '../services/passkeyClient';
 import { WalletIcon, CopyIcon, AddIcon, LaptopIcon, PhoneIcon, ChevronDownIcon, LockIcon, KeyIcon } from './Icons';
@@ -12,8 +12,8 @@ import BackupKeyManager from './BackupKeyManager';
 import { ARC_TESTNET_CONTRACTS, KEY_TYPE } from '../config/contracts';
 
 const SecuritySection: React.FC = () => {
-    // PasskeyAccount - Smart Wallet (single wallet system)
-    const { address } = usePasskeyAccount();
+    // Circle Modular Wallet - Smart Wallet (single wallet system)
+    const { address } = useCircleWallet();
     const { userId } = useSession();
     const [loading, setLoading] = useState(false);
     const [keys, setKeys] = useState<SessionKeySummary[]>([]);
@@ -158,8 +158,8 @@ const NetworkSection: React.FC = () => (
 
 
 const OrganizationRolesSection: React.FC = () => {
-    // PasskeyAccount - Smart Wallet (single wallet system)
-    const { address } = usePasskeyAccount();
+    // Circle Modular Wallet - Smart Wallet (single wallet system)
+    const { address } = useCircleWallet();
     const { email } = useSession();
 
     return (
@@ -213,8 +213,8 @@ const OrganizationRolesSection: React.FC = () => {
 
 // Smart Wallet Section - Shows ArcAccount contract info
 const SmartWalletSection: React.FC = () => {
-    // PasskeyAccount - Smart Wallet (single wallet system)
-    const { address } = usePasskeyAccount();
+    // Circle Modular Wallet - Smart Wallet (single wallet system)
+    const { address } = useCircleWallet();
     const [copied, setCopied] = useState<string | null>(null);
     const [isExpanded, setIsExpanded] = useState(false);
 
@@ -334,7 +334,7 @@ const SmartWalletSection: React.FC = () => {
 
 // Backup Key Recovery Section for individual users
 const BackupKeyRecoverySection: React.FC = () => {
-    const { address } = usePasskeyAccount();
+    const { address } = useCircleWallet();
     const [showBackupManager, setShowBackupManager] = useState(false);
 
     if (!address) {
@@ -396,7 +396,7 @@ const BackupKeyRecoverySection: React.FC = () => {
 
 const SessionInfoSection: React.FC = () => {
     const { email, logout: sessionLogout } = useSession();
-    const { disconnect } = usePasskeyAccount();
+    const { disconnect } = useCircleWallet();
 
     if (!email) {
         return null;

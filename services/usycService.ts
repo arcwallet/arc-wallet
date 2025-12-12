@@ -6,7 +6,7 @@
 
 import { Contract, Interface, parseUnits, formatUnits } from 'ethers';
 import { getProvider } from './rpcProvider';
-import type { PasskeyAccountManager } from './passkeyAccountManager';
+import { circleWalletService } from './circleWalletService';
 
 // Arc Testnet Contract Addresses (Verified on Blockscout)
 export const USYC_CONTRACTS = {
@@ -41,6 +41,9 @@ const ERC20_ABI = [
   'function balanceOf(address account) external view returns (uint256)',
   'function decimals() external view returns (uint8)',
 ];
+
+// Max uint256 for unlimited approval
+const MAX_UINT256 = BigInt('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff');
 
 // USYC Token ABI
 const USYC_ABI = [
@@ -310,14 +313,31 @@ class USYCService {
   }
 
   /**
+   * Check current allowance for a token
+   */
+  async checkAllowance(
+    tokenAddress: string,
+    ownerAddress: string,
+    spenderAddress: string
+  ): Promise<bigint> {
+    try {
+      const contract = new Contract(tokenAddress, ERC20_ABI, this.provider);
+      return await contract.allowance(ownerAddress, spenderAddress);
+    } catch (error) {
+      console.error('[USYC] Error checking allowance:', error);
+      return 0n;
+    }
+  }
+
+  /**
    * Subscribe: Convert USDC to USYC via Teller
+   * Uses batch transaction for approve + deposit in single UserOperation
    * Returns transaction hash
    */
   async subscribe(
     usdcAmount: string,
-    manager: PasskeyAccountManager
+    walletAddress: string
   ): Promise<string> {
-    const walletAddress = manager.getAccountAddress();
     if (!walletAddress) {
       throw new Error('Wallet not connected');
     }
@@ -328,49 +348,69 @@ class USYCService {
       wallet: walletAddress,
     });
 
-    // Step 1: Approve USDC to Teller
-    const approveData = this.erc20Interface.encodeFunctionData('approve', [
-      USYC_CONTRACTS.arcTestnet.teller,
-      amountIn,
-    ]);
-
-    console.log('[USYC] Approving USDC...');
-    const approveResult = await manager.executeTransaction(
+    // Check current USDC allowance
+    const currentAllowance = await this.checkAllowance(
       USYC_CONTRACTS.arcTestnet.usdc,
-      0n,
-      approveData
+      walletAddress,
+      USYC_CONTRACTS.arcTestnet.teller
     );
-    console.log('[USYC] Approve tx:', approveResult.hash);
 
-    // Wait for approval confirmation
-    await this.provider.waitForTransaction(approveResult.hash, 1);
+    console.log('[USYC] Current USDC allowance:', currentAllowance.toString());
 
-    // Step 2: Call deposit on Teller
+    // Prepare deposit call
     const depositData = this.tellerInterface.encodeFunctionData('deposit', [
       amountIn,
       walletAddress,
     ]);
 
-    console.log('[USYC] Calling deposit...');
-    const depositResult = await manager.executeTransaction(
-      USYC_CONTRACTS.arcTestnet.teller,
-      0n,
-      depositData
-    );
-    console.log('[USYC] Deposit tx:', depositResult.hash);
+    // If allowance is sufficient, just do the deposit
+    if (currentAllowance >= amountIn) {
+      console.log('[USYC] Sufficient allowance, calling deposit directly...');
+      const depositHash = await circleWalletService.sendTransaction({
+        to: USYC_CONTRACTS.arcTestnet.teller,
+        value: 0n,
+        data: depositData as `0x${string}`,
+      });
+      console.log('[USYC] Deposit tx:', depositHash);
+      return depositHash;
+    }
 
-    return depositResult.hash;
+    // Need approval - use batch transaction (approve + deposit in single UserOp)
+    console.log('[USYC] Using batch transaction for approve + deposit...');
+
+    // Prepare approve call (use max approval to avoid future approvals)
+    const approveData = this.erc20Interface.encodeFunctionData('approve', [
+      USYC_CONTRACTS.arcTestnet.teller,
+      MAX_UINT256,
+    ]);
+
+    // Execute batch transaction
+    const batchHash = await circleWalletService.sendBatchTransactions([
+      {
+        to: USYC_CONTRACTS.arcTestnet.usdc,
+        value: 0n,
+        data: approveData as `0x${string}`,
+      },
+      {
+        to: USYC_CONTRACTS.arcTestnet.teller,
+        value: 0n,
+        data: depositData as `0x${string}`,
+      },
+    ]);
+
+    console.log('[USYC] Batch tx (approve + deposit):', batchHash);
+    return batchHash;
   }
 
   /**
    * Redeem: Convert USYC to USDC via Teller
+   * Uses batch transaction for approve + redeem in single UserOperation
    * Returns transaction hash
    */
   async redeem(
     usycAmount: string,
-    manager: PasskeyAccountManager
+    walletAddress: string
   ): Promise<string> {
-    const walletAddress = manager.getAccountAddress();
     if (!walletAddress) {
       throw new Error('Wallet not connected');
     }
@@ -381,39 +421,59 @@ class USYCService {
       wallet: walletAddress,
     });
 
-    // Step 1: Approve USYC to Teller
-    const approveData = this.erc20Interface.encodeFunctionData('approve', [
-      USYC_CONTRACTS.arcTestnet.teller,
-      amountIn,
-    ]);
-
-    console.log('[USYC] Approving USYC...');
-    const approveResult = await manager.executeTransaction(
+    // Check current USYC allowance
+    const currentAllowance = await this.checkAllowance(
       USYC_CONTRACTS.arcTestnet.usyc,
-      0n,
-      approveData
+      walletAddress,
+      USYC_CONTRACTS.arcTestnet.teller
     );
-    console.log('[USYC] Approve tx:', approveResult.hash);
 
-    // Wait for approval confirmation
-    await this.provider.waitForTransaction(approveResult.hash, 1);
+    console.log('[USYC] Current USYC allowance:', currentAllowance.toString());
 
-    // Step 2: Call redeem on Teller
+    // Prepare redeem call
     const redeemData = this.tellerInterface.encodeFunctionData('redeem', [
       amountIn,
       walletAddress,
       walletAddress,
     ]);
 
-    console.log('[USYC] Calling redeem...');
-    const redeemResult = await manager.executeTransaction(
-      USYC_CONTRACTS.arcTestnet.teller,
-      0n,
-      redeemData
-    );
-    console.log('[USYC] Redeem tx:', redeemResult.hash);
+    // If allowance is sufficient, just do the redeem
+    if (currentAllowance >= amountIn) {
+      console.log('[USYC] Sufficient allowance, calling redeem directly...');
+      const redeemHash = await circleWalletService.sendTransaction({
+        to: USYC_CONTRACTS.arcTestnet.teller,
+        value: 0n,
+        data: redeemData as `0x${string}`,
+      });
+      console.log('[USYC] Redeem tx:', redeemHash);
+      return redeemHash;
+    }
 
-    return redeemResult.hash;
+    // Need approval - use batch transaction (approve + redeem in single UserOp)
+    console.log('[USYC] Using batch transaction for approve + redeem...');
+
+    // Prepare approve call (use max approval to avoid future approvals)
+    const approveData = this.erc20Interface.encodeFunctionData('approve', [
+      USYC_CONTRACTS.arcTestnet.teller,
+      MAX_UINT256,
+    ]);
+
+    // Execute batch transaction
+    const batchHash = await circleWalletService.sendBatchTransactions([
+      {
+        to: USYC_CONTRACTS.arcTestnet.usyc,
+        value: 0n,
+        data: approveData as `0x${string}`,
+      },
+      {
+        to: USYC_CONTRACTS.arcTestnet.teller,
+        value: 0n,
+        data: redeemData as `0x${string}`,
+      },
+    ]);
+
+    console.log('[USYC] Batch tx (approve + redeem):', batchHash);
+    return batchHash;
   }
 
   /**

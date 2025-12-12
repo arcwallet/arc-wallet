@@ -151,10 +151,21 @@ class Logger {
         }
     }
 
-    error(message: string, error?: Error, context?: LogContext): void {
+    error(message: string, errorOrContext?: Error | LogContext, context?: LogContext): void {
         if (!this.shouldLog(LogLevel.ERROR)) return;
 
-        const sanitized = this.sanitizeContext(context);
+        // Handle both signatures: error(msg, Error, ctx) and error(msg, ctx)
+        let error: Error | undefined;
+        let ctx: LogContext | undefined;
+
+        if (errorOrContext instanceof Error) {
+            error = errorOrContext;
+            ctx = context;
+        } else if (errorOrContext) {
+            ctx = errorOrContext as LogContext;
+        }
+
+        const sanitized = this.sanitizeContext(ctx);
 
         if (this.config.enableConsole) {
             console.error(this.formatMessage('ERROR', message, sanitized), error || '', sanitized || '');

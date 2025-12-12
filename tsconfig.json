@@ -27,5 +27,12 @@
     "allowSyntheticDefaultImports": true,
     "allowImportingTsExtensions": true,
     "noEmit": true
-  }
+  },
+  "exclude": [
+    "node_modules",
+    "backend",
+    "test",
+    "scripts",
+    "dist"
+  ]
 }

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, ReactNode } from 'react';
 import { useArcAccountSnapshot, type UseArcAccountSnapshotState } from '../hooks/useArcAccountSnapshot';
-import { usePasskeyAccount } from './PasskeyAccountContext';
+import { useCircleWallet } from './CircleWalletContext';
 
 interface ArcAccountContextValue extends UseArcAccountSnapshotState {
   address: string | null;
@@ -9,8 +9,8 @@ interface ArcAccountContextValue extends UseArcAccountSnapshotState {
 const ArcAccountContext = createContext<ArcAccountContextValue | undefined>(undefined);
 
 export const ArcAccountProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  // PasskeyAccount - Smart Wallet (single wallet system)
-  const { address } = usePasskeyAccount();
+  // Circle Modular Wallet - Smart Wallet (single wallet system)
+  const { address } = useCircleWallet();
   const snapshotState = useArcAccountSnapshot(address);
 
   return (

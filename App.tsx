@@ -12,22 +12,24 @@ import { ActivityProvider } from './contexts/ActivityContext';
 import { MultiSigProvider } from './contexts/MultiSigContext';
 import { PrivacyProvider } from './contexts/PrivacyContext';
 import { NetworkProvider } from './contexts/NetworkContext';
-// Smart Contract Passkey Wallet (ERC-4337)
-import { PasskeyAccountProvider, usePasskeyAccount } from './contexts/PasskeyAccountContext';
+
+// Circle Modular Wallet (ERC-4337 + ERC-6900)
+import { CircleWalletProvider, useCircleWallet } from './contexts/CircleWalletContext';
+import { ERC6900MultiSigProvider } from './contexts/ERC6900MultiSigContext';
+import { BridgeProvider } from './contexts/BridgeContext';
 import WalletSetup from './components/WalletSetup';
 
-// Smart Contract Passkey Wallet Experience
-// NEW ARCHITECTURE: Passkey IS the signing key, no private key stored
-const PasskeyWalletExperience: React.FC = () => {
-  const { isConnected } = usePasskeyAccount();
+// Circle Modular Wallet Experience
+// Uses Circle's infrastructure for passkey-based smart accounts
+const CircleWalletExperience: React.FC = () => {
+  const { isConnected } = useCircleWallet();
 
   const handleComplete = () => {
     // Wallet created/connected successfully
-    console.log('[App] Smart Contract Wallet ready');
+    console.log('[App] Circle Modular Wallet ready');
   };
 
   // No account or not connected - show setup
-  // WalletSetup now uses PasskeyAccountContext (Smart Contract)
   if (!isConnected) {
     return <WalletSetup onComplete={handleComplete} />;
   }
@@ -63,8 +65,8 @@ const RootView: React.FC = () => {
     return <LoginPage />;
   }
 
-  // Use Smart Contract Passkey Wallet (NEW - default)
-  return <PasskeyWalletExperience />;
+  // Use Circle Modular Wallet
+  return <CircleWalletExperience />;
 };
 
 const App: React.FC = () => {
@@ -82,21 +84,25 @@ const App: React.FC = () => {
       <DesktopOnlyGuard>
         <SessionProvider>
           <NetworkProvider>
-            <PasskeyAccountProvider>
-              <ArcAccountProvider>
-                <ActivityProvider>
-                  <PrivacyProvider>
-                    <MultiSigProvider>
-                      <div className="auth-wrapper">
-                        <React.Suspense fallback={null}>
-                          <RootView />
-                        </React.Suspense>
-                      </div>
-                    </MultiSigProvider>
-                  </PrivacyProvider>
-                </ActivityProvider>
-              </ArcAccountProvider>
-            </PasskeyAccountProvider>
+            <CircleWalletProvider>
+              <BridgeProvider>
+                <ERC6900MultiSigProvider>
+                  <ArcAccountProvider>
+                    <ActivityProvider>
+                      <PrivacyProvider>
+                        <MultiSigProvider>
+                          <div className="auth-wrapper">
+                            <React.Suspense fallback={null}>
+                              <RootView />
+                            </React.Suspense>
+                          </div>
+                        </MultiSigProvider>
+                      </PrivacyProvider>
+                    </ActivityProvider>
+                  </ArcAccountProvider>
+                </ERC6900MultiSigProvider>
+              </BridgeProvider>
+            </CircleWalletProvider>
           </NetworkProvider>
         </SessionProvider>
       </DesktopOnlyGuard>

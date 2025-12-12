@@ -21,7 +21,7 @@ export interface WalletBalance {
 import TreasuryScreen from './TreasuryScreen';
 import NetworkSelector from './NetworkSelector';
 import { Transaction } from '../types';
-import { usePasskeyAccount } from '../contexts/PasskeyAccountContext';
+import { useCircleWallet } from '../contexts/CircleWalletContext';
 import { useArcAccount } from '../contexts/ArcAccountContext';
 import { useNetwork } from '../contexts/NetworkContext';
 import type { AccountSnapshot } from '../services/arcRpcClient';
@@ -59,7 +59,7 @@ interface NotificationDropdownProps {
 const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ isOpen, onClose, onNavigateToTransactions }) => {
   const { activities } = useActivity();
   // PasskeyAccount - Smart Wallet (single wallet system)
-  const { address: walletAddress } = usePasskeyAccount();
+  const { address: walletAddress } = useCircleWallet();
 
   if (!isOpen) return null;
 
@@ -162,8 +162,8 @@ interface AgentIntentData {
 }
 
 const DashboardHeader: React.FC<DashboardHeaderPropsWithNav> = ({ account, isRefreshing, onRefresh, error, onNavigate }) => {
-  // PasskeyAccount - Smart Wallet (single wallet system)
-  const { address, disconnect } = usePasskeyAccount();
+  // Circle Modular Wallet - Smart Wallet (single wallet system)
+  const { address, disconnect } = useCircleWallet();
   const { isPrivacyMode, togglePrivacyMode } = usePrivacy();
   const { currentNetwork } = useNetwork();
 
@@ -567,8 +567,8 @@ const WalletDashboard: React.FC = () => {
     }
   };
 
-  // PasskeyAccount - Smart Wallet (single wallet system)
-  const { address } = usePasskeyAccount();
+  // Circle Modular Wallet - Smart Wallet (single wallet system)
+  const { address } = useCircleWallet();
   const { currentNetwork } = useNetwork();
 
   const { snapshot, formattedBalance, isLoading: isAccountLoading, error: accountError, refresh, lastUpdated } = useArcAccount();

@@ -8,7 +8,7 @@ import {
   TransactionWithDetails,
 } from '../services/multiSigClient';
 import { multiSigSigningService } from '../services/multiSigSigningService';
-import { usePasskeyAccount } from './PasskeyAccountContext';
+import { useCircleWallet } from './CircleWalletContext';
 import { useSession } from './SessionContext';
 
 interface MultiSigContextType {
@@ -65,8 +65,8 @@ const MultiSigContext = createContext<MultiSigContextType | undefined>(undefined
 export const MultiSigProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  // PasskeyAccount - Smart Wallet (single wallet system)
-  const { address: walletAddress } = usePasskeyAccount();
+  // Circle Modular Wallet - Smart Wallet (single wallet system)
+  const { address: walletAddress } = useCircleWallet();
   const { userId } = useSession();
 
   const [accounts, setAccounts] = useState<AccountWithDetails[]>([]);

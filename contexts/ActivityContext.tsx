@@ -13,7 +13,7 @@ import type { Transaction } from '../types';
 import { TransactionStatus, TransactionType } from '../types';
 import { RPC_URL } from '../services/rpcProvider';
 import { fetchRecentTransactions, RateLimitError } from '../services/activityService';
-import { usePasskeyAccount } from './PasskeyAccountContext';
+import { useCircleWallet } from './CircleWalletContext';
 import { API_ENDPOINTS } from '../config/app.config';
 
 interface ActivityContextValue {
@@ -158,7 +158,7 @@ const saveActivitiesToStorage = (address: string | null, activities: Transaction
 };
 
 export const ActivityProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const { address } = usePasskeyAccount();
+  const { address } = useCircleWallet();
   const [activities, setActivities] = useState<Transaction[]>([]);
   const pendingRef = useRef(new Set<string>());
   const [cooldownUntil, setCooldownUntil] = useState<number | null>(null);
