@@ -234,16 +234,6 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ onComplete }) => {
             {/* Render appropriate UI based on state */}
             {isCreating || isConnecting ? renderProcessing() : renderInitialChoice()}
 
-            {/* Info text */}
-            <div className="space-y-2 pt-4 border-t border-slate-700/50">
-              <p className="text-xs text-center text-slate-500">
-                Your wallet is secured by your device's passkey (Face ID / Touch ID).
-              </p>
-              <p className="text-xs text-center text-slate-500">
-                No seed phrases or passwords needed.
-              </p>
-            </div>
-
             {/* Circle Badge */}
             <div className="flex items-center justify-center gap-2 pt-2">
               <span className="text-xs text-slate-600">Powered by</span>
