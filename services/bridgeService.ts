@@ -289,8 +289,8 @@ class BridgeServiceImpl {
         burnTxHash,
       });
 
-      // Start polling for attestation in background
-      this.pollForAttestation(tx.id);
+      // Request backend to complete the bridge (auto-claim on destination)
+      this.requestBackendClaim(tx);
 
       return tx;
     } catch (err: any) {
@@ -428,8 +428,8 @@ class BridgeServiceImpl {
         burnTxHash,
       });
 
-      // Start polling for attestation
-      this.pollForAttestation(tx.id);
+      // Request backend to complete the bridge (auto-claim on destination)
+      this.requestBackendClaim(tx);
 
       return tx;
     } catch (err: any) {
@@ -445,6 +445,73 @@ class BridgeServiceImpl {
       });
 
       throw err;
+    }
+  }
+
+  /**
+   * Request backend to complete the bridge claim
+   * Backend will poll for attestation and execute receiveMessage
+   */
+  private async requestBackendClaim(tx: BridgeTransaction): Promise<void> {
+    if (!tx.burnTxHash) {
+      logger.error('Cannot request claim: no burn tx hash', { component: 'BridgeService', txId: tx.id });
+      return;
+    }
+
+    const direction = tx.sourceChainId === 5042002 ? 'arc-to-sepolia' : 'sepolia-to-arc';
+    const backendUrl = import.meta.env.VITE_BACKEND_URL || 'https://arcwallet-backend.onrender.com';
+
+    logger.info('Requesting backend to complete bridge claim', {
+      component: 'BridgeService',
+      txId: tx.id,
+      burnTxHash: tx.burnTxHash,
+      direction,
+    });
+
+    try {
+      const response = await fetch(`${backendUrl}/bridge/complete`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          sourceTxHash: tx.burnTxHash,
+          direction,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success && data.data?.destinationTxHash) {
+        // Backend completed the claim
+        tx.mintTxHash = data.data.destinationTxHash;
+        tx.status = 'completed';
+        tx.updatedAt = new Date();
+        this.saveHistory();
+
+        logger.info('Backend completed bridge claim', {
+          component: 'BridgeService',
+          txId: tx.id,
+          mintTxHash: tx.mintTxHash,
+        });
+      } else {
+        // Backend might still be processing (attestation not ready)
+        // Start polling to track status
+        logger.info('Backend claim pending, starting local poll', {
+          component: 'BridgeService',
+          txId: tx.id,
+          response: data,
+        });
+        this.pollForAttestation(tx.id);
+      }
+    } catch (err: any) {
+      logger.warn('Backend claim request failed, falling back to local polling', {
+        component: 'BridgeService',
+        txId: tx.id,
+        error: err.message,
+      });
+      // Fall back to local attestation polling
+      this.pollForAttestation(tx.id);
     }
   }
 
@@ -528,8 +595,10 @@ class BridgeServiceImpl {
 
   /**
    * Claim USDC on destination chain by calling receiveMessage
+   * Includes retry logic for better reliability
    */
-  private async claimOnDestination(txId: string): Promise<void> {
+  private async claimOnDestination(txId: string, retryCount: number = 0): Promise<void> {
+    const maxRetries = 3;
     const tx = this.transactions.get(txId);
     if (!tx || !tx.attestation || !tx.message) {
       logger.error('Cannot claim: missing attestation or message', { component: 'BridgeService', txId });
@@ -544,6 +613,7 @@ class BridgeServiceImpl {
       component: 'BridgeService',
       txId,
       destinationChainId: tx.destinationChainId,
+      attempt: retryCount + 1,
     });
 
     try {
@@ -564,9 +634,15 @@ class BridgeServiceImpl {
       // Execute on appropriate chain
       if (tx.destinationChainId === 5042002) {
         // Destination is Arc - use default bundler
+        logger.info('Executing claim on Arc Testnet', { component: 'BridgeService', txId });
         mintTxHash = await circleWalletService.sendBatchTransactions([call]);
       } else {
         // Destination is Sepolia/Base - use chain-specific bundler
+        logger.info('Executing claim on external chain via Circle multi-chain bundler', {
+          component: 'BridgeService',
+          txId,
+          chainId: tx.destinationChainId,
+        });
         mintTxHash = await circleWalletService.sendBatchTransactionsOnChain(tx.destinationChainId, [call]);
       }
 
@@ -582,12 +658,35 @@ class BridgeServiceImpl {
         mintTxHash,
       });
     } catch (err: any) {
-      tx.status = 'failed';
-      tx.error = `Claim failed: ${err.message}`;
+      logger.error('Claim attempt failed', {
+        component: 'BridgeService',
+        txId,
+        attempt: retryCount + 1,
+        error: err.message,
+        stack: err.stack,
+      });
+
+      // Retry logic
+      if (retryCount < maxRetries) {
+        const delay = Math.pow(2, retryCount) * 2000; // Exponential backoff: 2s, 4s, 8s
+        logger.info(`Retrying claim in ${delay}ms...`, { component: 'BridgeService', txId });
+
+        // Reset status to attestation_received for retry
+        tx.status = 'attestation_received';
+        tx.updatedAt = new Date();
+        this.saveHistory();
+
+        await new Promise(resolve => setTimeout(resolve, delay));
+        return this.claimOnDestination(txId, retryCount + 1);
+      }
+
+      // Max retries exceeded - mark as attestation_received so user can retry later
+      tx.status = 'attestation_received';
+      tx.error = `Auto-claim failed after ${maxRetries} attempts: ${err.message}`;
       tx.updatedAt = new Date();
       this.saveHistory();
 
-      logger.error('Failed to claim on destination', {
+      logger.error('Auto-claim failed after max retries', {
         component: 'BridgeService',
         txId,
         error: err.message,
@@ -666,6 +765,69 @@ class BridgeServiceImpl {
         error: err instanceof Error ? err.message : 'Unknown',
       });
       throw err;
+    }
+  }
+
+  /**
+   * Manually claim a pending transaction (for attestation_received status)
+   * Call this if auto-claim failed or page was refreshed
+   */
+  async claimTransaction(txId: string): Promise<void> {
+    const tx = this.transactions.get(txId);
+    if (!tx) {
+      throw new Error('Transaction not found');
+    }
+
+    // If attestation not received yet, try to fetch it
+    if (!tx.attestation || !tx.message) {
+      if (!tx.burnTxHash) {
+        throw new Error('No burn transaction hash');
+      }
+
+      const sourceChain = getChainConfig(tx.sourceChainId);
+      if (!sourceChain) {
+        throw new Error('Invalid source chain');
+      }
+
+      logger.info('Fetching attestation for manual claim', {
+        component: 'BridgeService',
+        txId,
+        burnTxHash: tx.burnTxHash,
+      });
+
+      const result = await this.fetchAttestationV2(tx.burnTxHash, sourceChain.domain);
+      if (!result) {
+        throw new Error('Attestation not ready yet. Please wait a few minutes.');
+      }
+
+      tx.attestation = result.attestation;
+      tx.message = result.message;
+      tx.messageHash = result.messageHash;
+      tx.status = 'attestation_received';
+      tx.updatedAt = new Date();
+      this.saveHistory();
+    }
+
+    // Now claim
+    await this.claimOnDestination(txId);
+  }
+
+  /**
+   * Resume polling for pending transactions (call on app load)
+   * Requests backend to complete any pending bridges
+   */
+  resumePendingTransactions(): void {
+    const pending = this.getPendingTransactions();
+    for (const tx of pending) {
+      if ((tx.status === 'pending_attestation' || tx.status === 'attestation_received') && tx.burnTxHash) {
+        logger.info('Resuming bridge completion via backend', {
+          component: 'BridgeService',
+          txId: tx.id,
+          status: tx.status,
+        });
+        // Request backend to complete the claim
+        this.requestBackendClaim(tx);
+      }
     }
   }
 

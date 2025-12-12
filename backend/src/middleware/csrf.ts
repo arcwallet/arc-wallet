@@ -40,6 +40,8 @@ const CSRF_EXEMPT_ROUTES = [
   '/passkeys',          // All passkey routes exempt (WebAuthn provides cryptographic security)
   '/api/passkeys',      // Also exempt with /api prefix
   '/api/passkey',       // Singular form also exempt
+  '/bridge/complete',   // Bridge claim endpoint (CORS provides security, no session needed)
+  '/bridge/completer',  // Bridge completer status (read-only)
 ];
 
 /**

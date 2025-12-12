@@ -44,6 +44,7 @@ interface BridgeContextValue {
   estimateBridge: (amount: string, destinationChainId: number) => Promise<BridgeEstimate>;
   executeBridge: (amount: string, destinationChainId: number) => Promise<BridgeTransaction>;
   executeInboundBridge: (amount: string, sourceChainId: number) => Promise<BridgeTransaction>;
+  claimTransaction: (txId: string) => Promise<void>;
   getTransaction: (txId: string) => BridgeTransaction | undefined;
   refreshTransactions: () => void;
   clearError: () => void;
@@ -78,9 +79,12 @@ export const BridgeProvider: React.FC<BridgeProviderProps> = ({ children }) => {
   const sourceChains = bridgeService.getDestinationChains(5042002); // Same chains, different direction
 
   // Load transactions on mount and when wallet connects
+  // Also resume any pending transactions that need attestation polling
   useEffect(() => {
     if (isConnected) {
       refreshTransactions();
+      // Resume polling for any pending transactions (e.g., after page refresh)
+      bridgeService.resumePendingTransactions();
     }
   }, [isConnected, address]);
 
@@ -220,6 +224,42 @@ export const BridgeProvider: React.FC<BridgeProviderProps> = ({ children }) => {
     }
   }, [isConnected, refreshTransactions]);
 
+  // Claim a pending transaction manually
+  const claimTransaction = useCallback(async (txId: string): Promise<void> => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      logger.info('Claiming transaction', {
+        component: 'BridgeContext',
+        txId,
+      });
+
+      await bridgeService.claimTransaction(txId);
+
+      // Refresh transactions list
+      refreshTransactions();
+
+      logger.info('Transaction claimed successfully', {
+        component: 'BridgeContext',
+        txId,
+      });
+    } catch (err: any) {
+      const message = err.message || 'Claim failed';
+      setError(message);
+
+      logger.error('Claim failed', {
+        component: 'BridgeContext',
+        txId,
+        error: message,
+      });
+
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [refreshTransactions]);
+
   // Get single transaction
   const getTransaction = useCallback((txId: string): BridgeTransaction | undefined => {
     return bridgeService.getTransaction(txId);
@@ -262,6 +302,7 @@ export const BridgeProvider: React.FC<BridgeProviderProps> = ({ children }) => {
     estimateBridge,
     executeBridge,
     executeInboundBridge,
+    claimTransaction,
     getTransaction,
     refreshTransactions,
     clearError,

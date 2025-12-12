@@ -288,15 +288,48 @@ const Bridge: React.FC = () => {
         </div>
       )}
 
-      {/* Pending Transactions Alert */}
+      {/* Pending Transactions */}
       {pendingTransactions.length > 0 && (
-        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4">
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 space-y-3">
           <div className="flex items-center gap-3">
             <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
             <span className="text-amber-400 font-medium">
               {pendingTransactions.length} pending transaction(s)
             </span>
           </div>
+          {pendingTransactions.map((tx) => (
+            <div key={tx.id} className="bg-slate-900/50 rounded-lg p-3 text-sm">
+              <div className="flex justify-between items-center">
+                <span className="text-slate-300">
+                  {tx.amount} USDC → {tx.destinationChainId === 5042002 ? 'Arc' : 'Sepolia'}
+                </span>
+                <span className={`px-2 py-0.5 rounded text-xs ${
+                  tx.status === 'attestation_received' ? 'bg-green-500/20 text-green-400' :
+                  tx.status === 'pending_attestation' ? 'bg-amber-500/20 text-amber-400' :
+                  tx.status === 'minting' ? 'bg-blue-500/20 text-blue-400' :
+                  'bg-slate-500/20 text-slate-400'
+                }`}>
+                  {tx.status.replace(/_/g, ' ')}
+                </span>
+              </div>
+              {tx.burnTxHash && (
+                <a
+                  href={tx.sourceChainId === 5042002
+                    ? `https://testnet.arcscan.app/tx/${tx.burnTxHash}`
+                    : `https://sepolia.etherscan.io/tx/${tx.burnTxHash}`
+                  }
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-xs text-blue-400 hover:text-blue-300 mt-1 inline-block"
+                >
+                  View burn tx ↗
+                </a>
+              )}
+              {tx.error && (
+                <p className="text-xs text-red-400 mt-1">{tx.error}</p>
+              )}
+            </div>
+          ))}
         </div>
       )}
 
