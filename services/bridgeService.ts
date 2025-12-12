@@ -516,6 +516,69 @@ class BridgeServiceImpl {
   }
 
   /**
+   * Request backend to complete claim when attestation is already received
+   * Used for Sepolia destination where Circle bundler doesn't work
+   */
+  private async requestBackendClaimWithAttestation(tx: BridgeTransaction): Promise<void> {
+    if (!tx.burnTxHash) {
+      logger.error('Cannot request claim: no burn tx hash', { component: 'BridgeService', txId: tx.id });
+      return;
+    }
+
+    const direction = tx.sourceChainId === 5042002 ? 'arc-to-sepolia' : 'sepolia-to-arc';
+    const backendUrl = import.meta.env.VITE_BACKEND_URL || 'https://arcwallet-backend.onrender.com';
+
+    logger.info('Requesting backend to complete claim (attestation ready)', {
+      component: 'BridgeService',
+      txId: tx.id,
+      burnTxHash: tx.burnTxHash,
+      direction,
+    });
+
+    try {
+      const response = await fetch(`${backendUrl}/bridge/complete`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          sourceTxHash: tx.burnTxHash,
+          direction,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success && data.data?.destinationTxHash) {
+        tx.mintTxHash = data.data.destinationTxHash;
+        tx.status = 'completed';
+        tx.updatedAt = new Date();
+        this.saveHistory();
+
+        logger.info('Backend completed bridge claim', {
+          component: 'BridgeService',
+          txId: tx.id,
+          mintTxHash: tx.mintTxHash,
+        });
+      } else {
+        // Keep status as attestation_received - user can manually claim later
+        logger.warn('Backend claim failed, keeping attestation_received status', {
+          component: 'BridgeService',
+          txId: tx.id,
+          response: data,
+        });
+      }
+    } catch (err: any) {
+      logger.error('Backend claim request failed', {
+        component: 'BridgeService',
+        txId: tx.id,
+        error: err.message,
+      });
+      // Keep status as attestation_received - user can manually claim later
+    }
+  }
+
+  /**
    * Poll for attestation from Circle's Iris service (V2)
    * After receiving attestation, automatically claims on destination chain
    */
@@ -558,10 +621,18 @@ class BridgeServiceImpl {
             component: 'BridgeService',
             txId,
             messageHash: result.messageHash,
+            destinationChainId: tx.destinationChainId,
           });
 
-          // Auto-claim on destination chain
-          await this.claimOnDestination(txId);
+          // For Sepolia destination, use backend relayer (Circle bundler doesn't support Sepolia)
+          // For Arc destination, we can use Circle bundler
+          if (tx.destinationChainId === 11155111) {
+            // Sepolia - use backend relayer
+            await this.requestBackendClaimWithAttestation(tx);
+          } else {
+            // Arc - use Circle bundler
+            await this.claimOnDestination(txId);
+          }
           return;
         }
       } catch (err: any) {

@@ -21,6 +21,7 @@ import { createRecoveryRoutes } from './routes/recovery.js';
 import { WalletBackupService } from './services/walletBackupService.js';
 import { IndexerService } from './services/indexerService.js';
 import { webhookService } from './services/webhookService.js';
+import { getBridgeCompleterService } from './services/bridgeCompleterService.js';
 import { initIndexerDB } from './db/indexer.js';
 import { MagicSessionStore } from './magicLink/SessionStore.js';
 // Agent temporarily disabled - will integrate new AI solution
@@ -133,6 +134,23 @@ else {
     console.log('⏸️ Indexer service disabled (INDEXER_ENABLED=false)');
 }
 webhookService.start();
+// Start Bridge Completer Service (auto-claims on destination chain)
+const BRIDGE_COMPLETER_ENABLED = process.env.BRIDGE_COMPLETER_ENABLED !== 'false';
+if (BRIDGE_COMPLETER_ENABLED && process.env.BUNDLER_PRIVATE_KEY) {
+    try {
+        console.log('🌉 Starting bridge completer service...');
+        const bridgeCompleter = getBridgeCompleterService();
+        bridgeCompleter.start();
+        console.log('✅ Bridge completer service started');
+    }
+    catch (error) {
+        console.warn('⚠️ Bridge completer service failed to start:', error.message);
+        console.warn('   Set BUNDLER_PRIVATE_KEY to enable auto-claim');
+    }
+}
+else {
+    console.log('⏸️ Bridge completer service disabled (no BUNDLER_PRIVATE_KEY or BRIDGE_COMPLETER_ENABLED=false)');
+}
 // Root endpoint
 app.get('/', (req, res) => {
     res.json({
