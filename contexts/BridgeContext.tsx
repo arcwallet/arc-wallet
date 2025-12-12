@@ -34,12 +34,16 @@ interface BridgeContextValue {
 
   // Chain info
   destinationChains: BridgeChainConfig[];
+  sourceChains: BridgeChainConfig[];
   selectedDestination: BridgeChainConfig | null;
+  selectedSource: BridgeChainConfig | null;
 
   // Actions
   selectDestination: (chainId: number) => void;
+  selectSource: (chainId: number) => void;
   estimateBridge: (amount: string, destinationChainId: number) => Promise<BridgeEstimate>;
   executeBridge: (amount: string, destinationChainId: number) => Promise<BridgeTransaction>;
+  executeInboundBridge: (amount: string, sourceChainId: number) => Promise<BridgeTransaction>;
   getTransaction: (txId: string) => BridgeTransaction | undefined;
   refreshTransactions: () => void;
   clearError: () => void;
@@ -65,9 +69,13 @@ export const BridgeProvider: React.FC<BridgeProviderProps> = ({ children }) => {
   const [transactions, setTransactions] = useState<BridgeTransaction[]>([]);
   const [currentEstimate, setCurrentEstimate] = useState<BridgeEstimate | null>(null);
   const [selectedDestination, setSelectedDestination] = useState<BridgeChainConfig | null>(null);
+  const [selectedSource, setSelectedSource] = useState<BridgeChainConfig | null>(null);
 
   // Get destination chains (excluding Arc Testnet as source)
   const destinationChains = bridgeService.getDestinationChains(5042002);
+
+  // Get source chains for inbound bridging (Sepolia, Base Sepolia)
+  const sourceChains = bridgeService.getDestinationChains(5042002); // Same chains, different direction
 
   // Load transactions on mount and when wallet connects
   useEffect(() => {
@@ -91,6 +99,13 @@ export const BridgeProvider: React.FC<BridgeProviderProps> = ({ children }) => {
   const selectDestination = useCallback((chainId: number) => {
     const chain = bridgeService.getChainConfig(chainId);
     setSelectedDestination(chain || null);
+    setCurrentEstimate(null);
+  }, []);
+
+  // Select source chain (for inbound bridging)
+  const selectSource = useCallback((chainId: number) => {
+    const chain = bridgeService.getChainConfig(chainId);
+    setSelectedSource(chain || null);
     setCurrentEstimate(null);
   }, []);
 
@@ -158,6 +173,53 @@ export const BridgeProvider: React.FC<BridgeProviderProps> = ({ children }) => {
     }
   }, [isConnected, refreshTransactions]);
 
+  // Execute inbound bridge (from external chain to Arc)
+  const executeInboundBridge = useCallback(async (
+    amount: string,
+    sourceChainId: number
+  ): Promise<BridgeTransaction> => {
+    if (!isConnected) {
+      throw new Error('Wallet not connected');
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      logger.info('Executing inbound bridge from context', {
+        component: 'BridgeContext',
+        amount,
+        sourceChainId,
+        destinationChainId: 5042002, // Arc Testnet
+      });
+
+      const tx = await bridgeService.bridgeInbound(amount, sourceChainId);
+
+      // Refresh transactions list
+      refreshTransactions();
+
+      logger.info('Inbound bridge initiated successfully', {
+        component: 'BridgeContext',
+        txId: tx.id,
+        status: tx.status,
+      });
+
+      return tx;
+    } catch (err: any) {
+      const message = err.message || 'Inbound bridge failed';
+      setError(message);
+
+      logger.error('Inbound bridge failed', {
+        component: 'BridgeContext',
+        error: message,
+      });
+
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [isConnected, refreshTransactions]);
+
   // Get single transaction
   const getTransaction = useCallback((txId: string): BridgeTransaction | undefined => {
     return bridgeService.getTransaction(txId);
@@ -190,12 +252,16 @@ export const BridgeProvider: React.FC<BridgeProviderProps> = ({ children }) => {
 
     // Chain info
     destinationChains,
+    sourceChains,
     selectedDestination,
+    selectedSource,
 
     // Actions
     selectDestination,
+    selectSource,
     estimateBridge,
     executeBridge,
+    executeInboundBridge,
     getTransaction,
     refreshTransactions,
     clearError,

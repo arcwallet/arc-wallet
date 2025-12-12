@@ -308,6 +308,145 @@ class BridgeServiceImpl {
   }
 
   /**
+   * Execute inbound bridge (from external chain to Arc)
+   * Requires the user's smart wallet to have USDC on the source chain
+   */
+  async bridgeInbound(
+    amount: string,
+    sourceChainId: number,
+    recipient?: Address
+  ): Promise<BridgeTransaction> {
+    const destinationChainId = 5042002; // Arc Testnet
+    const sourceChain = getChainConfig(sourceChainId);
+    const destinationChain = getChainConfig(destinationChainId);
+
+    if (!sourceChain || !destinationChain) {
+      throw new Error('Invalid chain configuration');
+    }
+
+    const walletAddress = circleWalletService.getAddress();
+    if (!walletAddress) {
+      throw new Error('Wallet not connected');
+    }
+
+    const sender = walletAddress as Address;
+    const mintRecipient = recipient || sender;
+    const amountRaw = parseUnits(amount, 6);
+
+    // Create transaction record
+    const tx: BridgeTransaction = {
+      id: `bridge_inbound_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+      sourceChainId,
+      destinationChainId,
+      amount,
+      amountRaw,
+      sender,
+      recipient: mintRecipient,
+      status: 'pending_approval',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    this.transactions.set(tx.id, tx);
+    this.saveHistory();
+
+    logger.info('Starting inbound bridge transaction', {
+      component: 'BridgeService',
+      txId: tx.id,
+      amount,
+      from: sourceChain.name,
+      to: destinationChain.name,
+    });
+
+    try {
+      // For inbound bridging, we need to execute on the source chain
+      // The smart wallet address is the same across all chains (counterfactual)
+      // But we need the wallet to be deployed and funded on the source chain
+
+      // Prepare calls for batch transaction
+      const calls: Array<{ to: Address; data: Hex }> = [];
+
+      // 1. Approve USDC to TokenMessenger on source chain
+      const approveData = encodeFunctionData({
+        abi: ERC20_ABI,
+        functionName: 'approve',
+        args: [CCTP_CONTRACTS.TokenMessengerV2, amountRaw],
+      });
+      calls.push({
+        to: sourceChain.usdc,
+        data: approveData as Hex,
+      });
+
+      // 2. depositForBurn on source chain
+      const mintRecipientBytes32 = addressToBytes32(mintRecipient);
+      const destinationCaller = '0x0000000000000000000000000000000000000000000000000000000000000000' as Hex;
+
+      const depositData = encodeFunctionData({
+        abi: TOKEN_MESSENGER_ABI,
+        functionName: 'depositForBurn',
+        args: [
+          amountRaw,
+          destinationChain.domain, // Arc's domain
+          mintRecipientBytes32,
+          sourceChain.usdc,
+          destinationCaller,
+          CCTP_FEES.maxFee,
+          0, // minFinalityThreshold
+        ],
+      });
+      calls.push({
+        to: CCTP_CONTRACTS.TokenMessengerV2,
+        data: depositData as Hex,
+      });
+
+      // Update status
+      tx.status = 'burning';
+      tx.updatedAt = new Date();
+      this.saveHistory();
+
+      logger.info('Executing inbound bridge batch transaction', {
+        component: 'BridgeService',
+        txId: tx.id,
+        sourceChain: sourceChain.name,
+        callCount: calls.length,
+      });
+
+      // Execute via Circle smart wallet on the source chain
+      // Uses multi-chain bundler support for Sepolia/Base Sepolia
+      const burnTxHash = await circleWalletService.sendBatchTransactionsOnChain(sourceChainId, calls);
+
+      tx.burnTxHash = burnTxHash;
+      tx.status = 'pending_attestation';
+      tx.updatedAt = new Date();
+      this.saveHistory();
+
+      logger.info('Inbound burn transaction confirmed', {
+        component: 'BridgeService',
+        txId: tx.id,
+        burnTxHash,
+      });
+
+      // Start polling for attestation
+      this.pollForAttestation(tx.id);
+
+      return tx;
+    } catch (err: any) {
+      tx.status = 'failed';
+      tx.error = err.message;
+      tx.updatedAt = new Date();
+      this.saveHistory();
+
+      logger.error('Inbound bridge transaction failed', {
+        component: 'BridgeService',
+        txId: tx.id,
+        error: err.message,
+      });
+
+      throw err;
+    }
+  }
+
+  /**
    * Poll for attestation from Circle's Iris service
    */
   private async pollForAttestation(txId: string): Promise<void> {

@@ -25,8 +25,28 @@ import {
 } from '@circle-fin/modular-wallets-core';
 import { toWebAuthnAccount } from 'viem/account-abstraction';
 import { arcTestnet } from '../config/chains/arcTestnet';
+import { sepolia, baseSepolia } from 'viem/chains';
 import { CIRCLE_CONFIG, validateCircleConfig } from '../config/circle';
 import { logger } from './logger';
+
+// Supported chains for Circle Modular Wallet
+const SUPPORTED_CHAINS = {
+  arcTestnet: {
+    chain: arcTestnet,
+    chainId: 5042002,
+    sdkPath: '/arcTestnet',
+  },
+  ethereumSepolia: {
+    chain: sepolia,
+    chainId: 11155111,
+    sdkPath: '/ethereumSepolia',
+  },
+  baseSepolia: {
+    chain: baseSepolia,
+    chainId: 84532,
+    sdkPath: '/baseSepolia',
+  },
+} as const;
 
 // Types
 export interface CircleWalletState {
@@ -138,8 +158,16 @@ const ERC20_ABI = [
   },
 ] as const;
 
+// Chain client configuration
+interface ChainClient {
+  publicClient: PublicClient;
+  bundlerClient: BundlerClient;
+  modularTransport: ReturnType<typeof toModularTransport>;
+}
+
 /**
  * Circle Modular Wallet Service
+ * Supports multi-chain operations via Circle's bundler infrastructure
  */
 class CircleWalletServiceImpl {
   private publicClient: PublicClient | null = null;
@@ -150,6 +178,9 @@ class CircleWalletServiceImpl {
   private modularTransport: ReturnType<typeof toModularTransport> | null = null;
   private passkeyTransport: ReturnType<typeof toPasskeyTransport> | null = null;
   private initialized: boolean = false;
+
+  // Multi-chain support: chain-specific clients
+  private chainClients: Map<number, ChainClient> = new Map();
 
   /**
    * Initialize the service with Circle SDK transports
@@ -592,6 +623,200 @@ class CircleWalletServiceImpl {
         errorMsg: err.message,
       });
       throw err;
+    }
+  }
+
+  /**
+   * Get or initialize a chain-specific bundler client
+   * Enables multi-chain operations (Sepolia, Base Sepolia, etc.)
+   */
+  private async getChainClient(chainId: number): Promise<ChainClient> {
+    // Return cached client if exists
+    if (this.chainClients.has(chainId)) {
+      return this.chainClients.get(chainId)!;
+    }
+
+    if (!this.account) {
+      throw new Error('Wallet not connected');
+    }
+
+    // Find chain config
+    const chainConfig = Object.values(SUPPORTED_CHAINS).find(c => c.chainId === chainId);
+    if (!chainConfig) {
+      throw new Error(`Unsupported chain: ${chainId}`);
+    }
+
+    logger.info('Initializing chain client', {
+      component: 'CircleWalletService',
+      chainId,
+      sdkPath: chainConfig.sdkPath,
+    });
+
+    try {
+      // Create chain-specific modular transport
+      const sdkUrl = `${CIRCLE_CONFIG.clientUrl}${chainConfig.sdkPath}`;
+      const modularTransport = toModularTransport(sdkUrl, CIRCLE_CONFIG.clientKey);
+
+      // Create public client for this chain
+      // @ts-ignore - viem type inference issues
+      const publicClient = createPublicClient({
+        chain: chainConfig.chain,
+        transport: modularTransport,
+      }) as PublicClient;
+
+      // Create bundler client for this chain
+      // @ts-ignore - viem type inference issues
+      const bundlerClient = createBundlerClient({
+        chain: chainConfig.chain,
+        transport: modularTransport,
+        account: this.account,
+      });
+
+      const client: ChainClient = {
+        publicClient,
+        bundlerClient,
+        modularTransport,
+      };
+
+      // Cache for future use
+      this.chainClients.set(chainId, client);
+
+      logger.info('Chain client initialized', {
+        component: 'CircleWalletService',
+        chainId,
+        chainName: chainConfig.chain.name,
+      });
+
+      return client;
+    } catch (err: any) {
+      logger.error('Failed to initialize chain client', {
+        component: 'CircleWalletService',
+        chainId,
+        errorMsg: err.message,
+      });
+      throw new Error(`Failed to connect to chain ${chainId}: ${err.message}`);
+    }
+  }
+
+  /**
+   * Send batch transactions on a specific chain
+   * Used for cross-chain operations (bridge from Sepolia/Base to Arc)
+   */
+  async sendBatchTransactionsOnChain(
+    chainId: number,
+    calls: Array<{
+      to: string;
+      value?: bigint;
+      data?: `0x${string}`;
+    }>
+  ): Promise<string> {
+    if (!this.account) {
+      throw new Error('Wallet not connected');
+    }
+
+    // For Arc Testnet, use the default bundler
+    if (chainId === 5042002) {
+      return this.sendBatchTransactions(calls);
+    }
+
+    logger.info('Sending batch transaction on chain', {
+      component: 'CircleWalletService',
+      chainId,
+      callCount: calls.length,
+    });
+
+    try {
+      const chainClient = await this.getChainClient(chainId);
+
+      const formattedCalls = calls.map((call) => ({
+        to: call.to as `0x${string}`,
+        value: call.value || 0n,
+        data: call.data || ('0x' as `0x${string}`),
+      }));
+
+      const hash = await chainClient.bundlerClient.sendUserOperation({
+        account: this.account,
+        calls: formattedCalls,
+      });
+
+      const receipt = await chainClient.bundlerClient.waitForUserOperationReceipt({
+        hash,
+      });
+
+      logger.info('Cross-chain batch transaction confirmed', {
+        component: 'CircleWalletService',
+        chainId,
+        txHash: receipt.receipt.transactionHash,
+      });
+
+      return receipt.receipt.transactionHash;
+    } catch (err: any) {
+      logger.error('Cross-chain batch transaction failed', {
+        component: 'CircleWalletService',
+        chainId,
+        errorMsg: err.message,
+      });
+      throw err;
+    }
+  }
+
+  /**
+   * Get token balance on a specific chain
+   */
+  async getTokenBalanceOnChain(chainId: number, tokenAddress: string): Promise<bigint> {
+    if (!this.account) {
+      throw new Error('Wallet not connected');
+    }
+
+    // For Arc Testnet, use the default client
+    if (chainId === 5042002) {
+      return this.getTokenBalance(tokenAddress);
+    }
+
+    try {
+      const chainClient = await this.getChainClient(chainId);
+
+      // @ts-ignore - viem type inference issues
+      const balance = await chainClient.publicClient.readContract({
+        address: tokenAddress as `0x${string}`,
+        abi: ERC20_ABI,
+        functionName: 'balanceOf',
+        args: [this.account.address],
+      });
+
+      return balance as bigint;
+    } catch (err: any) {
+      logger.warn('Failed to get token balance on chain', {
+        component: 'CircleWalletService',
+        chainId,
+        tokenAddress,
+        errorMsg: err.message,
+      });
+      return 0n;
+    }
+  }
+
+  /**
+   * Check if wallet is deployed on a specific chain
+   */
+  async isDeployedOnChain(chainId: number): Promise<boolean> {
+    if (!this.account) {
+      return false;
+    }
+
+    // For Arc Testnet, use the default client
+    if (chainId === 5042002) {
+      return this.isDeployed();
+    }
+
+    try {
+      const chainClient = await this.getChainClient(chainId);
+      const code = await chainClient.publicClient.getCode({
+        address: this.account.address,
+      });
+      return code !== undefined && code !== '0x';
+    } catch {
+      return false;
     }
   }
 
