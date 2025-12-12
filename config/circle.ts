@@ -29,7 +29,7 @@ export const CIRCLE_CONFIG = {
     // SDK path follows pattern: /chainName (camelCase for testnets)
     // Examples: /polygonAmoy, /arbitrumSepolia, /baseSepolia
     // For Arc Testnet, likely: /arc or /arcTestnet
-    sdkPath: getEnvVar('VITE_CIRCLE_CHAIN_PATH', '/arc'),
+    sdkPath: getEnvVar('VITE_CIRCLE_CHAIN_PATH', '/arcTestnet'),
   },
 
   // Passkey Configuration
