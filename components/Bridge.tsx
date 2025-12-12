@@ -1,566 +1,482 @@
 /**
  * Bridge Component - CCTP Cross-Chain USDC Transfer
  *
- * Bidirectional bridging via Circle Smart Wallet:
- * - Arc → Sepolia/Base
- * - Sepolia/Base → Arc
+ * Professional UI for bidirectional bridging via Circle CCTP V2:
+ * - Arc → Sepolia
+ * - Sepolia → Arc
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useCircleWallet } from '../contexts/CircleWalletContext';
 import { useBridge } from '../contexts/BridgeContext';
-import { formatUnits } from 'ethers';
+import { SpinnerIcon } from './Icons';
+import { formatUnits, parseUnits } from 'ethers';
 
-type BridgeDirection = 'from_arc' | 'to_arc';
+type BridgeDirection = 'arc-to-sepolia' | 'sepolia-to-arc';
 
-// Chain icon component
-const ChainIcon: React.FC<{ name: string; size?: number }> = ({ name, size = 32 }) => {
-  const getColor = () => {
-    if (name.includes('Ethereum')) return 'from-[#627EEA] to-[#3C3C3D]';
-    if (name.includes('Base')) return 'from-[#0052FF] to-[#003CC1]';
-    if (name.includes('Arc')) return 'from-[#6c7cff] to-[#4aa9ff]';
-    return 'from-slate-500 to-slate-600';
-  };
+const DIRECTIONS: { id: BridgeDirection; label: string; description: string }[] = [
+  {
+    id: 'arc-to-sepolia',
+    label: 'Arc → Sepolia',
+    description: 'Burn USDC on Arc and mint on Sepolia',
+  },
+  {
+    id: 'sepolia-to-arc',
+    label: 'Sepolia → Arc',
+    description: 'Burn USDC on Sepolia and mint on Arc',
+  },
+];
 
-  return (
-    <div
-      className={`rounded-full bg-gradient-to-br ${getColor()} flex items-center justify-center shadow-lg`}
-      style={{ width: size, height: size }}
-    >
-      <span className="text-white font-bold" style={{ fontSize: size * 0.4 }}>
-        {name.charAt(0)}
-      </span>
-    </div>
-  );
-};
+// Progress step type
+type ProgressStep =
+  | 'checking-balance'
+  | 'calculating-fee'
+  | 'approving-usdc'
+  | 'burning-usdc'
+  | 'waiting-attestation'
+  | 'attestation-received'
+  | 'minting-usdc'
+  | 'completed'
+  | 'error';
 
 const Bridge: React.FC = () => {
   const { address, isConnected, getTokenBalance } = useCircleWallet();
   const {
     isLoading,
     error,
-    transactions,
     pendingTransactions,
     destinationChains,
-    sourceChains,
-    selectedDestination,
-    selectedSource,
-    currentEstimate,
-    selectDestination,
-    selectSource,
-    estimateBridge,
     executeBridge,
     executeInboundBridge,
     clearError,
   } = useBridge();
 
-  // State
-  const [direction, setDirection] = useState<BridgeDirection>('from_arc');
+  const [direction, setDirection] = useState<BridgeDirection>('arc-to-sepolia');
   const [amount, setAmount] = useState('');
-  const [usdcBalance, setUsdcBalance] = useState<bigint | null>(null);
-  const [sourceBalance, setSourceBalance] = useState<string | null>(null);
-  const [isEstimating, setIsEstimating] = useState(false);
-  const [showHistory, setShowHistory] = useState(false);
+  const [amountError, setAmountError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [statusMessage, setStatusMessage] = useState('');
+  const [statusVariant, setStatusVariant] = useState<'info' | 'error' | 'success'>('info');
+  const [progressStep, setProgressStep] = useState<ProgressStep | null>(null);
+  const [sourceTxHash, setSourceTxHash] = useState<string | null>(null);
+  const [destTxHash, setDestTxHash] = useState<string | null>(null);
+  const [arcBalance, setArcBalance] = useState<string | null>(null);
+  const [sepoliaBalance, setSepoliaBalance] = useState<string | null>(null);
+  const [isLoadingBalance, setIsLoadingBalance] = useState(false);
 
   const ARC_USDC = '0x3600000000000000000000000000000000000000';
+  const SEPOLIA_USDC = '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238';
 
-  // Load Arc USDC balance
+  // Fetch balances
   useEffect(() => {
-    if (isConnected && address && direction === 'from_arc') {
-      getTokenBalance(ARC_USDC)
-        .then(setUsdcBalance)
-        .catch(() => setUsdcBalance(null));
-    }
-  }, [isConnected, address, getTokenBalance, direction]);
+    const fetchBalances = async () => {
+      if (!address || !isConnected) return;
 
-  // Estimate when amount or destination changes (outbound)
-  useEffect(() => {
-    if (direction !== 'from_arc' || !amount || !selectedDestination || parseFloat(amount) <= 0) return;
-
-    const timer = setTimeout(async () => {
-      setIsEstimating(true);
+      setIsLoadingBalance(true);
       try {
-        await estimateBridge(amount, selectedDestination.chainId);
-      } catch {
+        // Get Arc balance
+        const arcBal = await getTokenBalance(ARC_USDC);
+        setArcBalance(formatUnits(arcBal, 6));
+
+        // Sepolia balance would need multi-chain support
+        // For now, show placeholder
+        setSepoliaBalance('0.00');
+      } catch (err) {
+        console.error('Failed to fetch balances:', err);
+        setArcBalance('0.00');
+        setSepoliaBalance('0.00');
       } finally {
-        setIsEstimating(false);
+        setIsLoadingBalance(false);
       }
-    }, 500);
+    };
 
-    return () => clearTimeout(timer);
-  }, [amount, selectedDestination, estimateBridge, direction]);
+    fetchBalances();
+  }, [address, isConnected, getTokenBalance]);
 
-  // Outbound bridge (Arc → External)
-  const handleOutboundBridge = async () => {
-    if (!selectedDestination || !amount) return;
+  // Get source chain balance based on direction
+  const sourceBalance = direction === 'arc-to-sepolia' ? arcBalance : sepoliaBalance;
+
+  const normalizeAmount = (raw: string): string | null => {
+    if (raw == null) return null;
+    let s = String(raw).trim();
+    s = s.replace(/[\s_]/g, '');
+    if (s.includes(',') && !s.includes('.')) {
+      s = s.replace(/,/g, '.');
+    } else {
+      s = s.replace(/,/g, '');
+    }
+    if (s === '') return null;
+    if (s.startsWith('.')) s = '0' + s;
+    if (s.endsWith('.')) s = s + '0';
+    const num = Number(s);
+    if (!Number.isFinite(num) || num <= 0) return null;
+    const [int, frac = ''] = s.split('.');
+    const clamped = frac.length > 6 ? `${int}.${frac.slice(0, 6)}` : s;
+    return Number(clamped).toFixed(2);
+  };
+
+  const canSubmit = useMemo(() => {
+    if (!isConnected) return false;
+    if (isSubmitting || isLoading) return false;
+
+    const normalized = normalizeAmount(amount);
+    if (!normalized) return false;
+    const numeric = Number(normalized);
+    return Number.isFinite(numeric) && numeric > 0;
+  }, [isConnected, amount, isSubmitting, isLoading]);
+
+  // Calculate estimated fee
+  const feeInfo = useMemo(() => {
+    const normalized = normalizeAmount(amount);
+    if (!normalized) return null;
+
+    const feePercentage = '0.50'; // 0.5% fee
+    const amountNum = parseFloat(normalized);
+    const fee = (amountNum * 0.005).toFixed(4);
+    const netAmount = (amountNum - parseFloat(fee)).toFixed(4);
+
+    return { fee, netAmount, feePercentage };
+  }, [amount]);
+
+  const handleBridge = async () => {
+    if (!isConnected) {
+      setStatusVariant('error');
+      setStatusMessage('Please connect your wallet first.');
+      return;
+    }
+
+    const normalized = normalizeAmount(amount);
+    if (!normalized) {
+      setStatusVariant('error');
+      setStatusMessage('Please enter a valid amount greater than zero.');
+      setAmountError('Use digits and , or . for decimals. Example: 1.5 or 1,5');
+      return;
+    }
+    setAmountError(null);
+
+    // Check balance
+    if (sourceBalance && Number(normalized) > Number(sourceBalance)) {
+      setStatusVariant('error');
+      setStatusMessage(`Insufficient balance. You have ${sourceBalance} USDC on ${direction === 'arc-to-sepolia' ? 'Arc' : 'Sepolia'}.`);
+      return;
+    }
+
+    setIsSubmitting(true);
+    setStatusVariant('info');
+    setStatusMessage('Starting bridge transaction...');
+    setProgressStep('checking-balance');
+    setSourceTxHash(null);
+    setDestTxHash(null);
+
     try {
-      await executeBridge(amount, selectedDestination.chainId);
+      // Update progress
+      setProgressStep('burning-usdc');
+      setStatusMessage('Burning USDC on source chain (sign with passkey)...');
+
+      let result;
+      if (direction === 'arc-to-sepolia') {
+        // Arc → Sepolia
+        const sepoliaChain = destinationChains.find(c => c.name.includes('Sepolia') && !c.name.includes('Base'));
+        if (!sepoliaChain) throw new Error('Sepolia chain not found');
+
+        result = await executeBridge(normalized, sepoliaChain.chainId);
+      } else {
+        // Sepolia → Arc
+        const sepoliaChain = destinationChains.find(c => c.name.includes('Sepolia') && !c.name.includes('Base'));
+        if (!sepoliaChain) throw new Error('Sepolia chain not found');
+
+        result = await executeInboundBridge(normalized, sepoliaChain.chainId);
+      }
+
+      if (result.burnTxHash) {
+        setSourceTxHash(result.burnTxHash);
+        setProgressStep('waiting-attestation');
+        setStatusMessage('Waiting for Circle attestation...');
+      }
+
+      // The bridge service handles polling and auto-claim
+      // We just need to show success
+      setProgressStep('completed');
+      setStatusVariant('success');
+      setStatusMessage('Bridge initiated successfully! Your USDC will arrive shortly.');
       setAmount('');
-    } catch {
+
+    } catch (err: any) {
+      const message = err?.message || 'Bridge transaction failed';
+      setStatusVariant('error');
+      setStatusMessage(message);
+      setProgressStep('error');
+      console.error('Bridge failed:', err);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  // Inbound bridge (External → Arc)
-  const handleInboundBridge = async () => {
-    if (!selectedSource || !amount) return;
-    try {
-      await executeInboundBridge(amount, selectedSource.chainId);
-      setAmount('');
-    } catch {
+  const directionDetails = useMemo(
+    () => DIRECTIONS.find((item) => item.id === direction),
+    [direction]
+  );
+
+  const getProgressMessage = () => {
+    switch (progressStep) {
+      case 'checking-balance': return 'Checking USDC balance...';
+      case 'calculating-fee': return 'Calculating bridge fee...';
+      case 'approving-usdc': return 'Approving USDC (sign with passkey)...';
+      case 'burning-usdc': return 'Burning USDC on source chain...';
+      case 'waiting-attestation': return 'Waiting for Circle attestation (~2-3 min)...';
+      case 'attestation-received': return 'Attestation received from Circle!';
+      case 'minting-usdc': return 'Minting USDC on destination chain...';
+      case 'completed': return 'Bridge completed successfully!';
+      case 'error': return 'An error occurred';
+      default: return '';
     }
   };
-
-  const handleMaxAmount = () => {
-    if (direction === 'from_arc' && usdcBalance) {
-      const max = usdcBalance > 100000n ? usdcBalance - 100000n : usdcBalance;
-      setAmount(formatUnits(max, 6));
-    } else if (direction === 'to_arc' && sourceBalance) {
-      setAmount(sourceBalance);
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed': return 'text-emerald-400 bg-emerald-400/10';
-      case 'failed': return 'text-red-400 bg-red-400/10';
-      case 'pending_attestation':
-      case 'attestation_received': return 'text-amber-400 bg-amber-400/10';
-      default: return 'text-blue-400 bg-blue-400/10';
-    }
-  };
-
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case 'pending_approval': return 'Preparing';
-      case 'approving': return 'Approving';
-      case 'pending_burn': return 'Preparing';
-      case 'burning': return 'Burning';
-      case 'pending_attestation': return 'Waiting';
-      case 'attestation_received': return 'Ready';
-      case 'pending_mint': return 'Minting';
-      case 'minting': return 'Minting';
-      case 'completed': return 'Done';
-      case 'failed': return 'Failed';
-      default: return status;
-    }
-  };
-
-  if (!isConnected) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <div className="w-16 h-16 rounded-full bg-slate-800 flex items-center justify-center mx-auto mb-4">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-slate-500">
-              <path d="M13 10V3L4 14h7v7l9-11h-7z" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </div>
-          <p className="text-slate-400">Connect wallet to use bridge</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
-    <div className="max-w-xl mx-auto">
-      {/* Header */}
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold text-white">Bridge</h2>
-        <p className="text-slate-400 text-sm mt-1">Transfer USDC via Circle CCTP</p>
+    <div className="w-full max-w-3xl mx-auto px-6 py-10 space-y-10">
+      <div className="mb-8 text-center">
+        <h2 className="text-white text-4xl font-black leading-tight tracking-[-0.03em]">
+          Bridge USDC
+        </h2>
+        <p className="text-slate-400 text-base mt-2">
+          Transfer USDC between{' '}
+          <span className="text-blue-400 font-semibold">Arc Testnet</span> and{' '}
+          <span className="text-blue-400 font-semibold">Ethereum Sepolia</span> using Circle CCTP.
+        </p>
       </div>
 
-      {/* Direction Tabs */}
-      <div className="flex mb-6 bg-slate-800/50 rounded-xl p-1">
-        <button
-          onClick={() => { setDirection('from_arc'); setAmount(''); clearError(); }}
-          className={`flex-1 py-3 px-4 rounded-lg text-sm font-medium transition-all ${
-            direction === 'from_arc'
-              ? 'bg-slate-700 text-white'
-              : 'text-slate-400 hover:text-white'
-          }`}
-        >
-          From Arc
-        </button>
-        <button
-          onClick={() => { setDirection('to_arc'); setAmount(''); clearError(); }}
-          className={`flex-1 py-3 px-4 rounded-lg text-sm font-medium transition-all ${
-            direction === 'to_arc'
-              ? 'bg-slate-700 text-white'
-              : 'text-slate-400 hover:text-white'
-          }`}
-        >
-          To Arc
-        </button>
-      </div>
-
-      {/* Error */}
-      {error && (
-        <div
-          className="mb-4 p-4 rounded-xl bg-red-500/10 border border-red-500/20 cursor-pointer"
-          onClick={clearError}
-        >
-          <p className="text-red-400 text-sm">{error}</p>
+      {/* Wallet Status */}
+      {!isConnected && (
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-center">
+          <p className="text-amber-400 font-medium">Wallet Required</p>
+          <p className="text-amber-300/70 text-sm mt-1">
+            Please connect your wallet to use the bridge.
+          </p>
         </div>
       )}
 
-      {/* Pending Alert */}
-      {pendingTransactions.length > 0 && (
-        <div className="mb-4 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20">
+      {isConnected && (
+        <div className="rounded-xl border border-blue-500/30 bg-blue-500/10 p-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-              <span className="text-amber-400 text-sm font-medium">
-                {pendingTransactions.length} pending
-              </span>
+            <div>
+              <p className="text-blue-400 font-medium">Wallet Connected</p>
+              <p className="text-slate-400 text-sm font-mono">
+                {address?.slice(0, 10)}...{address?.slice(-8)}
+              </p>
             </div>
-            <button onClick={() => setShowHistory(true)} className="text-amber-400 text-sm hover:underline">
-              View
-            </button>
+            <div className="flex gap-4">
+              <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${direction === 'arc-to-sepolia' ? 'bg-blue-500/10 border border-blue-500/30' : 'bg-slate-800/50'}`}>
+                <div className="w-5 h-5 rounded-full bg-gradient-to-br from-[#6c7cff] to-[#4aa9ff]" />
+                <div className="text-right">
+                  <p className="text-slate-400 text-[10px]">Arc</p>
+                  <p className={`font-semibold text-sm ${direction === 'arc-to-sepolia' ? 'text-blue-400' : 'text-white'}`}>
+                    {isLoadingBalance ? '...' : arcBalance ? `${parseFloat(arcBalance).toFixed(2)}` : '0.00'} USDC
+                  </p>
+                </div>
+              </div>
+              <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${direction === 'sepolia-to-arc' ? 'bg-blue-500/10 border border-blue-500/30' : 'bg-slate-800/50'}`}>
+                <div className="w-5 h-5 rounded-full bg-gradient-to-br from-[#627EEA] to-[#3C3C3D]" />
+                <div className="text-right">
+                  <p className="text-slate-400 text-[10px]">Sepolia</p>
+                  <p className={`font-semibold text-sm ${direction === 'sepolia-to-arc' ? 'text-blue-400' : 'text-white'}`}>
+                    {isLoadingBalance ? '...' : sepoliaBalance ? `${parseFloat(sepoliaBalance).toFixed(2)}` : '0.00'} USDC
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}
 
-      {/* Bridge Card */}
-      <div className="rounded-2xl bg-slate-900/80 border border-slate-700/50 overflow-hidden">
+      {/* Pending Transactions Alert */}
+      {pendingTransactions.length > 0 && (
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4">
+          <div className="flex items-center gap-3">
+            <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+            <span className="text-amber-400 font-medium">
+              {pendingTransactions.length} pending transaction(s)
+            </span>
+          </div>
+        </div>
+      )}
 
-        {/* FROM ARC DIRECTION */}
-        {direction === 'from_arc' && (
-          <>
-            {/* From Section */}
-            <div className="p-5 border-b border-slate-700/50">
-              <div className="flex items-center justify-between mb-4">
-                <span className="text-slate-400 text-sm font-medium">From</span>
-                <span className="text-slate-500 text-xs">
-                  Balance: {usdcBalance ? parseFloat(formatUnits(usdcBalance, 6)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'} USDC
-                </span>
-              </div>
+      <div className="grid gap-6">
+        {/* Direction Selection */}
+        <div className="rounded-xl border border-slate-500/50 bg-slate-900/60 backdrop-blur-sm p-6 space-y-4">
+          <p className="text-sm font-medium text-slate-400">Bridge Direction</p>
+          <div className="grid sm:grid-cols-2 gap-3">
+            {DIRECTIONS.map((option) => (
+              <button
+                key={option.id}
+                type="button"
+                onClick={() => {
+                  setDirection(option.id);
+                  setAmount('');
+                  setStatusMessage('');
+                  setProgressStep(null);
+                  clearError();
+                }}
+                disabled={isSubmitting}
+                className={`rounded-xl border px-4 py-4 text-left transition-all ${
+                  option.id === direction
+                    ? 'border-blue-400 bg-blue-400/10 text-blue-400 shadow-[0_0_15px_rgba(96,165,250,0.2)]'
+                    : 'border-slate-500/30 bg-transparent text-slate-300 hover:border-blue-400/50 hover:bg-blue-400/5'
+                } disabled:opacity-50`}
+              >
+                <p className="text-base font-semibold">{option.label}</p>
+                <p className="text-xs text-slate-400 mt-1">{option.description}</p>
+              </button>
+            ))}
+          </div>
+        </div>
 
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-3 flex-shrink-0">
-                  <ChainIcon name="Arc" size={40} />
+        {/* Token & Amount */}
+        <div className="rounded-xl border border-slate-500/50 bg-slate-900/60 backdrop-blur-sm p-6 space-y-4">
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium text-slate-400">Token</label>
+              <div className="mt-1 w-full rounded-lg border border-slate-500/30 bg-slate-900/40 px-4 py-3 text-slate-100 flex items-center gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-[#2775ca] flex items-center justify-center">
+                    <span className="text-white font-bold text-sm">$</span>
+                  </div>
                   <div>
-                    <p className="text-white font-medium">Arc Testnet</p>
-                    <p className="text-slate-500 text-xs">Source</p>
+                    <p className="font-semibold text-base">USDC</p>
+                    <p className="text-xs text-slate-400">USD Coin</p>
                   </div>
                 </div>
-
-                <div className="flex-1">
-                  <div className="relative">
-                    <input
-                      type="number"
-                      value={amount}
-                      onChange={(e) => setAmount(e.target.value)}
-                      placeholder="0.00"
-                      className="w-full bg-slate-800/50 border border-slate-700/50 rounded-xl px-4 py-3 text-xl text-white text-right pr-20 outline-none focus:border-blue-500/50 transition-colors"
-                      step="0.01"
-                      min="0"
-                    />
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
-                      <button onClick={handleMaxAmount} className="px-2 py-1 rounded bg-slate-700/50 text-slate-400 text-xs hover:bg-slate-700 hover:text-white transition-colors">
-                        MAX
-                      </button>
-                      <span className="text-slate-400 text-sm">USDC</span>
-                    </div>
-                  </div>
+                <div className="ml-auto text-xs text-slate-300 bg-white/5 px-3 py-1.5 rounded-full border border-white/10">
+                  Arc Testnet ↔ Sepolia
                 </div>
               </div>
             </div>
 
-            {/* Arrow */}
-            <div className="relative h-0">
-              <div className="absolute left-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
-                <div className="w-10 h-10 rounded-full bg-slate-800 border-4 border-slate-900 flex items-center justify-center">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-blue-400">
-                    <path d="M12 5v14M19 12l-7 7-7-7" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </div>
-              </div>
-            </div>
-
-            {/* To Section */}
-            <div className="p-5">
-              <span className="text-slate-400 text-sm font-medium block mb-4">To</span>
-              <div className="grid grid-cols-2 gap-3 mb-4">
-                {destinationChains.map((chain) => (
+            <label className="flex flex-col gap-2">
+              <div className="flex justify-between">
+                <span className="text-sm font-medium text-slate-400">Amount (USDC)</span>
+                {sourceBalance && (
                   <button
-                    key={chain.chainId}
-                    onClick={() => selectDestination(chain.chainId)}
-                    className={`p-4 rounded-xl border-2 transition-all ${
-                      selectedDestination?.chainId === chain.chainId
-                        ? 'border-blue-500 bg-blue-500/10'
-                        : 'border-slate-700/50 bg-slate-800/30 hover:border-slate-600'
-                    }`}
+                    type="button"
+                    onClick={() => setAmount(sourceBalance)}
+                    className="text-xs text-blue-400 hover:text-blue-300"
                   >
-                    <div className="flex items-center gap-3">
-                      <ChainIcon name={chain.name} size={32} />
-                      <div className="text-left">
-                        <p className="text-white text-sm font-medium">{chain.name}</p>
-                        {chain.supportsFastTransfer && (
-                          <p className="text-emerald-400 text-xs">Fast</p>
-                        )}
-                      </div>
-                    </div>
+                    Max: {parseFloat(sourceBalance).toFixed(2)}
                   </button>
-                ))}
+                )}
               </div>
+              <input
+                type="text"
+                inputMode="decimal"
+                value={amount}
+                onChange={(event) => setAmount(event.target.value)}
+                disabled={isSubmitting}
+                className="form-input h-12 rounded-lg border border-slate-500/50 bg-slate-900/40 px-4 text-white focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400 transition-all placeholder:text-slate-500 disabled:opacity-50"
+                placeholder="e.g. 10.00"
+              />
+              {amountError && (
+                <span className="text-xs text-red-400">{amountError}</span>
+              )}
+            </label>
 
-              <div className="bg-slate-800/30 rounded-xl p-4">
-                <p className="text-slate-500 text-xs mb-1">Recipient</p>
-                <p className="text-white text-sm font-mono truncate">{address}</p>
-              </div>
-            </div>
-
-            {/* Estimate */}
-            {currentEstimate && (
-              <div className="px-5 pb-5">
-                <div className="bg-slate-800/30 rounded-xl p-4 space-y-3">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-slate-500">Amount</span>
-                    <span className="text-white">{currentEstimate.amount} USDC</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-slate-500">Fee</span>
-                    <span className="text-white">{currentEstimate.fee} USDC</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-slate-500">Time</span>
-                    <span className="text-white">{currentEstimate.estimatedTime}</span>
-                  </div>
-                  <div className="pt-3 border-t border-slate-700/50 flex justify-between">
-                    <span className="text-slate-400 text-sm font-medium">You receive</span>
-                    <span className="text-emerald-400 font-semibold">
-                      {(parseFloat(currentEstimate.amount) - parseFloat(currentEstimate.fee)).toFixed(2)} USDC
-                    </span>
-                  </div>
+            {/* Fee Estimation Display */}
+            {feeInfo && (
+              <div className="rounded-lg border p-4 space-y-2 bg-slate-800/50 border-slate-600/30">
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-400">You send</span>
+                  <span className="text-white font-medium">{normalizeAmount(amount)} USDC</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-400">Bridge fee ({feeInfo.feePercentage}%)</span>
+                  <span className="text-slate-300">-{feeInfo.fee} USDC</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-400">Estimated time</span>
+                  <span className="text-slate-300">~2-3 min</span>
+                </div>
+                <div className="border-t border-slate-600/30 pt-2 flex justify-between text-sm">
+                  <span className="text-slate-400">You receive</span>
+                  <span className="font-semibold text-blue-400">{feeInfo.netAmount} USDC</span>
                 </div>
               </div>
             )}
 
-            {/* Bridge Button */}
-            <div className="p-5 pt-0">
-              <button
-                onClick={handleOutboundBridge}
-                disabled={isLoading || !amount || !selectedDestination || parseFloat(amount) <= 0}
-                className={`w-full py-4 rounded-xl font-semibold transition-all ${
-                  isLoading || !amount || !selectedDestination || parseFloat(amount) <= 0
-                    ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                    : 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white hover:shadow-lg hover:shadow-blue-500/25'
-                }`}
-              >
-                {isLoading ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                    </svg>
-                    Processing...
-                  </span>
-                ) : isEstimating ? 'Estimating...' : !selectedDestination ? 'Select Destination' : !amount || parseFloat(amount) <= 0 ? 'Enter Amount' : `Bridge to ${selectedDestination.name}`}
-              </button>
+            <div className="rounded-lg p-3 bg-blue-500/10 border border-blue-500/30">
+              <p className="text-xs text-blue-300">
+                Bridge uses your smart wallet. You'll be prompted to sign with your passkey for each step.
+              </p>
             </div>
-          </>
-        )}
-
-        {/* TO ARC DIRECTION */}
-        {direction === 'to_arc' && (
-          <>
-            {/* From Section */}
-            <div className="p-5 border-b border-slate-700/50">
-              <div className="flex items-center justify-between mb-4">
-                <span className="text-slate-400 text-sm font-medium">From</span>
-                <span className="text-slate-500 text-xs">
-                  Select source chain
-                </span>
-              </div>
-
-              {/* Chain Selector */}
-              <div className="grid grid-cols-2 gap-3 mb-4">
-                {sourceChains?.map((chain) => (
-                  <button
-                    key={chain.chainId}
-                    onClick={() => selectSource(chain.chainId)}
-                    className={`p-4 rounded-xl border-2 transition-all ${
-                      selectedSource?.chainId === chain.chainId
-                        ? 'border-blue-500 bg-blue-500/10'
-                        : 'border-slate-700/50 bg-slate-800/30 hover:border-slate-600'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <ChainIcon name={chain.name} size={32} />
-                      <div className="text-left">
-                        <p className="text-white text-sm font-medium">{chain.name}</p>
-                        {chain.supportsFastTransfer && (
-                          <p className="text-emerald-400 text-xs">Fast</p>
-                        )}
-                      </div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-
-              {/* Amount Input */}
-              <div className="relative">
-                <input
-                  type="number"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  placeholder="0.00"
-                  className="w-full bg-slate-800/50 border border-slate-700/50 rounded-xl px-4 py-3 text-xl text-white text-right pr-20 outline-none focus:border-blue-500/50 transition-colors"
-                  step="0.01"
-                  min="0"
-                />
-                <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
-                  <button onClick={handleMaxAmount} className="px-2 py-1 rounded bg-slate-700/50 text-slate-400 text-xs hover:bg-slate-700 hover:text-white transition-colors">
-                    MAX
-                  </button>
-                  <span className="text-slate-400 text-sm">USDC</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Arrow */}
-            <div className="relative h-0">
-              <div className="absolute left-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
-                <div className="w-10 h-10 rounded-full bg-slate-800 border-4 border-slate-900 flex items-center justify-center">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-blue-400">
-                    <path d="M12 5v14M19 12l-7 7-7-7" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </div>
-              </div>
-            </div>
-
-            {/* To Section (Arc) */}
-            <div className="p-5">
-              <span className="text-slate-400 text-sm font-medium block mb-4">To</span>
-              <div className="flex items-center gap-3 p-4 bg-slate-800/30 rounded-xl mb-4">
-                <ChainIcon name="Arc" size={40} />
-                <div>
-                  <p className="text-white font-medium">Arc Testnet</p>
-                  <p className="text-slate-500 text-xs">Destination</p>
-                </div>
-              </div>
-
-              <div className="bg-slate-800/30 rounded-xl p-4">
-                <p className="text-slate-500 text-xs mb-1">Recipient</p>
-                <p className="text-white text-sm font-mono truncate">{address}</p>
-              </div>
-            </div>
-
-            {/* Estimate */}
-            {amount && parseFloat(amount) > 0 && selectedSource && (
-              <div className="px-5 pb-5">
-                <div className="bg-slate-800/30 rounded-xl p-4 space-y-3">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-slate-500">Amount</span>
-                    <span className="text-white">{amount} USDC</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-slate-500">Fee</span>
-                    <span className="text-white">~0.05 USDC</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-slate-500">Time</span>
-                    <span className="text-white">~15-20 min</span>
-                  </div>
-                  <div className="pt-3 border-t border-slate-700/50 flex justify-between">
-                    <span className="text-slate-400 text-sm font-medium">You receive</span>
-                    <span className="text-emerald-400 font-semibold">
-                      {(parseFloat(amount) - 0.05).toFixed(2)} USDC
-                    </span>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Bridge Button */}
-            <div className="p-5 pt-0">
-              <button
-                onClick={handleInboundBridge}
-                disabled={isLoading || !amount || !selectedSource || parseFloat(amount) <= 0}
-                className={`w-full py-4 rounded-xl font-semibold transition-all ${
-                  isLoading || !amount || !selectedSource || parseFloat(amount) <= 0
-                    ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                    : 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white hover:shadow-lg hover:shadow-blue-500/25'
-                }`}
-              >
-                {isLoading ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                    </svg>
-                    Processing...
-                  </span>
-                ) : !selectedSource ? 'Select Source Chain' : !amount || parseFloat(amount) <= 0 ? 'Enter Amount' : 'Bridge to Arc'}
-              </button>
-            </div>
-          </>
-        )}
-
-        {/* Footer */}
-        <div className="px-5 pb-5">
-          <div className="flex items-center justify-center gap-2 text-slate-600 text-xs">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="10" />
-              <path d="M12 16v-4M12 8h.01" />
-            </svg>
-            <span>Powered by Circle CCTP V2</span>
           </div>
         </div>
+
+        {/* Submit Button */}
+        <button
+          onClick={handleBridge}
+          disabled={!canSubmit}
+          className="flex items-center justify-center gap-2 h-14 rounded-lg text-lg font-semibold transition-all disabled:cursor-not-allowed disabled:opacity-50 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white shadow-[0_0_20px_rgba(99,102,241,0.2)] hover:shadow-[0_0_30px_rgba(99,102,241,0.3)]"
+        >
+          {isSubmitting && <SpinnerIcon size={20} />}
+          <span>
+            {isSubmitting
+              ? 'Bridging USDC…'
+              : `Bridge USDC ${directionDetails?.label ?? ''}`}
+          </span>
+        </button>
+
+        {/* Status Messages */}
+        {(statusMessage || error) && (
+          <div
+            className={`rounded-lg border px-4 py-3 text-sm text-left ${
+              statusVariant === 'error' || error
+                ? 'border-red-400/50 bg-red-500/10 text-red-200'
+                : statusVariant === 'success'
+                ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-200'
+                : 'border-white/10 bg-white/5 text-slate-300'
+            }`}
+            onClick={() => { clearError(); setStatusMessage(''); }}
+          >
+            {error || statusMessage}
+            {progressStep && progressStep !== 'completed' && progressStep !== 'error' && (
+              <div className="mt-1 text-xs text-slate-400">{getProgressMessage()}</div>
+            )}
+          </div>
+        )}
+
+        {/* Transaction Links */}
+        {(sourceTxHash || destTxHash) && (
+          <div className="rounded-lg border border-slate-500/30 bg-slate-900/40 p-4 space-y-2">
+            <p className="text-sm font-medium text-slate-400">Transaction Links</p>
+            {sourceTxHash && (
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-slate-500">Source (Burn):</span>
+                <a
+                  href={`https://testnet.arcscan.app/tx/${sourceTxHash}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-xs text-blue-400 hover:text-blue-300 font-mono"
+                >
+                  {sourceTxHash.slice(0, 10)}...{sourceTxHash.slice(-8)} ↗
+                </a>
+              </div>
+            )}
+            {destTxHash && (
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-slate-500">Destination (Mint):</span>
+                <a
+                  href={direction === 'arc-to-sepolia'
+                    ? `https://sepolia.etherscan.io/tx/${destTxHash}`
+                    : `https://testnet.arcscan.app/tx/${destTxHash}`
+                  }
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-xs text-blue-400 hover:text-blue-300 font-mono"
+                >
+                  {destTxHash.slice(0, 10)}...{destTxHash.slice(-8)} ↗
+                </a>
+              </div>
+            )}
+          </div>
+        )}
       </div>
-
-      {/* Transaction History */}
-      {(showHistory || transactions.length > 0) && (
-        <div className="mt-6 rounded-2xl bg-slate-900/80 border border-slate-700/50 overflow-hidden">
-          <div className="flex items-center justify-between p-5 border-b border-slate-700/50">
-            <h3 className="text-white font-semibold">History</h3>
-            <button onClick={() => setShowHistory(false)} className="text-slate-500 hover:text-white transition-colors">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </button>
-          </div>
-
-          <div className="p-5">
-            {transactions.length === 0 ? (
-              <p className="text-slate-500 text-sm text-center py-4">No transactions yet</p>
-            ) : (
-              <div className="space-y-3">
-                {transactions.slice(0, 5).map((tx) => (
-                  <div key={tx.id} className="flex items-center justify-between p-4 bg-slate-800/30 rounded-xl">
-                    <div className="flex items-center gap-4">
-                      <div className="flex items-center -space-x-2">
-                        <ChainIcon name="Arc" size={28} />
-                        <ChainIcon name={destinationChains.find(c => c.chainId === tx.destinationChainId)?.name || ''} size={28} />
-                      </div>
-                      <div>
-                        <p className="text-white font-medium">{tx.amount} USDC</p>
-                        <p className="text-slate-500 text-xs">
-                          Arc → {destinationChains.find(c => c.chainId === tx.destinationChainId)?.name || 'Unknown'}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <span className={`inline-block px-2 py-1 rounded-md text-xs font-medium ${getStatusColor(tx.status)}`}>
-                        {getStatusText(tx.status)}
-                      </span>
-                      {tx.burnTxHash && (
-                        <a
-                          href={`https://testnet.arcscan.app/tx/${tx.burnTxHash}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="block text-blue-400 text-xs mt-1 hover:underline"
-                        >
-                          View →
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 };
