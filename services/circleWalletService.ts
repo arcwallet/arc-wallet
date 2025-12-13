@@ -774,6 +774,25 @@ class CircleWalletServiceImpl {
     }
 
     try {
+      // For Sepolia, use direct HTTP client instead of Circle's modular transport
+      // Circle's transport doesn't support standard RPC calls properly
+      if (chainId === 11155111) {
+        const sepoliaClient = createPublicClient({
+          chain: sepolia,
+          transport: http('https://ethereum-sepolia-rpc.publicnode.com'),
+        });
+
+        const balance = await sepoliaClient.readContract({
+          address: tokenAddress as `0x${string}`,
+          abi: ERC20_ABI,
+          functionName: 'balanceOf',
+          args: [this.account.address],
+        });
+
+        return balance as bigint;
+      }
+
+      // For other chains, use Circle's chain client
       const chainClient = await this.getChainClient(chainId);
 
       // @ts-ignore - viem type inference issues
