@@ -54,6 +54,7 @@ interface CircleWalletContextValue {
   // Utils
   getBalance: () => Promise<bigint>;
   getTokenBalance: (tokenAddress: string) => Promise<bigint>;
+  getTokenBalanceOnChain: (chainId: number, tokenAddress: string) => Promise<bigint>;
   isDeployed: () => Promise<boolean>;
   refreshState: () => void;
   refreshBalance: () => Promise<void>;
@@ -311,6 +312,11 @@ export const CircleWalletProvider: React.FC<CircleWalletProviderProps> = ({ chil
     return circleWalletService.getTokenBalance(tokenAddress);
   }, []);
 
+  // Get token balance on specific chain
+  const getTokenBalanceOnChain = useCallback(async (chainId: number, tokenAddress: string): Promise<bigint> => {
+    return circleWalletService.getTokenBalanceOnChain(chainId, tokenAddress);
+  }, []);
+
   // Check if deployed
   const isDeployed = useCallback(async (): Promise<boolean> => {
     return circleWalletService.isDeployed();
@@ -343,6 +349,7 @@ export const CircleWalletProvider: React.FC<CircleWalletProviderProps> = ({ chil
     // Utils
     getBalance,
     getTokenBalance,
+    getTokenBalanceOnChain,
     isDeployed,
     refreshState,
     refreshBalance,

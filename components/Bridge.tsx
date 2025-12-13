@@ -40,7 +40,7 @@ type ProgressStep =
   | 'error';
 
 const Bridge: React.FC = () => {
-  const { address, isConnected, getTokenBalance } = useCircleWallet();
+  const { address, isConnected, getTokenBalance, getTokenBalanceOnChain } = useCircleWallet();
   const {
     isLoading,
     error,
@@ -78,9 +78,14 @@ const Bridge: React.FC = () => {
         const arcBal = await getTokenBalance(ARC_USDC);
         setArcBalance(formatUnits(arcBal, 6));
 
-        // Sepolia balance would need multi-chain support
-        // For now, show placeholder
-        setSepoliaBalance('0.00');
+        // Get Sepolia balance
+        try {
+          const sepoliaBal = await getTokenBalanceOnChain(11155111, SEPOLIA_USDC);
+          setSepoliaBalance(formatUnits(sepoliaBal, 6));
+        } catch (sepoliaErr) {
+          console.error('Failed to fetch Sepolia balance:', sepoliaErr);
+          setSepoliaBalance('0.00');
+        }
       } catch (err) {
         console.error('Failed to fetch balances:', err);
         setArcBalance('0.00');
@@ -91,7 +96,7 @@ const Bridge: React.FC = () => {
     };
 
     fetchBalances();
-  }, [address, isConnected, getTokenBalance]);
+  }, [address, isConnected, getTokenBalance, getTokenBalanceOnChain]);
 
   // Get source chain balance based on direction
   const sourceBalance = direction === 'arc-to-sepolia' ? arcBalance : sepoliaBalance;
