@@ -24,10 +24,10 @@ export const RPC_URL =
   runtimeEnv?.VITE_ARC_RPC_URL ?? runtimeEnv?.ARC_RPC_URL ?? 'https://rpc.testnet.arc.network';
 
 /**
- * Sepolia RPC URL (for bridging)
+ * Base Sepolia RPC URL (for bridging)
  */
-export const SEPOLIA_RPC_URL =
-  runtimeEnv?.VITE_SEPOLIA_RPC_URL ?? 'https://ethereum-sepolia-rpc.publicnode.com';
+export const BASE_SEPOLIA_RPC_URL =
+  runtimeEnv?.VITE_BASE_SEPOLIA_RPC_URL ?? 'https://sepolia.base.org';
 
 /**
  * Arc Chain ID
@@ -39,7 +39,7 @@ export const ARC_CHAIN_ID = 1555n;
 // ============================================================================
 
 let sharedProvider: JsonRpcProvider | null = null;
-let sepoliaProvider: JsonRpcProvider | null = null;
+let baseSepoliaProvider: JsonRpcProvider | null = null;
 
 /**
  * Get shared JsonRpcProvider instance for Arc network
@@ -54,14 +54,14 @@ export const getProvider = (): JsonRpcProvider => {
 };
 
 /**
- * Get provider for Sepolia network (bridging)
+ * Get provider for Base Sepolia network (bridging)
  */
-export const getSepoliaProvider = (): JsonRpcProvider => {
-  if (!sepoliaProvider) {
-    sepoliaProvider = new JsonRpcProvider(SEPOLIA_RPC_URL);
-    sepoliaProvider.pollingInterval = 12000;
+export const getBaseSepoliaProvider = (): JsonRpcProvider => {
+  if (!baseSepoliaProvider) {
+    baseSepoliaProvider = new JsonRpcProvider(BASE_SEPOLIA_RPC_URL);
+    baseSepoliaProvider.pollingInterval = 12000;
   }
-  return sepoliaProvider;
+  return baseSepoliaProvider;
 };
 
 /**

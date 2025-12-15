@@ -11,7 +11,7 @@ const SESSION_COOKIE_NAME = 'arcwallet_session';
 export interface BridgeConfig {
   NODE_ENV: string;
   ARC_RPC_URL: string;
-  SEPOLIA_RPC_URL: string;
+  BASE_SEPOLIA_RPC_URL: string;
 }
 
 type CookieRequest = Request & { cookies?: Record<string, string> };

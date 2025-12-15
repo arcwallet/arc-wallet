@@ -481,7 +481,7 @@ export const ALL_NETWORKS: NetworkConfig[] = [
   ARC_TESTNET,
   // Ethereum
   ETHEREUM_MAINNET,
-  ETHEREUM_SEPOLIA,
+  // Note: Ethereum Sepolia removed - not supported by Circle Modular Wallets
   // Base
   BASE_MAINNET,
   BASE_SEPOLIA,

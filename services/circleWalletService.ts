@@ -25,7 +25,7 @@ import {
 } from '@circle-fin/modular-wallets-core';
 import { toWebAuthnAccount } from 'viem/account-abstraction';
 import { arcTestnet } from '../config/chains/arcTestnet';
-import { sepolia, baseSepolia } from 'viem/chains';
+import { baseSepolia } from 'viem/chains';
 import { CIRCLE_CONFIG, validateCircleConfig } from '../config/circle';
 import { logger } from './logger';
 
@@ -35,11 +35,6 @@ const SUPPORTED_CHAINS = {
     chain: arcTestnet,
     chainId: 5042002,
     sdkPath: '/arcTestnet',
-  },
-  ethereumSepolia: {
-    chain: sepolia,
-    chainId: 11155111,
-    sdkPath: '/ethereumSepolia',
   },
   baseSepolia: {
     chain: baseSepolia,
@@ -629,6 +624,9 @@ class CircleWalletServiceImpl {
   /**
    * Get or initialize a chain-specific bundler client
    * Enables multi-chain operations (Sepolia, Base Sepolia, etc.)
+   *
+   * For Sepolia: Uses Pimlico bundler (Circle bundler doesn't support Sepolia)
+   * For other chains: Uses Circle's modular transport
    */
   private async getChainClient(chainId: number): Promise<ChainClient> {
     // Return cached client if exists
@@ -653,20 +651,26 @@ class CircleWalletServiceImpl {
     });
 
     try {
-      // Create chain-specific modular transport
+      let publicClient: PublicClient;
+      let bundlerClient: BundlerClient;
+      let modularTransport: ReturnType<typeof toModularTransport>;
+
+      // Use Circle's modular transport for all supported chains
+      // Note: Ethereum Sepolia is NOT supported by Circle Modular Wallets SDK
+      // Use Base Sepolia instead (chainId: 84532)
       const sdkUrl = `${CIRCLE_CONFIG.clientUrl}${chainConfig.sdkPath}`;
-      const modularTransport = toModularTransport(sdkUrl, CIRCLE_CONFIG.clientKey);
+      modularTransport = toModularTransport(sdkUrl, CIRCLE_CONFIG.clientKey);
 
       // Create public client for this chain
       // @ts-ignore - viem type inference issues
-      const publicClient = createPublicClient({
+      publicClient = createPublicClient({
         chain: chainConfig.chain,
         transport: modularTransport,
       }) as PublicClient;
 
       // Create bundler client for this chain
       // @ts-ignore - viem type inference issues
-      const bundlerClient = createBundlerClient({
+      bundlerClient = createBundlerClient({
         chain: chainConfig.chain,
         transport: modularTransport,
         account: this.account,
@@ -774,15 +778,15 @@ class CircleWalletServiceImpl {
     }
 
     try {
-      // For Sepolia, use direct HTTP client instead of Circle's modular transport
-      // Circle's transport doesn't support standard RPC calls properly
-      if (chainId === 11155111) {
-        const sepoliaClient = createPublicClient({
-          chain: sepolia,
-          transport: http('https://ethereum-sepolia-rpc.publicnode.com'),
+      // For Base Sepolia, use direct HTTP client
+      // Circle's modular transport doesn't support standard RPC calls properly
+      if (chainId === 84532) {
+        const baseSepoliaClient = createPublicClient({
+          chain: baseSepolia,
+          transport: http('https://sepolia.base.org'),
         });
 
-        const balance = await sepoliaClient.readContract({
+        const balance = await baseSepoliaClient.readContract({
           address: tokenAddress as `0x${string}`,
           abi: ERC20_ABI,
           functionName: 'balanceOf',

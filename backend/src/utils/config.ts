@@ -30,7 +30,7 @@ export function loadConfig(): EnvConfig {
   // Cookie domain for cross-subdomain sharing (e.g., .arcwallet.network)
   const COOKIE_DOMAIN = process.env.COOKIE_DOMAIN || undefined;
   const ARC_RPC_URL = process.env.ARC_RPC_URL || process.env.VITE_ARC_RPC_URL || 'https://rpc.testnet.arc.network';
-  const SEPOLIA_RPC_URL = process.env.SEPOLIA_RPC_URL || process.env.VITE_SEPOLIA_RPC_URL || 'https://ethereum-sepolia-rpc.publicnode.com';
+  const BASE_SEPOLIA_RPC_URL = process.env.BASE_SEPOLIA_RPC_URL || 'https://sepolia.base.org';
 
   const DB_PATH = process.env.DB_PATH || path.join(process.cwd(), 'data', 'wallet.db');
 
@@ -76,7 +76,7 @@ export function loadConfig(): EnvConfig {
     MAGIC_LINK_BASE_URL,
     COOKIE_DOMAIN,
     ARC_RPC_URL,
-    SEPOLIA_RPC_URL,
+    BASE_SEPOLIA_RPC_URL,
   };
 
   // Log configuration (excluding secrets)
@@ -123,7 +123,7 @@ export function validateConfig(config: EnvConfig): void {
   if (!config.ARC_RPC_URL) {
     throw new Error('ARC_RPC_URL must be provided');
   }
-  if (!config.SEPOLIA_RPC_URL) {
-    throw new Error('SEPOLIA_RPC_URL must be provided');
+  if (!config.BASE_SEPOLIA_RPC_URL) {
+    throw new Error('BASE_SEPOLIA_RPC_URL must be provided');
   }
 }

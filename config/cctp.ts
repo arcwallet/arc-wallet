@@ -73,17 +73,6 @@ export const BRIDGE_CHAINS: Record<string, BridgeChainConfig> = {
     nativeToken: 'USDC', // Arc uses USDC as native gas
     supportsFastTransfer: false, // Arc only supports standard transfer
   },
-  ethereumSepolia: {
-    chainId: 11155111,
-    name: 'Ethereum Sepolia',
-    domain: CCTP_DOMAINS.ETHEREUM_SEPOLIA,
-    rpcUrl: 'https://rpc.sepolia.org',
-    explorerUrl: 'https://sepolia.etherscan.io',
-    usdc: USDC_ADDRESSES[11155111],
-    isTestnet: true,
-    nativeToken: 'ETH',
-    supportsFastTransfer: true,
-  },
   baseSepolia: {
     chainId: 84532,
     name: 'Base Sepolia',

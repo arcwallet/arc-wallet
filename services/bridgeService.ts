@@ -458,7 +458,7 @@ class BridgeServiceImpl {
       return;
     }
 
-    const direction = tx.sourceChainId === 5042002 ? 'arc-to-sepolia' : 'sepolia-to-arc';
+    const direction = tx.sourceChainId === 5042002 ? 'arc-to-base' : 'base-to-arc';
     const backendUrl = import.meta.env.VITE_BACKEND_URL || 'https://arcwallet-backend.onrender.com';
 
     logger.info('Requesting backend to complete bridge claim', {
@@ -525,7 +525,7 @@ class BridgeServiceImpl {
       return;
     }
 
-    const direction = tx.sourceChainId === 5042002 ? 'arc-to-sepolia' : 'sepolia-to-arc';
+    const direction = tx.sourceChainId === 5042002 ? 'arc-to-base' : 'base-to-arc';
     const backendUrl = import.meta.env.VITE_BACKEND_URL || 'https://arcwallet-backend.onrender.com';
 
     logger.info('Requesting backend to complete claim (attestation ready)', {
@@ -624,10 +624,10 @@ class BridgeServiceImpl {
             destinationChainId: tx.destinationChainId,
           });
 
-          // For Sepolia destination, use backend relayer (Circle bundler doesn't support Sepolia)
+          // For Base Sepolia destination, use backend relayer
           // For Arc destination, we can use Circle bundler
-          if (tx.destinationChainId === 11155111) {
-            // Sepolia - use backend relayer
+          if (tx.destinationChainId === 84532) {
+            // Base Sepolia - use backend relayer
             await this.requestBackendClaimWithAttestation(tx);
           } else {
             // Arc - use Circle bundler

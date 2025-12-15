@@ -2,8 +2,8 @@
  * Bridge Component - CCTP Cross-Chain USDC Transfer
  *
  * Professional UI for bidirectional bridging via Circle CCTP V2:
- * - Arc → Sepolia
- * - Sepolia → Arc
+ * - Arc → Base Sepolia
+ * - Base Sepolia → Arc
  */
 
 import React, { useMemo, useState, useEffect } from 'react';
@@ -12,18 +12,18 @@ import { useBridge } from '../contexts/BridgeContext';
 import { SpinnerIcon } from './Icons';
 import { formatUnits, parseUnits } from 'ethers';
 
-type BridgeDirection = 'arc-to-sepolia' | 'sepolia-to-arc';
+type BridgeDirection = 'arc-to-base' | 'base-to-arc';
 
 const DIRECTIONS: { id: BridgeDirection; label: string; description: string }[] = [
   {
-    id: 'arc-to-sepolia',
-    label: 'Arc → Sepolia',
-    description: 'Burn USDC on Arc and mint on Sepolia',
+    id: 'arc-to-base',
+    label: 'Arc → Base',
+    description: 'Burn USDC on Arc and mint on Base Sepolia',
   },
   {
-    id: 'sepolia-to-arc',
-    label: 'Sepolia → Arc',
-    description: 'Burn USDC on Sepolia and mint on Arc',
+    id: 'base-to-arc',
+    label: 'Base → Arc',
+    description: 'Burn USDC on Base Sepolia and mint on Arc',
   },
 ];
 
@@ -51,7 +51,7 @@ const Bridge: React.FC = () => {
     clearError,
   } = useBridge();
 
-  const [direction, setDirection] = useState<BridgeDirection>('arc-to-sepolia');
+  const [direction, setDirection] = useState<BridgeDirection>('arc-to-base');
   const [amount, setAmount] = useState('');
   const [amountError, setAmountError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -61,11 +61,11 @@ const Bridge: React.FC = () => {
   const [sourceTxHash, setSourceTxHash] = useState<string | null>(null);
   const [destTxHash, setDestTxHash] = useState<string | null>(null);
   const [arcBalance, setArcBalance] = useState<string | null>(null);
-  const [sepoliaBalance, setSepoliaBalance] = useState<string | null>(null);
+  const [baseBalance, setBaseBalance] = useState<string | null>(null);
   const [isLoadingBalance, setIsLoadingBalance] = useState(false);
 
   const ARC_USDC = '0x3600000000000000000000000000000000000000';
-  const SEPOLIA_USDC = '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238';
+  const BASE_SEPOLIA_USDC = '0x036CbD53842c5426634e7929541eC2318f3dCF7e';
 
   // Fetch balances
   useEffect(() => {
@@ -78,18 +78,18 @@ const Bridge: React.FC = () => {
         const arcBal = await getTokenBalance(ARC_USDC);
         setArcBalance(formatUnits(arcBal, 6));
 
-        // Get Sepolia balance
+        // Get Base Sepolia balance
         try {
-          const sepoliaBal = await getTokenBalanceOnChain(11155111, SEPOLIA_USDC);
-          setSepoliaBalance(formatUnits(sepoliaBal, 6));
-        } catch (sepoliaErr) {
-          console.error('Failed to fetch Sepolia balance:', sepoliaErr);
-          setSepoliaBalance('0.00');
+          const baseBal = await getTokenBalanceOnChain(84532, BASE_SEPOLIA_USDC);
+          setBaseBalance(formatUnits(baseBal, 6));
+        } catch (baseErr) {
+          console.error('Failed to fetch Base Sepolia balance:', baseErr);
+          setBaseBalance('0.00');
         }
       } catch (err) {
         console.error('Failed to fetch balances:', err);
         setArcBalance('0.00');
-        setSepoliaBalance('0.00');
+        setBaseBalance('0.00');
       } finally {
         setIsLoadingBalance(false);
       }
@@ -99,7 +99,7 @@ const Bridge: React.FC = () => {
   }, [address, isConnected, getTokenBalance, getTokenBalanceOnChain]);
 
   // Get source chain balance based on direction
-  const sourceBalance = direction === 'arc-to-sepolia' ? arcBalance : sepoliaBalance;
+  const sourceBalance = direction === 'arc-to-base' ? arcBalance : baseBalance;
 
   const normalizeAmount = (raw: string): string | null => {
     if (raw == null) return null;
@@ -162,7 +162,7 @@ const Bridge: React.FC = () => {
     // Check balance
     if (sourceBalance && Number(normalized) > Number(sourceBalance)) {
       setStatusVariant('error');
-      setStatusMessage(`Insufficient balance. You have ${sourceBalance} USDC on ${direction === 'arc-to-sepolia' ? 'Arc' : 'Sepolia'}.`);
+      setStatusMessage(`Insufficient balance. You have ${sourceBalance} USDC on ${direction === 'arc-to-base' ? 'Arc' : 'Base Sepolia'}.`);
       return;
     }
 
@@ -179,18 +179,18 @@ const Bridge: React.FC = () => {
       setStatusMessage('Burning USDC on source chain (sign with passkey)...');
 
       let result;
-      if (direction === 'arc-to-sepolia') {
-        // Arc → Sepolia
-        const sepoliaChain = destinationChains.find(c => c.name.includes('Sepolia') && !c.name.includes('Base'));
-        if (!sepoliaChain) throw new Error('Sepolia chain not found');
+      if (direction === 'arc-to-base') {
+        // Arc → Base Sepolia
+        const baseChain = destinationChains.find(c => c.name.includes('Base'));
+        if (!baseChain) throw new Error('Base Sepolia chain not found');
 
-        result = await executeBridge(normalized, sepoliaChain.chainId);
+        result = await executeBridge(normalized, baseChain.chainId);
       } else {
-        // Sepolia → Arc
-        const sepoliaChain = destinationChains.find(c => c.name.includes('Sepolia') && !c.name.includes('Base'));
-        if (!sepoliaChain) throw new Error('Sepolia chain not found');
+        // Base Sepolia → Arc
+        const baseChain = destinationChains.find(c => c.name.includes('Base'));
+        if (!baseChain) throw new Error('Base Sepolia chain not found');
 
-        result = await executeInboundBridge(normalized, sepoliaChain.chainId);
+        result = await executeInboundBridge(normalized, baseChain.chainId);
       }
 
       if (result.burnTxHash) {
@@ -246,7 +246,7 @@ const Bridge: React.FC = () => {
         <p className="text-slate-400 text-base mt-2">
           Transfer USDC between{' '}
           <span className="text-blue-400 font-semibold">Arc Testnet</span> and{' '}
-          <span className="text-blue-400 font-semibold">Ethereum Sepolia</span> using Circle CCTP.
+          <span className="text-blue-400 font-semibold">Base Sepolia</span> using Circle CCTP.
         </p>
       </div>
 
@@ -270,21 +270,21 @@ const Bridge: React.FC = () => {
               </p>
             </div>
             <div className="flex gap-4">
-              <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${direction === 'arc-to-sepolia' ? 'bg-blue-500/10 border border-blue-500/30' : 'bg-slate-800/50'}`}>
+              <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${direction === 'arc-to-base' ? 'bg-blue-500/10 border border-blue-500/30' : 'bg-slate-800/50'}`}>
                 <div className="w-5 h-5 rounded-full bg-gradient-to-br from-[#6c7cff] to-[#4aa9ff]" />
                 <div className="text-right">
                   <p className="text-slate-400 text-[10px]">Arc</p>
-                  <p className={`font-semibold text-sm ${direction === 'arc-to-sepolia' ? 'text-blue-400' : 'text-white'}`}>
+                  <p className={`font-semibold text-sm ${direction === 'arc-to-base' ? 'text-blue-400' : 'text-white'}`}>
                     {isLoadingBalance ? '...' : arcBalance ? `${parseFloat(arcBalance).toFixed(2)}` : '0.00'} USDC
                   </p>
                 </div>
               </div>
-              <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${direction === 'sepolia-to-arc' ? 'bg-blue-500/10 border border-blue-500/30' : 'bg-slate-800/50'}`}>
-                <div className="w-5 h-5 rounded-full bg-gradient-to-br from-[#627EEA] to-[#3C3C3D]" />
+              <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${direction === 'base-to-arc' ? 'bg-blue-500/10 border border-blue-500/30' : 'bg-slate-800/50'}`}>
+                <div className="w-5 h-5 rounded-full bg-gradient-to-br from-[#0052FF] to-[#0039B3]" />
                 <div className="text-right">
-                  <p className="text-slate-400 text-[10px]">Sepolia</p>
-                  <p className={`font-semibold text-sm ${direction === 'sepolia-to-arc' ? 'text-blue-400' : 'text-white'}`}>
-                    {isLoadingBalance ? '...' : sepoliaBalance ? `${parseFloat(sepoliaBalance).toFixed(2)}` : '0.00'} USDC
+                  <p className="text-slate-400 text-[10px]">Base</p>
+                  <p className={`font-semibold text-sm ${direction === 'base-to-arc' ? 'text-blue-400' : 'text-white'}`}>
+                    {isLoadingBalance ? '...' : baseBalance ? `${parseFloat(baseBalance).toFixed(2)}` : '0.00'} USDC
                   </p>
                 </div>
               </div>
@@ -306,7 +306,7 @@ const Bridge: React.FC = () => {
             <div key={tx.id} className="bg-slate-900/50 rounded-lg p-3 text-sm">
               <div className="flex justify-between items-center">
                 <span className="text-slate-300">
-                  {tx.amount} USDC → {tx.destinationChainId === 5042002 ? 'Arc' : 'Sepolia'}
+                  {tx.amount} USDC → {tx.destinationChainId === 5042002 ? 'Arc' : 'Base'}
                 </span>
                 <span className={`px-2 py-0.5 rounded text-xs ${
                   tx.status === 'attestation_received' ? 'bg-green-500/20 text-green-400' :
@@ -321,7 +321,7 @@ const Bridge: React.FC = () => {
                 <a
                   href={tx.sourceChainId === 5042002
                     ? `https://testnet.arcscan.app/tx/${tx.burnTxHash}`
-                    : `https://sepolia.etherscan.io/tx/${tx.burnTxHash}`
+                    : `https://sepolia.basescan.org/tx/${tx.burnTxHash}`
                   }
                   target="_blank"
                   rel="noreferrer"
@@ -384,7 +384,7 @@ const Bridge: React.FC = () => {
                   </div>
                 </div>
                 <div className="ml-auto text-xs text-slate-300 bg-white/5 px-3 py-1.5 rounded-full border border-white/10">
-                  Arc Testnet ↔ Sepolia
+                  Arc Testnet ↔ Base Sepolia
                 </div>
               </div>
             </div>
@@ -500,8 +500,8 @@ const Bridge: React.FC = () => {
               <div className="flex items-center justify-between">
                 <span className="text-xs text-slate-500">Destination (Mint):</span>
                 <a
-                  href={direction === 'arc-to-sepolia'
-                    ? `https://sepolia.etherscan.io/tx/${destTxHash}`
+                  href={direction === 'arc-to-base'
+                    ? `https://sepolia.basescan.org/tx/${destTxHash}`
                     : `https://testnet.arcscan.app/tx/${destTxHash}`
                   }
                   target="_blank"

@@ -22,11 +22,11 @@ const CCTP_CONFIG = {
     messageTransmitter: '0xE737e5cEBEEBa77EFE34D4aa090756590b1CE275',
     domain: 26,
   },
-  sepolia: {
-    chainId: 11155111,
-    rpcUrl: process.env.SEPOLIA_RPC_URL || 'https://ethereum-sepolia-rpc.publicnode.com',
+  baseSepolia: {
+    chainId: 84532,
+    rpcUrl: process.env.BASE_SEPOLIA_RPC_URL || 'https://sepolia.base.org',
     messageTransmitter: '0xE737e5cEBEEBa77EFE34D4aa090756590b1CE275',
-    domain: 0,
+    domain: 6,
   },
 };
 
@@ -51,7 +51,7 @@ export class BridgeCompleterService {
   private isRunning: boolean = false;
   private checkInterval: NodeJS.Timeout | null = null;
   private arcWallet: Wallet;
-  private sepoliaWallet: Wallet;
+  private baseSepoliaWallet: Wallet;
 
   constructor() {
     const privateKey = process.env.BUNDLER_PRIVATE_KEY;
@@ -61,10 +61,10 @@ export class BridgeCompleterService {
 
     // Create wallets for both chains (using bundler key for gas)
     const arcProvider = new JsonRpcProvider(CCTP_CONFIG.arc.rpcUrl);
-    const sepoliaProvider = new JsonRpcProvider(CCTP_CONFIG.sepolia.rpcUrl);
+    const baseSepoliaProvider = new JsonRpcProvider(CCTP_CONFIG.baseSepolia.rpcUrl);
 
     this.arcWallet = new Wallet(privateKey, arcProvider);
-    this.sepoliaWallet = new Wallet(privateKey, sepoliaProvider);
+    this.baseSepoliaWallet = new Wallet(privateKey, baseSepoliaProvider);
 
     console.log('[BridgeCompleter] Initialized with completer address:', this.arcWallet.address);
   }
@@ -99,14 +99,14 @@ export class BridgeCompleterService {
    */
   registerBridge(params: {
     sourceTxHash: string;
-    direction: 'arc-to-sepolia' | 'sepolia-to-arc';
+    direction: 'arc-to-base' | 'base-to-arc';
     recipientAddress: string;
     amount: string;
   }): void {
     const { sourceTxHash, direction, recipientAddress, amount } = params;
 
-    const sourceDomain = direction === 'arc-to-sepolia' ? CCTP_CONFIG.arc.domain : CCTP_CONFIG.sepolia.domain;
-    const destinationDomain = direction === 'arc-to-sepolia' ? CCTP_CONFIG.sepolia.domain : CCTP_CONFIG.arc.domain;
+    const sourceDomain = direction === 'arc-to-base' ? CCTP_CONFIG.arc.domain : CCTP_CONFIG.baseSepolia.domain;
+    const destinationDomain = direction === 'arc-to-base' ? CCTP_CONFIG.baseSepolia.domain : CCTP_CONFIG.arc.domain;
 
     this.pendingBridges.set(sourceTxHash, {
       sourceTxHash,
@@ -186,11 +186,11 @@ export class BridgeCompleterService {
     attestation: string
   ): Promise<string> {
     // Determine destination chain
-    const isToSepolia = bridge.destinationDomain === CCTP_CONFIG.sepolia.domain;
-    const destConfig = isToSepolia ? CCTP_CONFIG.sepolia : CCTP_CONFIG.arc;
-    const wallet = isToSepolia ? this.sepoliaWallet : this.arcWallet;
+    const isToBaseSepolia = bridge.destinationDomain === CCTP_CONFIG.baseSepolia.domain;
+    const destConfig = isToBaseSepolia ? CCTP_CONFIG.baseSepolia : CCTP_CONFIG.arc;
+    const wallet = isToBaseSepolia ? this.baseSepoliaWallet : this.arcWallet;
 
-    console.log(`[BridgeCompleter] Executing receiveMessage on ${isToSepolia ? 'Sepolia' : 'Arc'}...`);
+    console.log(`[BridgeCompleter] Executing receiveMessage on ${isToBaseSepolia ? 'Base Sepolia' : 'Arc'}...`);
 
     const messageTransmitter = new ethers.Contract(
       destConfig.messageTransmitter,
@@ -239,7 +239,7 @@ export class BridgeCompleterService {
 
       // Determine destination from message
       const destDomain = msg.decodedMessage?.destinationDomain;
-      const isToSepolia = destDomain === '0' || destDomain === 0;
+      const isToBaseSepolia = destDomain === '6' || destDomain === 6;
 
       // Get recipient from decoded message
       const recipientAddress = msg.decodedMessage?.decodedMessageBody?.mintRecipient;
@@ -247,7 +247,7 @@ export class BridgeCompleterService {
       const bridge: PendingBridge = {
         sourceTxHash,
         sourceDomain,
-        destinationDomain: isToSepolia ? 0 : 26,
+        destinationDomain: isToBaseSepolia ? 6 : 26,
         recipientAddress: recipientAddress || '',
         amount: msg.decodedMessage?.decodedMessageBody?.amount || '0',
         createdAt: Date.now(),
