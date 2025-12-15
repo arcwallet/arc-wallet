@@ -68,7 +68,7 @@ export function createBridgeRoutes(db: Database, config: BridgeConfig, sessionSt
     [
       body('walletAddress').isString().notEmpty().withMessage('walletAddress is required'),
       body('amount').isString().notEmpty().withMessage('amount is required'),
-      body('direction').isIn(['arc-to-sepolia', 'sepolia-to-arc']).withMessage('Invalid direction'),
+      body('direction').isIn(['arc-to-base', 'base-to-arc']).withMessage('Invalid direction'),
       body('token').equals('USDC').withMessage('Only USDC is supported'),
     ],
     async (req: Request, res: Response) => {
@@ -332,7 +332,7 @@ export function createBridgeRoutes(db: Database, config: BridgeConfig, sessionSt
     '/bridge/complete',
     [
       body('sourceTxHash').isString().notEmpty().withMessage('sourceTxHash is required'),
-      body('direction').isIn(['arc-to-sepolia', 'sepolia-to-arc']).withMessage('Invalid direction'),
+      body('direction').isIn(['arc-to-base', 'base-to-arc']).withMessage('Invalid direction'),
     ],
     async (req: Request, res: Response) => {
       const errors = validationResult(req);
@@ -404,6 +404,64 @@ export function createBridgeRoutes(db: Database, config: BridgeConfig, sessionSt
       });
     }
   });
+
+  /**
+   * POST /bridge/public-claim
+   * Public endpoint to manually claim a bridge transaction
+   * No auth required - attestation proves validity
+   */
+  router.post(
+    '/bridge/public-claim',
+    [
+      body('sourceTxHash').isString().notEmpty().withMessage('sourceTxHash is required'),
+      body('sourceDomain').isInt().withMessage('sourceDomain is required (26 for Arc, 6 for Base Sepolia)'),
+    ],
+    async (req: Request, res: Response) => {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          error: errors.array()[0].msg,
+          code: 'INVALID_REQUEST'
+        });
+      }
+
+      const { sourceTxHash, sourceDomain } = req.body;
+
+      console.log(`🌉 [PUBLIC CLAIM] Manual claim request for ${sourceTxHash} from domain ${sourceDomain}`);
+
+      try {
+        const completer = getBridgeCompleterService();
+        const result = await completer.manualComplete(sourceTxHash, sourceDomain);
+
+        if (result.success) {
+          console.log(`✅ [PUBLIC CLAIM] Success! TX: ${result.txHash}`);
+          return res.json({
+            success: true,
+            data: {
+              sourceTxHash,
+              destinationTxHash: result.txHash,
+              message: 'Bridge claim completed successfully'
+            }
+          });
+        } else {
+          console.log(`❌ [PUBLIC CLAIM] Failed: ${result.error}`);
+          return res.status(400).json({
+            success: false,
+            error: result.error,
+            code: 'CLAIM_FAILED'
+          });
+        }
+      } catch (error: any) {
+        console.error('[PUBLIC CLAIM] Error:', error);
+        return res.status(500).json({
+          success: false,
+          error: error.message || 'Failed to complete claim',
+          code: 'CLAIM_ERROR'
+        });
+      }
+    }
+  );
 
   return router;
 }
