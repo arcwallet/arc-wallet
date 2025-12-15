@@ -42,6 +42,7 @@ const CSRF_EXEMPT_ROUTES = [
   '/api/passkey',       // Singular form also exempt
   '/bridge/complete',   // Bridge claim endpoint (CORS provides security, no session needed)
   '/bridge/completer',  // Bridge completer status (read-only)
+  '/bridge/public-claim', // Public claim endpoint (attestation proves validity)
 ];
 
 /**
