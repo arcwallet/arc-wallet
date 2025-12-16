@@ -129,19 +129,8 @@ const SwapScreen: React.FC<SwapScreenProps> = ({ initialFromToken, initialToToke
             <div className="mb-6">
                 <h2 className="text-2xl font-bold text-white">Stablecoin FX</h2>
                 <p className="text-slate-400 text-sm mt-2">
-                    Powered by <span className="text-blue-400 font-medium">StableFX</span> — Circle's decentralized FX protocol with atomic PvP settlement on Arc.
+                    Swap stablecoins on Arc Testnet via <span className="text-blue-400 font-medium">UniswapV2</span> — gasless transactions powered by Circle Modular Wallet.
                 </p>
-                <a
-                    href="https://6778953.fs1.hubspotusercontent-na1.net/hubfs/6778953/StableFX-Litepaper_2025.pdf"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300 mt-2 transition-colors"
-                >
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                    StableFX Litepaper (PDF)
-                </a>
             </div>
 
             <div className="bg-slate-900/60 backdrop-blur-sm p-6 rounded-xl border border-slate-500/50 relative shadow-xl">
@@ -239,26 +228,17 @@ const SwapScreen: React.FC<SwapScreenProps> = ({ initialFromToken, initialToToke
                     </div>
                 )}
 
-                {/* StableFX Notice */}
-                <div className="mt-4 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
-                    <div className="flex items-center gap-2 mb-1">
-                        <svg className="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                        </svg>
-                        <span className="text-amber-400 text-sm font-medium">StableFX Integration Pending</span>
-                    </div>
-                    <p className="text-xs text-slate-400">
-                        Swaps require Circle StableFX API access. Use the <span className="text-blue-400">Bridge</span> to transfer USDC between chains.
-                    </p>
-                </div>
-
                 {/* Swap Button */}
                 <button
                     onClick={handleSwap}
-                    disabled={true}
-                    className="w-full mt-4 py-3 rounded-lg font-bold text-lg bg-slate-800 text-slate-500 cursor-not-allowed"
+                    disabled={!quote || swapping || loading || !passkeyConnected}
+                    className={`w-full mt-4 py-3 rounded-lg font-bold text-lg transition-all shadow-[0_0_20px_rgba(255,255,255,0.1)] hover:shadow-[0_0_30px_rgba(255,255,255,0.2)] ${
+                        !quote || swapping || !passkeyConnected
+                            ? 'bg-slate-800 text-slate-500 cursor-not-allowed shadow-none'
+                            : 'bg-slate-200 text-slate-900 hover:bg-white'
+                    }`}
                 >
-                    Coming Soon
+                    {!passkeyConnected ? 'Connect Wallet' : swapping ? 'Swapping...' : 'Swap'}
                 </button>
             </div>
 
@@ -274,7 +254,7 @@ const SwapScreen: React.FC<SwapScreenProps> = ({ initialFromToken, initialToToke
             <div className="mt-6 p-4 bg-slate-900/40 border border-slate-500/20 rounded-xl">
                 <div className="flex items-center gap-2 mb-3">
                     <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-                    <span className="text-xs text-slate-400">Arc Testnet • 24/7 Settlement</span>
+                    <span className="text-xs text-slate-400">Arc Testnet • UniswapV2 Router</span>
                 </div>
                 <div className="grid grid-cols-2 gap-3 text-xs">
                     <div className="bg-slate-800/50 rounded-lg p-2.5">
@@ -282,20 +262,11 @@ const SwapScreen: React.FC<SwapScreenProps> = ({ initialFromToken, initialToToke
                         <p className="text-slate-300 font-medium">USDC ↔ EURC ↔ USYC</p>
                     </div>
                     <div className="bg-slate-800/50 rounded-lg p-2.5">
-                        <p className="text-slate-500 mb-1">Settlement</p>
-                        <p className="text-slate-300 font-medium">Atomic PvP</p>
+                        <p className="text-slate-500 mb-1">Gas</p>
+                        <p className="text-slate-300 font-medium">Gasless (ERC-4337)</p>
                     </div>
                 </div>
                 <div className="flex items-center justify-center gap-4 mt-3 pt-3 border-t border-slate-700/50">
-                    <a
-                        href="https://developers.circle.com/stablefx"
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-xs text-slate-500 hover:text-blue-400 transition-colors"
-                    >
-                        Circle Docs
-                    </a>
-                    <span className="text-slate-700">•</span>
                     <a
                         href="https://docs.arc.network"
                         target="_blank"

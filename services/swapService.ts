@@ -3,9 +3,6 @@ import { TokenInfo, getTokenContractAddress, SWAP_CONFIG } from '../config/token
 import { getProvider, getFeeSettings } from './rpcProvider';
 import { circleWalletService } from './circleWalletService';
 
-// Transaction execution function type
-export type ExecuteTransactionFn = (to: string, value: bigint, data: string) => Promise<string>;
-
 export interface Quote {
   fromToken: TokenInfo;
   toToken: TokenInfo;
@@ -161,15 +158,8 @@ class SwapService {
   }
 
   /**
-   * Execute a token swap using Circle StableFX
-   *
-   * NOTE: StableFX integration requires:
-   * - Circle StableFX API key (permissioned product)
-   * - KYB/AML verification
-   * - Circle Developer Console credentials
-   *
-   * For now, swaps are simulated on testnet.
-   * Full StableFX integration coming with mainnet launch.
+   * Execute a token swap using UniswapV2 Router on Arc Testnet
+   * Uses Circle Modular Wallet for gasless transactions
    */
   async executeSwap(
     quote: Quote,
@@ -197,36 +187,104 @@ class SwapService {
         throw new Error('Token addresses not found');
       }
 
-      console.log('[SWAP] StableFX swap request:', {
-        from: quote.fromToken.symbol,
-        to: quote.toToken.symbol,
-        amount: quote.fromAmount,
-        wallet: walletAddress,
-      });
+      const amountIn = parseUnits(quote.fromAmount, quote.fromToken.decimals);
 
-      // StableFX on Arc Testnet
-      // Contract: FxEscrow at 0x1f91886C7028986aD885ffCee0e40b75C9cd5aC1
-      // Requires Circle StableFX API key for full functionality
-
-      // For testnet demo: Show informative error
-      // Full StableFX requires permissioned API access
-      throw new Error(
-        'StableFX integration pending. ' +
-        'Stablecoin swaps on Arc require Circle StableFX API access. ' +
-        'Contact Circle for API credentials or use the Bridge to move USDC.'
-      );
-
-    } catch (error: any) {
-      console.error('[SWAP] Swap failed:', error);
-
-      // Pass through our custom errors
-      if (error?.message?.includes('StableFX')) {
-        throw error;
+      // MEV Protection: Re-quote if quote is stale
+      let amountOutMinimum: bigint;
+      if (!this.isQuoteFresh(quote)) {
+        console.log('[SWAP] Quote stale, re-quoting for current price...');
+        const freshQuote = await this.getQuote(quote.fromToken, quote.toToken, quote.fromAmount);
+        amountOutMinimum = parseUnits(freshQuote.minimumReceived, quote.toToken.decimals);
+        console.log('[SWAP] Fresh minimum received:', freshQuote.minimumReceived);
+      } else {
+        amountOutMinimum = parseUnits(quote.minimumReceived, quote.toToken.decimals);
       }
 
+      // Step 1: Check and approve token if needed
+      const erc20Interface = new Interface(ERC20_ABI);
+      const allowanceData = erc20Interface.encodeFunctionData('allowance', [walletAddress, this.routerAddress]);
+      const allowanceResult = await this.provider.call({
+        to: tokenInAddress,
+        data: allowanceData,
+      });
+      const currentAllowance = BigInt(allowanceResult);
+
+      const calls: Array<{ to: string; value?: bigint; data?: `0x${string}` }> = [];
+
+      // Add approval call if needed
+      if (currentAllowance < amountIn) {
+        console.log('[SWAP] Adding approval call...');
+        const approveData = erc20Interface.encodeFunctionData('approve', [this.routerAddress, amountIn * 2n]);
+        calls.push({
+          to: tokenInAddress,
+          data: approveData as `0x${string}`,
+        });
+      }
+
+      // Step 2: Build swap call using UniswapV2
+      const routerInterface = new Interface(UNISWAP_V2_ROUTER_ABI);
+
+      // MEV Protection: Shorter deadline (5 min instead of 20)
+      const deadline = Math.floor(Date.now() / 1000) + MEV_CONFIG.DEADLINE_SECONDS;
+
+      // UniswapV2 uses path array for swaps
+      const path = [tokenInAddress, tokenOutAddress];
+
+      console.log('[SWAP] Executing swap via Circle Wallet with params:', {
+        from: quote.fromToken.symbol,
+        to: quote.toToken.symbol,
+        amountIn: quote.fromAmount,
+        minimumOut: quote.minimumReceived,
+        router: this.routerAddress,
+        path,
+      });
+
+      // Encode the swap call for UniswapV2
+      const swapData = routerInterface.encodeFunctionData('swapExactTokensForTokens', [
+        amountIn,
+        amountOutMinimum,
+        path,
+        walletAddress,
+        deadline,
+      ]);
+
+      calls.push({
+        to: this.routerAddress,
+        data: swapData as `0x${string}`,
+      });
+
+      // Execute via Circle Wallet (batch transaction with passkey signature)
+      let txHash: string;
+      if (calls.length === 1) {
+        // Single call (no approval needed)
+        txHash = await circleWalletService.sendTransaction({
+          to: calls[0].to,
+          data: calls[0].data,
+        });
+      } else {
+        // Batch call (approval + swap)
+        txHash = await circleWalletService.sendBatchTransactions(calls);
+      }
+
+      console.log('[SWAP] Swap successful via Circle Wallet! TxHash:', txHash);
+
+      return txHash;
+    } catch (error: any) {
+      console.error('[SWAP] Swap execution failed:', error);
+
       // Enhanced error messages
-      if (error?.message?.includes('insufficient balance')) {
+      if (error?.message?.includes('insufficient allowance')) {
+        throw new Error('Token approval failed. Please try again.');
+      } else if (error?.message?.includes('insufficient balance') || error?.message?.includes('insufficient funds')) {
         throw new Error('Insufficient token balance for swap.');
+      } else if (error?.message?.includes('Too little received')) {
+        throw new Error('Price moved unfavorably. Please try again with higher slippage.');
+      } else if (error?.message?.includes('STF')) {
+        throw new Error('Swap transaction failed. Pool may have insufficient liquidity.');
+      } else if (error?.message?.includes('INSUFFICIENT_OUTPUT_AMOUNT')) {
+        throw new Error('Insufficient liquidity in pool. Try a smaller amount.');
+      } else if (error?.message?.includes('User rejected') || error?.message?.includes('cancelled')) {
+        throw new Error('Transaction cancelled by user.');
       }
 
       throw new Error(error?.message || 'Swap failed. Please try again.');
