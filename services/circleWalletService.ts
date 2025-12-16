@@ -158,6 +158,7 @@ interface ChainClient {
   publicClient: PublicClient;
   bundlerClient: BundlerClient;
   modularTransport: ReturnType<typeof toModularTransport>;
+  account: ToCircleSmartAccountReturnType; // Chain-specific account
 }
 
 /**
@@ -634,7 +635,7 @@ class CircleWalletServiceImpl {
       return this.chainClients.get(chainId)!;
     }
 
-    if (!this.account) {
+    if (!this.account || !this.credential) {
       throw new Error('Wallet not connected');
     }
 
@@ -668,18 +669,49 @@ class CircleWalletServiceImpl {
         transport: modularTransport,
       }) as PublicClient;
 
-      // Create bundler client for this chain
+      // CRITICAL: Create a chain-specific Circle smart account
+      // The same passkey credential works across all chains, but the account
+      // must be created with the chain-specific public client
+      const webAuthnAccount = toWebAuthnAccount({
+        credential: this.credential,
+      });
+
+      const chainAccount = await toCircleSmartAccount({
+        // @ts-expect-error - viem type inference issues with Circle SDK
+        client: publicClient,
+        owner: webAuthnAccount,
+      });
+
+      logger.info('Chain-specific account created', {
+        component: 'CircleWalletService',
+        chainId,
+        accountAddress: chainAccount.address,
+        expectedAddress: this.account.address,
+      });
+
+      // Verify addresses match (counterfactual address should be the same)
+      if (chainAccount.address.toLowerCase() !== this.account.address.toLowerCase()) {
+        logger.warn('Chain account address mismatch - this should not happen', {
+          component: 'CircleWalletService',
+          chainId,
+          chainAccountAddress: chainAccount.address,
+          mainAccountAddress: this.account.address,
+        });
+      }
+
+      // Create bundler client with chain-specific account
       // @ts-ignore - viem type inference issues
       bundlerClient = createBundlerClient({
         chain: chainConfig.chain,
         transport: modularTransport,
-        account: this.account,
+        account: chainAccount,
       });
 
       const client: ChainClient = {
         publicClient,
         bundlerClient,
         modularTransport,
+        account: chainAccount,
       };
 
       // Cache for future use
@@ -738,8 +770,10 @@ class CircleWalletServiceImpl {
         data: call.data || ('0x' as `0x${string}`),
       }));
 
+      // CRITICAL: Use the chain-specific account, not this.account
+      // The chain-specific account was created with the correct chain's client
       const hash = await chainClient.bundlerClient.sendUserOperation({
-        account: this.account,
+        account: chainClient.account,
         calls: formattedCalls,
       });
 
