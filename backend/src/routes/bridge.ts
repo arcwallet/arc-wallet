@@ -345,7 +345,9 @@ export function createBridgeRoutes(db: Database, config: BridgeConfig, sessionSt
       }
 
       const { sourceTxHash, direction } = req.body;
-      const sourceDomain = direction === 'arc-to-sepolia' ? 26 : 0;
+      // For arc-to-base: source is Arc (domain 26)
+      // For base-to-arc: source is Base Sepolia (domain 6)
+      const sourceDomain = direction === 'arc-to-base' ? 26 : 6;
 
       try {
         console.log(`🌉 [BRIDGE COMPLETE] Manual claim request: ${sourceTxHash} (${direction})`);

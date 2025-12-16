@@ -105,7 +105,7 @@ app.use('/passkeys', createPasskeyRoutes(db, config, magicSessionStore));
 app.use(createBridgeRoutes(db, {
     NODE_ENV: config.NODE_ENV,
     ARC_RPC_URL: config.ARC_RPC_URL,
-    SEPOLIA_RPC_URL: config.SEPOLIA_RPC_URL,
+    BASE_SEPOLIA_RPC_URL: config.BASE_SEPOLIA_RPC_URL,
 }, magicSessionStore));
 app.use('/auth', createOAuthRouter(db, config, magicSessionStore));
 app.use('/multisig', createMultiSigRoutes(db, config, magicSessionStore));

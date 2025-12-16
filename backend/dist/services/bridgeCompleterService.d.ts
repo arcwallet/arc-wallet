@@ -16,7 +16,7 @@ export declare class BridgeCompleterService {
     private isRunning;
     private checkInterval;
     private arcWallet;
-    private sepoliaWallet;
+    private baseSepoliaWallet;
     constructor();
     /**
      * Start the bridge completer service
@@ -31,7 +31,7 @@ export declare class BridgeCompleterService {
      */
     registerBridge(params: {
         sourceTxHash: string;
-        direction: 'arc-to-sepolia' | 'sepolia-to-arc';
+        direction: 'arc-to-base' | 'base-to-arc';
         recipientAddress: string;
         amount: string;
     }): void;

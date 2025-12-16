@@ -4,7 +4,7 @@ import { MagicSessionStore } from '../magicLink/SessionStore.js';
 export interface BridgeConfig {
     NODE_ENV: string;
     ARC_RPC_URL: string;
-    SEPOLIA_RPC_URL: string;
+    BASE_SEPOLIA_RPC_URL: string;
 }
 /**
  * Bridge Routes

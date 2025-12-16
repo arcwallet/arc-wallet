@@ -253,6 +253,6 @@ export interface EnvConfig {
     MAGIC_LINK_BASE_URL?: string;
     COOKIE_DOMAIN?: string;
     ARC_RPC_URL: string;
-    SEPOLIA_RPC_URL: string;
+    BASE_SEPOLIA_RPC_URL: string;
 }
 //# sourceMappingURL=index.d.ts.map

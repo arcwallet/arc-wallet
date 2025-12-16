@@ -487,7 +487,10 @@ const Bridge: React.FC = () => {
               <div className="flex items-center justify-between">
                 <span className="text-xs text-slate-500">Source (Burn):</span>
                 <a
-                  href={`https://testnet.arcscan.app/tx/${sourceTxHash}`}
+                  href={direction === 'arc-to-base'
+                    ? `https://testnet.arcscan.app/tx/${sourceTxHash}`
+                    : `https://sepolia.basescan.org/tx/${sourceTxHash}`
+                  }
                   target="_blank"
                   rel="noreferrer"
                   className="text-xs text-blue-400 hover:text-blue-300 font-mono"
