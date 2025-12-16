@@ -126,7 +126,23 @@ const SwapScreen: React.FC<SwapScreenProps> = ({ initialFromToken, initialToToke
 
     return (
         <div className="max-w-md mx-auto mt-8">
-            <h2 className="text-2xl font-bold text-white mb-6">Stablecoin FX</h2>
+            <div className="mb-6">
+                <h2 className="text-2xl font-bold text-white">Stablecoin FX</h2>
+                <p className="text-slate-400 text-sm mt-2">
+                    Powered by <span className="text-blue-400 font-medium">StableFX</span> — Circle's decentralized FX protocol with atomic PvP settlement on Arc.
+                </p>
+                <a
+                    href="https://6778953.fs1.hubspotusercontent-na1.net/hubfs/6778953/StableFX-Litepaper_2025.pdf"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300 mt-2 transition-colors"
+                >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    StableFX Litepaper (PDF)
+                </a>
+            </div>
 
             <div className="bg-slate-900/60 backdrop-blur-sm p-6 rounded-xl border border-slate-500/50 relative shadow-xl">
                 {/* From Token */}
@@ -243,6 +259,52 @@ const SwapScreen: React.FC<SwapScreenProps> = ({ initialFromToken, initialToToke
                     <p className="text-xs mt-1 opacity-80">Tx: {txHash.slice(0, 10)}...</p>
                 </div>
             )}
+
+            {/* Protocol Info */}
+            <div className="mt-6 p-4 bg-slate-900/40 border border-slate-500/20 rounded-xl">
+                <div className="flex items-center gap-2 mb-3">
+                    <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+                    <span className="text-xs text-slate-400">Arc Testnet • 24/7 Settlement</span>
+                </div>
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                    <div className="bg-slate-800/50 rounded-lg p-2.5">
+                        <p className="text-slate-500 mb-1">Supported Pairs</p>
+                        <p className="text-slate-300 font-medium">USDC ↔ EURC ↔ USYC</p>
+                    </div>
+                    <div className="bg-slate-800/50 rounded-lg p-2.5">
+                        <p className="text-slate-500 mb-1">Settlement</p>
+                        <p className="text-slate-300 font-medium">Atomic PvP</p>
+                    </div>
+                </div>
+                <div className="flex items-center justify-center gap-4 mt-3 pt-3 border-t border-slate-700/50">
+                    <a
+                        href="https://developers.circle.com/stablefx"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs text-slate-500 hover:text-blue-400 transition-colors"
+                    >
+                        Circle Docs
+                    </a>
+                    <span className="text-slate-700">•</span>
+                    <a
+                        href="https://docs.arc.network"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs text-slate-500 hover:text-blue-400 transition-colors"
+                    >
+                        Arc Docs
+                    </a>
+                    <span className="text-slate-700">•</span>
+                    <a
+                        href="https://testnet.arcscan.app"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs text-slate-500 hover:text-blue-400 transition-colors"
+                    >
+                        Explorer
+                    </a>
+                </div>
+            </div>
         </div>
     );
 };
