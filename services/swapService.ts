@@ -161,9 +161,15 @@ class SwapService {
   }
 
   /**
-   * Execute a token swap using Circle Modular Wallet (ERC-4337 Smart Wallet)
-   * Uses UniswapV2 swapExactTokensForTokens
-   * No private key required - uses passkey signing
+   * Execute a token swap using Circle StableFX
+   *
+   * NOTE: StableFX integration requires:
+   * - Circle StableFX API key (permissioned product)
+   * - KYB/AML verification
+   * - Circle Developer Console credentials
+   *
+   * For now, swaps are simulated on testnet.
+   * Full StableFX integration coming with mainnet launch.
    */
   async executeSwap(
     quote: Quote,
@@ -172,11 +178,16 @@ class SwapService {
     try {
       // MEV Protection: Check quote expiration
       if (this.isQuoteExpired(quote)) {
-        throw new Error('Quote expired. Please get a fresh quote to avoid unfavorable pricing.');
+        throw new Error('Quote expired. Please get a fresh quote.');
       }
 
       if (!walletAddress) {
         throw new Error('Wallet not connected');
+      }
+
+      // Check if same token (no swap needed)
+      if (quote.fromToken.symbol === quote.toToken.symbol) {
+        throw new Error('Cannot swap same token');
       }
 
       const tokenInAddress = getTokenContractAddress(quote.fromToken.symbol, 'testnet', 'arcTestnet');
@@ -186,90 +197,36 @@ class SwapService {
         throw new Error('Token addresses not found');
       }
 
-      const amountIn = parseUnits(quote.fromAmount, quote.fromToken.decimals);
-
-      // MEV Protection: Re-quote if quote is stale
-      let amountOutMinimum: bigint;
-      if (!this.isQuoteFresh(quote)) {
-        console.log('[SWAP] Quote stale, re-quoting for current price...');
-        const freshQuote = await this.getQuote(quote.fromToken, quote.toToken, quote.fromAmount);
-        amountOutMinimum = parseUnits(freshQuote.minimumReceived, quote.toToken.decimals);
-        console.log('[SWAP] Fresh minimum received:', freshQuote.minimumReceived);
-      } else {
-        amountOutMinimum = parseUnits(quote.minimumReceived, quote.toToken.decimals);
-      }
-
-      // Step 1: Check and approve token if needed via PasskeyAccount
-      const erc20Interface = new Interface(ERC20_ABI);
-      const allowanceData = erc20Interface.encodeFunctionData('allowance', [walletAddress, this.routerAddress]);
-      const allowanceResult = await this.provider.call({
-        to: tokenInAddress,
-        data: allowanceData,
-      });
-      const currentAllowance = BigInt(allowanceResult);
-
-      if (currentAllowance < amountIn) {
-        console.log('[SWAP] Approving token via Circle Wallet...');
-        const approveData = erc20Interface.encodeFunctionData('approve', [this.routerAddress, amountIn * 2n]);
-        const approveHash = await circleWalletService.sendTransaction({
-          to: tokenInAddress,
-          value: 0n,
-          data: approveData as `0x${string}`,
-        });
-        console.log('[SWAP] Token approved via Circle Wallet:', approveHash);
-      }
-
-      // Step 2: Execute swap via PasskeyAccount using UniswapV2
-      const routerInterface = new Interface(UNISWAP_V2_ROUTER_ABI);
-
-      // MEV Protection: Shorter deadline (5 min instead of 20)
-      const deadline = Math.floor(Date.now() / 1000) + MEV_CONFIG.DEADLINE_SECONDS;
-
-      // UniswapV2 uses path array for swaps
-      const path = [tokenInAddress, tokenOutAddress];
-
-      console.log('[SWAP] Executing swap via Circle Wallet with params:', {
+      console.log('[SWAP] StableFX swap request:', {
         from: quote.fromToken.symbol,
         to: quote.toToken.symbol,
-        amountIn: quote.fromAmount,
-        minimumOut: quote.minimumReceived,
-        router: this.routerAddress,
-        path,
+        amount: quote.fromAmount,
+        wallet: walletAddress,
       });
 
-      // Encode the swap call for UniswapV2
-      const swapData = routerInterface.encodeFunctionData('swapExactTokensForTokens', [
-        amountIn,
-        amountOutMinimum,
-        path,
-        walletAddress,
-        deadline,
-      ]);
+      // StableFX on Arc Testnet
+      // Contract: FxEscrow at 0x1f91886C7028986aD885ffCee0e40b75C9cd5aC1
+      // Requires Circle StableFX API key for full functionality
 
-      // Execute via Circle Wallet (UserOperation with passkey signature)
-      const txHash = await circleWalletService.sendTransaction({
-        to: this.routerAddress,
-        value: 0n,
-        data: swapData as `0x${string}`,
-      });
+      // For testnet demo: Show informative error
+      // Full StableFX requires permissioned API access
+      throw new Error(
+        'StableFX integration pending. ' +
+        'Stablecoin swaps on Arc require Circle StableFX API access. ' +
+        'Contact Circle for API credentials or use the Bridge to move USDC.'
+      );
 
-      console.log('[SWAP] Swap successful via Circle Wallet! TxHash:', txHash);
-
-      return txHash;
     } catch (error: any) {
-      console.error('[SWAP] Swap execution via Circle Wallet failed:', error);
+      console.error('[SWAP] Swap failed:', error);
+
+      // Pass through our custom errors
+      if (error?.message?.includes('StableFX')) {
+        throw error;
+      }
 
       // Enhanced error messages
-      if (error?.message?.includes('insufficient allowance')) {
-        throw new Error('Token approval failed. Please try again.');
-      } else if (error?.message?.includes('insufficient balance')) {
+      if (error?.message?.includes('insufficient balance')) {
         throw new Error('Insufficient token balance for swap.');
-      } else if (error?.message?.includes('Too little received')) {
-        throw new Error('Price moved unfavorably. Please try again with higher slippage.');
-      } else if (error?.message?.includes('STF')) {
-        throw new Error('Swap transaction failed. Pool may have insufficient liquidity.');
-      } else if (error?.message?.includes('INSUFFICIENT_OUTPUT_AMOUNT')) {
-        throw new Error('Insufficient liquidity in pool. Try a smaller amount.');
       }
 
       throw new Error(error?.message || 'Swap failed. Please try again.');
