@@ -205,9 +205,30 @@ export const CCTP_FEES = {
   standardTransferFee: 50000n, // 0.05 USDC in 6 decimals
   // Fast transfer: higher fee for faster finality
   fastTransferFee: 100000n, // 0.10 USDC in 6 decimals
-  // Max fee we're willing to pay (for safety)
-  maxFee: 1000000n, // 1 USDC max
+  // Max fee cap (for safety) - but actual maxFee must be < amount
+  maxFeeCap: 500000n, // 0.5 USDC cap
+  // Minimum bridge amount (must be > maxFee)
+  minBridgeAmount: 1000000n, // 1 USDC minimum
 } as const;
+
+/**
+ * Calculate maxFee for CCTP bridge
+ * CCTP V2 Rule: maxFee MUST be less than amount
+ * @param amountRaw - Amount in smallest units (6 decimals for USDC)
+ * @returns maxFee that is guaranteed to be less than amount
+ */
+export function calculateMaxFee(amountRaw: bigint): bigint {
+  // Use 10% of amount or maxFeeCap, whichever is smaller
+  const tenPercent = amountRaw / 10n;
+  const fee = tenPercent < CCTP_FEES.maxFeeCap ? tenPercent : CCTP_FEES.maxFeeCap;
+
+  // Ensure fee is less than amount (leave at least 1 unit)
+  if (fee >= amountRaw) {
+    return amountRaw - 1n;
+  }
+
+  return fee;
+}
 
 // CCTP V2 Finality Thresholds
 // See: https://developers.circle.com/cctp/technical-guide

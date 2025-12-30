@@ -195,6 +195,11 @@ class CircleWalletServiceImpl {
   // Multi-chain support: chain-specific clients
   private chainClients: Map<number, ChainClient> = new Map();
 
+  // Security: Track if passkey was used for authentication
+  // silentReconnect = true (needs passkey for transactions)
+  // login() = false (passkey already verified)
+  private needsPasskeyForTransactions: boolean = true;
+
   /**
    * Initialize the service with Circle SDK transports
    */
@@ -347,6 +352,9 @@ class CircleWalletServiceImpl {
       // Store session info in localStorage for reconnection
       this.saveSessionToStorage();
 
+      // Passkey was used - no need for re-auth on transactions
+      this.needsPasskeyForTransactions = false;
+
       return { address: this.account.address };
     } catch (err: any) {
       logger.error('Failed to create wallet', {
@@ -405,6 +413,9 @@ class CircleWalletServiceImpl {
       // Store session for future reconnection
       this.saveSessionToStorage();
 
+      // Passkey was used - no need for re-auth on transactions
+      this.needsPasskeyForTransactions = false;
+
       logger.info('Login successful', {
         component: 'CircleWalletService',
         address: this.account.address,
@@ -428,9 +439,37 @@ class CircleWalletServiceImpl {
     this.bundlerClient = null;
     this.credential = null;
     this.username = null;
+    this.needsPasskeyForTransactions = true;
     this.clearSessionFromStorage();
 
     logger.info('Wallet disconnected', {
+      component: 'CircleWalletService',
+    });
+  }
+
+  /**
+   * Ensure passkey is authenticated before transactions
+   * Called automatically before any send operation
+   * If user connected via silentReconnect, this will prompt for passkey
+   */
+  private async ensurePasskeyAuthenticated(): Promise<void> {
+    if (!this.needsPasskeyForTransactions) {
+      // Already authenticated with passkey in this session
+      return;
+    }
+
+    if (!this.account) {
+      throw new Error('Wallet not connected');
+    }
+
+    logger.info('Transaction requires passkey authentication', {
+      component: 'CircleWalletService',
+    });
+
+    // Force passkey re-authentication by calling login
+    await this.login();
+
+    logger.info('Passkey authenticated for transaction', {
       component: 'CircleWalletService',
     });
   }
@@ -443,6 +482,9 @@ class CircleWalletServiceImpl {
     if (!this.bundlerClient || !this.account) {
       throw new Error('Wallet not connected');
     }
+
+    // Require passkey authentication before transaction
+    await this.ensurePasskeyAuthenticated();
 
     logger.info('Sending transaction', {
       component: 'CircleWalletService',
@@ -513,6 +555,9 @@ class CircleWalletServiceImpl {
     if (!this.bundlerClient || !this.account) {
       throw new Error('Wallet not connected');
     }
+
+    // Require passkey authentication before transaction
+    await this.ensurePasskeyAuthenticated();
 
     // Validate amount format
     let amount: bigint;
@@ -599,6 +644,9 @@ class CircleWalletServiceImpl {
     if (!this.bundlerClient || !this.account) {
       throw new Error('Wallet not connected');
     }
+
+    // Require passkey authentication before transaction
+    await this.ensurePasskeyAuthenticated();
 
     logger.info('Sending batch transaction', {
       component: 'CircleWalletService',
@@ -767,8 +815,13 @@ class CircleWalletServiceImpl {
       throw new Error('Wallet not connected');
     }
 
-    // For Arc Testnet, use the default bundler
+    // Require passkey authentication before transaction
+    await this.ensurePasskeyAuthenticated();
+
+    // For Arc Testnet, use the default bundler (passkey already verified above)
     if (chainId === 5042002) {
+      // Skip ensurePasskeyAuthenticated in sendBatchTransactions since we just did it
+      this.needsPasskeyForTransactions = false;
       return this.sendBatchTransactions(calls);
     }
 
@@ -1196,6 +1249,10 @@ class CircleWalletServiceImpl {
         component: 'CircleWalletService',
         address: this.account.address,
       });
+
+      // IMPORTANT: silentReconnect does NOT authenticate for transactions
+      // User must use passkey before any send/bridge operation
+      this.needsPasskeyForTransactions = true;
 
       // Update session timestamp (extends the window)
       this.refreshSessionTimestamp();

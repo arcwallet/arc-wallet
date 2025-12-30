@@ -25,6 +25,7 @@ import {
   addressToBytes32,
   getChainConfig,
   getDestinationChains,
+  calculateMaxFee,
   type BridgeChainConfig,
 } from '../config/cctp';
 import { logger } from './logger';
@@ -262,7 +263,7 @@ class BridgeServiceImpl {
           mintRecipientBytes32,
           sourceChain.usdc,
           destinationCaller,
-          CCTP_FEES.maxFee, // Max fee we're willing to pay
+          calculateMaxFee(amountRaw), // Dynamic fee: min(10% of amount, 0.5 USDC cap), always < amount
           minFinalityThreshold, // Standard (2000) for Arc, Fast (1000) for others
         ],
       });
@@ -405,7 +406,7 @@ class BridgeServiceImpl {
           mintRecipientBytes32,
           sourceChain.usdc,
           destinationCaller,
-          CCTP_FEES.maxFee,
+          calculateMaxFee(amountRaw), // Dynamic fee: min(10% of amount, 0.5 USDC cap), always < amount
           minFinalityThreshold, // Fast (1000) for Base Sepolia
         ],
       });
