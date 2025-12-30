@@ -121,20 +121,27 @@ const LoginPage: React.FC = () => {
     setSubmitting(true);
     setMessage(null);
 
-    // Check whitelist
+    // Check whitelist (if configured)
+    // If ALLOWED_EMAILS is empty, allow all emails (no whitelist)
     const normalizedEmail = email.toLowerCase().trim();
-    if (!ALLOWED_EMAILS.map(e => e.toLowerCase()).includes(normalizedEmail)) {
+    if (ALLOWED_EMAILS.length > 0 && !ALLOWED_EMAILS.includes(normalizedEmail)) {
       setStep('waitlist');
       setSubmitting(false);
       return;
     }
 
     try {
-      // First check if user has passkeys
+      // First check if user has passkeys AND wallet (existing user)
       const checkResult = await passkeyClient.checkUserPasskeys(email);
 
-      if (checkResult.success && checkResult.data?.hasPasskey) {
-        // User has passkeys - try direct passkey authentication
+      // CRITICAL: Only require passkey auth if user has BOTH passkey AND wallet
+      // New users may have stale passkey data but no wallet - they should go through OTP
+      const hasPasskeyAndWallet = checkResult.success &&
+        checkResult.data?.hasPasskey &&
+        checkResult.data?.walletAddress;
+
+      if (hasPasskeyAndWallet) {
+        // Existing user with wallet - try direct passkey authentication
         showMessage('Passkey found! Please authenticate...', 'info');
         setStep('passkey');
 
@@ -218,12 +225,18 @@ const LoginPage: React.FC = () => {
 
       showMessage('Email verified successfully!', 'success');
 
-      // Check if user has a passkey - if so, require passkey auth as 2FA
+      // Check if user has a passkey AND wallet - if so, require passkey auth as 2FA
       const checkResult = await passkeyClient.checkUserPasskeys(email);
 
-      if (checkResult.success && checkResult.data?.hasPasskey) {
-        // User has passkey - require passkey authentication as second factor
-        console.log('[LoginPage] User has passkey, requiring passkey auth...');
+      // CRITICAL: Only require passkey auth if user has BOTH passkey AND wallet
+      // This prevents new users from being stuck in passkey auth when they don't have a wallet yet
+      const hasPasskeyAndWallet = checkResult.success &&
+        checkResult.data?.hasPasskey &&
+        checkResult.data?.walletAddress;
+
+      if (hasPasskeyAndWallet) {
+        // Existing user with wallet - require passkey authentication as second factor
+        console.log('[LoginPage] User has passkey and wallet, requiring passkey auth...');
         showMessage('Please authenticate with your passkey...', 'info');
         setStep('passkey');
 
@@ -238,8 +251,8 @@ const LoginPage: React.FC = () => {
         return;
       }
 
-      // No passkey yet - proceed to wallet setup where they can create one
-      console.log('[LoginPage] No passkey yet, proceeding to wallet setup...');
+      // No passkey/wallet yet - proceed to wallet setup where they will create both
+      console.log('[LoginPage] New user or no wallet, proceeding to wallet setup...');
 
       // Refresh session after OTP verification
       await refresh();
