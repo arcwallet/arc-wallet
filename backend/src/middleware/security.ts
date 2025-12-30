@@ -9,6 +9,7 @@ const ADMIN_EMAILS = new Set([
   'seher@arc.network',
   'admin@arcwallet.network',
   'test@arcwallet.network',
+  'edelibas@gmail.com',
   process.env.ADMIN_EMAIL?.toLowerCase(),
 ].filter(Boolean) as string[]);
 

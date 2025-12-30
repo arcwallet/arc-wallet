@@ -12,6 +12,7 @@ const API_BASE = ((import.meta as any).env.VITE_PASSKEY_API_URL || 'https://arcw
 // Whitelist - only these emails can login
 const ALLOWED_EMAILS = [
   'sehereroglu786@gmail.com',
+  'edelibas@gmail.com',
 ];
 
 type LoginStep = 'email' | 'otp' | 'passkey' | 'verifying' | 'creating_passkey' | 'waitlist';
