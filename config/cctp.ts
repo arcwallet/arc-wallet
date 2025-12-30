@@ -209,6 +209,17 @@ export const CCTP_FEES = {
   maxFee: 1000000n, // 1 USDC max
 } as const;
 
+// CCTP V2 Finality Thresholds
+// See: https://developers.circle.com/cctp/technical-guide
+export const CCTP_FINALITY = {
+  // Fast Transfer: confirmed level attestation (faster, higher fee)
+  // Use for chains that support fast transfer
+  FAST: 1000,
+  // Standard Transfer: finalized level attestation (slower, lower fee)
+  // Use for chains that only support standard transfer (like Arc)
+  STANDARD: 2000,
+} as const;
+
 export default {
   CCTP_DOMAINS,
   CCTP_CONTRACTS,

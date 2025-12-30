@@ -68,6 +68,19 @@ const DEFAULT_TIMEOUT = 60000; // 60 seconds
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 2000; // 2 seconds
 
+// Session Configuration
+const SESSION_CONFIG = {
+  // Session duration: 1 day
+  maxAgeDays: 1,
+  maxAgeMs: 1 * 24 * 60 * 60 * 1000, // 1 day in milliseconds
+
+  // Storage key
+  storageKey: 'arc_wallet_session',
+
+  // Auto-reconnect on page load
+  autoReconnect: true,
+} as const;
+
 /**
  * Utility: Timeout wrapper for promises
  */
@@ -941,11 +954,13 @@ class CircleWalletServiceImpl {
         address: this.account?.address,
         timestamp: Date.now(),
         hasWallet: true,
+        version: 2, // Session format version for future migrations
       };
-      localStorage.setItem('circle_wallet_state', JSON.stringify(data));
+      localStorage.setItem(SESSION_CONFIG.storageKey, JSON.stringify(data));
       logger.info('Session saved to storage', {
         component: 'CircleWalletService',
         address: this.account?.address,
+        expiresIn: `${SESSION_CONFIG.maxAgeDays} days`,
       });
     } catch (e) {
       logger.error('Failed to save session to storage', {
@@ -959,12 +974,24 @@ class CircleWalletServiceImpl {
     if (typeof window === 'undefined') return null;
 
     try {
-      const stored = localStorage.getItem('circle_wallet_state');
+      // Try new storage key first, then fallback to old key for migration
+      let stored = localStorage.getItem(SESSION_CONFIG.storageKey);
+
+      // Migration: check old storage key
+      if (!stored) {
+        stored = localStorage.getItem('circle_wallet_state');
+        if (stored) {
+          // Migrate to new key
+          localStorage.setItem(SESSION_CONFIG.storageKey, stored);
+          localStorage.removeItem('circle_wallet_state');
+          logger.info('Migrated session from old storage key', { component: 'CircleWalletService' });
+        }
+      }
+
       if (stored) {
         const data = JSON.parse(stored);
-        // Check if session is not too old (10 minutes)
-        const maxAge = 10 * 60 * 1000; // 10 minutes
-        if (data.timestamp && Date.now() - data.timestamp < maxAge) {
+        // Check if session is not too old (7 days)
+        if (data.timestamp && Date.now() - data.timestamp < SESSION_CONFIG.maxAgeMs) {
           return {
             username: data.username || null,
             address: data.address || null,
@@ -972,6 +999,10 @@ class CircleWalletServiceImpl {
           };
         }
         // Session expired, clear it
+        logger.info('Session expired, clearing', {
+          component: 'CircleWalletService',
+          age: Math.round((Date.now() - data.timestamp) / (1000 * 60 * 60 * 24)) + ' days',
+        });
         this.clearSessionFromStorage();
       }
     } catch (e) {
@@ -984,22 +1015,23 @@ class CircleWalletServiceImpl {
     if (typeof window === 'undefined') return;
 
     try {
-      localStorage.removeItem('circle_wallet_state');
+      localStorage.removeItem(SESSION_CONFIG.storageKey);
+      localStorage.removeItem('circle_wallet_state'); // Also clear old key
     } catch (e) {
       // Ignore storage errors
     }
   }
 
-  // Refresh session timestamp to extend the 10-minute window
+  // Refresh session timestamp to extend the session window
   private refreshSessionTimestamp(): void {
     if (typeof window === 'undefined' || !this.account) return;
 
     try {
-      const stored = localStorage.getItem('circle_wallet_state');
+      const stored = localStorage.getItem(SESSION_CONFIG.storageKey);
       if (stored) {
         const data = JSON.parse(stored);
         data.timestamp = Date.now();
-        localStorage.setItem('circle_wallet_state', JSON.stringify(data));
+        localStorage.setItem(SESSION_CONFIG.storageKey, JSON.stringify(data));
       }
     } catch (e) {
       // Ignore storage errors

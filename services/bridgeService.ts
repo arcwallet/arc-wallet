@@ -18,6 +18,7 @@ import {
   BRIDGE_CHAINS,
   CCTP_ATTESTATION,
   CCTP_FEES,
+  CCTP_FINALITY,
   TOKEN_MESSENGER_ABI,
   MESSAGE_TRANSMITTER_ABI,
   ERC20_ABI,
@@ -246,6 +247,12 @@ class BridgeServiceImpl {
       // destinationCaller = 0x0 allows anyone to call receiveMessage
       const destinationCaller = '0x0000000000000000000000000000000000000000000000000000000000000000' as Hex;
 
+      // Determine finality threshold based on source chain support
+      // Arc Testnet only supports Standard Transfer (finalized attestation)
+      const minFinalityThreshold = sourceChain.supportsFastTransfer
+        ? CCTP_FINALITY.FAST
+        : CCTP_FINALITY.STANDARD;
+
       const depositData = encodeFunctionData({
         abi: TOKEN_MESSENGER_ABI,
         functionName: 'depositForBurn',
@@ -256,7 +263,7 @@ class BridgeServiceImpl {
           sourceChain.usdc,
           destinationCaller,
           CCTP_FEES.maxFee, // Max fee we're willing to pay
-          0, // minFinalityThreshold (0 for standard)
+          minFinalityThreshold, // Standard (2000) for Arc, Fast (1000) for others
         ],
       });
       calls.push({
@@ -383,6 +390,12 @@ class BridgeServiceImpl {
       const mintRecipientBytes32 = addressToBytes32(mintRecipient);
       const destinationCaller = '0x0000000000000000000000000000000000000000000000000000000000000000' as Hex;
 
+      // Determine finality threshold based on source chain support
+      // Base Sepolia supports Fast Transfer, Arc only supports Standard
+      const minFinalityThreshold = sourceChain.supportsFastTransfer
+        ? CCTP_FINALITY.FAST
+        : CCTP_FINALITY.STANDARD;
+
       const depositData = encodeFunctionData({
         abi: TOKEN_MESSENGER_ABI,
         functionName: 'depositForBurn',
@@ -393,7 +406,7 @@ class BridgeServiceImpl {
           sourceChain.usdc,
           destinationCaller,
           CCTP_FEES.maxFee,
-          0, // minFinalityThreshold
+          minFinalityThreshold, // Fast (1000) for Base Sepolia
         ],
       });
       calls.push({

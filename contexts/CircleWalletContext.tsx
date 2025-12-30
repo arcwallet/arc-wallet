@@ -151,6 +151,7 @@ export const CircleWalletProvider: React.FC<CircleWalletProviderProps> = ({ chil
   }, [isConnected, isReconnecting, refreshState, refreshBalance]);
 
   // Initialize and check for stored session on mount
+  // Automatically try to reconnect if there's a valid session
   useEffect(() => {
     refreshState();
 
@@ -161,8 +162,28 @@ export const CircleWalletProvider: React.FC<CircleWalletProviderProps> = ({ chil
       // Pre-fill address from stored session (before reconnect)
       setAddress(storedSession.address);
       setUsername(storedSession.username);
+
+      // Automatically try to reconnect with passkey
+      // This will prompt for biometric/passkey verification
+      logger.info('Found stored session, attempting auto-reconnect', {
+        component: 'CircleWalletContext',
+        address: storedSession.address,
+      });
+
+      // Small delay to ensure UI is ready
+      const timer = setTimeout(() => {
+        tryReconnect().then((success) => {
+          if (!success) {
+            logger.info('Auto-reconnect failed, user needs to login manually', {
+              component: 'CircleWalletContext',
+            });
+          }
+        });
+      }, 500);
+
+      return () => clearTimeout(timer);
     }
-  }, [refreshState]);
+  }, []); // Only run once on mount - don't include refreshState in deps
 
   // Auto-refresh balance when connected
   useEffect(() => {
