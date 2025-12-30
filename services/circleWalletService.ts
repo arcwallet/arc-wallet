@@ -70,9 +70,13 @@ const RETRY_DELAY = 2000; // 2 seconds
 
 // Session Configuration
 const SESSION_CONFIG = {
-  // Session duration: 1 day
+  // Session duration: 1 day (for address/username storage)
   maxAgeDays: 1,
   maxAgeMs: 1 * 24 * 60 * 60 * 1000, // 1 day in milliseconds
+
+  // Passkey re-authentication threshold: 15 minutes
+  // Within this window, user won't be prompted for passkey on page refresh
+  passkeyReauthMs: 15 * 60 * 1000, // 15 minutes in milliseconds
 
   // Storage key
   storageKey: 'arc_wallet_session',
@@ -949,18 +953,26 @@ class CircleWalletServiceImpl {
     if (typeof window === 'undefined') return;
 
     try {
+      const now = Date.now();
       const data = {
         username: this.username,
         address: this.account?.address,
-        timestamp: Date.now(),
+        timestamp: now,
         hasWallet: true,
-        version: 2, // Session format version for future migrations
+        version: 3, // Session format version for future migrations
+        // Passkey session: store credential for silent reconnect within 15 min
+        lastPasskeyAuth: now,
+        credential: this.credential ? {
+          id: this.credential.id,
+          publicKey: this.credential.publicKey,
+        } : null,
       };
       localStorage.setItem(SESSION_CONFIG.storageKey, JSON.stringify(data));
       logger.info('Session saved to storage', {
         component: 'CircleWalletService',
         address: this.account?.address,
         expiresIn: `${SESSION_CONFIG.maxAgeDays} days`,
+        passkeyValidFor: '15 minutes',
       });
     } catch (e) {
       logger.error('Failed to save session to storage', {
@@ -970,7 +982,13 @@ class CircleWalletServiceImpl {
     }
   }
 
-  private loadSessionFromStorage(): { username: string | null; address: string | null; hasWallet: boolean } | null {
+  private loadSessionFromStorage(): {
+    username: string | null;
+    address: string | null;
+    hasWallet: boolean;
+    canSilentReconnect: boolean;
+    credential: { id: string; publicKey: string } | null;
+  } | null {
     if (typeof window === 'undefined') return null;
 
     try {
@@ -990,18 +1008,34 @@ class CircleWalletServiceImpl {
 
       if (stored) {
         const data = JSON.parse(stored);
-        // Check if session is not too old (7 days)
-        if (data.timestamp && Date.now() - data.timestamp < SESSION_CONFIG.maxAgeMs) {
+        const now = Date.now();
+
+        // Check if session is not too old (1 day)
+        if (data.timestamp && now - data.timestamp < SESSION_CONFIG.maxAgeMs) {
+          // Check if within 15-minute passkey window (silent reconnect possible)
+          const lastPasskeyAuth = data.lastPasskeyAuth || 0;
+          const timeSincePasskey = now - lastPasskeyAuth;
+          const canSilentReconnect = timeSincePasskey < SESSION_CONFIG.passkeyReauthMs && !!data.credential;
+
+          logger.info('Session loaded', {
+            component: 'CircleWalletService',
+            canSilentReconnect,
+            timeSincePasskey: Math.round(timeSincePasskey / 1000) + 's',
+            hasCredential: !!data.credential,
+          });
+
           return {
             username: data.username || null,
             address: data.address || null,
             hasWallet: data.hasWallet || false,
+            canSilentReconnect,
+            credential: data.credential || null,
           };
         }
         // Session expired, clear it
         logger.info('Session expired, clearing', {
           component: 'CircleWalletService',
-          age: Math.round((Date.now() - data.timestamp) / (1000 * 60 * 60 * 24)) + ' days',
+          age: Math.round((now - data.timestamp) / (1000 * 60 * 60 * 24)) + ' days',
         });
         this.clearSessionFromStorage();
       }
@@ -1063,6 +1097,10 @@ class CircleWalletServiceImpl {
   /**
    * Try to auto-reconnect using stored session
    * Returns true if reconnection was successful
+   *
+   * Two modes:
+   * 1. Silent reconnect (within 15 min): Uses stored credential, no passkey prompt
+   * 2. Normal reconnect (after 15 min): Requires passkey authentication
    */
   async tryAutoReconnect(): Promise<boolean> {
     const session = this.loadSessionFromStorage();
@@ -1071,9 +1109,21 @@ class CircleWalletServiceImpl {
     }
 
     try {
-      logger.info('Attempting auto-reconnect', {
+      // Check if we can do silent reconnect (within 15-minute window)
+      if (session.canSilentReconnect && session.credential) {
+        logger.info('Attempting silent reconnect (within 15-min window)', {
+          component: 'CircleWalletService',
+          storedAddress: session.address,
+        });
+
+        return await this.silentReconnect(session.credential, session.username);
+      }
+
+      // Otherwise, require full passkey authentication
+      logger.info('Attempting auto-reconnect with passkey', {
         component: 'CircleWalletService',
         storedAddress: session.address,
+        reason: 'Outside 15-min window or no stored credential',
       });
 
       await this.login();
@@ -1095,6 +1145,69 @@ class CircleWalletServiceImpl {
         errorMsg: err.message,
       });
       // Don't clear session - user might want to try again
+      return false;
+    }
+  }
+
+  /**
+   * Silent reconnect using stored credential (no passkey prompt)
+   * Only works within 15-minute window after last passkey auth
+   */
+  private async silentReconnect(
+    storedCredential: { id: string; publicKey: string },
+    username: string | null
+  ): Promise<boolean> {
+    await this.initialize();
+
+    if (!this.publicClient) {
+      throw new Error('Service not initialized');
+    }
+
+    try {
+      // Reconstruct credential from stored data
+      this.credential = {
+        id: storedCredential.id,
+        publicKey: storedCredential.publicKey as `0x${string}`,
+      } as WebAuthnCredential;
+
+      // Create WebAuthn account from stored credential
+      const webAuthnAccount = toWebAuthnAccount({
+        credential: this.credential,
+      });
+
+      // Recreate Circle Smart Account
+      this.account = await toCircleSmartAccount({
+        // @ts-expect-error - viem type inference issues with Circle SDK
+        client: this.publicClient,
+        owner: webAuthnAccount,
+      });
+
+      this.username = username;
+
+      // Initialize bundler client
+      // @ts-ignore - viem type inference issues with custom chains
+      this.bundlerClient = createBundlerClient({
+        chain: arcTestnet,
+        transport: this.modularTransport!,
+        account: this.account,
+      });
+
+      logger.info('Silent reconnect successful (no passkey prompt)', {
+        component: 'CircleWalletService',
+        address: this.account.address,
+      });
+
+      // Update session timestamp (extends the window)
+      this.refreshSessionTimestamp();
+
+      return true;
+    } catch (err: any) {
+      logger.warn('Silent reconnect failed, will require passkey', {
+        component: 'CircleWalletService',
+        errorMsg: err.message,
+      });
+      // Clear stored credential since it's invalid
+      this.credential = null;
       return false;
     }
   }
