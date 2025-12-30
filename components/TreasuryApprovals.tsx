@@ -6,7 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import { treasuryMultiSigService, TreasuryTransaction, TreasurySignature } from '../services/treasuryMultiSigService';
 import { UserRole } from '../services/treasuryPolicyService';
-import { SpinnerIcon, VerifiedIcon } from './Icons';
+import { SpinnerIcon } from './Icons';
 
 // Icons
 const ClockIcon = ({ size = 20, className = '' }: { size?: number; className?: string }) => (
@@ -105,64 +105,62 @@ const ApprovalCard: React.FC<ApprovalCardProps> = ({
   const isExpired = new Date() > transaction.expiresAt;
 
   return (
-    <div className="bg-[#151A22] border border-slate-500/50 rounded-xl p-4">
+    <div className="bg-[#0D1321] border border-white/[0.06] rounded-xl p-4">
       {/* Header */}
       <div className="flex items-start justify-between mb-3">
         <div>
           <div className="flex items-center gap-2">
-            <span className={`px-2 py-0.5 rounded text-xs font-semibold ${
-              transaction.operationType === 'subscribe'
-                ? 'bg-green-500/20 text-green-400'
-                : 'bg-blue-500/20 text-blue-400'
-            }`}>
+            <span className="px-2.5 py-0.5 rounded-md text-xs font-medium bg-[#1F2937] text-[#E5E7EB] border border-white/[0.06]">
               {getOperationLabel(transaction.operationType)}
             </span>
             {isExpired && (
-              <span className="px-2 py-0.5 rounded text-xs font-semibold bg-red-500/20 text-red-400">
+              <span className="px-2 py-0.5 rounded text-xs font-medium bg-[#1F2937]/50 text-[#F87171] border border-[#374151]/50">
                 Expired
               </span>
             )}
           </div>
-          <p className="text-[#E6EEF3] font-bold text-lg mt-1">
+          <p className="text-white font-bold text-lg mt-1">
             {parseFloat(transaction.amount).toLocaleString()} {transaction.token}
           </p>
           {transaction.expectedOutput && (
-            <p className="text-[#A7B4C8] text-sm">
+            <p className="text-[#6B7280] text-sm">
               → {parseFloat(transaction.expectedOutput).toLocaleString()} {transaction.outputToken}
             </p>
           )}
         </div>
         <div className="text-right">
-          <div className="flex items-center gap-1 text-[#A7B4C8] text-sm">
+          <div className="flex items-center gap-1 text-[#6B7280] text-sm">
             <ClockIcon size={14} />
             {formatTimeRemaining(transaction.expiresAt)}
           </div>
-          <p className="text-[#A7B4C8]/70 text-xs mt-1">
+          <p className="text-[#5C6370] text-xs mt-1">
             {formatDate(transaction.createdAt)}
           </p>
         </div>
       </div>
 
       {/* Submitter Info */}
-      <div className="mb-3 p-2 bg-slate-900/50 rounded-lg border border-slate-500/30">
-        <p className="text-[#A7B4C8] text-xs">Requested By</p>
-        <p className="text-[#E6EEF3] text-sm">{transaction.submitterEmail}</p>
+      <div className="mb-3 p-2.5 bg-[#0A0F1A] rounded-lg border border-white/[0.06]">
+        <p className="text-[#5C6370] text-xs">Requested By</p>
+        <p className="text-[#E5E7EB] text-sm">{transaction.submitterEmail}</p>
       </div>
 
       {/* Signatures Progress */}
       <div className="mb-3">
-        <div className="flex items-center justify-between text-sm mb-1">
-          <span className="text-[#A7B4C8]">Approval Status</span>
-          <span className="text-[#E6EEF3] font-semibold">
+        <div className="flex items-center justify-between text-sm mb-1.5">
+          <span className="text-[#6B7280]">Approval Status</span>
+          <span className="text-white font-semibold">
             {transaction.currentSignatures} / {transaction.requiredSignatures}
           </span>
         </div>
-        <div className="w-full bg-[#151A22] rounded-full h-2">
+        <div className="w-full bg-[#1E293B] rounded-full h-2 relative overflow-hidden">
+          {/* Metallic overlay */}
+          <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent pointer-events-none" />
           <div
             className={`h-2 rounded-full transition-all ${
               transaction.currentSignatures >= transaction.requiredSignatures
-                ? 'bg-green-500'
-                : 'bg-blue-500'
+                ? 'bg-gradient-to-r from-[#E2E8F0] to-[#94A3B8]'
+                : 'bg-gradient-to-r from-[#3A7ACC] to-[#4A9EFF]'
             }`}
             style={{ width: `${(transaction.currentSignatures / transaction.requiredSignatures) * 100}%` }}
           />
@@ -171,17 +169,17 @@ const ApprovalCard: React.FC<ApprovalCardProps> = ({
 
       {/* Signatures List */}
       {transaction.signatures.length > 0 && (
-        <div className="mb-3 space-y-1">
-          <p className="text-[#A7B4C8] text-xs mb-1">Signatures</p>
+        <div className="mb-3 space-y-1.5">
+          <p className="text-[#5C6370] text-xs mb-1">Signatures</p>
           {transaction.signatures.map((sig, idx) => (
             <div key={idx} className="flex items-center gap-2 text-sm">
               {sig.status === 'approved' ? (
-                <CheckIcon size={14} className="text-green-400" />
+                <CheckIcon size={14} className="text-[#9CA3AF]" />
               ) : (
-                <XIcon size={14} className="text-red-400" />
+                <XIcon size={14} className="text-[#F87171]" />
               )}
-              <span className="text-[#E6EEF3]">{sig.signerEmail}</span>
-              <span className="text-[#A7B4C8]/70 text-xs">({sig.signerRole})</span>
+              <span className="text-[#E5E7EB]">{sig.signerEmail}</span>
+              <span className="text-[#5C6370] text-xs">({sig.signerRole})</span>
             </div>
           ))}
         </div>
@@ -196,14 +194,14 @@ const ApprovalCard: React.FC<ApprovalCardProps> = ({
               value={comment}
               onChange={(e) => setComment(e.target.value)}
               placeholder="Add comment (optional)"
-              className="w-full px-3 py-2 bg-[#151A22] border border-slate-500/50 rounded-lg text-[#E6EEF3] text-sm placeholder:text-[#A7B4C8]/50 outline-none focus:border-blue-500"
+              className="w-full px-3 py-2 bg-[#0A0F1A] border border-[#1F2937] rounded-lg text-white text-sm placeholder:text-[#4B5563] outline-none focus:border-[#4A9EFF]/50"
             />
           )}
           <div className="flex gap-2">
             <button
               onClick={() => onSign(transaction.id, true, comment || undefined)}
               disabled={isLoading}
-              className="flex-1 flex items-center justify-center gap-2 py-2 bg-slate-200 hover:bg-white text-slate-900 font-semibold rounded-lg transition-colors disabled:opacity-50 shadow-[0_0_20px_rgba(255,255,255,0.1)]"
+              className="flex-1 flex items-center justify-center gap-2 py-2 bg-gradient-to-r from-[#3B82F6] to-[#2563EB] text-white font-semibold rounded-lg transition-all disabled:opacity-50 shadow-[0_4px_14px_rgba(59,130,246,0.3)] hover:shadow-[0_6px_20px_rgba(59,130,246,0.4)]"
             >
               {isLoading ? (
                 <SpinnerIcon size={16} />
@@ -223,7 +221,7 @@ const ApprovalCard: React.FC<ApprovalCardProps> = ({
                 }
               }}
               disabled={isLoading}
-              className="flex-1 flex items-center justify-center gap-2 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 font-semibold rounded-lg transition-colors disabled:opacity-50"
+              className="flex-1 flex items-center justify-center gap-2 py-2 bg-[#1F2937]/50 hover:bg-[#1F2937] text-[#F87171] font-semibold rounded-lg transition-colors disabled:opacity-50 border border-[#374151]/50"
             >
               <XIcon size={16} />
               Reject
@@ -234,17 +232,17 @@ const ApprovalCard: React.FC<ApprovalCardProps> = ({
 
       {/* Already Signed */}
       {hasUserSigned && (
-        <div className="flex items-center gap-2 p-2 bg-green-500/10 border border-green-500/30 rounded-lg">
-          <VerifiedIcon size={16} className="text-green-400" />
-          <span className="text-green-400 text-sm">You have already signed this transaction</span>
+        <div className="flex items-center gap-2 p-2.5 bg-[#4A9EFF]/5 border border-[#4A9EFF]/20 rounded-lg">
+          <CheckIcon size={16} className="text-[#93C5FD]" />
+          <span className="text-[#93C5FD] text-sm">You have already signed this transaction</span>
         </div>
       )}
 
       {/* Cannot Sign */}
       {!canSign && !hasUserSigned && !isExpired && (
-        <div className="flex items-center gap-2 p-2 bg-amber-500/10 border border-amber-500/30 rounded-lg">
-          <AlertIcon size={16} className="text-amber-400" />
-          <span className="text-amber-400 text-sm">You do not have permission to approve this transaction</span>
+        <div className="flex items-center gap-2 p-2.5 bg-[#1F2937]/50 border border-[#374151]/50 rounded-lg">
+          <AlertIcon size={16} className="text-[#9CA3AF]" />
+          <span className="text-[#9CA3AF] text-sm">You do not have permission to approve this transaction</span>
         </div>
       )}
     </div>
@@ -304,9 +302,11 @@ const TreasuryApprovals: React.FC<TreasuryApprovalsProps> = ({
 
   if (loading) {
     return (
-      <div className="bg-slate-900/60 backdrop-blur-sm rounded-xl border border-slate-500/50 p-6 mt-6">
-        <h3 className="text-lg font-semibold text-[#E6EEF3] mb-4 flex items-center gap-2">
-          <ClockIcon size={20} className="text-amber-400" />
+      <div className="bg-[rgba(15,22,41,0.5)] backdrop-blur-sm rounded-xl border border-white/[0.06] p-6 mt-6">
+        <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+          <div className="p-2 bg-[#1F2937] rounded-lg">
+            <ClockIcon size={20} className="text-[#9CA3AF]" />
+          </div>
           Pending Approvals
         </h3>
         <div className="flex items-center justify-center py-8">
@@ -318,26 +318,32 @@ const TreasuryApprovals: React.FC<TreasuryApprovalsProps> = ({
 
   if (pendingTransactions.length === 0) {
     return (
-      <div className="bg-slate-900/60 backdrop-blur-sm rounded-xl border border-slate-500/50 p-6 mt-6">
-        <h3 className="text-lg font-semibold text-[#E6EEF3] mb-4 flex items-center gap-2">
-          <ClockIcon size={20} className="text-amber-400" />
+      <div className="bg-[rgba(15,22,41,0.5)] backdrop-blur-sm rounded-xl border border-white/[0.06] p-6 mt-6">
+        <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+          <div className="p-2 bg-[#1F2937] rounded-lg">
+            <ClockIcon size={20} className="text-[#9CA3AF]" />
+          </div>
           Pending Approvals
         </h3>
         <div className="text-center py-6">
-          <CheckIcon size={48} className="text-[#A7B4C8]/50 mx-auto mb-3" />
-          <p className="text-[#A7B4C8]">No pending transactions</p>
-          <p className="text-[#A7B4C8]/70 text-sm mt-1">All transactions have been approved or completed</p>
+          <div className="w-12 h-12 rounded-full bg-[#1F2937]/50 flex items-center justify-center mx-auto mb-3">
+            <CheckIcon size={24} className="text-[#6B7280]" />
+          </div>
+          <p className="text-[#9CA3AF] text-base font-medium">No pending transactions</p>
+          <p className="text-[#6B7280] text-sm mt-1">All transactions have been approved or completed</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="bg-slate-900/60 backdrop-blur-sm rounded-xl border border-amber-500/30 p-6 mt-6">
-      <h3 className="text-lg font-semibold text-[#E6EEF3] mb-4 flex items-center gap-2">
-        <ClockIcon size={20} className="text-amber-400" />
+    <div className="bg-[rgba(15,22,41,0.5)] backdrop-blur-sm rounded-xl border border-white/[0.06] p-6 mt-6">
+      <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+        <div className="p-2 bg-[#1F2937] rounded-lg">
+          <ClockIcon size={20} className="text-[#9CA3AF]" />
+        </div>
         Pending Approvals
-        <span className="ml-auto px-2 py-0.5 bg-amber-500/20 text-amber-400 text-sm rounded-full">
+        <span className="ml-auto px-2 py-0.5 bg-[#4A9EFF]/10 text-[#93C5FD] text-sm font-medium rounded-full border border-[#4A9EFF]/20">
           {pendingTransactions.length}
         </span>
       </h3>
