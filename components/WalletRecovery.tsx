@@ -133,22 +133,22 @@ const WalletRecovery: React.FC<WalletRecoveryProps> = ({
   const unverifiedKeys = activeKeys.filter(k => !verifiedKeys.includes(k.keyHash));
 
   return (
-    <div className="bg-slate-900/95 backdrop-blur-sm rounded-xl border border-red-500/30 p-6">
+    <div className="bg-[#091325] backdrop-blur-sm rounded-xl border border-slate-500/50 p-6">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-red-500/20 flex items-center justify-center">
-            <ShieldOffIcon size={24} className="text-red-400" />
+          <div className="w-10 h-10 rounded-lg bg-amber-500/10 flex items-center justify-center border border-amber-500/20">
+            <ShieldOffIcon size={24} className="text-amber-400" />
           </div>
           <div>
-            <h2 className="text-lg font-bold text-white">Wallet Recovery</h2>
-            <p className="text-sm text-red-400">2-of-3 Multi-Sig Recovery</p>
+            <h2 className="text-lg font-bold text-[#E6EEF3]">Wallet Recovery</h2>
+            <p className="text-sm text-amber-400">2-of-3 Multi-Sig Recovery</p>
           </div>
         </div>
         {onClose && (
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-white transition-colors"
+            className="text-[#A7B4C8] hover:text-[#E6EEF3] transition-colors p-1"
           >
             ✕
           </button>
@@ -158,7 +158,7 @@ const WalletRecovery: React.FC<WalletRecoveryProps> = ({
       {/* Step: Select Recovery Type */}
       {step === 'select' && (
         <div className="space-y-4">
-          <p className="text-slate-300 text-sm mb-4">
+          <p className="text-[#A7B4C8] text-sm mb-4">
             Select the recovery action you need to perform:
           </p>
 
@@ -167,14 +167,14 @@ const WalletRecovery: React.FC<WalletRecoveryProps> = ({
               setRecoveryType('add');
               setStep('verify1');
             }}
-            className="w-full flex items-center gap-4 p-4 bg-slate-800/50 hover:bg-slate-800 rounded-lg border border-slate-700/50 hover:border-cyan-500/50 transition-colors text-left"
+            className="w-full flex items-center gap-4 p-4 bg-[#151A22] hover:bg-[#151A22]/80 rounded-lg border border-slate-500/30 hover:border-slate-400 transition-colors text-left"
           >
-            <div className="w-12 h-12 rounded-lg bg-cyan-500/20 flex items-center justify-center flex-shrink-0">
-              <UserPlusIcon size={24} className="text-cyan-400" />
+            <div className="w-12 h-12 rounded-lg bg-blue-500/10 flex items-center justify-center flex-shrink-0 border border-blue-500/20">
+              <UserPlusIcon size={24} className="text-blue-400" />
             </div>
             <div>
-              <h3 className="text-white font-semibold">Add New Passkey</h3>
-              <p className="text-slate-400 text-sm">
+              <h3 className="text-[#E6EEF3] font-semibold">Add New Passkey</h3>
+              <p className="text-[#A7B4C8] text-sm">
                 Lost a device? Add a new passkey with approval from 2 existing signers
               </p>
             </div>
@@ -185,22 +185,22 @@ const WalletRecovery: React.FC<WalletRecoveryProps> = ({
               setRecoveryType('replace');
               setStep('verify1');
             }}
-            className="w-full flex items-center gap-4 p-4 bg-slate-800/50 hover:bg-slate-800 rounded-lg border border-slate-700/50 hover:border-amber-500/50 transition-colors text-left"
+            className="w-full flex items-center gap-4 p-4 bg-[#151A22] hover:bg-[#151A22]/80 rounded-lg border border-slate-500/30 hover:border-slate-400 transition-colors text-left"
           >
-            <div className="w-12 h-12 rounded-lg bg-amber-500/20 flex items-center justify-center flex-shrink-0">
+            <div className="w-12 h-12 rounded-lg bg-amber-500/10 flex items-center justify-center flex-shrink-0 border border-amber-500/20">
               <RefreshIcon size={24} className="text-amber-400" />
             </div>
             <div>
-              <h3 className="text-white font-semibold">Replace Compromised Key</h3>
-              <p className="text-slate-400 text-sm">
+              <h3 className="text-[#E6EEF3] font-semibold">Replace Compromised Key</h3>
+              <p className="text-[#A7B4C8] text-sm">
                 Key compromised? Remove it and add a replacement with 2-of-3 approval
               </p>
             </div>
           </button>
 
-          <div className="mt-6 p-3 bg-slate-800/50 rounded-lg">
-            <p className="text-slate-400 text-xs">
-              <strong className="text-slate-300">Security Note:</strong> Recovery requires verification
+          <div className="mt-6 p-3 bg-[#151A22] rounded-lg border border-slate-500/20">
+            <p className="text-[#A7B4C8] text-xs">
+              <strong className="text-[#E6EEF3]">Security Note:</strong> Recovery requires verification
               from 2 of your 3 registered passkeys. Each signer must authenticate with their device.
             </p>
           </div>
@@ -211,13 +211,13 @@ const WalletRecovery: React.FC<WalletRecoveryProps> = ({
       {step === 'verify1' && (
         <div className="space-y-4">
           <div className="flex items-center gap-2 mb-4">
-            <div className="w-8 h-8 rounded-full bg-cyan-500/20 flex items-center justify-center">
-              <span className="text-cyan-400 font-bold">1</span>
+            <div className="w-8 h-8 rounded-full bg-blue-500/10 flex items-center justify-center border border-blue-500/20">
+              <span className="text-blue-400 font-bold text-sm">1</span>
             </div>
-            <span className="text-white font-semibold">First Signer Verification</span>
+            <span className="text-[#E6EEF3] font-semibold">First Signer Verification</span>
           </div>
 
-          <p className="text-slate-300 text-sm mb-4">
+          <p className="text-[#A7B4C8] text-sm mb-4">
             Select a passkey to verify your identity:
           </p>
 
@@ -227,23 +227,23 @@ const WalletRecovery: React.FC<WalletRecoveryProps> = ({
                 key={key.keyHash}
                 onClick={() => handleVerifyKey(key.keyHash)}
                 disabled={loading}
-                className="w-full flex items-center justify-between p-3 bg-slate-800/50 hover:bg-slate-800 rounded-lg border border-slate-700/50 hover:border-cyan-500/50 transition-colors disabled:opacity-50"
+                className="w-full flex items-center justify-between p-3 bg-[#151A22] hover:bg-[#151A22]/80 rounded-lg border border-slate-500/30 hover:border-slate-400 transition-colors disabled:opacity-50"
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center">
-                    <span className="text-slate-300 text-sm font-bold">
+                  <div className="w-10 h-10 rounded-full bg-slate-500/10 flex items-center justify-center border border-slate-500/20">
+                    <span className="text-[#A7B4C8] text-sm font-bold">
                       {key.role[0].toUpperCase()}
                     </span>
                   </div>
                   <div className="text-left">
-                    <p className="text-white font-medium">{key.deviceName}</p>
-                    <p className="text-slate-500 text-xs">{key.role.toUpperCase()}</p>
+                    <p className="text-[#E6EEF3] font-medium">{key.deviceName}</p>
+                    <p className="text-[#A7B4C8]/70 text-xs">{key.role.toUpperCase()}</p>
                   </div>
                 </div>
                 {loading ? (
                   <SpinnerIcon size={20} />
                 ) : (
-                  <span className="text-cyan-400 text-sm">Verify →</span>
+                  <span className="text-[#A7B4C8] hover:text-[#E6EEF3] text-sm">Verify →</span>
                 )}
               </button>
             ))}
@@ -255,20 +255,20 @@ const WalletRecovery: React.FC<WalletRecoveryProps> = ({
       {step === 'verify2' && (
         <div className="space-y-4">
           <div className="flex items-center gap-2 mb-4">
-            <div className="w-8 h-8 rounded-full bg-cyan-500 flex items-center justify-center">
-              <CheckCircleIcon size={16} className="text-white" />
+            <div className="w-8 h-8 rounded-full bg-green-500/10 flex items-center justify-center border border-green-500/20">
+              <CheckCircleIcon size={16} className="text-green-400" />
             </div>
-            <span className="text-cyan-400 text-sm">First signer verified</span>
+            <span className="text-green-400 text-sm">First signer verified</span>
           </div>
 
           <div className="flex items-center gap-2 mb-4">
-            <div className="w-8 h-8 rounded-full bg-cyan-500/20 flex items-center justify-center">
-              <span className="text-cyan-400 font-bold">2</span>
+            <div className="w-8 h-8 rounded-full bg-blue-500/10 flex items-center justify-center border border-blue-500/20">
+              <span className="text-blue-400 font-bold text-sm">2</span>
             </div>
-            <span className="text-white font-semibold">Second Signer Verification</span>
+            <span className="text-[#E6EEF3] font-semibold">Second Signer Verification</span>
           </div>
 
-          <p className="text-slate-300 text-sm mb-4">
+          <p className="text-[#A7B4C8] text-sm mb-4">
             Now verify with a different passkey:
           </p>
 
@@ -278,23 +278,23 @@ const WalletRecovery: React.FC<WalletRecoveryProps> = ({
                 key={key.keyHash}
                 onClick={() => handleVerifyKey(key.keyHash)}
                 disabled={loading}
-                className="w-full flex items-center justify-between p-3 bg-slate-800/50 hover:bg-slate-800 rounded-lg border border-slate-700/50 hover:border-cyan-500/50 transition-colors disabled:opacity-50"
+                className="w-full flex items-center justify-between p-3 bg-[#151A22] hover:bg-[#151A22]/80 rounded-lg border border-slate-500/30 hover:border-slate-400 transition-colors disabled:opacity-50"
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center">
-                    <span className="text-slate-300 text-sm font-bold">
+                  <div className="w-10 h-10 rounded-full bg-slate-500/10 flex items-center justify-center border border-slate-500/20">
+                    <span className="text-[#A7B4C8] text-sm font-bold">
                       {key.role[0].toUpperCase()}
                     </span>
                   </div>
                   <div className="text-left">
-                    <p className="text-white font-medium">{key.deviceName}</p>
-                    <p className="text-slate-500 text-xs">{key.role.toUpperCase()}</p>
+                    <p className="text-[#E6EEF3] font-medium">{key.deviceName}</p>
+                    <p className="text-[#A7B4C8]/70 text-xs">{key.role.toUpperCase()}</p>
                   </div>
                 </div>
                 {loading ? (
                   <SpinnerIcon size={20} />
                 ) : (
-                  <span className="text-cyan-400 text-sm">Verify →</span>
+                  <span className="text-[#A7B4C8] hover:text-[#E6EEF3] text-sm">Verify →</span>
                 )}
               </button>
             ))}
@@ -306,19 +306,19 @@ const WalletRecovery: React.FC<WalletRecoveryProps> = ({
       {step === 'newkey' && (
         <div className="space-y-4">
           <div className="flex items-center gap-2 mb-2">
-            <CheckCircleIcon size={20} className="text-cyan-400" />
-            <span className="text-cyan-400 text-sm">2 of 3 signers verified</span>
+            <CheckCircleIcon size={20} className="text-green-400" />
+            <span className="text-green-400 text-sm">2 of 3 signers verified</span>
           </div>
 
           {recoveryType === 'replace' && (
             <div className="mb-4">
-              <label className="text-xs text-slate-400 mb-1 block">
+              <label className="text-xs text-[#A7B4C8] mb-1 block">
                 Select key to replace:
               </label>
               <select
                 value={selectedKeyToReplace || ''}
                 onChange={(e) => setSelectedKeyToReplace(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-800/50 border border-slate-600/50 rounded-lg text-white text-sm outline-none focus:border-cyan-500"
+                className="w-full px-3 py-2 bg-[#151A22] border border-slate-500/50 rounded-lg text-[#E6EEF3] text-sm outline-none focus:border-slate-400"
               >
                 <option value="">Select a key...</option>
                 {activeKeys
@@ -332,35 +332,35 @@ const WalletRecovery: React.FC<WalletRecoveryProps> = ({
             </div>
           )}
 
-          <h3 className="text-white font-semibold">Register New Passkey</h3>
+          <h3 className="text-[#E6EEF3] font-semibold">Register New Passkey</h3>
 
           <div className="space-y-3">
             <div>
-              <label className="text-xs text-slate-400 mb-1 block">Owner Email</label>
+              <label className="text-xs text-[#A7B4C8] mb-1 block">Owner Email</label>
               <input
                 type="email"
                 value={newKeyEmail}
                 onChange={(e) => setNewKeyEmail(e.target.value)}
                 placeholder="newuser@company.com"
-                className="w-full px-3 py-2 bg-slate-800/50 border border-slate-600/50 rounded-lg text-white text-sm placeholder:text-slate-500 outline-none focus:border-cyan-500"
+                className="w-full px-3 py-2 bg-[#151A22] border border-slate-500/50 rounded-lg text-[#E6EEF3] text-sm placeholder:text-[#A7B4C8]/50 outline-none focus:border-slate-400"
               />
             </div>
             <div>
-              <label className="text-xs text-slate-400 mb-1 block">Device Name</label>
+              <label className="text-xs text-[#A7B4C8] mb-1 block">Device Name</label>
               <input
                 type="text"
                 value={newKeyDeviceName}
                 onChange={(e) => setNewKeyDeviceName(e.target.value)}
                 placeholder="CFO's New MacBook"
-                className="w-full px-3 py-2 bg-slate-800/50 border border-slate-600/50 rounded-lg text-white text-sm placeholder:text-slate-500 outline-none focus:border-cyan-500"
+                className="w-full px-3 py-2 bg-[#151A22] border border-slate-500/50 rounded-lg text-[#E6EEF3] text-sm placeholder:text-[#A7B4C8]/50 outline-none focus:border-slate-400"
               />
             </div>
             <div>
-              <label className="text-xs text-slate-400 mb-1 block">Role</label>
+              <label className="text-xs text-[#A7B4C8] mb-1 block">Role</label>
               <select
                 value={newKeyRole}
                 onChange={(e) => setNewKeyRole(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-800/50 border border-slate-600/50 rounded-lg text-white text-sm outline-none focus:border-cyan-500"
+                className="w-full px-3 py-2 bg-[#151A22] border border-slate-500/50 rounded-lg text-[#E6EEF3] text-sm outline-none focus:border-slate-400"
               >
                 <option value="ceo">CEO</option>
                 <option value="cfo">CFO</option>
@@ -370,9 +370,9 @@ const WalletRecovery: React.FC<WalletRecoveryProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-2 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+          <div className="flex items-center gap-2 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
             <AlertTriangleIcon size={20} className="text-amber-400 flex-shrink-0" />
-            <p className="text-amber-300 text-xs">
+            <p className="text-amber-300/80 text-xs">
               This action will {recoveryType === 'replace' ? 'replace the compromised key with' : 'add'} a new passkey.
               The new owner must register their passkey on this device.
             </p>
@@ -381,7 +381,7 @@ const WalletRecovery: React.FC<WalletRecoveryProps> = ({
           <button
             onClick={handleAddNewKey}
             disabled={loading || !newKeyEmail || !newKeyDeviceName}
-            className="w-full flex items-center justify-center gap-2 py-3 bg-cyan-600 hover:bg-cyan-500 text-white font-semibold rounded-lg transition-colors disabled:opacity-50"
+            className="w-full flex items-center justify-center gap-2 py-3 bg-slate-200 hover:bg-white text-slate-900 font-semibold rounded-lg transition-colors disabled:opacity-50"
           >
             {loading ? (
               <>
@@ -401,17 +401,17 @@ const WalletRecovery: React.FC<WalletRecoveryProps> = ({
       {/* Step: Complete */}
       {step === 'complete' && (
         <div className="text-center py-8">
-          <div className="w-16 h-16 rounded-full bg-cyan-500/20 flex items-center justify-center mx-auto mb-4">
-            <CheckCircleIcon size={40} className="text-cyan-400" />
+          <div className="w-16 h-16 rounded-full bg-green-500/10 flex items-center justify-center mx-auto mb-4 border border-green-500/20">
+            <CheckCircleIcon size={40} className="text-green-400" />
           </div>
-          <h3 className="text-xl font-bold text-white mb-2">Recovery Complete!</h3>
-          <p className="text-slate-400 mb-6">
+          <h3 className="text-xl font-bold text-[#E6EEF3] mb-2">Recovery Complete!</h3>
+          <p className="text-[#A7B4C8] mb-6">
             The new passkey has been added to your wallet.
             {recoveryType === 'replace' && ' The compromised key has been removed.'}
           </p>
           <button
             onClick={onClose}
-            className="px-6 py-2 bg-cyan-600 hover:bg-cyan-500 text-white font-semibold rounded-lg transition-colors"
+            className="px-6 py-2 bg-slate-200 hover:bg-white text-slate-900 font-semibold rounded-lg transition-colors"
           >
             Done
           </button>
@@ -426,7 +426,7 @@ const WalletRecovery: React.FC<WalletRecoveryProps> = ({
               key={s}
               className={`w-2 h-2 rounded-full ${
                 ['verify1', 'verify2', 'newkey'].indexOf(step) >= i
-                  ? 'bg-cyan-500'
+                  ? 'bg-blue-400'
                   : 'bg-slate-600'
               }`}
             />
