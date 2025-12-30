@@ -361,7 +361,7 @@ const BalanceOverview: React.FC<BalanceOverviewProps> = ({ onNavigate, balanceDi
   const updatedAt = lastUpdated ? new Date(lastUpdated).toLocaleTimeString() : '—';
 
   return (
-    <div className="relative bg-gradient-to-b from-[#111827] to-[#0F1629] rounded-[20px] border border-white/[0.06] p-[28px_32px] overflow-hidden">
+    <div className="relative bg-gradient-to-b from-[#111827] to-[#0F1629] rounded-2xl border border-white/[0.06] p-5 overflow-hidden">
       {/* Top edge highlight */}
       <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/[0.08] to-transparent" />
 
@@ -369,71 +369,71 @@ const BalanceOverview: React.FC<BalanceOverviewProps> = ({ onNavigate, balanceDi
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgba(74,158,255,0.03)_0%,transparent_70%)]" />
 
       <div className="relative flex items-start justify-between">
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-1">
           {/* Total Balance Label */}
-          <p className="text-sm font-medium text-[#6B7280]">Total Balance</p>
+          <p className="text-[13px] font-medium text-[#6B7280]">Total Balance</p>
 
           {/* Balance Value */}
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             <p
-              className="text-4xl font-bold text-white min-h-[44px]"
+              className="text-[32px] font-bold text-white"
               style={{ letterSpacing: '-1px', fontFeatureSettings: '"tnum"' }}
             >
               {isHidden ? '••••••' : displayBalance}
             </p>
 
             {/* Finalized Badge - GRAY not green */}
-            <div className="inline-flex items-center gap-1.5 bg-white/[0.06] border border-white/[0.1] rounded-md px-2.5 py-1">
-              <CheckCircleIcon size={14} className="text-[#9CA3AF]" />
-              <span className="text-xs font-medium text-[#9CA3AF]">Finalized</span>
+            <div className="inline-flex items-center gap-1.5 bg-white/[0.06] border border-white/[0.1] rounded-md px-2 py-0.5">
+              <CheckCircleIcon size={12} className="text-[#9CA3AF]" />
+              <span className="text-[11px] font-medium text-[#9CA3AF]">Finalized</span>
             </div>
           </div>
 
           {/* Synced at */}
-          <div className="flex items-center gap-1.5 mt-2">
-            <span className="text-xs text-[#4B5563]">Synced at {updatedAt}</span>
+          <div className="flex items-center gap-1.5 mt-1">
+            <span className="text-[11px] text-[#4B5563]">Synced at {updatedAt}</span>
             <button
               onClick={() => void onRefresh()}
-              className="p-1 text-[#4B5563] hover:text-[#6B7280] transition-colors group"
+              className="p-0.5 text-[#4B5563] hover:text-[#6B7280] transition-colors group"
               aria-label="Refresh balances"
             >
               <RefreshCwIcon
-                size={12}
+                size={11}
                 className={`transition-transform ${isRefreshing ? 'animate-spin' : 'group-hover:rotate-180'}`}
               />
             </button>
           </div>
 
-          {error && <p className="text-sm text-[#F87171] mt-2">{error}</p>}
+          {error && <p className="text-[13px] text-[#F87171] mt-1">{error}</p>}
         </div>
 
         {/* Eye Icon - Hide Balance Toggle */}
         <button
           onClick={toggleHidden}
-          className="p-2 text-[#4B5563] hover:text-[#6B7280] hover:bg-white/[0.05] rounded-lg transition-all"
+          className="p-1.5 text-[#4B5563] hover:text-[#6B7280] hover:bg-white/[0.05] rounded-lg transition-all"
           title={isHidden ? 'Show balance' : 'Hide balance'}
         >
-          {isHidden ? <EyeIcon size={20} /> : <EyeOffIcon size={20} />}
+          {isHidden ? <EyeIcon size={18} /> : <EyeOffIcon size={18} />}
         </button>
       </div>
 
       {/* Send / Receive Buttons */}
-      <div className="relative grid grid-cols-2 gap-4 mt-6">
+      <div className="relative grid grid-cols-2 gap-3 mt-5">
         {/* Send Button - White/Light */}
         <button
           onClick={() => onNavigate('Send')}
-          className="flex h-[52px] items-center justify-center gap-2 px-6 text-[15px] font-semibold bg-white text-[#0F1629] rounded-xl transition-all hover:bg-[#F1F5F9] hover:shadow-[0_4px_12px_rgba(255,255,255,0.1)] hover:-translate-y-0.5 active:translate-y-0 active:bg-[#E2E8F0]"
+          className="flex h-11 items-center justify-center gap-2 px-5 text-[14px] font-semibold bg-white text-[#0F1629] rounded-xl transition-all hover:bg-[#F1F5F9] hover:shadow-[0_4px_12px_rgba(255,255,255,0.1)] hover:-translate-y-0.5 active:translate-y-0 active:bg-[#E2E8F0]"
         >
-          <ArrowUpRightIcon size={18} />
+          <ArrowUpRightIcon size={16} />
           <span>Send</span>
         </button>
 
         {/* Receive Button - Outlined */}
         <button
           onClick={() => onNavigate('Receive')}
-          className="flex h-[52px] items-center justify-center gap-2 px-6 text-[15px] font-semibold bg-transparent border border-white/[0.15] text-white rounded-xl transition-all hover:bg-white/[0.05] hover:border-white/[0.25] hover:-translate-y-0.5 active:translate-y-0 active:bg-white/[0.08]"
+          className="flex h-11 items-center justify-center gap-2 px-5 text-[14px] font-semibold bg-transparent border border-white/[0.15] text-white rounded-xl transition-all hover:bg-white/[0.05] hover:border-white/[0.25] hover:-translate-y-0.5 active:translate-y-0 active:bg-white/[0.08]"
         >
-          <ArrowDownLeftIcon size={18} />
+          <ArrowDownLeftIcon size={16} />
           <span>Receive</span>
         </button>
       </div>
@@ -529,9 +529,9 @@ const AssetsTable: React.FC<AssetsTableProps> = ({ balanceDisplay, isLoading, to
   return (
     <div>
       {/* My Assets Header with Badge */}
-      <div className="flex items-center gap-2 mt-10 mb-5">
-        <h2 className="text-lg font-semibold text-white">My Assets</h2>
-        <span className="bg-[#1F2937] text-[#6B7280] text-xs font-medium px-2 py-0.5 rounded-full">
+      <div className="flex items-center gap-2 mt-6 mb-3">
+        <h2 className="text-base font-semibold text-white">My Assets</h2>
+        <span className="bg-[#1F2937] text-[#6B7280] text-[11px] font-medium px-1.5 py-0.5 rounded-full">
           {tokenCount}
         </span>
       </div>
@@ -539,21 +539,21 @@ const AssetsTable: React.FC<AssetsTableProps> = ({ balanceDisplay, isLoading, to
       {/* Table */}
       <div className="flow-root">
         <div className="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
-          <div className="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
+          <div className="inline-block min-w-full py-1 align-middle sm:px-6 lg:px-8">
             <table className="min-w-full">
               {/* Table Header */}
               <thead>
                 <tr className="border-b border-white/[0.06]">
-                  <th scope="col" className="py-3 pl-4 pr-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-[#4B5563] sm:pl-0" style={{ flex: 2 }}>
+                  <th scope="col" className="py-2.5 pl-4 pr-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-[#4B5563] sm:pl-0" style={{ flex: 2 }}>
                     Asset
                   </th>
-                  <th scope="col" className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-[#4B5563]" style={{ flex: 1 }}>
+                  <th scope="col" className="px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-[#4B5563]" style={{ flex: 1 }}>
                     Price
                   </th>
-                  <th scope="col" className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-[#4B5563]" style={{ flex: 1 }}>
+                  <th scope="col" className="px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-[#4B5563]" style={{ flex: 1 }}>
                     Balance
                   </th>
-                  <th scope="col" className="py-3 pl-3 pr-4 text-right text-[11px] font-semibold uppercase tracking-[0.08em] text-[#4B5563] sm:pr-0" style={{ flex: 1 }}>
+                  <th scope="col" className="py-2.5 pl-3 pr-4 text-right text-[11px] font-semibold uppercase tracking-[0.08em] text-[#4B5563] sm:pr-0" style={{ flex: 1 }}>
                     Value
                   </th>
                 </tr>
@@ -575,11 +575,11 @@ const AssetsTable: React.FC<AssetsTableProps> = ({ balanceDisplay, isLoading, to
                       `}
                     >
                       {/* Asset Column */}
-                      <td className="whitespace-nowrap py-4 pl-4 pr-3 sm:pl-0">
+                      <td className="whitespace-nowrap py-3 pl-4 pr-3 sm:pl-0">
                         <div className="flex items-center">
                           {/* Token Icon with Brand Colors */}
                           <div
-                            className="h-10 w-10 flex-shrink-0 rounded-full flex items-center justify-center"
+                            className="h-9 w-9 flex-shrink-0 rounded-full flex items-center justify-center"
                             style={{
                               backgroundColor: tokenColor.bg,
                               border: `1px solid ${tokenColor.border}`,
@@ -587,13 +587,13 @@ const AssetsTable: React.FC<AssetsTableProps> = ({ balanceDisplay, isLoading, to
                           >
                             {asset.icon && (asset.icon.startsWith('http') || asset.icon.startsWith('/')) ? (
                               <img
-                                className={`h-10 w-10 object-cover rounded-full ${isZeroBalance ? 'opacity-50' : ''}`}
+                                className={`h-9 w-9 object-cover rounded-full ${isZeroBalance ? 'opacity-50' : ''}`}
                                 src={asset.icon}
                                 alt={`${asset.name} logo`}
                               />
                             ) : (
                               <span
-                                className="text-xs font-bold"
+                                className="text-[11px] font-bold"
                                 style={{ color: tokenColor.text }}
                               >
                                 {getTokenIconContent(asset.ticker)}
@@ -602,11 +602,11 @@ const AssetsTable: React.FC<AssetsTableProps> = ({ balanceDisplay, isLoading, to
                           </div>
 
                           {/* Token Name */}
-                          <div className="ml-3.5">
-                            <div className={`text-[15px] font-medium ${isZeroBalance ? 'text-[#9CA3AF]' : 'text-white'}`}>
+                          <div className="ml-3">
+                            <div className={`text-[14px] font-medium ${isZeroBalance ? 'text-[#9CA3AF]' : 'text-white'}`}>
                               {asset.name}
                             </div>
-                            <div className={`text-[13px] mt-0.5 ${isZeroBalance ? 'text-[#4B5563]' : 'text-[#6B7280]'}`}>
+                            <div className={`text-[12px] ${isZeroBalance ? 'text-[#4B5563]' : 'text-[#6B7280]'}`}>
                               {asset.ticker}
                             </div>
                           </div>
@@ -614,28 +614,28 @@ const AssetsTable: React.FC<AssetsTableProps> = ({ balanceDisplay, isLoading, to
                       </td>
 
                       {/* Price Column */}
-                      <td className="whitespace-nowrap px-3 py-4">
-                        <div className={`text-sm font-medium ${isZeroBalance ? 'text-[#9CA3AF]' : 'text-white'}`}>
+                      <td className="whitespace-nowrap px-3 py-3">
+                        <div className={`text-[13px] font-medium ${isZeroBalance ? 'text-[#9CA3AF]' : 'text-white'}`}>
                           {asset.price}
                         </div>
-                        <div className={`text-[13px] mt-0.5 ${isZeroBalance ? 'text-[#4B5563]' : getPriceChangeColor(asset.changeNum)}`}>
+                        <div className={`text-[12px] ${isZeroBalance ? 'text-[#4B5563]' : getPriceChangeColor(asset.changeNum)}`}>
                           {formatPriceChange(asset.changeNum)}
                         </div>
                       </td>
 
                       {/* Balance Column */}
-                      <td className="whitespace-nowrap px-3 py-4">
+                      <td className="whitespace-nowrap px-3 py-3">
                         <span
-                          className={`text-sm font-medium font-mono ${isZeroBalance ? 'text-[#4B5563]' : 'text-white'}`}
+                          className={`text-[13px] font-medium font-mono ${isZeroBalance ? 'text-[#4B5563]' : 'text-white'}`}
                         >
                           {asset.balance}
                         </span>
                       </td>
 
                       {/* Value Column */}
-                      <td className="whitespace-nowrap py-4 pl-3 pr-4 text-right sm:pr-0">
+                      <td className="whitespace-nowrap py-3 pl-3 pr-4 text-right sm:pr-0">
                         <span
-                          className={`text-sm font-semibold ${isZeroBalance ? 'text-[#4B5563]' : 'text-white'}`}
+                          className={`text-[13px] font-semibold ${isZeroBalance ? 'text-[#4B5563]' : 'text-white'}`}
                         >
                           {asset.value}
                         </span>
@@ -959,7 +959,7 @@ const WalletDashboard: React.FC = () => {
               {selectedTransaction && <TransactionDetail transaction={selectedTransaction} onClose={() => setSelectedTransactionId(null)} />}
             </>
           ) : (
-            <div className="w-full p-8 overflow-y-auto">{renderPageContent()}</div>
+            <div className="w-full px-6 py-5 overflow-y-auto">{renderPageContent()}</div>
           )}
         </div>
       </main>

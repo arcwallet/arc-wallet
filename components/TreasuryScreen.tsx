@@ -219,65 +219,65 @@ const ActionPanel: React.FC<ActionPanelProps> = ({ type, balance, onSuccess, use
   };
 
   return (
-    <div className="bg-[#0D1321] backdrop-blur-sm rounded-xl border border-white/[0.06] p-5">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-base font-semibold text-[#E5E7EB]">
+    <div className="bg-[#0D1321] backdrop-blur-sm rounded-xl border border-white/[0.06] p-4">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-[14px] font-semibold text-[#E5E7EB]">
           {isSubscribe ? 'USDC' : 'USYC'} <span className="text-[#6B7280]">→</span> {isSubscribe ? 'USYC' : 'USDC'}
         </h3>
-        <span className="text-xs text-[#6B7280] uppercase tracking-wider">
+        <span className="text-[10px] text-[#6B7280] uppercase tracking-wider">
           {isSubscribe ? 'Subscribe' : 'Redeem'}
         </span>
       </div>
 
       {/* Amount Input */}
-      <div className="mb-4">
-        <div className="flex items-center gap-2 bg-[#0A0F1A] border border-[#1F2937] p-3 rounded-lg focus-within:border-[#4A9EFF]/50 focus-within:shadow-[0_0_12px_rgba(74,158,255,0.1)] transition-all">
+      <div className="mb-3">
+        <div className="flex items-center gap-2 bg-[#0A0F1A] border border-[#1F2937] p-2.5 rounded-lg focus-within:border-[#4A9EFF]/50 focus-within:shadow-[0_0_12px_rgba(74,158,255,0.1)] transition-all">
           <input
             type="number"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             placeholder="0.00"
-            className="bg-transparent text-white text-lg font-medium w-full outline-none placeholder:text-[#4B5563]"
+            className="bg-transparent text-white text-base font-medium w-full outline-none placeholder:text-[#4B5563]"
           />
           <button
             onClick={handleMaxClick}
-            className="text-xs text-[#9CA3AF] hover:text-white font-medium px-2 py-1 bg-[#1F2937] hover:bg-[#374151] border border-[#374151] rounded transition-colors"
+            className="text-[10px] text-[#9CA3AF] hover:text-white font-medium px-1.5 py-0.5 bg-[#1F2937] hover:bg-[#374151] border border-[#374151] rounded transition-colors"
           >
             MAX
           </button>
-          <span className="text-[#9CA3AF] text-sm font-medium">{inputToken}</span>
+          <span className="text-[#9CA3AF] text-[13px] font-medium">{inputToken}</span>
         </div>
-        <p className="text-[#6B7280] text-[13px] mt-1.5">
+        <p className="text-[#6B7280] text-[12px] mt-1">
           Available: {parseFloat(maxAmount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {inputToken}
         </p>
       </div>
 
       {/* Output Preview */}
       {quote && (
-        <div className="mb-4 p-3 bg-[#0A0F1A] rounded-lg border border-white/[0.06]">
+        <div className="mb-3 p-2.5 bg-[#0A0F1A] rounded-lg border border-white/[0.06]">
           <div className="flex items-center justify-between">
-            <span className="text-[#6B7280] text-sm">You receive</span>
-            <span className="text-white font-medium">
+            <span className="text-[#6B7280] text-[12px]">You receive</span>
+            <span className="text-white text-[13px] font-medium">
               {parseFloat(quote.outputAmount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {outputToken}
             </span>
           </div>
-          <div className="flex items-center justify-between mt-1">
-            <span className="text-[#5C6370] text-xs">Rate</span>
-            <span className="text-[#6B7280] text-xs">1:{quote.rate}</span>
+          <div className="flex items-center justify-between mt-0.5">
+            <span className="text-[#5C6370] text-[11px]">Rate</span>
+            <span className="text-[#6B7280] text-[11px]">1:{quote.rate}</span>
           </div>
         </div>
       )}
 
       {/* Policy Warnings */}
       {policyValidation && !policyValidation.allowed && (
-        <div className="mb-4 p-3 bg-[#1F2937]/50 border border-[#374151]/50 rounded-lg">
-          <p className="text-xs text-[#F87171]">{policyValidation.reason}</p>
+        <div className="mb-3 p-2.5 bg-[#1F2937]/50 border border-[#374151]/50 rounded-lg">
+          <p className="text-[11px] text-[#F87171]">{policyValidation.reason}</p>
         </div>
       )}
 
       {policyValidation?.requiresApproval && (
-        <div className="mb-4 p-3 bg-[#1F2937]/50 border border-[#374151]/50 rounded-lg">
-          <p className="text-xs text-[#9CA3AF]">
+        <div className="mb-3 p-2.5 bg-[#1F2937]/50 border border-[#374151]/50 rounded-lg">
+          <p className="text-[11px] text-[#9CA3AF]">
             Requires {policyValidation.requiredSignatures} approval(s)
           </p>
         </div>
@@ -285,15 +285,15 @@ const ActionPanel: React.FC<ActionPanelProps> = ({ type, balance, onSuccess, use
 
       {/* Error */}
       {error && (
-        <div className="mb-4 p-3 bg-[#1F2937]/50 border border-[#374151]/50 rounded-lg">
-          <p className="text-xs text-[#F87171]">{error}</p>
+        <div className="mb-3 p-2.5 bg-[#1F2937]/50 border border-[#374151]/50 rounded-lg">
+          <p className="text-[11px] text-[#F87171]">{error}</p>
         </div>
       )}
 
       {/* Success */}
       {txHash && (
-        <div className="mb-4 p-3 bg-[#4A9EFF]/5 border border-[#4A9EFF]/20 rounded-lg">
-          <p className="text-xs text-[#93C5FD]">
+        <div className="mb-3 p-2.5 bg-[#4A9EFF]/5 border border-[#4A9EFF]/20 rounded-lg">
+          <p className="text-[11px] text-[#93C5FD]">
             Submitted!{' '}
             <a href={`${TX_EXPLORER_URL}${txHash}`} target="_blank" rel="noreferrer" className="underline hover:text-white">
               View tx
@@ -306,7 +306,7 @@ const ActionPanel: React.FC<ActionPanelProps> = ({ type, balance, onSuccess, use
       <button
         onClick={handleExecute}
         disabled={!quote || executing || loading || !isConnected || (policyValidation && !policyValidation.allowed)}
-        className={`w-full py-2.5 rounded-lg font-medium text-sm transition-all ${
+        className={`w-full py-2 rounded-lg font-medium text-[13px] transition-all ${
           !quote || executing || !isConnected || (policyValidation && !policyValidation.allowed)
             ? 'bg-[#1F2937]/50 text-[#4B5563] cursor-not-allowed border border-[#374151]/50'
             : 'bg-gradient-to-r from-[#3B82F6] to-[#2563EB] text-white shadow-[0_4px_14px_rgba(59,130,246,0.3)] hover:shadow-[0_6px_20px_rgba(59,130,246,0.4)]'
@@ -325,31 +325,31 @@ const TreasuryHistory: React.FC<{ activities: any[] }> = ({ activities }) => {
   const treasuryActivities = useMemo(() => {
     return activities
       .filter((a) => a.description?.includes('USYC') || a.description?.includes('Subscribe') || a.description?.includes('Redeem'))
-      .slice(0, 5);
+      .slice(0, 3);
   }, [activities]);
 
   return (
-    <div className="mt-6">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-xs font-semibold text-[#6B7280] uppercase tracking-[0.1em]">Recent Activity</h3>
+    <div className="mt-4">
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="text-[11px] font-semibold text-[#6B7280] uppercase tracking-[0.1em]">Recent Activity</h3>
       </div>
 
       {treasuryActivities.length === 0 ? (
-        <p className="text-[#4B5563] text-sm">No treasury transactions yet</p>
+        <p className="text-[#4B5563] text-[13px]">No treasury transactions yet</p>
       ) : (
-        <div className="space-y-1">
+        <div className="space-y-0.5">
           {treasuryActivities.map((activity, index) => (
-            <div key={activity.id || index} className="flex items-center justify-between py-2 hover:bg-white/[0.02] rounded-lg px-2 -mx-2 transition-colors">
-              <div className="flex items-center gap-3">
-                <div className="w-6 h-6 rounded-lg bg-[#1F2937] flex items-center justify-center">
-                  <YieldIcon size={12} className="text-[#9CA3AF]" />
+            <div key={activity.id || index} className="flex items-center justify-between py-1.5 hover:bg-white/[0.02] rounded-lg px-2 -mx-2 transition-colors">
+              <div className="flex items-center gap-2">
+                <div className="w-5 h-5 rounded bg-[#1F2937] flex items-center justify-center">
+                  <YieldIcon size={10} className="text-[#9CA3AF]" />
                 </div>
                 <div>
-                  <p className="text-[#E5E7EB] text-sm">{activity.description}</p>
-                  <p className="text-[#6B7280] text-xs">{activity.timestamp}</p>
+                  <p className="text-[#E5E7EB] text-[13px]">{activity.description}</p>
+                  <p className="text-[#6B7280] text-[11px]">{activity.timestamp}</p>
                 </div>
               </div>
-              <span className="text-sm font-medium text-white">
+              <span className="text-[13px] font-medium text-white">
                 {activity.amount?.toFixed(2)} {activity.currency}
               </span>
             </div>
@@ -435,20 +435,20 @@ const TreasuryScreen: React.FC = () => {
   return (
     <div className="max-w-4xl mx-auto">
       {/* Header */}
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-center justify-between mb-4">
         <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-medium text-white tracking-tight">Treasury</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-medium text-white tracking-tight">Treasury</h1>
             {isAllowlisted && (
-              <span className="flex items-center gap-1.5 text-sm text-[#9CA3AF]">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#9CA3AF]" />
+              <span className="flex items-center gap-1 text-xs text-[#9CA3AF]">
+                <span className="w-1 h-1 rounded-full bg-[#9CA3AF]" />
                 Verified
               </span>
             )}
           </div>
-          <p className="text-[#9CA3AF] text-sm mt-1">
+          <p className="text-[#9CA3AF] text-[13px] mt-0.5">
             ${totalValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            <span className="text-[#6B7280] ml-2">total value</span>
+            <span className="text-[#6B7280] ml-1.5">total value</span>
           </p>
         </div>
         <div className="flex items-center gap-1">
@@ -480,29 +480,29 @@ const TreasuryScreen: React.FC = () => {
       </div>
 
       {/* Main Content */}
-      <div className="relative bg-gradient-to-b from-[#0F1629] to-[#111827] backdrop-blur-sm rounded-2xl border border-white/[0.08] p-6 shadow-[0_25px_50px_-12px_rgba(0,0,0,0.25)] hover:border-white/[0.12] transition-colors duration-200">
+      <div className="relative bg-gradient-to-b from-[#0F1629] to-[#111827] backdrop-blur-sm rounded-2xl border border-white/[0.08] p-5 shadow-[0_25px_50px_-12px_rgba(0,0,0,0.25)] hover:border-white/[0.12] transition-colors duration-200">
         {/* Top highlight line */}
         <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/15 to-transparent" />
 
         {/* Balances Row */}
-        <div className="grid grid-cols-2 gap-8 mb-6">
+        <div className="grid grid-cols-2 gap-6 mb-4">
           {/* USDC */}
           <div>
-            <p className="text-xs text-[#6B7280] uppercase tracking-[0.05em] mb-1">USDC (Liquid)</p>
-            <p className={`text-[32px] font-bold ${usdcValue > 0 ? 'text-white' : 'text-[#4B5563]'}`}>
+            <p className="text-[11px] text-[#6B7280] uppercase tracking-[0.05em] mb-0.5">USDC (Liquid)</p>
+            <p className={`text-[28px] font-bold ${usdcValue > 0 ? 'text-white' : 'text-[#4B5563]'}`}>
               {usdcValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </p>
           </div>
 
           {/* USYC */}
           <div>
-            <div className="flex items-center gap-2 mb-1">
-              <p className="text-xs text-[#6B7280] uppercase tracking-[0.05em]">USYC (Yield)</p>
-              <span className="text-xs text-[#93C5FD] font-medium bg-[#4A9EFF]/[0.08] border border-[#4A9EFF]/20 px-2.5 py-0.5 rounded-md">
+            <div className="flex items-center gap-2 mb-0.5">
+              <p className="text-[11px] text-[#6B7280] uppercase tracking-[0.05em]">USYC (Yield)</p>
+              <span className="text-[10px] text-[#93C5FD] font-medium bg-[#4A9EFF]/[0.08] border border-[#4A9EFF]/20 px-2 py-0.5 rounded">
                 {balance?.apy || '5.0'}% APY
               </span>
             </div>
-            <p className={`text-[32px] font-bold ${usycValue > 0 ? 'text-white' : 'text-[#4B5563]'}`}>
+            <p className={`text-[28px] font-bold ${usycValue > 0 ? 'text-white' : 'text-[#4B5563]'}`}>
               {usycValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </p>
           </div>
@@ -512,16 +512,16 @@ const TreasuryScreen: React.FC = () => {
         {allocation && <AllocationBar allocation={allocation} />}
 
         {/* Yield Stats */}
-        <div className="mt-6 pt-6 border-t border-white/[0.06]">
-          <div className="flex items-center gap-6 text-sm">
-            <div className="flex items-center gap-2">
+        <div className="mt-4 pt-4 border-t border-white/[0.06]">
+          <div className="flex items-center gap-5 text-[13px]">
+            <div className="flex items-center gap-1.5">
               <span className="text-[#6B7280]">Yield Earned</span>
               <span className={`font-medium ${yieldEarned > 0 ? 'text-[#4ADE80]' : 'text-[#6B7280]'}`}>
                 ${yieldEarned.toFixed(2)}
               </span>
             </div>
-            <div className="w-px h-4 bg-[#374151]" />
-            <div className="flex items-center gap-2">
+            <div className="w-px h-3 bg-[#374151]" />
+            <div className="flex items-center gap-1.5">
               <span className="text-[#6B7280]">Provider</span>
               <span className="text-[#9CA3AF] font-medium">Hashnote</span>
               <InfoTooltip content="USYC is backed by US Treasury Bills" />
@@ -530,7 +530,7 @@ const TreasuryScreen: React.FC = () => {
         </div>
 
         {/* Action Panels */}
-        <div className="grid grid-cols-2 gap-4 mt-6">
+        <div className="grid grid-cols-2 gap-3 mt-4">
           {balance && (
             <>
               <ActionPanel type="subscribe" balance={balance} onSuccess={handleRefresh} userEmail={userEmail} userRole={userRole} />

@@ -152,12 +152,12 @@ const ProgressSteps: React.FC<{ currentStep: number }> = ({ currentStep }) => {
   const steps = ['Details', 'Review', 'Confirm'];
 
   return (
-    <div className="flex items-center justify-center gap-3 my-6">
+    <div className="flex items-center justify-center gap-2 my-4">
       {steps.map((step, index) => (
         <React.Fragment key={step}>
-          <div className="flex flex-col items-center gap-1.5">
+          <div className="flex flex-col items-center gap-1">
             <div
-              className={`w-2.5 h-2.5 rounded-full transition-all ${
+              className={`w-2 h-2 rounded-full transition-all ${
                 index < currentStep
                   ? 'bg-white'
                   : index === currentStep
@@ -166,7 +166,7 @@ const ProgressSteps: React.FC<{ currentStep: number }> = ({ currentStep }) => {
               }`}
             />
             <span
-              className={`text-[11px] font-medium ${
+              className={`text-[10px] font-medium ${
                 index <= currentStep ? 'text-white' : 'text-[#4B5563]'
               }`}
             >
@@ -175,7 +175,7 @@ const ProgressSteps: React.FC<{ currentStep: number }> = ({ currentStep }) => {
           </div>
           {index < steps.length - 1 && (
             <div
-              className={`w-14 h-0.5 -mt-4 ${
+              className={`w-10 h-0.5 -mt-3 ${
                 index < currentStep ? 'bg-white' : 'bg-[#374151]'
               }`}
             />
@@ -468,31 +468,31 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
   };
 
   return (
-    <div className="w-full max-w-[480px] mx-auto px-6 py-8">
+    <div className="w-full max-w-[520px] mx-auto">
       {/* Header */}
-      <div className="mb-6">
+      <div className="mb-4">
         {/* Back Button */}
         {onBack && (
           <button
             onClick={onBack}
-            className="p-2 -ml-2 mb-4 text-[#6B7280] hover:text-white transition-colors"
+            className="p-1.5 -ml-1.5 mb-3 text-[#6B7280] hover:text-white transition-colors"
           >
-            <ArrowLeftIcon size={20} />
+            <ArrowLeftIcon size={18} />
           </button>
         )}
 
         {/* Title */}
-        <h1 className="text-2xl font-semibold text-white text-center tracking-[-0.5px]">
+        <h1 className="text-[22px] font-semibold text-white text-center tracking-[-0.5px]">
           Send Assets
         </h1>
-        <p className="text-[#6B7280] text-sm text-center mt-1.5">
+        <p className="text-[#6B7280] text-[13px] text-center mt-1">
           Transfer digital assets securely
         </p>
 
         {/* Security Indicator */}
-        <div className="flex items-center justify-center gap-1.5 mt-3">
-          <ShieldCheckIcon size={14} className="text-[#4B5563]" />
-          <span className="text-[#4B5563] text-xs">Secure transfer</span>
+        <div className="flex items-center justify-center gap-1.5 mt-2">
+          <ShieldCheckIcon size={12} className="text-[#4B5563]" />
+          <span className="text-[#4B5563] text-[11px]">Secure transfer</span>
         </div>
       </div>
 
@@ -501,32 +501,32 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
 
       {/* FROM - Source Wallet Card */}
       {passkeyConnected && (
-        <div className="mb-6">
-          <p className="text-[#6B7280] text-xs font-medium uppercase tracking-[0.05em] mb-2">From</p>
-          <div className="relative bg-gradient-to-b from-[#111827] to-[#0F1629] rounded-[14px] border border-white/[0.06] p-[18px_20px] overflow-hidden">
+        <div className="mb-4">
+          <p className="text-[#6B7280] text-[11px] font-medium uppercase tracking-[0.05em] mb-1.5">From</p>
+          <div className="relative bg-gradient-to-b from-[#111827] to-[#0F1629] rounded-xl border border-white/[0.06] p-3.5 overflow-hidden">
             {/* Top highlight */}
             <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/[0.08] to-transparent" />
 
-            <div className="flex items-center gap-3.5">
+            <div className="flex items-center gap-3">
               {/* Wallet Avatar */}
-              <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-[#1F2937] to-[#374151] border border-white/[0.1] flex items-center justify-center">
-                <WalletIcon size={22} className="text-[#9CA3AF]" />
+              <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-[#1F2937] to-[#374151] border border-white/[0.1] flex items-center justify-center">
+                <WalletIcon size={18} className="text-[#9CA3AF]" />
               </div>
 
               {/* Wallet Info */}
               <div className="flex-1">
-                <p className="text-[15px] font-semibold text-white">Smart Wallet</p>
-                <p className="text-[13px] text-[#6B7280] font-mono">
+                <p className="text-[14px] font-semibold text-white">Smart Wallet</p>
+                <p className="text-[12px] text-[#6B7280] font-mono">
                   {walletAddress ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}` : 'Loading...'}
                 </p>
               </div>
 
               {/* Badges */}
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] font-medium text-[#9CA3AF] bg-[#1A2235] border border-[#2D3748] px-2.5 py-1.5 rounded-md">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] font-medium text-[#9CA3AF] bg-[#1A2235] border border-[#2D3748] px-2 py-1 rounded">
                   ERC-4337
                 </span>
-                <span className="text-[11px] font-medium text-[#7DD3FC] bg-[rgba(74,158,255,0.08)] border border-[rgba(74,158,255,0.15)] px-2.5 py-1.5 rounded-md">
+                <span className="text-[10px] font-medium text-[#7DD3FC] bg-[rgba(74,158,255,0.08)] border border-[rgba(74,158,255,0.15)] px-2 py-1 rounded">
                   Gasless
                 </span>
               </div>
@@ -536,17 +536,17 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
       )}
 
       {/* Asset Selection */}
-      <div className="mb-6" ref={tokenDropdownRef}>
-        <p className="text-[#6B7280] text-xs font-medium uppercase tracking-[0.05em] mb-2">Asset</p>
+      <div className="mb-4" ref={tokenDropdownRef}>
+        <p className="text-[#6B7280] text-[11px] font-medium uppercase tracking-[0.05em] mb-1.5">Asset</p>
         <div className="relative">
           <button
             type="button"
             onClick={() => setShowTokenDropdown(!showTokenDropdown)}
-            className="w-full flex items-center gap-3 bg-[#0D1321] border border-[#1F2937] rounded-xl p-3.5 cursor-pointer transition-all hover:border-[#374151] hover:bg-[#111827] focus:border-[rgba(74,158,255,0.5)] focus:shadow-[0_0_0_3px_rgba(74,158,255,0.1)] focus:outline-none"
+            className="w-full flex items-center gap-2.5 bg-[#0D1321] border border-[#1F2937] rounded-lg p-3 cursor-pointer transition-all hover:border-[#374151] hover:bg-[#111827] focus:border-[rgba(74,158,255,0.5)] focus:shadow-[0_0_0_3px_rgba(74,158,255,0.1)] focus:outline-none"
           >
             {/* Token Icon */}
             <div
-              className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold"
+              className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[10px] font-bold"
               style={{ backgroundColor: getTokenColor(selectedToken.symbol) }}
             >
               {selectedToken.symbol.slice(0, 2)}
@@ -554,17 +554,17 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
 
             {/* Token Info */}
             <div className="flex items-center gap-1.5 flex-1">
-              <span className="text-[15px] font-medium text-white">{selectedToken.name}</span>
-              <span className="text-[15px] text-[#6B7280]">({selectedToken.symbol})</span>
+              <span className="text-[14px] font-medium text-white">{selectedToken.name}</span>
+              <span className="text-[14px] text-[#6B7280]">({selectedToken.symbol})</span>
             </div>
 
             {/* Chevron */}
-            <ChevronDownIcon size={20} className="text-[#6B7280]" />
+            <ChevronDownIcon size={18} className="text-[#6B7280]" />
           </button>
 
           {/* Dropdown */}
           {showTokenDropdown && (
-            <div className="absolute top-full left-0 right-0 mt-2 bg-[#111827] border border-[#1F2937] rounded-xl overflow-hidden z-50 shadow-xl">
+            <div className="absolute top-full left-0 right-0 mt-1.5 bg-[#111827] border border-[#1F2937] rounded-lg overflow-hidden z-50 shadow-xl">
               {getAllSupportedTokens().map((token) => (
                 <button
                   key={token.symbol}
@@ -573,18 +573,18 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
                     setSelectedToken(token);
                     setShowTokenDropdown(false);
                   }}
-                  className={`w-full flex items-center gap-3 p-3.5 transition-colors hover:bg-white/[0.05] ${
+                  className={`w-full flex items-center gap-2.5 p-3 transition-colors hover:bg-white/[0.05] ${
                     token.symbol === selectedToken.symbol ? 'bg-white/[0.03]' : ''
                   }`}
                 >
                   <div
-                    className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold"
+                    className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[10px] font-bold"
                     style={{ backgroundColor: getTokenColor(token.symbol) }}
                   >
                     {token.symbol.slice(0, 2)}
                   </div>
-                  <span className="text-[15px] font-medium text-white">{token.name}</span>
-                  <span className="text-[15px] text-[#6B7280]">({token.symbol})</span>
+                  <span className="text-[14px] font-medium text-white">{token.name}</span>
+                  <span className="text-[14px] text-[#6B7280]">({token.symbol})</span>
                 </button>
               ))}
             </div>
@@ -592,43 +592,43 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
         </div>
 
         {/* Balance */}
-        <div className="flex justify-end items-center gap-1 mt-2">
-          <span className="text-[13px] text-[#4B5563]">Balance:</span>
-          <span className="text-[13px] text-[#6B7280] font-medium font-mono">
+        <div className="flex justify-end items-center gap-1 mt-1.5">
+          <span className="text-[12px] text-[#4B5563]">Balance:</span>
+          <span className="text-[12px] text-[#6B7280] font-medium font-mono">
             {isLoading ? 'Loading...' : balanceLabel}
           </span>
         </div>
       </div>
 
       {/* Amount Input */}
-      <div className="mb-6">
-        <p className="text-[#6B7280] text-xs font-medium uppercase tracking-[0.05em] mb-2">Amount</p>
-        <div className="flex items-center bg-[#0D1321] border border-[#1F2937] rounded-xl p-3.5 transition-all focus-within:border-[rgba(74,158,255,0.5)] focus-within:shadow-[0_0_0_3px_rgba(74,158,255,0.1)]">
+      <div className="mb-4">
+        <p className="text-[#6B7280] text-[11px] font-medium uppercase tracking-[0.05em] mb-1.5">Amount</p>
+        <div className="flex items-center bg-[#0D1321] border border-[#1F2937] rounded-lg p-3 transition-all focus-within:border-[rgba(74,158,255,0.5)] focus-within:shadow-[0_0_0_3px_rgba(74,158,255,0.1)]">
           <input
             type="number"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             placeholder="0.00"
-            className="flex-1 bg-transparent text-white text-xl font-semibold outline-none placeholder:text-[#374151] font-mono"
+            className="flex-1 bg-transparent text-white text-lg font-semibold outline-none placeholder:text-[#374151] font-mono"
           />
-          <span className="text-[#6B7280] text-sm font-medium mr-3">{selectedToken.symbol}</span>
+          <span className="text-[#6B7280] text-[13px] font-medium mr-2">{selectedToken.symbol}</span>
           <button
             type="button"
             onClick={() => setAmount(balance.toFixed(6))}
-            className="text-xs font-semibold text-[#9CA3AF] bg-[#1F2937] border border-[#374151] rounded-md px-3 py-1.5 transition-colors hover:bg-[#374151] hover:text-white hover:border-[#4B5563]"
+            className="text-[10px] font-semibold text-[#9CA3AF] bg-[#1F2937] border border-[#374151] rounded px-2 py-1 transition-colors hover:bg-[#374151] hover:text-white hover:border-[#4B5563]"
           >
             MAX
           </button>
         </div>
 
         {/* Quick Amount Buttons */}
-        <div className="flex gap-2 mt-2.5">
+        <div className="flex gap-1.5 mt-2">
           {[25, 50, 75, 100].map((percent) => (
             <button
               key={percent}
               type="button"
               onClick={() => setAmount(((balance * percent) / 100).toFixed(6))}
-              className="text-xs text-[#6B7280] border border-[#374151] rounded px-2.5 py-1 transition-colors hover:border-[#4B5563] hover:text-[#9CA3AF]"
+              className="text-[11px] text-[#6B7280] border border-[#374151] rounded px-2 py-0.5 transition-colors hover:border-[#4B5563] hover:text-[#9CA3AF]"
             >
               {percent}%
             </button>
@@ -637,29 +637,29 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
       </div>
 
       {/* Recipient Address */}
-      <div className="mb-6 relative" ref={addressBookRef}>
-        <div className="flex items-center justify-between mb-2">
-          <p className="text-[#6B7280] text-xs font-medium uppercase tracking-[0.05em]">Send To</p>
+      <div className="mb-4 relative" ref={addressBookRef}>
+        <div className="flex items-center justify-between mb-1.5">
+          <p className="text-[#6B7280] text-[11px] font-medium uppercase tracking-[0.05em]">Send To</p>
           {recipient && isAddress(recipient) && !addressBookService.getContactByAddress(recipient) && (
             <button
               type="button"
               onClick={() => setShowSaveContact(true)}
               className="flex items-center gap-1 text-[#4B5563] hover:text-[#6B7280] transition-colors"
             >
-              <UserPlusIcon size={14} />
-              <span className="text-xs">Save Contact</span>
+              <UserPlusIcon size={12} />
+              <span className="text-[11px]">Save Contact</span>
             </button>
           )}
         </div>
 
-        <div className="flex items-center bg-[#0D1321] border border-[#1F2937] rounded-xl p-3.5 gap-3 transition-all focus-within:border-[rgba(74,158,255,0.5)] focus-within:shadow-[0_0_0_3px_rgba(74,158,255,0.1)]">
+        <div className="flex items-center bg-[#0D1321] border border-[#1F2937] rounded-lg p-3 gap-2.5 transition-all focus-within:border-[rgba(74,158,255,0.5)] focus-within:shadow-[0_0_0_3px_rgba(74,158,255,0.1)]">
           <input
             type="text"
             value={recipient}
             onChange={(e) => setRecipient(e.target.value)}
             onFocus={() => setShowAddressBook(true)}
             placeholder="0x... or ENS name"
-            className="flex-1 bg-transparent text-white text-sm font-mono tracking-wide outline-none placeholder:text-[#374151]"
+            className="flex-1 bg-transparent text-white text-[13px] font-mono tracking-wide outline-none placeholder:text-[#374151]"
           />
 
           {/* Valid Address Indicator */}
@@ -831,55 +831,55 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
       </div>
 
       {/* Transaction Summary Card */}
-      <div className="mb-6 bg-gradient-to-b from-[#0F1629] to-[#0D1321] rounded-2xl border border-white/[0.06] overflow-hidden">
+      <div className="mb-4 bg-gradient-to-b from-[#0F1629] to-[#0D1321] rounded-xl border border-white/[0.06] overflow-hidden">
         {/* Header */}
-        <div className="flex items-center gap-2.5 px-5 py-4 bg-white/[0.02] border-b border-white/[0.04]">
-          <FileTextIcon size={18} className="text-[#6B7280]" />
-          <span className="text-[14px] font-medium text-[#9CA3AF]">Transaction Summary</span>
+        <div className="flex items-center gap-2 px-4 py-3 bg-white/[0.02] border-b border-white/[0.04]">
+          <FileTextIcon size={16} className="text-[#6B7280]" />
+          <span className="text-[13px] font-medium text-[#9CA3AF]">Transaction Summary</span>
         </div>
 
         {/* Gas Sponsored Banner */}
-        <div className="mx-5 my-4 p-3.5 bg-[rgba(74,158,255,0.04)] border border-[rgba(74,158,255,0.08)] rounded-[10px] flex items-center gap-3">
-          <div className="w-9 h-9 rounded-[10px] bg-[rgba(74,158,255,0.1)] flex items-center justify-center">
-            <ZapIcon size={18} className="text-[#7DD3FC]" />
+        <div className="mx-4 my-3 p-3 bg-[rgba(74,158,255,0.04)] border border-[rgba(74,158,255,0.08)] rounded-lg flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg bg-[rgba(74,158,255,0.1)] flex items-center justify-center">
+            <ZapIcon size={16} className="text-[#7DD3FC]" />
           </div>
           <div>
-            <p className="text-[14px] font-medium text-[#E5E7EB]">Gas Sponsored</p>
-            <p className="text-[13px] text-[#6B7280]">Zero transaction fees</p>
+            <p className="text-[13px] font-medium text-[#E5E7EB]">Gas Sponsored</p>
+            <p className="text-[12px] text-[#6B7280]">Zero transaction fees</p>
           </div>
         </div>
 
         {/* Detail Rows */}
-        <div className="px-5">
-          <div className="flex justify-between items-center py-3.5 border-b border-white/[0.04]">
-            <span className="text-[14px] text-[#6B7280]">Sending</span>
-            <span className="text-[14px] font-semibold text-white">
+        <div className="px-4">
+          <div className="flex justify-between items-center py-2.5 border-b border-white/[0.04]">
+            <span className="text-[13px] text-[#6B7280]">Sending</span>
+            <span className="text-[13px] font-semibold text-white">
               {amountNumber > 0 ? `${amountNumber} ${selectedToken.symbol}` : '-'}
             </span>
           </div>
 
-          <div className="flex justify-between items-center py-3.5 border-b border-white/[0.04]">
-            <span className="text-[14px] text-[#6B7280]">Execution Route</span>
-            <div className="flex items-center gap-1.5">
-              <KeyIcon size={14} className="text-[#6B7280]" />
-              <span className="text-[14px] font-medium text-white">PasskeyAccount</span>
+          <div className="flex justify-between items-center py-2.5 border-b border-white/[0.04]">
+            <span className="text-[13px] text-[#6B7280]">Execution Route</span>
+            <div className="flex items-center gap-1">
+              <KeyIcon size={12} className="text-[#6B7280]" />
+              <span className="text-[13px] font-medium text-white">PasskeyAccount</span>
             </div>
           </div>
 
-          <div className="flex justify-between items-center py-3.5">
-            <span className="text-[14px] text-[#6B7280]">Network Fee</span>
+          <div className="flex justify-between items-center py-2.5">
+            <span className="text-[13px] text-[#6B7280]">Network Fee</span>
             <div className="flex items-center gap-1">
-              <ZapIcon size={14} className="text-[#7DD3FC]" />
-              <span className="text-[14px] font-semibold text-[#7DD3FC]">FREE</span>
+              <ZapIcon size={12} className="text-[#7DD3FC]" />
+              <span className="text-[13px] font-semibold text-[#7DD3FC]">FREE</span>
             </div>
           </div>
         </div>
 
         {/* Total */}
-        <div className="px-5 py-[18px] bg-white/[0.02] border-t border-white/[0.06]">
+        <div className="px-4 py-3 bg-white/[0.02] border-t border-white/[0.06]">
           <div className="flex justify-between items-center">
-            <span className="text-[14px] font-medium text-[#9CA3AF]">Total</span>
-            <span className="text-[18px] font-bold text-white font-mono">
+            <span className="text-[13px] font-medium text-[#9CA3AF]">Total</span>
+            <span className="text-base font-bold text-white font-mono">
               {total > 0 ? `${total.toFixed(4)} ${selectedToken.symbol}` : '-'}
             </span>
           </div>
@@ -888,29 +888,29 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
 
       {/* Error Message */}
       {submitError && (
-        <div className="mb-4 p-3 bg-[#1F2937]/50 border border-[#374151]/50 rounded-xl">
-          <p className="text-[13px] text-[#F87171] text-center">{submitError}</p>
+        <div className="mb-3 p-2.5 bg-[#1F2937]/50 border border-[#374151]/50 rounded-lg">
+          <p className="text-[12px] text-[#F87171] text-center">{submitError}</p>
         </div>
       )}
 
       {/* Success State */}
       {txHash && (
-        <div className="mb-6 text-center">
-          <div className="flex items-center justify-center gap-1.5 mb-3">
-            <CheckCircleIcon size={18} className="text-[#34D399]/80" />
-            <span className="text-[15px] font-medium text-[#34D399]/80">Transaction submitted!</span>
+        <div className="mb-4 text-center">
+          <div className="flex items-center justify-center gap-1.5 mb-2">
+            <CheckCircleIcon size={16} className="text-[#34D399]/80" />
+            <span className="text-[14px] font-medium text-[#34D399]/80">Transaction submitted!</span>
           </div>
           <a
             href={`${TX_EXPLORER_URL}${txHash}`}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#111827] border border-[#1F2937] rounded-lg transition-all hover:bg-[#1A2235] hover:border-[#374151] group"
+            className="inline-flex items-center gap-1.5 px-3 py-2 bg-[#111827] border border-[#1F2937] rounded-lg transition-all hover:bg-[#1A2235] hover:border-[#374151] group"
           >
-            <span className="text-[13px] text-[#9CA3AF] font-mono group-hover:text-white transition-colors">
+            <span className="text-[12px] text-[#9CA3AF] font-mono group-hover:text-white transition-colors">
               {txHash.slice(0, 10)}...{txHash.slice(-8)}
             </span>
-            <ExternalLinkIcon size={14} className="text-[#6B7280] group-hover:text-white transition-colors" />
-            <span className="text-[13px] text-[#6B7280] group-hover:text-white transition-colors">View on ArcScan</span>
+            <ExternalLinkIcon size={12} className="text-[#6B7280] group-hover:text-white transition-colors" />
+            <span className="text-[12px] text-[#6B7280] group-hover:text-white transition-colors">View on ArcScan</span>
           </a>
         </div>
       )}
@@ -920,7 +920,7 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
         type="button"
         onClick={handleSubmit}
         disabled={!canSubmit}
-        className={`w-full py-4 rounded-xl font-semibold text-base transition-all relative overflow-hidden ${
+        className={`w-full py-3 rounded-xl font-semibold text-[14px] transition-all relative overflow-hidden ${
           canSubmit
             ? 'bg-gradient-to-r from-[#3B82F6] to-[#2563EB] text-white shadow-[0_8px_24px_rgba(59,130,246,0.35)] hover:shadow-[0_12px_28px_rgba(59,130,246,0.45)] hover:-translate-y-0.5 active:translate-y-0 active:shadow-[0_4px_12px_rgba(59,130,246,0.25)]'
             : 'bg-[#1F2937] border border-[#374151] text-[#4B5563] cursor-not-allowed'
@@ -928,12 +928,12 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
       >
         {isSubmitting ? (
           <span className="flex items-center justify-center gap-2">
-            <Loader2Icon size={18} />
+            <Loader2Icon size={16} />
             <span>Sending...</span>
           </span>
         ) : (
           <span className="flex items-center justify-center gap-2">
-            <SendIcon size={18} />
+            <SendIcon size={16} />
             <span>Send with Passkey</span>
           </span>
         )}
@@ -941,7 +941,7 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
 
       {/* Helper Text */}
       {!passkeyConnected && (
-        <p className="mt-3 text-[13px] text-[#F87171] text-center">
+        <p className="mt-2 text-[12px] text-[#F87171] text-center">
           Connect with your passkey to send transactions.
         </p>
       )}
