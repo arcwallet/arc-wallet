@@ -11,6 +11,8 @@ export enum TransactionType {
   Contract = 'Contract',
   Swap = 'Swap',
   Bridge = 'Bridge',
+  Subscribe = 'Subscribe',
+  Redeem = 'Redeem',
 }
 
 export interface Approval {

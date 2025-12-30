@@ -1,8 +1,9 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { useActivity } from '../contexts/ActivityContext';
 import { useCircleWallet } from '../contexts/CircleWalletContext';
 import { TransactionStatus, TransactionType } from '../types';
 import { TX_EXPLORER_URL } from '../config/app.config';
+import { refreshTransactions } from '../services/activityService';
 import {
   SendIcon,
   ReceiveIcon,
@@ -11,15 +12,55 @@ import {
   RefreshIcon,
 } from './Icons';
 
-type FilterType = 'all' | 'send' | 'receive' | 'swap' | 'bridge';
+// Custom icons for new transaction types
+const SubscribeIcon = ({ size = 18, className = '' }: { size?: number; className?: string }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M12 2v20M17 7l-5-5-5 5" />
+    <circle cx="12" cy="16" r="4" />
+  </svg>
+);
+
+const RedeemIcon = ({ size = 18, className = '' }: { size?: number; className?: string }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M12 22V2M7 17l5 5 5-5" />
+    <circle cx="12" cy="8" r="4" />
+  </svg>
+);
+
+const ContractIcon = ({ size = 18, className = '' }: { size?: number; className?: string }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <rect x="3" y="3" width="18" height="18" rx="2" />
+    <path d="M9 9h6M9 12h6M9 15h4" />
+  </svg>
+);
+
+type FilterType = 'all' | 'send' | 'receive' | 'swap' | 'bridge' | 'treasury';
 type TimeFilter = 'all' | 'today' | 'week' | 'month';
 
 const History: React.FC = () => {
-  const { activities } = useActivity();
+  const { activities, addActivity } = useActivity();
   const { address } = useCircleWallet();
   const [filterType, setFilterType] = useState<FilterType>('all');
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Refresh transactions from blockchain
+  const handleRefresh = useCallback(async () => {
+    if (!address || isRefreshing) return;
+
+    setIsRefreshing(true);
+    try {
+      const freshTransactions = await refreshTransactions(address);
+      // The ActivityContext will handle merging/updating
+      freshTransactions.forEach(tx => addActivity(tx));
+      console.log(`[History] Refreshed ${freshTransactions.length} transactions`);
+    } catch (error) {
+      console.error('[History] Refresh failed:', error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [address, isRefreshing, addActivity]);
 
   const filteredActivities = useMemo(() => {
     let filtered = [...activities];
@@ -36,6 +77,8 @@ const History: React.FC = () => {
             return activity.type === TransactionType.Swap;
           case 'bridge':
             return activity.type === TransactionType.Bridge;
+          case 'treasury':
+            return activity.type === TransactionType.Subscribe || activity.type === TransactionType.Redeem;
           default:
             return true;
         }
@@ -86,6 +129,12 @@ const History: React.FC = () => {
         return <SwapIcon size={18} className="text-blue-400" />;
       case TransactionType.Bridge:
         return <BridgeIcon size={18} className="text-purple-400" />;
+      case TransactionType.Subscribe:
+        return <SubscribeIcon size={18} className="text-indigo-400" />;
+      case TransactionType.Redeem:
+        return <RedeemIcon size={18} className="text-amber-400" />;
+      case TransactionType.Contract:
+        return <ContractIcon size={18} className="text-slate-400" />;
       default:
         return <SendIcon size={18} className="text-slate-400" />;
     }
@@ -139,6 +188,15 @@ const History: React.FC = () => {
     return groups;
   }, [filteredActivities]);
 
+  // Calculate stats
+  const stats = useMemo(() => ({
+    total: activities.length,
+    sent: activities.filter(a => a.type === TransactionType.Sent).length,
+    received: activities.filter(a => a.type === TransactionType.Received).length,
+    bridges: activities.filter(a => a.type === TransactionType.Bridge).length,
+    treasury: activities.filter(a => a.type === TransactionType.Subscribe || a.type === TransactionType.Redeem).length,
+  }), [activities]);
+
   return (
     <div className="w-full max-w-4xl mx-auto space-y-6">
       {/* Header */}
@@ -146,10 +204,16 @@ const History: React.FC = () => {
         <div>
           <h2 className="text-white text-3xl font-bold">Transaction History</h2>
           <p className="text-slate-400 text-sm mt-1">
-            View all your wallet activity
+            View all your wallet activity on Arc Testnet
           </p>
         </div>
-        <button className="p-2 rounded-lg bg-slate-800/50 hover:bg-slate-700/50 text-slate-400 hover:text-white transition-colors">
+        <button
+          onClick={handleRefresh}
+          disabled={isRefreshing}
+          className={`p-2 rounded-lg bg-slate-800/50 hover:bg-slate-700/50 text-slate-400 hover:text-white transition-colors ${
+            isRefreshing ? 'animate-spin' : ''
+          }`}
+        >
           <RefreshIcon size={20} />
         </button>
       </div>
@@ -168,8 +232,8 @@ const History: React.FC = () => {
         </div>
 
         {/* Type Filter */}
-        <div className="flex gap-2">
-          {(['all', 'send', 'receive', 'swap', 'bridge'] as FilterType[]).map((type) => (
+        <div className="flex gap-2 flex-wrap">
+          {(['all', 'send', 'receive', 'swap', 'bridge', 'treasury'] as FilterType[]).map((type) => (
             <button
               key={type}
               onClick={() => setFilterType(type)}
@@ -198,28 +262,26 @@ const History: React.FC = () => {
       </div>
 
       {/* Stats Summary */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
         <div className="rounded-xl border border-slate-500/30 bg-slate-900/60 p-4">
-          <p className="text-slate-400 text-xs mb-1">Total Transactions</p>
-          <p className="text-white text-2xl font-bold">{activities.length}</p>
+          <p className="text-slate-400 text-xs mb-1">Total</p>
+          <p className="text-white text-2xl font-bold">{stats.total}</p>
         </div>
         <div className="rounded-xl border border-slate-500/30 bg-slate-900/60 p-4">
           <p className="text-slate-400 text-xs mb-1">Sent</p>
-          <p className="text-red-400 text-2xl font-bold">
-            {activities.filter((a) => a.type === TransactionType.Sent).length}
-          </p>
+          <p className="text-red-400 text-2xl font-bold">{stats.sent}</p>
         </div>
         <div className="rounded-xl border border-slate-500/30 bg-slate-900/60 p-4">
           <p className="text-slate-400 text-xs mb-1">Received</p>
-          <p className="text-green-400 text-2xl font-bold">
-            {activities.filter((a) => a.type === TransactionType.Received).length}
-          </p>
+          <p className="text-green-400 text-2xl font-bold">{stats.received}</p>
         </div>
         <div className="rounded-xl border border-slate-500/30 bg-slate-900/60 p-4">
           <p className="text-slate-400 text-xs mb-1">Bridges</p>
-          <p className="text-purple-400 text-2xl font-bold">
-            {activities.filter((a) => a.type === TransactionType.Bridge).length}
-          </p>
+          <p className="text-purple-400 text-2xl font-bold">{stats.bridges}</p>
+        </div>
+        <div className="rounded-xl border border-slate-500/30 bg-slate-900/60 p-4">
+          <p className="text-slate-400 text-xs mb-1">Treasury</p>
+          <p className="text-indigo-400 text-2xl font-bold">{stats.treasury}</p>
         </div>
       </div>
 
@@ -266,9 +328,12 @@ const History: React.FC = () => {
                           href={`${TX_EXPLORER_URL}${activity.hash}`}
                           target="_blank"
                           rel="noreferrer"
-                          className="text-blue-400 hover:text-blue-300 text-xs font-mono"
+                          className="text-blue-400 hover:text-blue-300 text-xs font-mono flex items-center gap-1"
                         >
                           {activity.hash.slice(0, 10)}...{activity.hash.slice(-8)}
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3" />
+                          </svg>
                         </a>
                       </div>
                     )}
@@ -288,6 +353,15 @@ const History: React.FC = () => {
                 ? 'Try adjusting your search or filters'
                 : 'Your transaction history will appear here'}
             </p>
+            {!searchQuery && address && (
+              <button
+                onClick={handleRefresh}
+                disabled={isRefreshing}
+                className="mt-4 px-4 py-2 rounded-lg bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 transition-colors text-sm font-medium"
+              >
+                {isRefreshing ? 'Refreshing...' : 'Refresh Now'}
+              </button>
+            )}
           </div>
         )}
       </div>
