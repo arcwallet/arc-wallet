@@ -32,15 +32,115 @@ import {
   WalletIcon,
   NotificationIcon,
   LockIcon,
-  VerifiedIcon,
-  EyeOffIcon,
-  EyeIcon,
-  SendIcon,
-  ReceiveIcon
 } from './Icons';
 import { formatTokenAmount, getAllSupportedTokens, TokenInfo } from '../config/tokens';
 import { DEFAULT_TOKEN_ICON } from '../config/app.config';
 import { tokenService, TokenBalance, TokenPrices } from '../services/tokenService';
+
+// ============================================
+// LUCIDE-STYLE SVG ICONS
+// ============================================
+
+const CheckCircleIcon = ({ size = 14, className = '' }: { size?: number; className?: string }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <circle cx="12" cy="12" r="10" />
+    <path d="M9 12l2 2 4-4" />
+  </svg>
+);
+
+const RefreshCwIcon = ({ size = 12, className = '' }: { size?: number; className?: string }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M21 2v6h-6" />
+    <path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
+    <path d="M3 22v-6h6" />
+    <path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
+  </svg>
+);
+
+const EyeIcon = ({ size = 20, className = '' }: { size?: number; className?: string }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+    <circle cx="12" cy="12" r="3" />
+  </svg>
+);
+
+const EyeOffIcon = ({ size = 20, className = '' }: { size?: number; className?: string }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+    <line x1="1" y1="1" x2="23" y2="23" />
+  </svg>
+);
+
+const ArrowUpRightIcon = ({ size = 18, className = '' }: { size?: number; className?: string }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <line x1="7" y1="17" x2="17" y2="7" />
+    <polyline points="7 7 17 7 17 17" />
+  </svg>
+);
+
+const ArrowDownLeftIcon = ({ size = 18, className = '' }: { size?: number; className?: string }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <line x1="17" y1="7" x2="7" y2="17" />
+    <polyline points="17 17 7 17 7 7" />
+  </svg>
+);
+
+const TrendingUpIcon = ({ size = 14, className = '' }: { size?: number; className?: string }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
+    <polyline points="17 6 23 6 23 12" />
+  </svg>
+);
+
+const TrendingDownIcon = ({ size = 14, className = '' }: { size?: number; className?: string }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <polyline points="23 18 13.5 8.5 8.5 13.5 1 6" />
+    <polyline points="17 18 23 18 23 12" />
+  </svg>
+);
+
+// ============================================
+// TOKEN BRAND COLORS
+// ============================================
+
+const TOKEN_COLORS: Record<string, { bg: string; border: string; text: string }> = {
+  USDC: {
+    bg: 'rgba(39, 117, 202, 0.15)',
+    border: 'rgba(39, 117, 202, 0.3)',
+    text: '#2775CA',
+  },
+  EURC: {
+    bg: 'rgba(26, 115, 232, 0.15)',
+    border: 'rgba(26, 115, 232, 0.3)',
+    text: '#1A73E8',
+  },
+  USYC: {
+    bg: 'rgba(99, 102, 241, 0.15)',
+    border: 'rgba(99, 102, 241, 0.3)',
+    text: '#6366F1',
+  },
+};
+
+const getTokenColor = (symbol: string) => {
+  return TOKEN_COLORS[symbol] || {
+    bg: 'rgba(74, 158, 255, 0.15)',
+    border: 'rgba(74, 158, 255, 0.3)',
+    text: '#4A9EFF',
+  };
+};
+
+const getTokenIconContent = (symbol: string): string => {
+  switch (symbol) {
+    case 'USDC': return 'US';
+    case 'EURC': return '€';
+    case 'USYC': return 'Y';
+    default: return symbol.slice(0, 2);
+  }
+};
+
+// ============================================
+// INTERFACES
+// ============================================
 
 interface DashboardHeaderProps {
   account: AccountSnapshot | null;
@@ -107,37 +207,37 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ isOpen, onC
       {/* Backdrop */}
       <div className="fixed inset-0 z-[100]" onClick={onClose} />
       {/* Dropdown */}
-      <div className="fixed right-8 top-20 mt-2 w-80 z-[110] rounded-lg border border-white/10 bg-[#151A22] shadow-lg">
-        <div className="p-4 border-b border-white/10">
-          <h3 className="text-lg font-semibold text-[#E6EEF3]">Notifications</h3>
+      <div className="fixed right-8 top-20 mt-2 w-80 z-[110] rounded-xl border border-white/[0.1] bg-[#0F1629] shadow-xl">
+        <div className="p-4 border-b border-white/[0.06]">
+          <h3 className="text-base font-semibold text-white">Notifications</h3>
         </div>
         <div className="max-h-96 overflow-y-auto">
           {notifications.length > 0 ? (
             notifications.map((notification) => (
-              <div key={notification.id} className="p-4 border-b border-white/5 hover:bg-white/5 transition-colors">
+              <div key={notification.id} className="p-4 border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors cursor-pointer">
                 <div className="flex items-start gap-3">
-                  <div className={`w-2 h-2 rounded-full mt-2 flex-shrink-0 ${notification.type === 'success' ? 'bg-green-400' :
+                  <div className={`w-2 h-2 rounded-full mt-2 flex-shrink-0 ${notification.type === 'success' ? 'bg-[#34D399]' :
                     notification.type === 'warning' ? 'bg-yellow-400' :
-                      'bg-blue-400'
+                      'bg-[#4A9EFF]'
                     }`} />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-[#E6EEF3] truncate">{notification.title}</p>
-                    <p className="text-sm text-[#A7B4C8] mt-1 leading-relaxed">{notification.message}</p>
-                    <p className="text-xs text-[#A7B4C8] mt-2">{notification.time}</p>
+                    <p className="text-sm font-medium text-white truncate">{notification.title}</p>
+                    <p className="text-sm text-[#9CA3AF] mt-1 leading-relaxed">{notification.message}</p>
+                    <p className="text-xs text-[#4B5563] mt-2">{notification.time}</p>
                   </div>
                 </div>
               </div>
             ))
           ) : (
             <div className="p-8 text-center">
-              <p className="text-sm text-[#A7B4C8]">No recent activity</p>
-              <p className="text-xs text-[#A7B4C8] mt-1">Your transactions and updates will appear here</p>
+              <p className="text-sm text-[#6B7280]">No recent activity</p>
+              <p className="text-xs text-[#4B5563] mt-1">Your transactions and updates will appear here</p>
             </div>
           )}
         </div>
-        <div className="p-3 border-t border-white/10">
+        <div className="p-3 border-t border-white/[0.06]">
           <button
-            className="w-full text-sm text-[#9EBBE4] hover:text-[#B9D1ED] transition-colors"
+            className="w-full text-sm text-[#4A9EFF] hover:text-[#6BB3FF] transition-colors font-medium"
             onClick={() => {
               onNavigateToTransactions();
               onClose();
@@ -173,28 +273,28 @@ const DashboardHeader: React.FC<DashboardHeaderPropsWithNav> = ({ account, isRef
   const lastUpdated = account ? formatBlockTime(account.latestBlock.timestamp) : '—';
 
   return (
-    <header className="relative z-50 flex h-20 items-center justify-between gap-4 border-b border-slate-500/30 px-8 py-3 backdrop-blur-sm bg-slate-900/40">
+    <header className="relative z-50 flex h-20 items-center justify-between gap-4 border-b border-white/[0.06] px-8 py-3 backdrop-blur-sm bg-[#0A0F1A]/80">
       <div />
       <div className="flex items-center gap-4">
         <div className="hidden lg:flex flex-col text-right">
-          <p className="text-xs text-[#A7B4C8] uppercase tracking-wide">{blockLabel}</p>
-          <p className="text-sm font-semibold text-[#E6EEF3]">{account ? `#${account.latestBlock.number.toLocaleString()}` : '—'}</p>
-          <p className="text-xs text-[#A7B4C8]">{lastUpdated}</p>
+          <p className="text-[11px] text-[#4B5563] uppercase tracking-[0.08em] font-semibold">{blockLabel}</p>
+          <p className="text-sm font-semibold text-white">{account ? `#${account.latestBlock.number.toLocaleString()}` : '—'}</p>
+          <p className="text-xs text-[#6B7280]">{lastUpdated}</p>
         </div>
         {/* Network Selector */}
         <NetworkSelector compact />
-        <div className="flex items-center gap-3 rounded-lg bg-[#151A22] border border-white/10 px-3 py-1.5 opacity-60 cursor-not-allowed" title="Privacy Mode with TEE - Coming Soon">
+        <div className="flex items-center gap-3 rounded-lg bg-[#111827] border border-white/[0.06] px-3 py-1.5 opacity-60 cursor-not-allowed" title="Privacy Mode with TEE - Coming Soon">
           <div className="flex items-center gap-2">
-            <LockIcon size={14} className="text-slate-500" />
-            <p className="text-sm font-medium text-slate-400">Privacy Mode</p>
+            <LockIcon size={14} className="text-[#4B5563]" />
+            <p className="text-sm font-medium text-[#6B7280]">Privacy Mode</p>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-blue-400 bg-blue-400/10 px-2 py-0.5 rounded">Coming Soon</span>
+            <span className="text-[11px] font-medium text-[#4A9EFF] bg-[rgba(74,158,255,0.1)] px-2 py-0.5 rounded">Coming Soon</span>
             <button
               disabled
-              className="relative inline-flex h-5 w-9 items-center rounded-full bg-slate-700 cursor-not-allowed opacity-50"
+              className="relative inline-flex h-5 w-9 items-center rounded-full bg-[#1F2937] cursor-not-allowed opacity-50"
             >
-              <span className="inline-block h-3.5 w-3.5 transform rounded-full bg-white translate-x-1" />
+              <span className="inline-block h-3.5 w-3.5 transform rounded-full bg-[#4B5563] translate-x-1" />
             </button>
           </div>
         </div>
@@ -205,24 +305,24 @@ const DashboardHeader: React.FC<DashboardHeaderPropsWithNav> = ({ account, isRef
               setHasCopiedAddress(true);
               setTimeout(() => setHasCopiedAddress(false), 2000);
             }}
-            className="hidden sm:flex items-center gap-2 rounded-lg bg-slate-900/60 backdrop-blur-sm px-3 py-1.5 border border-slate-500/50 text-left hover:border-blue-400 transition-all"
+            className="hidden sm:flex items-center gap-2 rounded-lg bg-[#111827] px-3 py-1.5 border border-white/[0.06] text-left hover:border-white/[0.15] hover:bg-[#1A2235] transition-all"
             title="Copy wallet address"
           >
-            <WalletIcon size={16} className="text-text-secondary" />
-            <p className="text-sm font-mono text-text-secondary">{hasCopiedAddress ? 'Copied!' : `${address.slice(0, 6)}...${address.slice(-4)}`}</p>
+            <WalletIcon size={16} className="text-[#6B7280]" />
+            <p className="text-sm font-mono text-[#9CA3AF]">{hasCopiedAddress ? 'Copied!' : `${address.slice(0, 6)}...${address.slice(-4)}`}</p>
           </button>
         )}
-        {error && <p className="hidden md:block text-sm text-accent-orange">{error}</p>}
+        {error && <p className="hidden md:block text-sm text-[#F87171]">{error}</p>}
         <div className="relative">
           <button
             onClick={() => setIsNotificationOpen(!isNotificationOpen)}
-            className="rounded-lg p-2 text-[#A7B4C8] hover:bg-[#151A22] transition-colors relative"
+            className="rounded-lg p-2 text-[#6B7280] hover:text-[#9CA3AF] hover:bg-white/[0.05] transition-all relative"
           >
             <NotificationIcon size={20} />
             {/* Notification badge */}
             {activities.length > 0 && (
-              <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full flex items-center justify-center">
-                <span className="text-xs text-white font-bold">{Math.min(activities.length, 9)}</span>
+              <span className="absolute -top-1 -right-1 w-4 h-4 bg-[#F87171] rounded-full flex items-center justify-center">
+                <span className="text-[10px] text-white font-bold">{Math.min(activities.length, 9)}</span>
               </span>
             )}
           </button>
@@ -234,9 +334,9 @@ const DashboardHeader: React.FC<DashboardHeaderPropsWithNav> = ({ account, isRef
         </div>
         <button
           onClick={disconnect}
-          className="flex min-w-[84px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 px-4 bg-[#151A22] text-[#E6EEF3] text-sm font-bold tracking-wide hover:bg-[#1f252e]"
+          className="flex min-w-[84px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 px-4 bg-[#111827] border border-white/[0.06] text-white text-sm font-semibold hover:bg-[#1A2235] hover:border-white/[0.1] transition-all"
         >
-          <LockIcon size={18} className="mr-2" />
+          <LockIcon size={16} className="mr-2 text-[#6B7280]" />
           <span className="truncate">Lock</span>
         </button>
       </div>
@@ -256,66 +356,85 @@ interface BalanceOverviewProps {
   toggleHidden: () => void;
 }
 
-const ShimmerBar: React.FC<{ width?: string }> = ({ width = '100%' }) => (
-  <div className="relative overflow-hidden rounded-md bg-white/5" style={{ width, height: '14px' }}>
-    <div className="absolute inset-0 animate-[shimmer_1.8s_infinite]" style={{ background: 'linear-gradient(90deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0.04) 100%)' }} />
-  </div>
-);
-
 const BalanceOverview: React.FC<BalanceOverviewProps> = ({ onNavigate, balanceDisplay, isLoading, lastUpdated, error, onRefresh, isRefreshing, isHidden, toggleHidden }) => {
   const displayBalance = balanceDisplay ?? '$0.00';
   const updatedAt = lastUpdated ? new Date(lastUpdated).toLocaleTimeString() : '—';
 
   return (
-    <div className="flex flex-col gap-6 rounded-xl bg-slate-900/60 backdrop-blur-sm border border-slate-500/50 p-6">
-      <div className="flex items-start justify-between">
+    <div className="relative bg-gradient-to-b from-[#111827] to-[#0F1629] rounded-[20px] border border-white/[0.06] p-[28px_32px] overflow-hidden">
+      {/* Top edge highlight */}
+      <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/[0.08] to-transparent" />
+
+      {/* Subtle background glow */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgba(74,158,255,0.03)_0%,transparent_70%)]" />
+
+      <div className="relative flex items-start justify-between">
         <div className="flex flex-col gap-2">
-          <p className="text-base font-medium text-[#A7B4C8]">Total Balance</p>
+          {/* Total Balance Label */}
+          <p className="text-sm font-medium text-[#6B7280]">Total Balance</p>
+
+          {/* Balance Value */}
           <div className="flex items-center gap-4">
-            <p className="text-4xl font-bold text-[#E6EEF3] min-h-[44px]">
+            <p
+              className="text-4xl font-bold text-white min-h-[44px]"
+              style={{ letterSpacing: '-1px', fontFeatureSettings: '"tnum"' }}
+            >
               {isHidden ? '••••••' : displayBalance}
             </p>
-            <div className="flex items-center gap-1.5">
-              <p className="text-green-400 text-sm font-medium">Finalized</p>
-              <VerifiedIcon size={16} className="text-green-400" />
+
+            {/* Finalized Badge - GRAY not green */}
+            <div className="inline-flex items-center gap-1.5 bg-white/[0.06] border border-white/[0.1] rounded-md px-2.5 py-1">
+              <CheckCircleIcon size={14} className="text-[#9CA3AF]" />
+              <span className="text-xs font-medium text-[#9CA3AF]">Finalized</span>
             </div>
           </div>
-          <div className="flex items-center gap-2 text-xs text-[#A7B4C8]">
-            {`Synced at ${updatedAt}`}
-            {(
-              <button
-                onClick={() => void onRefresh()}
-                className="p-1 text-[#A7B4C8] hover:text-white transition-colors"
-                aria-label="Refresh balances"
-              >
-                <RefreshIcon size={14} className={isRefreshing ? 'animate-spin' : ''} />
-              </button>
-            )}
+
+          {/* Synced at */}
+          <div className="flex items-center gap-1.5 mt-2">
+            <span className="text-xs text-[#4B5563]">Synced at {updatedAt}</span>
+            <button
+              onClick={() => void onRefresh()}
+              className="p-1 text-[#4B5563] hover:text-[#6B7280] transition-colors group"
+              aria-label="Refresh balances"
+            >
+              <RefreshCwIcon
+                size={12}
+                className={`transition-transform ${isRefreshing ? 'animate-spin' : 'group-hover:rotate-180'}`}
+              />
+            </button>
           </div>
-          {error && <p className="text-sm text-accent-orange">{error}</p>}
+
+          {error && <p className="text-sm text-[#F87171] mt-2">{error}</p>}
         </div>
+
+        {/* Eye Icon - Hide Balance Toggle */}
         <button
           onClick={toggleHidden}
-          className="p-2 text-[#A7B4C8] hover:bg-white/10 rounded-lg"
+          className="p-2 text-[#4B5563] hover:text-[#6B7280] hover:bg-white/[0.05] rounded-lg transition-all"
           title={isHidden ? 'Show balance' : 'Hide balance'}
         >
           {isHidden ? <EyeIcon size={20} /> : <EyeOffIcon size={20} />}
         </button>
       </div>
-      <div className="flex gap-4">
+
+      {/* Send / Receive Buttons */}
+      <div className="relative grid grid-cols-2 gap-4 mt-6">
+        {/* Send Button - White/Light */}
         <button
           onClick={() => onNavigate('Send')}
-          className="flex h-12 flex-1 items-center justify-center gap-2 px-5 text-base font-semibold bg-slate-200 hover:bg-white text-slate-900 rounded-lg shadow-[0_0_20px_rgba(255,255,255,0.1)] hover:shadow-[0_0_30px_rgba(255,255,255,0.2)] transition-all"
+          className="flex h-[52px] items-center justify-center gap-2 px-6 text-[15px] font-semibold bg-white text-[#0F1629] rounded-xl transition-all hover:bg-[#F1F5F9] hover:shadow-[0_4px_12px_rgba(255,255,255,0.1)] hover:-translate-y-0.5 active:translate-y-0 active:bg-[#E2E8F0]"
         >
-          <SendIcon size={20} />
-          <span className="truncate">Send</span>
+          <ArrowUpRightIcon size={18} />
+          <span>Send</span>
         </button>
+
+        {/* Receive Button - Outlined */}
         <button
           onClick={() => onNavigate('Receive')}
-          className="flex h-12 flex-1 items-center justify-center gap-2 px-5 text-base font-semibold bg-slate-200 hover:bg-white text-slate-900 rounded-lg shadow-[0_0_20px_rgba(255,255,255,0.1)] hover:shadow-[0_0_30px_rgba(255,255,255,0.2)] transition-all"
+          className="flex h-[52px] items-center justify-center gap-2 px-6 text-[15px] font-semibold bg-transparent border border-white/[0.15] text-white rounded-xl transition-all hover:bg-white/[0.05] hover:border-white/[0.25] hover:-translate-y-0.5 active:translate-y-0 active:bg-white/[0.08]"
         >
-          <ReceiveIcon size={20} />
-          <span className="truncate">Receive</span>
+          <ArrowDownLeftIcon size={18} />
+          <span>Receive</span>
         </button>
       </div>
     </div>
@@ -333,15 +452,31 @@ interface TokenAssetData {
   name: string;
   ticker: string;
   price: string;
+  priceNum: number;
   change: string;
+  changeNum: number;
   balance: string;
+  balanceNum: number;
   value: string;
+  valueNum: number;
   icon: string;
 }
 
-const AssetsTable: React.FC<AssetsTableProps> = ({ balanceDisplay, isLoading, tokenBalances: propTokenBalances, prices: propPrices }) => {
-  const [activeTab, setActiveTab] = useState<'tokens'>('tokens');
+// Helper function for price change color
+const getPriceChangeColor = (changeNum: number): string => {
+  if (changeNum > 0) return 'text-[#34D399]/80'; // Green at 80% opacity
+  if (changeNum < 0) return 'text-[#F87171]/80'; // Red at 80% opacity
+  return 'text-[#6B7280]'; // Gray for neutral/zero
+};
 
+// Helper function for price change display
+const formatPriceChange = (changeNum: number): string => {
+  if (changeNum === 0) return '0.00%'; // No + sign for zero
+  if (changeNum > 0) return `+${changeNum.toFixed(2)}%`;
+  return `${changeNum.toFixed(2)}%`;
+};
+
+const AssetsTable: React.FC<AssetsTableProps> = ({ balanceDisplay, isLoading, tokenBalances: propTokenBalances, prices: propPrices }) => {
   // Use props if provided, otherwise empty
   const tokenBalances = propTokenBalances || [];
   const prices = propPrices || {};
@@ -355,9 +490,13 @@ const AssetsTable: React.FC<AssetsTableProps> = ({ balanceDisplay, isLoading, to
           name: `${token.name} (${token.symbol})`,
           ticker: token.symbol,
           price: `$${priceUsd.toFixed(2)}`,
-          change: '+0.00%',
-          balance: '0.00',
+          priceNum: priceUsd,
+          change: '0.00%',
+          changeNum: 0,
+          balance: `0.00 ${token.symbol}`,
+          balanceNum: 0,
           value: '$0.00',
+          valueNum: 0,
           icon: token.icon || DEFAULT_TOKEN_ICON,
         };
       });
@@ -373,72 +512,139 @@ const AssetsTable: React.FC<AssetsTableProps> = ({ balanceDisplay, isLoading, to
         name: `${tokenBalance.token.name} (${tokenBalance.token.symbol})`,
         ticker: tokenBalance.token.symbol,
         price: `$${priceUsd.toFixed(2)}`,
-        change: '+0.00%',
+        priceNum: priceUsd,
+        change: '0.00%',
+        changeNum: 0, // We don't have real price change data
         balance: `${qty.toFixed(2)} ${tokenBalance.token.symbol}`,
+        balanceNum: qty,
         value: `$${value.toFixed(2)}`,
+        valueNum: value,
         icon: tokenBalance.token.icon || DEFAULT_TOKEN_ICON,
       };
     });
   }, [tokenBalances, prices]);
 
+  const tokenCount = rows.length;
+
   return (
     <div>
-      <div className="flex items-center justify-between">
-        <div className="flex gap-6">
-          <button
-            onClick={() => setActiveTab('tokens')}
-            className={`text-lg font-semibold transition-colors ${activeTab === 'tokens' ? 'text-[#E6EEF3]' : 'text-[#A7B4C8] hover:text-white'}`}
-          >
-            My Assets
-          </button>
-
-        </div>
+      {/* My Assets Header with Badge */}
+      <div className="flex items-center gap-2 mt-10 mb-5">
+        <h2 className="text-lg font-semibold text-white">My Assets</h2>
+        <span className="bg-[#1F2937] text-[#6B7280] text-xs font-medium px-2 py-0.5 rounded-full">
+          {tokenCount}
+        </span>
       </div>
-      <div className="mt-3 flow-root">
+
+      {/* Table */}
+      <div className="flow-root">
         <div className="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
           <div className="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
             <table className="min-w-full">
-              <thead className="text-left text-xs font-semibold uppercase text-[#A7B4C8]">
-                <tr>
-                  <th scope="col" className="py-3.5 pl-4 pr-3 sm:pl-0">Asset</th>
-                  <th scope="col" className="px-3 py-3.5">Price</th>
-                  <th scope="col" className="px-3 py-3.5">Balance</th>
-                  <th scope="col" className="relative py-3.5 pl-3 pr-4 sm:pr-0">Value</th>
+              {/* Table Header */}
+              <thead>
+                <tr className="border-b border-white/[0.06]">
+                  <th scope="col" className="py-3 pl-4 pr-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-[#4B5563] sm:pl-0" style={{ flex: 2 }}>
+                    Asset
+                  </th>
+                  <th scope="col" className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-[#4B5563]" style={{ flex: 1 }}>
+                    Price
+                  </th>
+                  <th scope="col" className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-[#4B5563]" style={{ flex: 1 }}>
+                    Balance
+                  </th>
+                  <th scope="col" className="py-3 pl-3 pr-4 text-right text-[11px] font-semibold uppercase tracking-[0.08em] text-[#4B5563] sm:pr-0" style={{ flex: 1 }}>
+                    Value
+                  </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/10">
-                {rows.map((asset) => (
-                  <tr key={asset.name}>
-                    <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm sm:pl-0">
-                      <div className="flex items-center">
-                        <div className="h-10 w-10 flex-shrink-0 bg-white/5 rounded-full flex items-center justify-center overflow-hidden">
-                          {asset.icon && (asset.icon.startsWith('http') || asset.icon.startsWith('/')) ? (
-                            <img className="h-10 w-10 object-cover" src={asset.icon} alt={`${asset.name} logo`} />
-                          ) : (
-                            <span className="text-xs font-bold text-[#A7B4C8]">{asset.ticker.slice(0, 2)}</span>
-                          )}
+
+              {/* Table Body */}
+              <tbody>
+                {rows.map((asset) => {
+                  const isZeroBalance = asset.balanceNum === 0;
+                  const tokenColor = getTokenColor(asset.ticker);
+
+                  return (
+                    <tr
+                      key={asset.ticker}
+                      className={`
+                        rounded-xl cursor-pointer transition-all duration-150
+                        hover:bg-white/[0.03]
+                        ${isZeroBalance ? 'opacity-60 hover:opacity-100' : ''}
+                      `}
+                    >
+                      {/* Asset Column */}
+                      <td className="whitespace-nowrap py-4 pl-4 pr-3 sm:pl-0">
+                        <div className="flex items-center">
+                          {/* Token Icon with Brand Colors */}
+                          <div
+                            className="h-10 w-10 flex-shrink-0 rounded-full flex items-center justify-center"
+                            style={{
+                              backgroundColor: tokenColor.bg,
+                              border: `1px solid ${tokenColor.border}`,
+                            }}
+                          >
+                            {asset.icon && (asset.icon.startsWith('http') || asset.icon.startsWith('/')) ? (
+                              <img
+                                className={`h-10 w-10 object-cover rounded-full ${isZeroBalance ? 'opacity-50' : ''}`}
+                                src={asset.icon}
+                                alt={`${asset.name} logo`}
+                              />
+                            ) : (
+                              <span
+                                className="text-xs font-bold"
+                                style={{ color: tokenColor.text }}
+                              >
+                                {getTokenIconContent(asset.ticker)}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Token Name */}
+                          <div className="ml-3.5">
+                            <div className={`text-[15px] font-medium ${isZeroBalance ? 'text-[#9CA3AF]' : 'text-white'}`}>
+                              {asset.name}
+                            </div>
+                            <div className={`text-[13px] mt-0.5 ${isZeroBalance ? 'text-[#4B5563]' : 'text-[#6B7280]'}`}>
+                              {asset.ticker}
+                            </div>
+                          </div>
                         </div>
-                        <div className="ml-4">
-                          <div className="font-medium text-[#E6EEF3]">{asset.name}</div>
-                          <div className="text-[#A7B4C8]">{asset.ticker}</div>
+                      </td>
+
+                      {/* Price Column */}
+                      <td className="whitespace-nowrap px-3 py-4">
+                        <div className={`text-sm font-medium ${isZeroBalance ? 'text-[#9CA3AF]' : 'text-white'}`}>
+                          {asset.price}
                         </div>
-                      </div>
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-4 text-sm">
-                      <>
-                        <div className="text-slate-100">{asset.price}</div>
-                        <div className="text-green-400">{asset.change}</div>
-                      </>
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-4 text-sm text-slate-300">{asset.balance}</td>
-                    <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-0">
-                      <div className="text-slate-100">{asset.value}</div>
-                    </td>
-                  </tr>
-                ))}
+                        <div className={`text-[13px] mt-0.5 ${isZeroBalance ? 'text-[#4B5563]' : getPriceChangeColor(asset.changeNum)}`}>
+                          {formatPriceChange(asset.changeNum)}
+                        </div>
+                      </td>
+
+                      {/* Balance Column */}
+                      <td className="whitespace-nowrap px-3 py-4">
+                        <span
+                          className={`text-sm font-medium font-mono ${isZeroBalance ? 'text-[#4B5563]' : 'text-white'}`}
+                        >
+                          {asset.balance}
+                        </span>
+                      </td>
+
+                      {/* Value Column */}
+                      <td className="whitespace-nowrap py-4 pl-3 pr-4 text-right sm:pr-0">
+                        <span
+                          className={`text-sm font-semibold ${isZeroBalance ? 'text-[#4B5563]' : 'text-white'}`}
+                        >
+                          {asset.value}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
-
           </div>
         </div>
       </div>
@@ -478,36 +684,38 @@ const RecentActivity: React.FC<{ activities: any[]; onNavigate: (page: string) =
   };
 
   return (
-    <div className="mt-6">
+    <div className="mt-8">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-[#E6EEF3]">Recent Activity</h3>
+        <h3 className="text-lg font-semibold text-white">Recent Activity</h3>
         <button
           onClick={() => onNavigate('History')}
-          className="text-sm text-blue-400 hover:text-blue-300 transition-colors"
+          className="text-sm text-[#4A9EFF] hover:text-[#6BB3FF] transition-colors font-medium"
         >
           View All
         </button>
       </div>
-      <div className="rounded-xl border border-slate-500/30 bg-slate-900/60 overflow-hidden">
+      <div className="rounded-xl border border-white/[0.06] bg-[#0F1629] overflow-hidden">
         {recentItems.length > 0 ? (
-          <div className="divide-y divide-slate-700/50">
+          <div className="divide-y divide-white/[0.04]">
             {recentItems.map((activity, index) => (
-              <div key={activity.id || index} className="p-4 flex items-center justify-between hover:bg-slate-800/40 transition-colors">
+              <div key={activity.id || index} className="p-4 flex items-center justify-between hover:bg-white/[0.02] transition-colors cursor-pointer">
                 <div className="flex items-center gap-3">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                    activity.amount >= 0 ? 'bg-green-500/10' : 'bg-red-500/10'
+                  <div className={`w-9 h-9 rounded-full flex items-center justify-center ${
+                    activity.amount >= 0 ? 'bg-[rgba(52,211,153,0.1)]' : 'bg-[rgba(248,113,113,0.1)]'
                   }`}>
-                    <span className={activity.amount >= 0 ? 'text-green-400' : 'text-red-400'}>
-                      {activity.amount >= 0 ? '&#8595;' : '&#8593;'}
-                    </span>
+                    {activity.amount >= 0 ? (
+                      <ArrowDownLeftIcon size={16} className="text-[#34D399]" />
+                    ) : (
+                      <ArrowUpRightIcon size={16} className="text-[#F87171]" />
+                    )}
                   </div>
                   <div>
                     <p className="text-white text-sm font-medium">{activity.description}</p>
-                    <p className="text-slate-500 text-xs">{formatTime(activity.date)}</p>
+                    <p className="text-[#4B5563] text-xs mt-0.5">{formatTime(activity.date)}</p>
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className={`font-semibold text-sm ${activity.amount >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                  <p className={`font-semibold text-sm ${activity.amount >= 0 ? 'text-[#34D399]' : 'text-[#F87171]'}`}>
                     {activity.amount >= 0 ? '+' : ''}{activity.amount?.toFixed(2) || '0.00'} {activity.currency || 'USDC'}
                   </p>
                 </div>
@@ -515,12 +723,12 @@ const RecentActivity: React.FC<{ activities: any[]; onNavigate: (page: string) =
             ))}
           </div>
         ) : (
-          <div className="p-8 text-center">
-            <div className="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center mx-auto mb-3">
-              <span className="text-slate-500 text-xl">&#x1F4CB;</span>
+          <div className="p-10 text-center">
+            <div className="w-14 h-14 rounded-full bg-[#111827] flex items-center justify-center mx-auto mb-4">
+              <ArrowUpRightIcon size={24} className="text-[#4B5563]" />
             </div>
-            <p className="text-slate-400 text-sm">No recent activity</p>
-            <p className="text-slate-500 text-xs mt-1">Your transactions will appear here</p>
+            <p className="text-[#6B7280] text-sm font-medium">No recent activity</p>
+            <p className="text-[#4B5563] text-xs mt-1">Your transactions will appear here</p>
           </div>
         )}
       </div>
@@ -541,9 +749,7 @@ const DashboardHome: React.FC<DashboardHomeProps> = ({ onNavigate, balanceDispla
       isHidden={isHidden}
       toggleHidden={toggleHidden}
     />
-    <div className="mt-6">
-      <AssetsTable balanceDisplay={balanceDisplay} isLoading={isLoading} tokenBalances={tokenBalances} prices={prices} />
-    </div>
+    <AssetsTable balanceDisplay={balanceDisplay} isLoading={isLoading} tokenBalances={tokenBalances} prices={prices} />
   </>
 );
 
@@ -737,7 +943,7 @@ const WalletDashboard: React.FC = () => {
   };
 
   return (
-    <div className="flex h-screen w-full bg-[#091325] text-white">
+    <div className="flex h-screen w-full bg-[#0A0F1A] text-white">
       <SideNavBar currentPage={currentPage} onNavigate={handleNavigate} />
       <main className="flex flex-1 flex-col overflow-hidden">
         <DashboardHeader account={snapshot} isRefreshing={isAccountLoading} onRefresh={refresh} error={accountError} onNavigate={handleNavigate} />
