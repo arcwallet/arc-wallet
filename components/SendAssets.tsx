@@ -1,5 +1,5 @@
 
-import React, { useEffect, useMemo, useState, useRef } from 'react';
+import React, { useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import { isAddress, parseUnits, Interface } from 'ethers';
 import { useArcAccount } from '../contexts/ArcAccountContext';
 import { useCircleWallet } from '../contexts/CircleWalletContext';
@@ -139,26 +139,27 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
     return total;
   };
 
+  // Fetch token balance - memoized callback for reuse
+  const fetchTokenBalance = useCallback(async () => {
+    const addresses = listAddresses();
+    if (addresses.length === 0) {
+      setTokenBalance('0');
+      return;
+    }
+
+    try {
+      const total = await fetchTotalBalance(selectedToken.symbol, addresses);
+      setTokenBalance(total.toString());
+    } catch (error) {
+      console.error('Error fetching token balance:', error);
+      setTokenBalance('0');
+    }
+  }, [selectedToken, walletAddress]);
+
   // Fetch token balance when selected token or address changes
   useEffect(() => {
-    const fetchTokenBalance = async () => {
-      const addresses = listAddresses();
-      if (addresses.length === 0) {
-        setTokenBalance('0');
-        return;
-      }
-
-      try {
-        const total = await fetchTotalBalance(selectedToken.symbol, addresses);
-        setTokenBalance(total.toString());
-      } catch (error) {
-        console.error('Error fetching token balance:', error);
-        setTokenBalance('0');
-      }
-    };
-
     fetchTokenBalance();
-  }, [selectedToken, walletAddress]);
+  }, [fetchTokenBalance]);
 
   // PasskeyAccount is always a Smart Account - no need to check availability
 
@@ -302,8 +303,10 @@ const SendAssets: React.FC<SendAssetsProps> = ({ initialAmount = '', initialReci
       // Record recipient in address book
       addressBookService.recordRecipient(recipient, amount, selectedToken.symbol);
 
-      // Refresh balance after successful transaction
+      // Refresh balances after successful transaction
       refreshBalance();
+      // Also refresh token balance with a small delay
+      setTimeout(() => fetchTokenBalance(), 1500);
 
       // Add to activity
       addActivity({

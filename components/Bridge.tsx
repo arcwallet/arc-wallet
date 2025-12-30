@@ -6,11 +6,14 @@
  * - Base Sepolia → Arc
  */
 
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { useCircleWallet } from '../contexts/CircleWalletContext';
 import { useBridge } from '../contexts/BridgeContext';
 import { SpinnerIcon } from './Icons';
 import { formatUnits, parseUnits } from 'ethers';
+
+// Balance refresh interval (15 seconds)
+const BALANCE_REFRESH_INTERVAL = 15_000;
 
 type BridgeDirection = 'arc-to-base' | 'base-to-arc';
 
@@ -66,36 +69,44 @@ const Bridge: React.FC = () => {
   const ARC_USDC = '0x3600000000000000000000000000000000000000';
   const BASE_SEPOLIA_USDC = '0x036CbD53842c5426634e7929541eC2318f3dCF7e';
 
-  // Fetch balances
-  useEffect(() => {
-    const fetchBalances = async () => {
-      if (!address || !isConnected) return;
+  // Fetch balances - memoized callback for reuse
+  const fetchBalances = useCallback(async (showLoading = true) => {
+    if (!address || !isConnected) return;
 
-      setIsLoadingBalance(true);
+    if (showLoading) setIsLoadingBalance(true);
+    try {
+      // Get Arc balance
+      const arcBal = await getTokenBalance(ARC_USDC);
+      setArcBalance(formatUnits(arcBal, 6));
+
+      // Get Base Sepolia balance
       try {
-        // Get Arc balance
-        const arcBal = await getTokenBalance(ARC_USDC);
-        setArcBalance(formatUnits(arcBal, 6));
-
-        // Get Base Sepolia balance
-        try {
-          const baseBal = await getTokenBalanceOnChain(84532, BASE_SEPOLIA_USDC);
-          setBaseBalance(formatUnits(baseBal, 6));
-        } catch (baseErr) {
-          console.error('Failed to fetch Base Sepolia balance:', baseErr);
-          setBaseBalance('0.00');
-        }
-      } catch (err) {
-        console.error('Failed to fetch balances:', err);
-        setArcBalance('0.00');
+        const baseBal = await getTokenBalanceOnChain(84532, BASE_SEPOLIA_USDC);
+        setBaseBalance(formatUnits(baseBal, 6));
+      } catch (baseErr) {
+        console.error('Failed to fetch Base Sepolia balance:', baseErr);
         setBaseBalance('0.00');
-      } finally {
-        setIsLoadingBalance(false);
       }
-    };
-
-    fetchBalances();
+    } catch (err) {
+      console.error('Failed to fetch balances:', err);
+      setArcBalance('0.00');
+      setBaseBalance('0.00');
+    } finally {
+      if (showLoading) setIsLoadingBalance(false);
+    }
   }, [address, isConnected, getTokenBalance, getTokenBalanceOnChain]);
+
+  // Initial fetch + periodic refresh
+  useEffect(() => {
+    fetchBalances();
+
+    // Set up periodic refresh every 15 seconds
+    const intervalId = setInterval(() => {
+      fetchBalances(false); // Silent refresh (no loading spinner)
+    }, BALANCE_REFRESH_INTERVAL);
+
+    return () => clearInterval(intervalId);
+  }, [fetchBalances]);
 
   // Get source chain balance based on direction
   const sourceBalance = direction === 'arc-to-base' ? arcBalance : baseBalance;
@@ -204,6 +215,12 @@ const Bridge: React.FC = () => {
       setStatusVariant('success');
       setStatusMessage('Bridge initiated successfully! Your USDC will arrive shortly.');
       setAmount('');
+
+      // Refresh balances after successful bridge
+      // Small delay to allow transaction to propagate
+      setTimeout(() => fetchBalances(), 2000);
+      // Refresh again after attestation might complete
+      setTimeout(() => fetchBalances(), 10000);
 
     } catch (err: any) {
       const message = err?.message || 'Bridge transaction failed';
