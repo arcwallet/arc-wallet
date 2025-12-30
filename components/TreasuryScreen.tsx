@@ -69,13 +69,13 @@ const AllocationBar: React.FC<{ allocation: TreasuryAllocation }> = ({ allocatio
   return (
     <div className="space-y-3">
       {/* Stacked bar */}
-      <div className="h-3 bg-slate-800 rounded-full overflow-hidden flex">
+      <div className="h-3 bg-[#151A22] rounded-full overflow-hidden flex">
         <div
           className="h-full bg-gradient-to-r from-blue-500 to-blue-400 transition-all duration-500"
           style={{ width: `${allocation.liquid}%` }}
         />
         <div
-          className="h-full bg-gradient-to-r from-cyan-500 to-cyan-400 transition-all duration-500"
+          className="h-full bg-gradient-to-r from-green-500 to-green-400 transition-all duration-500"
           style={{ width: `${allocation.yield}%` }}
         />
       </div>
@@ -84,13 +84,13 @@ const AllocationBar: React.FC<{ allocation: TreasuryAllocation }> = ({ allocatio
       <div className="flex items-center gap-6 text-sm">
         <div className="flex items-center gap-2">
           <div className="w-2.5 h-2.5 rounded-full bg-blue-500" />
-          <span className="text-slate-400">USDC</span>
-          <span className="text-slate-200 font-medium">{allocation.liquid}%</span>
+          <span className="text-[#A7B4C8]">USDC</span>
+          <span className="text-[#E6EEF3] font-medium">{allocation.liquid}%</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-2.5 h-2.5 rounded-full bg-cyan-500" />
-          <span className="text-slate-400">USYC</span>
-          <span className="text-slate-200 font-medium">{allocation.yield}%</span>
+          <div className="w-2.5 h-2.5 rounded-full bg-green-500" />
+          <span className="text-[#A7B4C8]">USYC</span>
+          <span className="text-[#E6EEF3] font-medium">{allocation.yield}%</span>
         </div>
       </div>
     </div>
@@ -214,51 +214,51 @@ const ActionPanel: React.FC<ActionPanelProps> = ({ type, balance, onSuccess, use
   };
 
   return (
-    <div className="bg-slate-900/40 rounded-xl border border-slate-700/50 p-5">
+    <div className="bg-slate-900/60 backdrop-blur-sm rounded-xl border border-slate-500/50 p-5">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-base font-medium text-slate-200">
+        <h3 className="text-base font-medium text-[#E6EEF3]">
           {isSubscribe ? 'USDC → USYC' : 'USYC → USDC'}
         </h3>
-        <span className="text-xs text-slate-500 uppercase tracking-wide">
+        <span className="text-xs text-[#A7B4C8] uppercase tracking-wide">
           {isSubscribe ? 'Subscribe' : 'Redeem'}
         </span>
       </div>
 
       {/* Amount Input */}
       <div className="mb-4">
-        <div className="flex items-center gap-2 bg-slate-800/60 border border-slate-600/40 p-3 rounded-lg">
+        <div className="flex items-center gap-2 bg-[#151A22] border border-slate-500/50 p-3 rounded-lg">
           <input
             type="number"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             placeholder="0.00"
-            className="bg-transparent text-white text-lg font-medium w-full outline-none placeholder:text-slate-600"
+            className="bg-transparent text-[#E6EEF3] text-lg font-medium w-full outline-none placeholder:text-[#A7B4C8]/50"
           />
           <button
             onClick={handleMaxClick}
-            className="text-xs text-cyan-400 hover:text-cyan-300 font-medium px-2 py-1 bg-cyan-500/10 rounded transition-colors"
+            className="text-xs text-blue-400 hover:text-blue-300 font-medium px-2 py-1 bg-blue-400/10 rounded transition-colors"
           >
             MAX
           </button>
-          <span className="text-slate-400 text-sm font-medium">{inputToken}</span>
+          <span className="text-[#A7B4C8] text-sm font-medium">{inputToken}</span>
         </div>
-        <p className="text-slate-500 text-xs mt-1.5">
+        <p className="text-[#A7B4C8] text-xs mt-1.5">
           Available: {parseFloat(maxAmount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {inputToken}
         </p>
       </div>
 
       {/* Output Preview */}
       {quote && (
-        <div className="mb-4 p-3 bg-slate-800/40 rounded-lg">
+        <div className="mb-4 p-3 bg-[#151A22] rounded-lg border border-slate-500/30">
           <div className="flex items-center justify-between">
-            <span className="text-slate-400 text-sm">You receive</span>
-            <span className="text-white font-medium">
+            <span className="text-[#A7B4C8] text-sm">You receive</span>
+            <span className="text-[#E6EEF3] font-medium">
               {parseFloat(quote.outputAmount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {outputToken}
             </span>
           </div>
           <div className="flex items-center justify-between mt-1">
-            <span className="text-slate-500 text-xs">Rate</span>
-            <span className="text-slate-400 text-xs">1:{quote.rate}</span>
+            <span className="text-[#A7B4C8]/70 text-xs">Rate</span>
+            <span className="text-[#A7B4C8] text-xs">1:{quote.rate}</span>
           </div>
         </div>
       )}
@@ -287,8 +287,8 @@ const ActionPanel: React.FC<ActionPanelProps> = ({ type, balance, onSuccess, use
 
       {/* Success */}
       {txHash && (
-        <div className="mb-4 p-3 bg-cyan-500/10 border border-cyan-500/20 rounded-lg">
-          <p className="text-xs text-cyan-400">
+        <div className="mb-4 p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
+          <p className="text-xs text-green-400">
             Submitted!{' '}
             <a href={`${TX_EXPLORER_URL}${txHash}`} target="_blank" rel="noreferrer" className="underline">
               View tx
@@ -303,10 +303,8 @@ const ActionPanel: React.FC<ActionPanelProps> = ({ type, balance, onSuccess, use
         disabled={!quote || executing || loading || !isConnected || (policyValidation && !policyValidation.allowed)}
         className={`w-full py-2.5 rounded-lg font-medium text-sm transition-all ${
           !quote || executing || !isConnected || (policyValidation && !policyValidation.allowed)
-            ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
-            : isSubscribe
-            ? 'bg-cyan-600 hover:bg-cyan-500 text-white'
-            : 'bg-blue-600 hover:bg-blue-500 text-white'
+            ? 'bg-[#151A22] text-[#A7B4C8]/50 cursor-not-allowed border border-slate-500/30'
+            : 'bg-slate-200 hover:bg-white text-slate-900 shadow-[0_0_20px_rgba(255,255,255,0.1)] hover:shadow-[0_0_30px_rgba(255,255,255,0.2)]'
         }`}
       >
         {executing ? 'Processing...' : loading ? 'Loading...' :
@@ -328,28 +326,28 @@ const TreasuryHistory: React.FC<{ activities: any[] }> = ({ activities }) => {
   return (
     <div className="mt-6">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-medium text-slate-300 uppercase tracking-wide">Recent Activity</h3>
+        <h3 className="text-sm font-medium text-[#A7B4C8] uppercase tracking-wide">Recent Activity</h3>
       </div>
 
       {treasuryActivities.length === 0 ? (
-        <p className="text-slate-500 text-sm">No treasury transactions yet</p>
+        <p className="text-[#A7B4C8] text-sm">No treasury transactions yet</p>
       ) : (
         <div className="space-y-2">
           {treasuryActivities.map((activity, index) => (
-            <div key={activity.id || index} className="flex items-center justify-between py-2 border-b border-slate-800/50 last:border-0">
+            <div key={activity.id || index} className="flex items-center justify-between py-2 border-b border-slate-500/30 last:border-0">
               <div className="flex items-center gap-3">
                 <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                  activity.description?.includes('Subscribe') ? 'bg-cyan-500/10' : 'bg-blue-500/10'
+                  activity.description?.includes('Subscribe') ? 'bg-green-500/10' : 'bg-blue-500/10'
                 }`}>
-                  <YieldIcon size={12} className={activity.description?.includes('Subscribe') ? 'text-cyan-400' : 'text-blue-400'} />
+                  <YieldIcon size={12} className={activity.description?.includes('Subscribe') ? 'text-green-400' : 'text-blue-400'} />
                 </div>
                 <div>
-                  <p className="text-slate-200 text-sm">{activity.description}</p>
-                  <p className="text-slate-500 text-xs">{activity.timestamp}</p>
+                  <p className="text-[#E6EEF3] text-sm">{activity.description}</p>
+                  <p className="text-[#A7B4C8] text-xs">{activity.timestamp}</p>
                 </div>
               </div>
               <span className={`text-sm font-medium ${
-                activity.description?.includes('Subscribe') ? 'text-cyan-400' : 'text-blue-400'
+                activity.description?.includes('Subscribe') ? 'text-green-400' : 'text-blue-400'
               }`}>
                 {activity.amount?.toFixed(2)} {activity.currency}
               </span>
@@ -413,9 +411,9 @@ const TreasuryScreen: React.FC = () => {
   if (!isConnected) {
     return (
       <div className="flex flex-col items-center justify-center h-full py-20">
-        <TreasuryIcon size={48} className="text-slate-600 mb-4" />
-        <h2 className="text-xl font-medium text-white mb-1">Treasury</h2>
-        <p className="text-slate-400 text-sm">Connect wallet to continue</p>
+        <TreasuryIcon size={48} className="text-[#A7B4C8] mb-4" />
+        <h2 className="text-xl font-medium text-[#E6EEF3] mb-1">Treasury</h2>
+        <p className="text-[#A7B4C8] text-sm">Connect wallet to continue</p>
       </div>
     );
   }
@@ -439,23 +437,23 @@ const TreasuryScreen: React.FC = () => {
       <div className="flex items-center justify-between mb-8">
         <div>
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-medium text-white tracking-tight">Treasury</h1>
+            <h1 className="text-2xl font-medium text-[#E6EEF3] tracking-tight">Treasury</h1>
             {isAllowlisted && (
-              <span className="flex items-center gap-1 text-xs text-cyan-400">
+              <span className="flex items-center gap-1 text-xs text-green-400">
                 <CheckIcon size={12} />
                 Verified
               </span>
             )}
           </div>
-          <p className="text-slate-400 text-sm mt-1">
+          <p className="text-[#A7B4C8] text-sm mt-1">
             ${totalValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            <span className="text-slate-500 ml-2">total value</span>
+            <span className="text-[#A7B4C8]/70 ml-2">total value</span>
           </p>
         </div>
         <div className="flex items-center gap-2">
           <button
             onClick={() => setShowRecovery(true)}
-            className="p-2 text-slate-400 hover:text-amber-400 hover:bg-slate-800 rounded-lg transition-colors"
+            className="p-2 text-[#A7B4C8] hover:text-amber-400 hover:bg-[#151A22] rounded-lg transition-colors"
             title="Wallet Recovery"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -464,7 +462,7 @@ const TreasuryScreen: React.FC = () => {
           </button>
           <button
             onClick={() => setShowSettings(true)}
-            className="p-2 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg transition-colors"
+            className="p-2 text-[#A7B4C8] hover:text-[#E6EEF3] hover:bg-[#151A22] rounded-lg transition-colors"
             title="Settings"
           >
             <SettingsIcon size={18} />
@@ -472,7 +470,7 @@ const TreasuryScreen: React.FC = () => {
           <button
             onClick={handleRefresh}
             disabled={refreshing}
-            className="p-2 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg transition-colors"
+            className="p-2 text-[#A7B4C8] hover:text-[#E6EEF3] hover:bg-[#151A22] rounded-lg transition-colors"
             title="Refresh"
           >
             <RefreshIcon size={18} className={refreshing ? 'animate-spin' : ''} />
@@ -481,13 +479,13 @@ const TreasuryScreen: React.FC = () => {
       </div>
 
       {/* Main Content */}
-      <div className="bg-slate-900/60 backdrop-blur-sm rounded-2xl border border-slate-700/50 p-6">
+      <div className="bg-slate-900/60 backdrop-blur-sm rounded-2xl border border-slate-500/50 p-6">
         {/* Balances Row */}
         <div className="grid grid-cols-2 gap-8 mb-6">
           {/* USDC */}
           <div>
-            <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">USDC (Liquid)</p>
-            <p className="text-2xl font-medium text-slate-100">
+            <p className="text-xs text-[#A7B4C8] uppercase tracking-wide mb-1">USDC (Liquid)</p>
+            <p className="text-2xl font-medium text-[#E6EEF3]">
               {usdcValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </p>
           </div>
@@ -495,12 +493,12 @@ const TreasuryScreen: React.FC = () => {
           {/* USYC */}
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <p className="text-xs text-slate-500 uppercase tracking-wide">USYC (Yield)</p>
-              <span className="text-xs text-cyan-400 border border-cyan-500/30 px-1.5 py-0.5 rounded">
+              <p className="text-xs text-[#A7B4C8] uppercase tracking-wide">USYC (Yield)</p>
+              <span className="text-xs text-green-400 border border-green-500/30 px-1.5 py-0.5 rounded">
                 {balance?.apy || '5.0'}% APY
               </span>
             </div>
-            <p className="text-2xl font-medium text-slate-100">
+            <p className="text-2xl font-medium text-[#E6EEF3]">
               {usycValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </p>
           </div>
@@ -510,17 +508,17 @@ const TreasuryScreen: React.FC = () => {
         {allocation && <AllocationBar allocation={allocation} />}
 
         {/* Yield Stats */}
-        <div className="mt-6 pt-6 border-t border-slate-700/50">
+        <div className="mt-6 pt-6 border-t border-slate-500/30">
           <div className="flex items-center gap-8 text-sm">
             <div className="flex items-center gap-2">
-              <span className="text-slate-500">Yield Earned</span>
-              <span className="text-cyan-400 font-medium">
+              <span className="text-[#A7B4C8]">Yield Earned</span>
+              <span className="text-green-400 font-medium">
                 ${yieldEarned.toFixed(2)}
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-slate-500">Provider</span>
-              <span className="text-slate-300">Hashnote</span>
+              <span className="text-[#A7B4C8]">Provider</span>
+              <span className="text-[#E6EEF3]">Hashnote</span>
               <InfoTooltip content="USYC is backed by US Treasury Bills" />
             </div>
           </div>
@@ -554,12 +552,12 @@ const TreasuryScreen: React.FC = () => {
       {/* Settings Modal */}
       {showSettings && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-3xl w-full max-h-[85vh] overflow-hidden">
-            <div className="p-5 border-b border-slate-700/50 flex items-center justify-between">
-              <h2 className="text-lg font-medium text-white">Treasury Settings</h2>
+          <div className="bg-[#091325] border border-slate-500/50 rounded-2xl max-w-3xl w-full max-h-[85vh] overflow-hidden">
+            <div className="p-5 border-b border-slate-500/30 flex items-center justify-between">
+              <h2 className="text-lg font-medium text-[#E6EEF3]">Treasury Settings</h2>
               <button
                 onClick={() => setShowSettings(false)}
-                className="text-slate-400 hover:text-white p-1.5 hover:bg-slate-800 rounded-lg transition-colors"
+                className="text-[#A7B4C8] hover:text-[#E6EEF3] p-1.5 hover:bg-[#151A22] rounded-lg transition-colors"
               >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M18 6L6 18M6 6l12 12" />
