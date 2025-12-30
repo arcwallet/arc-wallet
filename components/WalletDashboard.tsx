@@ -536,117 +536,113 @@ const AssetsTable: React.FC<AssetsTableProps> = ({ balanceDisplay, isLoading, to
         </span>
       </div>
 
-      {/* Table */}
-      <div className="flow-root">
-        <div className="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
-          <div className="inline-block min-w-full py-1 align-middle sm:px-6 lg:px-8">
-            <table className="min-w-full">
-              {/* Table Header */}
-              <thead>
-                <tr className="border-b border-white/[0.06]">
-                  <th scope="col" className="py-2.5 pl-4 pr-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-[#4B5563] sm:pl-0" style={{ flex: 2 }}>
-                    Asset
-                  </th>
-                  <th scope="col" className="px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-[#4B5563]" style={{ flex: 1 }}>
-                    Price
-                  </th>
-                  <th scope="col" className="px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-[#4B5563]" style={{ flex: 1 }}>
-                    Balance
-                  </th>
-                  <th scope="col" className="py-2.5 pl-3 pr-4 text-right text-[11px] font-semibold uppercase tracking-[0.08em] text-[#4B5563] sm:pr-0" style={{ flex: 1 }}>
-                    Value
-                  </th>
-                </tr>
-              </thead>
+      {/* Table - Fixed width, no horizontal scroll */}
+      <div className="w-full max-w-full overflow-hidden box-border">
+        <table className="w-full table-fixed">
+          {/* Table Header */}
+          <thead>
+            <tr className="border-b border-white/[0.06]">
+              <th scope="col" className="w-[40%] py-2.5 pr-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-[#4B5563]">
+                Asset
+              </th>
+              <th scope="col" className="w-[20%] px-2 py-2.5 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-[#4B5563]">
+                Price
+              </th>
+              <th scope="col" className="w-[20%] px-2 py-2.5 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-[#4B5563]">
+                Balance
+              </th>
+              <th scope="col" className="w-[20%] py-2.5 pl-2 text-right text-[11px] font-semibold uppercase tracking-[0.08em] text-[#4B5563]">
+                Value
+              </th>
+            </tr>
+          </thead>
 
-              {/* Table Body */}
-              <tbody>
-                {rows.map((asset) => {
-                  const isZeroBalance = asset.balanceNum === 0;
-                  const tokenColor = getTokenColor(asset.ticker);
+          {/* Table Body */}
+          <tbody>
+            {rows.map((asset) => {
+              const isZeroBalance = asset.balanceNum === 0;
+              const tokenColor = getTokenColor(asset.ticker);
 
-                  return (
-                    <tr
-                      key={asset.ticker}
-                      className={`
-                        rounded-xl cursor-pointer transition-all duration-150
-                        hover:bg-white/[0.03]
-                        ${isZeroBalance ? 'opacity-60 hover:opacity-100' : ''}
-                      `}
-                    >
-                      {/* Asset Column */}
-                      <td className="whitespace-nowrap py-3 pl-4 pr-3 sm:pl-0">
-                        <div className="flex items-center">
-                          {/* Token Icon with Brand Colors */}
-                          <div
-                            className="h-9 w-9 flex-shrink-0 rounded-full flex items-center justify-center"
-                            style={{
-                              backgroundColor: tokenColor.bg,
-                              border: `1px solid ${tokenColor.border}`,
-                            }}
+              return (
+                <tr
+                  key={asset.ticker}
+                  className={`
+                    rounded-xl cursor-pointer transition-all duration-150
+                    hover:bg-white/[0.03]
+                    ${isZeroBalance ? 'opacity-60 hover:opacity-100' : ''}
+                  `}
+                >
+                  {/* Asset Column - 40% */}
+                  <td className="py-3 pr-3">
+                    <div className="flex items-center">
+                      {/* Token Icon with Brand Colors */}
+                      <div
+                        className="h-9 w-9 flex-shrink-0 rounded-full flex items-center justify-center"
+                        style={{
+                          backgroundColor: tokenColor.bg,
+                          border: `1px solid ${tokenColor.border}`,
+                        }}
+                      >
+                        {asset.icon && (asset.icon.startsWith('http') || asset.icon.startsWith('/')) ? (
+                          <img
+                            className={`h-9 w-9 object-cover rounded-full ${isZeroBalance ? 'opacity-50' : ''}`}
+                            src={asset.icon}
+                            alt={`${asset.name} logo`}
+                          />
+                        ) : (
+                          <span
+                            className="text-[11px] font-bold"
+                            style={{ color: tokenColor.text }}
                           >
-                            {asset.icon && (asset.icon.startsWith('http') || asset.icon.startsWith('/')) ? (
-                              <img
-                                className={`h-9 w-9 object-cover rounded-full ${isZeroBalance ? 'opacity-50' : ''}`}
-                                src={asset.icon}
-                                alt={`${asset.name} logo`}
-                              />
-                            ) : (
-                              <span
-                                className="text-[11px] font-bold"
-                                style={{ color: tokenColor.text }}
-                              >
-                                {getTokenIconContent(asset.ticker)}
-                              </span>
-                            )}
-                          </div>
+                            {getTokenIconContent(asset.ticker)}
+                          </span>
+                        )}
+                      </div>
 
-                          {/* Token Name */}
-                          <div className="ml-3">
-                            <div className={`text-[14px] font-medium ${isZeroBalance ? 'text-[#9CA3AF]' : 'text-white'}`}>
-                              {asset.name}
-                            </div>
-                            <div className={`text-[12px] ${isZeroBalance ? 'text-[#4B5563]' : 'text-[#6B7280]'}`}>
-                              {asset.ticker}
-                            </div>
-                          </div>
+                      {/* Token Name */}
+                      <div className="ml-3 min-w-0">
+                        <div className={`text-[14px] font-medium truncate ${isZeroBalance ? 'text-[#9CA3AF]' : 'text-white'}`}>
+                          {asset.name}
                         </div>
-                      </td>
-
-                      {/* Price Column */}
-                      <td className="whitespace-nowrap px-3 py-3">
-                        <div className={`text-[13px] font-medium ${isZeroBalance ? 'text-[#9CA3AF]' : 'text-white'}`}>
-                          {asset.price}
+                        <div className={`text-[12px] ${isZeroBalance ? 'text-[#4B5563]' : 'text-[#6B7280]'}`}>
+                          {asset.ticker}
                         </div>
-                        <div className={`text-[12px] ${isZeroBalance ? 'text-[#4B5563]' : getPriceChangeColor(asset.changeNum)}`}>
-                          {formatPriceChange(asset.changeNum)}
-                        </div>
-                      </td>
+                      </div>
+                    </div>
+                  </td>
 
-                      {/* Balance Column */}
-                      <td className="whitespace-nowrap px-3 py-3">
-                        <span
-                          className={`text-[13px] font-medium font-mono ${isZeroBalance ? 'text-[#4B5563]' : 'text-white'}`}
-                        >
-                          {asset.balance}
-                        </span>
-                      </td>
+                  {/* Price Column - 20% */}
+                  <td className="px-2 py-3">
+                    <div className={`text-[13px] font-medium ${isZeroBalance ? 'text-[#9CA3AF]' : 'text-white'}`}>
+                      {asset.price}
+                    </div>
+                    <div className={`text-[12px] ${isZeroBalance ? 'text-[#4B5563]' : getPriceChangeColor(asset.changeNum)}`}>
+                      {formatPriceChange(asset.changeNum)}
+                    </div>
+                  </td>
 
-                      {/* Value Column */}
-                      <td className="whitespace-nowrap py-3 pl-3 pr-4 text-right sm:pr-0">
-                        <span
-                          className={`text-[13px] font-semibold ${isZeroBalance ? 'text-[#4B5563]' : 'text-white'}`}
-                        >
-                          {asset.value}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
+                  {/* Balance Column - 20% */}
+                  <td className="px-2 py-3">
+                    <span
+                      className={`text-[13px] font-medium font-mono ${isZeroBalance ? 'text-[#4B5563]' : 'text-white'}`}
+                    >
+                      {asset.balance}
+                    </span>
+                  </td>
+
+                  {/* Value Column - 20% */}
+                  <td className="py-3 pl-2 text-right">
+                    <span
+                      className={`text-[13px] font-semibold ${isZeroBalance ? 'text-[#4B5563]' : 'text-white'}`}
+                    >
+                      {asset.value}
+                    </span>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
     </div>
   );
