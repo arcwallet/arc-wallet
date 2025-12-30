@@ -10,10 +10,11 @@ import OtpInput from '../components/OtpInput';
 const API_BASE = ((import.meta as any).env.VITE_PASSKEY_API_URL || 'https://arcwallet-backend.onrender.com').replace(/\/$/, '');
 
 // Whitelist - only these emails can login
-const ALLOWED_EMAILS = [
-  'sehereroglu786@gmail.com',
-  'edelibas@gmail.com',
-];
+// Set via VITE_ALLOWED_EMAILS env var (comma-separated)
+const ALLOWED_EMAILS = (import.meta.env.VITE_ALLOWED_EMAILS || '')
+  .split(',')
+  .map((e: string) => e.trim().toLowerCase())
+  .filter(Boolean);
 
 type LoginStep = 'email' | 'otp' | 'passkey' | 'verifying' | 'creating_passkey' | 'waitlist';
 
