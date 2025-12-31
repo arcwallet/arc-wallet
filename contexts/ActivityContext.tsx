@@ -203,8 +203,8 @@ export const ActivityProvider: React.FC<{ children: ReactNode }> = ({ children }
       }
       try {
         const history = await fetchRecentTransactions(address, {
-          maxTransactions: 50,
-          maxBlocks: 500,
+          maxTransactions: 100,
+          maxBlocks: 50000, // Fetch more history from Arc Testnet
         });
 
         if (cancelled) return;
