@@ -191,7 +191,10 @@ export const ActivityProvider: React.FC<{ children: ReactNode }> = ({ children }
 
   // Fetch activities from blockchain API
   useEffect(() => {
+    console.log('🔍 [Activity] useEffect triggered, address:', address || 'NULL');
+
     if (!address) {
+      console.log('⚠️ [Activity] No address available, skipping fetch');
       return;
     }
 
