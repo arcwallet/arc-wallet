@@ -174,23 +174,31 @@ async function fetchFromBlockscout(address: string, limit: number = 50): Promise
 /**
  * Fetch token transfers from ArcScan
  */
-async function fetchTokenTransfers(address: string, limit: number = 50): Promise<any[]> {
+async function fetchTokenTransfers(address: string, limit: number = 100): Promise<any[]> {
   try {
     const normalizedAddress = address.toLowerCase();
     const blockscoutUrl = `${BLOCKSCOUT_API_URL}/addresses/${normalizedAddress}/token-transfers`;
+
+    console.log('[Activity] Fetching token transfers from:', blockscoutUrl);
 
     const response = await fetch(blockscoutUrl, {
       headers: { 'Accept': 'application/json' },
     });
 
-    if (!response.ok) return [];
+    if (!response.ok) {
+      console.warn('[Activity] Token transfers API returned:', response.status);
+      return [];
+    }
 
     const json = await response.json();
     const items = json.items || json.result || [];
+
+    console.log('[Activity] Token transfers found:', items.length);
+
     if (items.length === 0) return [];
 
     return items.slice(0, limit).map((transfer: any) => ({
-      hash: transfer.tx_hash || transfer.hash,
+      hash: transfer.transaction_hash || transfer.tx_hash || transfer.hash,
       block_number: transfer.block_number || transfer.blockNumber,
       from_address: (transfer.from?.hash || transfer.from || '').toLowerCase(),
       to_address: (transfer.to?.hash || transfer.to || '').toLowerCase(),
@@ -199,9 +207,11 @@ async function fetchTokenTransfers(address: string, limit: number = 50): Promise
         ? (typeof transfer.timestamp === 'number' ? transfer.timestamp : Math.floor(new Date(transfer.timestamp).getTime() / 1000))
         : Math.floor(Date.now() / 1000),
       status: 1,
-      token_address: (transfer.token?.address || transfer.contractAddress || '').toLowerCase(),
-      token_symbol: transfer.token?.symbol || transfer.tokenSymbol || 'TOKEN',
-      token_decimals: transfer.token?.decimals || transfer.tokenDecimal || 18,
+      token_address: (transfer.token?.address_hash || transfer.token?.address || transfer.contractAddress || '').toLowerCase(),
+      token_symbol: transfer.token?.symbol || transfer.tokenSymbol || 'USDC',
+      token_decimals: parseInt(transfer.total?.decimals || transfer.token?.decimals || '18', 10),
+      log_index: transfer.log_index || 0,
+      method: transfer.method || '',
     }));
   } catch (error) {
     console.error('[Activity] Error fetching token transfers:', error);
