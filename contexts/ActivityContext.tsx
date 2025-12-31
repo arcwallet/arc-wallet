@@ -198,14 +198,19 @@ export const ActivityProvider: React.FC<{ children: ReactNode }> = ({ children }
     let cancelled = false;
 
     const load = async () => {
+      console.log('🔄 [Activity] Starting fetch for address:', address?.slice(0, 10) + '...');
+
       if (cooldownRef.current && Date.now() < cooldownRef.current) {
+        console.log('⏸️ [Activity] Still in cooldown, skipping');
         return;
       }
       try {
         const history = await fetchRecentTransactions(address, {
           maxTransactions: 100,
-          maxBlocks: 50000, // Fetch more history from Arc Testnet
+          maxBlocks: 50000,
         });
+
+        console.log('✅ [Activity] Fetched', history.length, 'transactions');
 
         if (cancelled) return;
 
@@ -217,6 +222,7 @@ export const ActivityProvider: React.FC<{ children: ReactNode }> = ({ children }
           const merged = [...history, ...pending];
           merged.sort((a, b) => b.date.getTime() - a.date.getTime());
           pendingRef.current = new Set(merged.filter((tx) => tx.status === TransactionStatus.Pending).map((tx) => tx.hash));
+          console.log('📊 [Activity] Total activities after merge:', merged.length);
           return merged;
         });
       } catch (error) {
