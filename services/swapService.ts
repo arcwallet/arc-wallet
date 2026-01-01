@@ -1,6 +1,7 @@
 import { JsonRpcProvider, parseUnits, formatUnits, Interface } from 'ethers';
 import { TokenInfo, getTokenContractAddress, SWAP_CONFIG } from '../config/tokens';
 import { getProvider, getFeeSettings } from './rpcProvider';
+import { stableFxService } from './stableFxService';
 
 export interface Quote {
   fromToken: TokenInfo;
@@ -16,6 +17,8 @@ export interface Quote {
   expiresAt: number; // Quote expiration time
   warning?: string; // Optional warning message
   usingFallback?: boolean; // True if using fallback calculation
+  source?: 'stablefx' | 'uniswap'; // Quote source
+  stableFxQuoteId?: string; // StableFX quote ID for trade execution
 }
 
 // MEV Protection Constants
@@ -77,13 +80,39 @@ class SwapService {
 
   /**
    * Get a quote for swapping tokens
-   * Uses real on-chain price data from UniswapV2 Router
+   * Priority: StableFX (Circle) > UniswapV2 Router > Fallback calculation
    */
   async getQuote(
     fromToken: TokenInfo,
     toToken: TokenInfo,
     amount: string
   ): Promise<Quote> {
+    // Try StableFX first (best rates for USDC/EURC)
+    if (stableFxService.isAvailable() && stableFxService.isPairSupported(fromToken.symbol, toToken.symbol)) {
+      try {
+        console.log('[SWAP] Trying StableFX for quote...');
+        const stableFxQuote = await stableFxService.getQuote(fromToken, toToken, amount);
+        const quote = stableFxService.toSwapQuote(stableFxQuote, fromToken, toToken);
+
+        console.log('[SWAP] StableFX quote received:', {
+          rate: quote.rate,
+          toAmount: quote.toAmount,
+          fee: quote.fee,
+        });
+
+        return {
+          ...quote,
+          source: 'stablefx',
+          stableFxQuoteId: stableFxQuote.id,
+        };
+      } catch (error: any) {
+        console.warn('[SWAP] StableFX quote failed, falling back to Uniswap:', error?.message);
+      }
+    } else {
+      console.log('[SWAP] StableFX not available or pair not supported, using Uniswap');
+    }
+
+    // Fallback to UniswapV2 Router
     try {
       const tokenInAddress = getTokenContractAddress(fromToken.symbol, 'testnet', 'arcTestnet');
       const tokenOutAddress = getTokenContractAddress(toToken.symbol, 'testnet', 'arcTestnet');
@@ -192,6 +221,7 @@ class SwapService {
         expiresAt: now + MEV_CONFIG.QUOTE_EXPIRY_TIME,
         warning,
         usingFallback,
+        source: 'uniswap',
       };
     } catch (error) {
       console.error('Error getting quote:', error);
@@ -338,7 +368,7 @@ class SwapService {
 
   /**
    * Execute a token swap using PasskeyAccount (ERC-4337 Smart Wallet)
-   * Uses UniswapV2 swapExactTokensForTokens
+   * Supports both StableFX (Circle) and UniswapV2
    * No private key required - uses passkey signing
    */
   async executeSwapWithPasskey(
@@ -359,6 +389,12 @@ class SwapService {
         throw new Error('PasskeyAccount not connected');
       }
 
+      // Check if this is a StableFX quote
+      if (quote.source === 'stablefx' && quote.stableFxQuoteId) {
+        return await this.executeStableFxSwap(quote);
+      }
+
+      // Otherwise, use UniswapV2
       const tokenInAddress = getTokenContractAddress(quote.fromToken.symbol, 'testnet', 'arcTestnet');
       const tokenOutAddress = getTokenContractAddress(quote.toToken.symbol, 'testnet', 'arcTestnet');
 
@@ -468,6 +504,43 @@ class SwapService {
       }
 
       throw new Error(errorMessage || 'Swap failed. Please try again.');
+    }
+  }
+
+  /**
+   * Execute swap via Circle StableFX
+   */
+  private async executeStableFxSwap(quote: Quote): Promise<string> {
+    if (!quote.stableFxQuoteId) {
+      throw new Error('StableFX quote ID not found');
+    }
+
+    console.log('[SWAP] Executing via StableFX:', {
+      quoteId: quote.stableFxQuoteId,
+      from: quote.fromToken.symbol,
+      to: quote.toToken.symbol,
+      amount: quote.fromAmount,
+    });
+
+    try {
+      const trade = await stableFxService.executeTrade(quote.stableFxQuoteId);
+
+      console.log('[SWAP] StableFX trade created:', {
+        tradeId: trade.id,
+        status: trade.status,
+        txHash: trade.settlementTransactionHash,
+      });
+
+      // Return the settlement transaction hash or trade ID
+      return trade.settlementTransactionHash || trade.id;
+    } catch (error: any) {
+      console.error('[SWAP] StableFX trade failed:', error);
+
+      if (error?.message?.includes('expired')) {
+        throw new Error('Quote expired. Please get a fresh quote.');
+      }
+
+      throw new Error(error?.message || 'StableFX swap failed. Please try again.');
     }
   }
 

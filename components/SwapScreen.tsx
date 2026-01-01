@@ -292,7 +292,9 @@ const SwapScreen: React.FC<SwapScreenProps> = ({ initialFromToken, initialToToke
             <div className="mt-6 p-4 bg-slate-900/40 border border-slate-500/20 rounded-xl">
                 <div className="flex items-center gap-2 mb-3">
                     <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-                    <span className="text-xs text-slate-400">Arc Testnet • UniswapV2 Router</span>
+                    <span className="text-xs text-slate-400">
+                        Arc Testnet • {quote?.source === 'stablefx' ? 'Circle StableFX' : 'UniswapV2 Router'}
+                    </span>
                 </div>
                 <div className="grid grid-cols-2 gap-3 text-xs">
                     <div className="bg-slate-800/50 rounded-lg p-2.5">
