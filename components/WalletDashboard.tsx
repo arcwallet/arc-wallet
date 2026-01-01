@@ -158,33 +158,8 @@ interface NotificationDropdownProps {
 
 const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ isOpen, onClose, onNavigateToTransactions, dropdownRef }) => {
   const { activities, markAsRead, markAllAsRead, unreadCount } = useActivity();
-  // PasskeyAccount - Smart Wallet (single wallet system)
-  const { address: walletAddress } = useCircleWallet();
 
-  // Handle outside click to close dropdown
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        onClose();
-      }
-    };
-
-    // Add listener with a small delay to prevent immediate close on open click
-    const timeoutId = setTimeout(() => {
-      document.addEventListener('mousedown', handleClickOutside);
-    }, 0);
-
-    return () => {
-      clearTimeout(timeoutId);
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [isOpen, onClose, dropdownRef]);
-
-  if (!isOpen) return null;
-
-  // Create notifications from recent activities and system events
+  // Create notifications from recent activities - MUST be before any conditional return
   const notifications = useMemo(() => {
     const activityNotifications = activities.slice(0, 5).map((activity) => {
       // Safe null check for activity.date
@@ -211,9 +186,33 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ isOpen, onC
     return activityNotifications;
   }, [activities]);
 
+  // Handle outside click to close dropdown - MUST be before any conditional return
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        onClose();
+      }
+    };
+
+    // Add listener with a small delay to prevent immediate close on open click
+    const timeoutId = setTimeout(() => {
+      document.addEventListener('mousedown', handleClickOutside);
+    }, 0);
+
+    return () => {
+      clearTimeout(timeoutId);
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isOpen, onClose, dropdownRef]);
+
   const handleNotificationClick = (notificationId: string) => {
     markAsRead(notificationId);
   };
+
+  // Conditional return AFTER all hooks
+  if (!isOpen) return null;
 
   return (
     <div ref={dropdownRef} className="absolute right-0 top-full mt-2 w-80 z-[110] rounded-xl border border-white/[0.1] bg-[#0F1629] shadow-xl">
