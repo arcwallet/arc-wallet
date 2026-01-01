@@ -224,11 +224,21 @@ export const ActivityProvider: React.FC<{ children: ReactNode }> = ({ children }
         if (cancelled) return;
 
         setActivities((current) => {
+          // Preserve isRead status from current activities
+          const currentReadStatus = new Map(current.map((tx) => [tx.id, tx.isRead]));
+
           const historyMap = new Map(history.map((tx) => [tx.id, tx]));
           const pending = current.filter((tx) =>
             tx.status === TransactionStatus.Pending && !historyMap.has(tx.id),
           );
-          const merged = [...history, ...pending];
+
+          // Merge history with preserved isRead status
+          const historyWithReadStatus = history.map((tx) => ({
+            ...tx,
+            isRead: currentReadStatus.get(tx.id) ?? tx.isRead ?? false,
+          }));
+
+          const merged = [...historyWithReadStatus, ...pending];
           merged.sort((a, b) => b.date.getTime() - a.date.getTime());
           pendingRef.current = new Set(merged.filter((tx) => tx.status === TransactionStatus.Pending).map((tx) => tx.hash));
           console.log('📊 [Activity] Total activities after merge:', merged.length);

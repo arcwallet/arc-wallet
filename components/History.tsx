@@ -135,16 +135,16 @@ const History: React.FC = () => {
   const getTypeIcon = (type: TransactionType) => {
     switch (type) {
       case TransactionType.Sent:
-        return <SendIcon size={16} className="text-[#EF4444]" />;
+        return <SendIcon size={16} className="text-[#F87171]" />;
       case TransactionType.Received:
-        return <ReceiveIcon size={16} className="text-[#22C55E]" />;
+        return <ReceiveIcon size={16} className="text-[#34D399]" />;
       case TransactionType.Swap:
-        return <SwapIcon size={16} className="text-[#3B82F6]" />;
+        return <SwapIcon size={16} className="text-[#4A9EFF]" />;
       case TransactionType.Bridge:
-        return <BridgeIcon size={16} className="text-[#A855F7]" />;
+        return <BridgeIcon size={16} className="text-[#4A9EFF]" />;
       case TransactionType.Subscribe:
       case TransactionType.Redeem:
-        return <TreasuryIcon size={16} className="text-[#6366F1]" />;
+        return <TreasuryIcon size={16} className="text-[#4A9EFF]" />;
       default:
         return <SendIcon size={16} className="text-[#6B7280]" />;
     }
@@ -154,23 +154,23 @@ const History: React.FC = () => {
     switch (status) {
       case TransactionStatus.Completed:
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[#22C55E]/10 border border-[#22C55E]/20">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#22C55E]" />
-            <span className="text-[10px] font-medium text-[#22C55E]">Completed</span>
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[#34D399]/10 border border-[#34D399]/20">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#34D399]" />
+            <span className="text-[10px] font-medium text-[#34D399]">Completed</span>
           </span>
         );
       case TransactionStatus.Pending:
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[#F59E0B]/10 border border-[#F59E0B]/20">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#F59E0B] animate-pulse" />
-            <span className="text-[10px] font-medium text-[#F59E0B]">Pending</span>
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[#4A9EFF]/10 border border-[#4A9EFF]/20">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#4A9EFF] animate-pulse" />
+            <span className="text-[10px] font-medium text-[#4A9EFF]">Pending</span>
           </span>
         );
       case TransactionStatus.Failed:
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[#EF4444]/10 border border-[#EF4444]/20">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#EF4444]" />
-            <span className="text-[10px] font-medium text-[#EF4444]">Failed</span>
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[#F87171]/10 border border-[#F87171]/20">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#F87171]" />
+            <span className="text-[10px] font-medium text-[#F87171]">Failed</span>
           </span>
         );
       default:
@@ -243,10 +243,10 @@ const History: React.FC = () => {
       <div className="grid grid-cols-5 gap-3">
         {[
           { label: 'Total', value: stats.total, color: 'text-white' },
-          { label: 'Sent', value: stats.sent, color: 'text-[#EF4444]' },
-          { label: 'Received', value: stats.received, color: 'text-[#22C55E]' },
-          { label: 'Bridges', value: stats.bridges, color: 'text-[#A855F7]' },
-          { label: 'Treasury', value: stats.treasury, color: 'text-[#6366F1]' },
+          { label: 'Sent', value: stats.sent, color: 'text-[#F87171]' },
+          { label: 'Received', value: stats.received, color: 'text-[#34D399]' },
+          { label: 'Bridges', value: stats.bridges, color: 'text-[#4A9EFF]' },
+          { label: 'Treasury', value: stats.treasury, color: 'text-[#4A9EFF]' },
         ].map((stat) => (
           <div
             key={stat.label}
@@ -329,7 +329,7 @@ const History: React.FC = () => {
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className={`text-[14px] font-semibold ${activity.amount >= 0 ? 'text-[#22C55E]' : 'text-[#EF4444]'}`}>
+                        <p className={`text-[14px] font-semibold ${activity.amount >= 0 ? 'text-[#34D399]' : 'text-[#F87171]'}`}>
                           {activity.amount >= 0 ? '+' : ''}{activity.amount.toFixed(2)} {activity.currency}
                         </p>
                         <p className="text-[12px] text-[#6B7280]">${activity.usdValue.toFixed(2)}</p>
@@ -344,7 +344,7 @@ const History: React.FC = () => {
                           href={`${TX_EXPLORER_URL}${activity.hash}`}
                           target="_blank"
                           rel="noreferrer"
-                          className="text-[#3B82F6] hover:text-[#60A5FA] text-[11px] font-mono flex items-center gap-1.5 transition-colors"
+                          className="text-[#4A9EFF] hover:text-[#6BB3FF] text-[11px] font-mono flex items-center gap-1.5 transition-colors"
                         >
                           {activity.hash.slice(0, 8)}...{activity.hash.slice(-6)}
                           <ExternalLinkIcon size={10} />
