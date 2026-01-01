@@ -56,12 +56,13 @@ class SwapService {
   constructor() {
     this.provider = getProvider();
     this.routerAddress = SWAP_CONFIG.routerAddresses.testnet.arcTestnet;
-    this.slippageTolerance = SWAP_CONFIG.defaultSlippage;
+    // Use higher slippage for testnet pools (lower liquidity)
+    this.slippageTolerance = 5; // 5% slippage for testnet
   }
 
   /**
    * Get a quote for swapping tokens
-   * Uses real on-chain price data
+   * Uses real on-chain price data from UniswapV2 Router
    */
   async getQuote(
     fromToken: TokenInfo,
@@ -78,30 +79,20 @@ class SwapService {
 
       const amountIn = parseUnits(amount, fromToken.decimals);
 
-      // For stablecoins, use simpler pricing (near 1:1 for USDC-EURC)
+      // Get real quote from UniswapV2 Router using getAmountsOut
       let amountOut: bigint;
-      let fee: number;
+      let fee: number = FEE_TIERS.LOW;
 
-      if (this.isStablecoinPair(fromToken.symbol, toToken.symbol)) {
-        // Stablecoin swap: use approximate rate
-        amountOut = this.calculateStablecoinSwap(amountIn, fromToken, toToken);
-        fee = FEE_TIERS.LOW; // Use low fee tier for stablecoins
-      } else {
-        // For other pairs, try to get on-chain quote
-        // Note: This may fail if no liquidity pool exists
-        try {
-          const quote = await this.getOnChainQuote(
-            tokenInAddress,
-            tokenOutAddress,
-            amountIn,
-            FEE_TIERS.MEDIUM
-          );
-          amountOut = quote.amountOut;
-          fee = FEE_TIERS.MEDIUM;
-        } catch (error) {
-          console.warn('On-chain quote failed, using fallback calculation:', error);
+      try {
+        amountOut = await this.getAmountsOutFromRouter(tokenInAddress, tokenOutAddress, amountIn);
+        console.log('[SWAP] Got real quote from router:', formatUnits(amountOut, toToken.decimals));
+      } catch (error) {
+        console.warn('[SWAP] Router quote failed, using fallback:', error);
+        // Fallback to approximate calculation
+        if (this.isStablecoinPair(fromToken.symbol, toToken.symbol)) {
+          amountOut = this.calculateStablecoinSwap(amountIn, fromToken, toToken);
+        } else {
           amountOut = this.calculateFallbackQuote(amountIn, fromToken, toToken);
-          fee = FEE_TIERS.MEDIUM;
         }
       }
 
@@ -109,18 +100,12 @@ class SwapService {
       const rate = (Number(amountOutFormatted) / Number(amount)).toFixed(6);
       const feePercent = (fee / 1_000_000).toFixed(4); // Convert to percentage
 
-      // Calculate minimum amount after slippage
+      // Calculate minimum amount after slippage (use higher slippage for testnet)
       const slippageMultiplier = (100 - this.slippageTolerance) / 100;
       const minimumReceived = (Number(amountOutFormatted) * slippageMultiplier).toFixed(6);
 
       // Estimate gas
-      const estimatedGas = await this.estimateSwapGas(
-        tokenInAddress,
-        tokenOutAddress,
-        amountIn,
-        parseUnits(minimumReceived, toToken.decimals),
-        fee
-      );
+      const estimatedGas = 150000n;
 
       const now = Date.now();
       return {
@@ -140,6 +125,32 @@ class SwapService {
       console.error('Error getting quote:', error);
       throw new Error('Failed to get swap quote. Please try again.');
     }
+  }
+
+  /**
+   * Get real quote from UniswapV2 Router using getAmountsOut
+   */
+  private async getAmountsOutFromRouter(
+    tokenIn: string,
+    tokenOut: string,
+    amountIn: bigint
+  ): Promise<bigint> {
+    const routerInterface = new Interface(UNISWAP_V2_ROUTER_ABI);
+    const path = [tokenIn, tokenOut];
+
+    const data = routerInterface.encodeFunctionData('getAmountsOut', [amountIn, path]);
+
+    const result = await this.provider.call({
+      to: this.routerAddress,
+      data,
+    });
+
+    // Decode result - returns uint256[] amounts
+    const decoded = routerInterface.decodeFunctionResult('getAmountsOut', result);
+    const amounts = decoded[0] as bigint[];
+
+    // amounts[0] = amountIn, amounts[1] = amountOut
+    return amounts[1];
   }
 
   /**
