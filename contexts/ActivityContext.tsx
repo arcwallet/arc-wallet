@@ -369,8 +369,15 @@ export const ActivityProvider: React.FC<{ children: ReactNode }> = ({ children }
   const addActivity = useCallback(
     (activity: Transaction) => {
       setActivities((current) => {
+        // Preserve isRead status from existing activity
+        const existingActivity = current.find((tx) => tx.id === activity.id);
+        const activityWithReadStatus = {
+          ...activity,
+          isRead: existingActivity?.isRead ?? activity.isRead ?? false,
+        };
+
         const filtered = current.filter((tx) => tx.id !== activity.id);
-        const updated = [activity, ...filtered];
+        const updated = [activityWithReadStatus, ...filtered];
         updated.sort((a, b) => b.date.getTime() - a.date.getTime());
         return updated;
       });
