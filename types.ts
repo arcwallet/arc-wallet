@@ -38,6 +38,8 @@ export interface Transaction {
     required: number;
     list: Approval[];
   };
+  /** Whether this notification has been read by the user */
+  isRead?: boolean;
 }
 
 // Types for Multi-Signature Approvals

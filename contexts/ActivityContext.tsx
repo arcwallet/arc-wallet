@@ -20,6 +20,12 @@ interface ActivityContextValue {
   activities: Transaction[];
   addActivity: (activity: Transaction) => void;
   clear: () => void;
+  /** Mark a single activity as read */
+  markAsRead: (id: string) => void;
+  /** Mark all activities as read */
+  markAllAsRead: () => void;
+  /** Count of unread activities */
+  unreadCount: number;
 }
 
 const STORAGE_KEY_PREFIX = 'arcwallet:activity-log:';
@@ -375,13 +381,34 @@ export const ActivityProvider: React.FC<{ children: ReactNode }> = ({ children }
     pendingRef.current.clear();
   }, [setActivities]);
 
+  const markAsRead = useCallback((id: string) => {
+    setActivities((current) =>
+      current.map((tx) =>
+        tx.id === id ? { ...tx, isRead: true } : tx
+      )
+    );
+  }, []);
+
+  const markAllAsRead = useCallback(() => {
+    setActivities((current) =>
+      current.map((tx) => ({ ...tx, isRead: true }))
+    );
+  }, []);
+
+  const unreadCount = useMemo(() => {
+    return activities.filter((tx) => !tx.isRead).length;
+  }, [activities]);
+
   const value = useMemo<ActivityContextValue>(
     () => ({
       activities,
       addActivity,
       clear,
+      markAsRead,
+      markAllAsRead,
+      unreadCount,
     }),
-    [activities, addActivity, clear],
+    [activities, addActivity, clear, markAsRead, markAllAsRead, unreadCount],
   );
 
   return <ActivityContext.Provider value={value}>{children}</ActivityContext.Provider>;

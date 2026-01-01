@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import SideNavBar from './SideNavBar';
 import TransactionList from './TransactionList';
 import TransactionDetail from './TransactionDetail';
@@ -153,18 +153,40 @@ interface NotificationDropdownProps {
   isOpen: boolean;
   onClose: () => void;
   onNavigateToTransactions: () => void;
+  dropdownRef: React.RefObject<HTMLDivElement | null>;
 }
 
-const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ isOpen, onClose, onNavigateToTransactions }) => {
-  const { activities } = useActivity();
+const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ isOpen, onClose, onNavigateToTransactions, dropdownRef }) => {
+  const { activities, markAsRead, markAllAsRead, unreadCount } = useActivity();
   // PasskeyAccount - Smart Wallet (single wallet system)
   const { address: walletAddress } = useCircleWallet();
+
+  // Handle outside click to close dropdown
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        onClose();
+      }
+    };
+
+    // Add listener with a small delay to prevent immediate close on open click
+    const timeoutId = setTimeout(() => {
+      document.addEventListener('mousedown', handleClickOutside);
+    }, 0);
+
+    return () => {
+      clearTimeout(timeoutId);
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isOpen, onClose, dropdownRef]);
 
   if (!isOpen) return null;
 
   // Create notifications from recent activities and system events
   const notifications = useMemo(() => {
-    const activityNotifications = activities.slice(0, 3).map((activity, index) => {
+    const activityNotifications = activities.slice(0, 5).map((activity) => {
       // Safe null check for activity.date
       const activityDate = activity.date instanceof Date ? activity.date : new Date(activity.date || Date.now());
       const timeAgo = Date.now() - activityDate.getTime();
@@ -176,78 +198,86 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ isOpen, onC
       const isPositive = activity.amount > 0;
 
       return {
-        id: `activity-${activity.id}`,
+        id: activity.id,
+        activityId: activity.id,
         title: isPositive ? `${activity.currency} Received` : `${activity.currency} Sent`,
         message: `${Math.abs(activity.amount)} ${activity.currency} - ${activity.description}`,
         time: timeString,
-        type: isPositive ? 'success' as const : 'info' as const
+        type: isPositive ? 'success' as const : 'info' as const,
+        isRead: activity.isRead ?? false
       };
     });
 
-    // Add system notifications
-    const systemNotifications = [];
+    return activityNotifications;
+  }, [activities]);
 
-    // Session expiry warning
-    if (walletAddress) {
-      systemNotifications.push({
-        id: 'session-warning',
-        title: 'Session Active',
-        message: 'Your wallet session is active and secure',
-        time: 'Now',
-        type: 'info' as const
-      });
-    }
-
-    // Combine activity and system notifications
-    return [...activityNotifications, ...systemNotifications].slice(0, 5);
-  }, [activities, walletAddress]);
+  const handleNotificationClick = (notificationId: string) => {
+    markAsRead(notificationId);
+  };
 
   return (
-    <>
-      {/* Backdrop */}
-      <div className="fixed inset-0 z-[100]" onClick={onClose} />
-      {/* Dropdown */}
-      <div className="fixed right-8 top-20 mt-2 w-80 z-[110] rounded-xl border border-white/[0.1] bg-[#0F1629] shadow-xl">
-        <div className="p-4 border-b border-white/[0.06]">
-          <h3 className="text-base font-semibold text-white">Notifications</h3>
-        </div>
-        <div className="max-h-96 overflow-y-auto">
-          {notifications.length > 0 ? (
-            notifications.map((notification) => (
-              <div key={notification.id} className="p-4 border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors cursor-pointer">
-                <div className="flex items-start gap-3">
-                  <div className={`w-2 h-2 rounded-full mt-2 flex-shrink-0 ${notification.type === 'success' ? 'bg-[#34D399]' :
-                    notification.type === 'warning' ? 'bg-yellow-400' :
-                      'bg-[#4A9EFF]'
-                    }`} />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-white truncate">{notification.title}</p>
-                    <p className="text-sm text-[#9CA3AF] mt-1 leading-relaxed">{notification.message}</p>
-                    <p className="text-xs text-[#4B5563] mt-2">{notification.time}</p>
-                  </div>
-                </div>
-              </div>
-            ))
-          ) : (
-            <div className="p-8 text-center">
-              <p className="text-sm text-[#6B7280]">No recent activity</p>
-              <p className="text-xs text-[#4B5563] mt-1">Your transactions and updates will appear here</p>
-            </div>
-          )}
-        </div>
-        <div className="p-3 border-t border-white/[0.06]">
+    <div ref={dropdownRef} className="absolute right-0 top-full mt-2 w-80 z-[110] rounded-xl border border-white/[0.1] bg-[#0F1629] shadow-xl">
+      <div className="p-4 border-b border-white/[0.06] flex items-center justify-between">
+        <h3 className="text-base font-semibold text-white">Notifications</h3>
+        {unreadCount > 0 && (
           <button
-            className="w-full text-sm text-[#4A9EFF] hover:text-[#6BB3FF] transition-colors font-medium"
-            onClick={() => {
-              onNavigateToTransactions();
-              onClose();
-            }}
+            onClick={markAllAsRead}
+            className="text-xs text-[#4A9EFF] hover:text-[#6BB3FF] transition-colors font-medium"
           >
-            View All Transactions
+            Mark all as read
           </button>
-        </div>
+        )}
       </div>
-    </>
+      <div className="max-h-96 overflow-y-auto">
+        {notifications.length > 0 ? (
+          notifications.map((notification) => (
+            <div
+              key={notification.id}
+              onClick={() => handleNotificationClick(notification.activityId)}
+              className={`p-4 border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors cursor-pointer ${
+                notification.isRead ? 'opacity-60' : ''
+              }`}
+            >
+              <div className="flex items-start gap-3">
+                <div className={`w-2 h-2 rounded-full mt-2 flex-shrink-0 ${
+                  notification.isRead
+                    ? 'bg-[#4B5563]'
+                    : notification.type === 'success'
+                      ? 'bg-[#34D399]'
+                      : 'bg-[#4A9EFF]'
+                }`} />
+                <div className="flex-1 min-w-0">
+                  <p className={`text-sm font-medium truncate ${notification.isRead ? 'text-[#9CA3AF]' : 'text-white'}`}>
+                    {notification.title}
+                  </p>
+                  <p className="text-sm text-[#9CA3AF] mt-1 leading-relaxed">{notification.message}</p>
+                  <p className="text-xs text-[#4B5563] mt-2">{notification.time}</p>
+                </div>
+                {!notification.isRead && (
+                  <div className="w-2 h-2 rounded-full bg-[#4A9EFF] flex-shrink-0 mt-2" />
+                )}
+              </div>
+            </div>
+          ))
+        ) : (
+          <div className="p-8 text-center">
+            <p className="text-sm text-[#6B7280]">No recent activity</p>
+            <p className="text-xs text-[#4B5563] mt-1">Your transactions and updates will appear here</p>
+          </div>
+        )}
+      </div>
+      <div className="p-3 border-t border-white/[0.06]">
+        <button
+          className="w-full text-sm text-[#4A9EFF] hover:text-[#6BB3FF] transition-colors font-medium"
+          onClick={() => {
+            onNavigateToTransactions();
+            onClose();
+          }}
+        >
+          View All Transactions
+        </button>
+      </div>
+    </div>
   );
 };
 
@@ -268,7 +298,8 @@ const DashboardHeader: React.FC<DashboardHeaderPropsWithNav> = ({ account, isRef
 
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [hasCopiedAddress, setHasCopiedAddress] = useState(false);
-  const { activities } = useActivity();
+  const { unreadCount } = useActivity();
+  const notificationDropdownRef = useRef<HTMLDivElement>(null);
   const blockLabel = account?.latestBlock.finalized ? 'Finalized Block' : 'Latest Block';
   const lastUpdated = account ? formatBlockTime(account.latestBlock.timestamp) : '—';
 
@@ -313,23 +344,24 @@ const DashboardHeader: React.FC<DashboardHeaderPropsWithNav> = ({ account, isRef
           </button>
         )}
         {error && <p className="hidden md:block text-sm text-[#F87171]">{error}</p>}
-        <div className="relative">
+        <div className="relative" ref={notificationDropdownRef}>
           <button
             onClick={() => setIsNotificationOpen(!isNotificationOpen)}
             className="rounded-lg p-2 text-[#6B7280] hover:text-[#9CA3AF] hover:bg-white/[0.05] transition-all relative"
           >
             <NotificationIcon size={20} />
-            {/* Notification badge */}
-            {activities.length > 0 && (
+            {/* Notification badge - only show unread count */}
+            {unreadCount > 0 && (
               <span className="absolute -top-1 -right-1 w-4 h-4 bg-[#F87171] rounded-full flex items-center justify-center">
-                <span className="text-[10px] text-white font-bold">{Math.min(activities.length, 9)}</span>
+                <span className="text-[10px] text-white font-bold">{Math.min(unreadCount, 9)}{unreadCount > 9 ? '+' : ''}</span>
               </span>
             )}
           </button>
           <NotificationDropdown
             isOpen={isNotificationOpen}
             onClose={() => setIsNotificationOpen(false)}
-            onNavigateToTransactions={() => onNavigate('Transactions')}
+            onNavigateToTransactions={() => onNavigate('History')}
+            dropdownRef={notificationDropdownRef}
           />
         </div>
         <button
