@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { SwapIcon, SpinnerIcon } from './Icons';
 import { getAllSupportedTokens, TokenInfo } from '../config/tokens';
 import { swapService, Quote } from '../services/swapService';
@@ -18,6 +18,22 @@ const SwapScreen: React.FC<SwapScreenProps> = ({ initialFromToken, initialToToke
     // Circle Modular Wallet - Smart Wallet (single wallet system)
     const { address: walletAddress, isConnected: passkeyConnected, sendTransaction } = useCircleWallet();
     const { addActivity } = useActivity();
+
+    // Create a passkey manager adapter for swapService compatibility
+    const passkeyManager = useMemo(() => {
+        if (!walletAddress || !sendTransaction) return null;
+        return {
+            getAccountAddress: () => walletAddress,
+            executeTransaction: async (to: string, value: bigint, data: string) => {
+                const hash = await sendTransaction({
+                    to,
+                    value,
+                    data: data as `0x${string}`,
+                });
+                return { hash };
+            },
+        };
+    }, [walletAddress, sendTransaction]);
 
     const [fromToken, setFromToken] = useState<TokenInfo>(() => {
         if (initialFromToken) {
@@ -62,7 +78,7 @@ const SwapScreen: React.FC<SwapScreenProps> = ({ initialFromToken, initialToToke
     }, [amount, fromToken, toToken]);
 
     const handleSwap = async () => {
-        if (!quote || !passkeyConnected || !walletAddress) {
+        if (!quote || !passkeyConnected || !passkeyManager || !walletAddress) {
             setError('Wallet not connected. Please connect your passkey wallet.');
             return;
         }
@@ -71,14 +87,14 @@ const SwapScreen: React.FC<SwapScreenProps> = ({ initialFromToken, initialToToke
         setError(null);
 
         try {
-            console.log('[SWAP UI] Starting swap via Circle Wallet:', {
+            console.log('[SWAP UI] Starting swap via PasskeyAccount:', {
                 from: quote.fromToken.symbol,
                 to: quote.toToken.symbol,
                 amount: quote.fromAmount
             });
 
-            // Execute swap via Circle Modular Wallet
-            const hash = await swapService.executeSwap(quote, walletAddress);
+            // Execute swap via PasskeyAccount smart wallet
+            const hash = await swapService.executeSwapWithPasskey(quote, passkeyManager);
 
             console.log('[SWAP UI] Swap successful! Hash:', hash);
             setTxHash(hash);
@@ -231,9 +247,9 @@ const SwapScreen: React.FC<SwapScreenProps> = ({ initialFromToken, initialToToke
                 {/* Swap Button */}
                 <button
                     onClick={handleSwap}
-                    disabled={!quote || swapping || loading || !passkeyConnected}
+                    disabled={!quote || swapping || loading || !passkeyConnected || !passkeyManager}
                     className={`w-full mt-4 py-3 rounded-lg font-bold text-lg transition-all shadow-[0_0_20px_rgba(255,255,255,0.1)] hover:shadow-[0_0_30px_rgba(255,255,255,0.2)] ${
-                        !quote || swapping || !passkeyConnected
+                        !quote || swapping || !passkeyConnected || !passkeyManager
                             ? 'bg-slate-800 text-slate-500 cursor-not-allowed shadow-none'
                             : 'bg-slate-200 text-slate-900 hover:bg-white'
                     }`}

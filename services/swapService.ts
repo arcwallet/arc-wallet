@@ -1,7 +1,6 @@
 import { JsonRpcProvider, parseUnits, formatUnits, Interface } from 'ethers';
 import { TokenInfo, getTokenContractAddress, SWAP_CONFIG } from '../config/tokens';
 import { getProvider, getFeeSettings } from './rpcProvider';
-import { circleWalletService } from './circleWalletService';
 
 export interface Quote {
   fromToken: TokenInfo;
@@ -158,26 +157,26 @@ class SwapService {
   }
 
   /**
-   * Execute a token swap using UniswapV2 Router on Arc Testnet
-   * Uses Circle Modular Wallet for gasless transactions
+   * Execute a token swap using PasskeyAccount (ERC-4337 Smart Wallet)
+   * Uses UniswapV2 swapExactTokensForTokens
+   * No private key required - uses passkey signing
    */
-  async executeSwap(
+  async executeSwapWithPasskey(
     quote: Quote,
-    walletAddress: string
+    passkeyManager: {
+      getAccountAddress: () => string | null;
+      executeTransaction: (to: string, value: bigint, data: string) => Promise<{ hash?: string }>;
+    }
   ): Promise<string> {
     try {
       // MEV Protection: Check quote expiration
       if (this.isQuoteExpired(quote)) {
-        throw new Error('Quote expired. Please get a fresh quote.');
+        throw new Error('Quote expired. Please get a fresh quote to avoid unfavorable pricing.');
       }
 
+      const walletAddress = passkeyManager.getAccountAddress();
       if (!walletAddress) {
-        throw new Error('Wallet not connected');
-      }
-
-      // Check if same token (no swap needed)
-      if (quote.fromToken.symbol === quote.toToken.symbol) {
-        throw new Error('Cannot swap same token');
+        throw new Error('PasskeyAccount not connected');
       }
 
       const tokenInAddress = getTokenContractAddress(quote.fromToken.symbol, 'testnet', 'arcTestnet');
@@ -200,7 +199,7 @@ class SwapService {
         amountOutMinimum = parseUnits(quote.minimumReceived, quote.toToken.decimals);
       }
 
-      // Step 1: Check and approve token if needed
+      // Step 1: Check and approve token if needed via PasskeyAccount
       const erc20Interface = new Interface(ERC20_ABI);
       const allowanceData = erc20Interface.encodeFunctionData('allowance', [walletAddress, this.routerAddress]);
       const allowanceResult = await this.provider.call({
@@ -209,19 +208,14 @@ class SwapService {
       });
       const currentAllowance = BigInt(allowanceResult);
 
-      const calls: Array<{ to: string; value?: bigint; data?: `0x${string}` }> = [];
-
-      // Add approval call if needed
       if (currentAllowance < amountIn) {
-        console.log('[SWAP] Adding approval call...');
+        console.log('[SWAP] Approving token via PasskeyAccount...');
         const approveData = erc20Interface.encodeFunctionData('approve', [this.routerAddress, amountIn * 2n]);
-        calls.push({
-          to: tokenInAddress,
-          data: approveData as `0x${string}`,
-        });
+        const approveResult = await passkeyManager.executeTransaction(tokenInAddress, 0n, approveData);
+        console.log('[SWAP] Token approved via PasskeyAccount:', approveResult.hash);
       }
 
-      // Step 2: Build swap call using UniswapV2
+      // Step 2: Execute swap via PasskeyAccount using UniswapV2
       const routerInterface = new Interface(UNISWAP_V2_ROUTER_ABI);
 
       // MEV Protection: Shorter deadline (5 min instead of 20)
@@ -230,7 +224,7 @@ class SwapService {
       // UniswapV2 uses path array for swaps
       const path = [tokenInAddress, tokenOutAddress];
 
-      console.log('[SWAP] Executing swap via Circle Wallet with params:', {
+      console.log('[SWAP] Executing swap via PasskeyAccount with params:', {
         from: quote.fromToken.symbol,
         to: quote.toToken.symbol,
         amountIn: quote.fromAmount,
@@ -248,34 +242,19 @@ class SwapService {
         deadline,
       ]);
 
-      calls.push({
-        to: this.routerAddress,
-        data: swapData as `0x${string}`,
-      });
+      // Execute via PasskeyAccount (UserOperation with passkey signature)
+      const swapResult = await passkeyManager.executeTransaction(this.routerAddress, 0n, swapData);
 
-      // Execute via Circle Wallet (batch transaction with passkey signature)
-      let txHash: string;
-      if (calls.length === 1) {
-        // Single call (no approval needed)
-        txHash = await circleWalletService.sendTransaction({
-          to: calls[0].to,
-          data: calls[0].data,
-        });
-      } else {
-        // Batch call (approval + swap)
-        txHash = await circleWalletService.sendBatchTransactions(calls);
-      }
+      console.log('[SWAP] Swap successful via PasskeyAccount! TxHash:', swapResult.hash);
 
-      console.log('[SWAP] Swap successful via Circle Wallet! TxHash:', txHash);
-
-      return txHash;
+      return swapResult.hash || '';
     } catch (error: any) {
-      console.error('[SWAP] Swap execution failed:', error);
+      console.error('[SWAP] Swap execution via PasskeyAccount failed:', error);
 
       // Enhanced error messages
       if (error?.message?.includes('insufficient allowance')) {
         throw new Error('Token approval failed. Please try again.');
-      } else if (error?.message?.includes('insufficient balance') || error?.message?.includes('insufficient funds')) {
+      } else if (error?.message?.includes('insufficient balance')) {
         throw new Error('Insufficient token balance for swap.');
       } else if (error?.message?.includes('Too little received')) {
         throw new Error('Price moved unfavorably. Please try again with higher slippage.');
@@ -283,8 +262,6 @@ class SwapService {
         throw new Error('Swap transaction failed. Pool may have insufficient liquidity.');
       } else if (error?.message?.includes('INSUFFICIENT_OUTPUT_AMOUNT')) {
         throw new Error('Insufficient liquidity in pool. Try a smaller amount.');
-      } else if (error?.message?.includes('User rejected') || error?.message?.includes('cancelled')) {
-        throw new Error('Transaction cancelled by user.');
       }
 
       throw new Error(error?.message || 'Swap failed. Please try again.');
