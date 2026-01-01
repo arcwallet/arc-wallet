@@ -213,8 +213,14 @@ const SwapScreen: React.FC<SwapScreenProps> = ({ initialFromToken, initialToToke
                 {/* Quote Details */}
                 {quote && (
                     <div className="mt-4 p-3 bg-slate-900/40 border border-slate-500/30 rounded-lg text-sm">
+                        {/* Warning if using fallback rate */}
+                        {quote.warning && (
+                            <div className="mb-2 p-2 bg-yellow-500/10 border border-yellow-500/30 rounded text-yellow-400 text-xs">
+                                ⚠️ {quote.warning}
+                            </div>
+                        )}
                         <div className="flex justify-between text-slate-400 mb-1">
-                            <span>Rate</span>
+                            <span>Rate {quote.usingFallback && <span className="text-yellow-400">(estimated)</span>}</span>
                             <span>1 {fromToken.symbol} = {quote.rate} {toToken.symbol}</span>
                         </div>
                         <div className="flex justify-between text-slate-400 mb-1">
@@ -224,6 +230,10 @@ const SwapScreen: React.FC<SwapScreenProps> = ({ initialFromToken, initialToToke
                         <div className="flex justify-between text-slate-400 mb-1">
                             <span>Price Impact</span>
                             <span className="text-blue-400">{quote.priceImpact}</span>
+                        </div>
+                        <div className="flex justify-between text-slate-400 mb-1">
+                            <span>Slippage Tolerance</span>
+                            <span className="text-yellow-400">{swapService.getSlippageTolerance()}%</span>
                         </div>
                         <div className="flex justify-between text-slate-400">
                             <span>Minimum Received</span>
