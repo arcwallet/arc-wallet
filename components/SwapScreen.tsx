@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { SwapIcon, SpinnerIcon } from './Icons';
 import { getAllSupportedTokens, TokenInfo } from '../config/tokens';
 import { swapService, Quote } from '../services/swapService';
@@ -15,37 +15,9 @@ interface SwapScreenProps {
 
 const SwapScreen: React.FC<SwapScreenProps> = ({ initialFromToken, initialToToken, initialAmount = '' }) => {
     const tokens = getAllSupportedTokens();
-    // Circle Modular Wallet - Smart Wallet (single wallet system)
-    const { address: walletAddress, isConnected: passkeyConnected, sendTransaction } = useCircleWallet();
+    // Circle Modular Wallet - Smart Wallet with EIP-712 signing for StableFX
+    const { address: walletAddress, isConnected, signTypedData } = useCircleWallet();
     const { addActivity } = useActivity();
-
-    // Create a passkey manager adapter for swapService compatibility
-    const passkeyManager = useMemo(() => {
-        if (!walletAddress || !sendTransaction) return null;
-        return {
-            getAccountAddress: () => walletAddress,
-            executeTransaction: async (to: string, value: bigint, data: string) => {
-                console.log('[SWAP ADAPTER] executeTransaction called:', {
-                    to,
-                    value: value.toString(),
-                    dataLength: data?.length,
-                    dataPrefix: data?.slice(0, 10),
-                });
-                try {
-                    const hash = await sendTransaction({
-                        to,
-                        value,
-                        data: (data.startsWith('0x') ? data : `0x${data}`) as `0x${string}`,
-                    });
-                    console.log('[SWAP ADAPTER] Transaction successful:', hash);
-                    return { hash };
-                } catch (err: any) {
-                    console.error('[SWAP ADAPTER] Transaction failed:', err);
-                    throw err;
-                }
-            },
-        };
-    }, [walletAddress, sendTransaction]);
 
     const [fromToken, setFromToken] = useState<TokenInfo>(() => {
         if (initialFromToken) {
@@ -90,7 +62,7 @@ const SwapScreen: React.FC<SwapScreenProps> = ({ initialFromToken, initialToToke
     }, [amount, fromToken, toToken]);
 
     const handleSwap = async () => {
-        if (!quote || !passkeyConnected || !passkeyManager || !walletAddress) {
+        if (!quote || !isConnected || !walletAddress || !signTypedData) {
             setError('Wallet not connected. Please connect your passkey wallet.');
             return;
         }
@@ -99,14 +71,15 @@ const SwapScreen: React.FC<SwapScreenProps> = ({ initialFromToken, initialToToke
         setError(null);
 
         try {
-            console.log('[SWAP UI] Starting swap via PasskeyAccount:', {
+            console.log('[SWAP UI] Starting swap via Circle StableFX:', {
                 from: quote.fromToken.symbol,
                 to: quote.toToken.symbol,
-                amount: quote.fromAmount
+                amount: quote.fromAmount,
+                quoteId: quote.stableFxQuoteId,
             });
 
-            // Execute swap via PasskeyAccount smart wallet
-            const hash = await swapService.executeSwapWithPasskey(quote, passkeyManager);
+            // Execute swap via Circle StableFX with EIP-712 signing
+            const hash = await swapService.executeSwap(quote, signTypedData, walletAddress);
 
             console.log('[SWAP UI] Swap successful! Hash:', hash);
             setTxHash(hash);
@@ -126,7 +99,7 @@ const SwapScreen: React.FC<SwapScreenProps> = ({ initialFromToken, initialToToke
                 hash,
                 from: walletAddress,
                 to: walletAddress, // Swap is to self
-                networkFee: 0, // Gasless via smart wallet
+                networkFee: 0, // Gasless via Circle StableFX
                 approvals: {
                     required: 0,
                     list: [],
@@ -157,7 +130,7 @@ const SwapScreen: React.FC<SwapScreenProps> = ({ initialFromToken, initialToToke
             <div className="mb-6">
                 <h2 className="text-2xl font-bold text-white">Stablecoin FX</h2>
                 <p className="text-slate-400 text-sm mt-2">
-                    Swap stablecoins on Arc Testnet via <span className="text-blue-400 font-medium">UniswapV2</span> — gasless transactions powered by Circle Modular Wallet.
+                    Swap stablecoins via <span className="text-blue-400 font-medium">Circle StableFX</span> — institutional-grade rates with instant settlement on Arc.
                 </p>
             </div>
 
@@ -213,14 +186,14 @@ const SwapScreen: React.FC<SwapScreenProps> = ({ initialFromToken, initialToToke
                 {/* Quote Details */}
                 {quote && (
                     <div className="mt-4 p-3 bg-slate-900/40 border border-slate-500/30 rounded-lg text-sm">
-                        {/* Warning if using fallback rate */}
+                        {/* Warning if any */}
                         {quote.warning && (
                             <div className="mb-2 p-2 bg-yellow-500/10 border border-yellow-500/30 rounded text-yellow-400 text-xs">
-                                ⚠️ {quote.warning}
+                                {quote.warning}
                             </div>
                         )}
                         <div className="flex justify-between text-slate-400 mb-1">
-                            <span>Rate {quote.usingFallback && <span className="text-yellow-400">(estimated)</span>}</span>
+                            <span>Rate</span>
                             <span>1 {fromToken.symbol} = {quote.rate} {toToken.symbol}</span>
                         </div>
                         <div className="flex justify-between text-slate-400 mb-1">
@@ -232,12 +205,12 @@ const SwapScreen: React.FC<SwapScreenProps> = ({ initialFromToken, initialToToke
                             <span className="text-blue-400">{quote.priceImpact}</span>
                         </div>
                         <div className="flex justify-between text-slate-400 mb-1">
-                            <span>Slippage Tolerance</span>
-                            <span className="text-yellow-400">{swapService.getSlippageTolerance()}%</span>
+                            <span>Execution</span>
+                            <span className="text-green-400">RFQ (No Slippage)</span>
                         </div>
                         <div className="flex justify-between text-slate-400">
-                            <span>Minimum Received</span>
-                            <span>{quote.minimumReceived} {toToken.symbol}</span>
+                            <span>You Receive</span>
+                            <span className="text-white font-medium">{quote.toAmount} {toToken.symbol}</span>
                         </div>
                     </div>
                 )}
@@ -269,14 +242,14 @@ const SwapScreen: React.FC<SwapScreenProps> = ({ initialFromToken, initialToToke
                 {/* Swap Button */}
                 <button
                     onClick={handleSwap}
-                    disabled={!quote || swapping || loading || !passkeyConnected || !passkeyManager}
+                    disabled={!quote || swapping || loading || !isConnected}
                     className={`w-full mt-4 py-3 rounded-lg font-bold text-lg transition-all shadow-[0_0_20px_rgba(255,255,255,0.1)] hover:shadow-[0_0_30px_rgba(255,255,255,0.2)] ${
-                        !quote || swapping || !passkeyConnected || !passkeyManager
+                        !quote || swapping || !isConnected
                             ? 'bg-slate-800 text-slate-500 cursor-not-allowed shadow-none'
                             : 'bg-slate-200 text-slate-900 hover:bg-white'
                     }`}
                 >
-                    {!passkeyConnected ? 'Connect Wallet' : swapping ? 'Swapping...' : 'Swap'}
+                    {!isConnected ? 'Connect Wallet' : swapping ? 'Swapping...' : 'Swap'}
                 </button>
             </div>
 
@@ -293,27 +266,27 @@ const SwapScreen: React.FC<SwapScreenProps> = ({ initialFromToken, initialToToke
                 <div className="flex items-center gap-2 mb-3">
                     <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
                     <span className="text-xs text-slate-400">
-                        Arc Testnet • {quote?.source === 'stablefx' ? 'Circle StableFX' : 'UniswapV2 Router'}
+                        Arc Testnet • Circle StableFX
                     </span>
                 </div>
                 <div className="grid grid-cols-2 gap-3 text-xs">
                     <div className="bg-slate-800/50 rounded-lg p-2.5">
                         <p className="text-slate-500 mb-1">Supported Pairs</p>
-                        <p className="text-slate-300 font-medium">USDC ↔ EURC ↔ USYC</p>
+                        <p className="text-slate-300 font-medium">USDC ↔ EURC</p>
                     </div>
                     <div className="bg-slate-800/50 rounded-lg p-2.5">
-                        <p className="text-slate-500 mb-1">Gas</p>
-                        <p className="text-slate-300 font-medium">Gasless (ERC-4337)</p>
+                        <p className="text-slate-500 mb-1">Execution</p>
+                        <p className="text-slate-300 font-medium">Gasless RFQ</p>
                     </div>
                 </div>
                 <div className="flex items-center justify-center gap-4 mt-3 pt-3 border-t border-slate-700/50">
                     <a
-                        href="https://docs.arc.network"
+                        href="https://developers.circle.com/stablecoins/stablefx-api"
                         target="_blank"
                         rel="noreferrer"
                         className="text-xs text-slate-500 hover:text-blue-400 transition-colors"
                     >
-                        Arc Docs
+                        StableFX Docs
                     </a>
                     <span className="text-slate-700">•</span>
                     <a

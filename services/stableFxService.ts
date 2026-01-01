@@ -3,9 +3,16 @@
  *
  * Uses Circle's institutional-grade FX engine for USDC ↔ EURC swaps
  * with competitive rates and instant settlement on Arc.
+ *
+ * Full flow:
+ * 1. Create Quote
+ * 2. Create Trade
+ * 3. Get Trade Presign Data → Sign → Register Signature
+ * 4. Get Funding Presign Data → Sign → Fund Trade
  */
 
 import { TokenInfo } from '../config/tokens';
+import { circleWalletService, type TypedDataParams } from './circleWalletService';
 
 // StableFX API Configuration
 const STABLEFX_CONFIG = {
@@ -13,10 +20,18 @@ const STABLEFX_CONFIG = {
   sandboxUrl: 'https://api-sandbox.circle.com/v1/exchange/stablefx',
   productionUrl: 'https://api.circle.com/v1/exchange/stablefx',
 
-  // Settlement contract on Arc Testnet
-  escrowContract: '0x1f91886C7028986aD885ffCee0e40b75C9cd5aC1',
+  // Contract addresses on Arc Testnet
+  contracts: {
+    fxEscrow: '0x1f91886C7028986aD885ffCee0e40b75C9cd5aC1',
+    permit2: '0x000000000022D473030F116dDEE9F6B43aC78BA3',
+    usdc: '0x3600000000000000000000000000000000000000',
+    eurc: '0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a',
+  },
 
-  // Minimum swap amount (in USDC equivalent)
+  // Arc Testnet chainId
+  chainId: 5042002,
+
+  // Minimum swap amount (in USDC/EURC)
   minimumAmount: '10',
 
   // Supported currencies
@@ -70,7 +85,7 @@ export interface StableFxQuote {
 export interface StableFxTrade {
   id: string;
   contractTradeId: string;
-  status: 'pending' | 'settled' | 'failed' | 'breached';
+  status: 'pending' | 'pending_settlement' | 'settled' | 'failed' | 'breached';
   rate: number;
   from: {
     currency: string;
@@ -86,6 +101,18 @@ export interface StableFxTrade {
   settlementTransactionHash?: string;
 }
 
+export interface StableFxPresignData {
+  domain: {
+    name: string;
+    version: string;
+    chainId: number;
+    verifyingContract: string;
+  };
+  types: Record<string, Array<{ name: string; type: string }>>;
+  primaryType: string;
+  message: Record<string, any>;
+}
+
 export interface SwapQuote {
   fromToken: TokenInfo;
   toToken: TokenInfo;
@@ -98,8 +125,8 @@ export interface SwapQuote {
   minimumReceived: string;
   timestamp: number;
   expiresAt: number;
-  source: 'stablefx' | 'uniswap';
-  stableFxQuoteId?: string;
+  source: 'stablefx';
+  stableFxQuoteId: string;
 }
 
 class StableFxService {
@@ -107,6 +134,14 @@ class StableFxService {
   private baseUrl: string;
 
   constructor() {
+    this.apiKey = getApiKey();
+    this.baseUrl = getBaseUrl();
+  }
+
+  /**
+   * Refresh API key from environment (useful after config changes)
+   */
+  refreshConfig(): void {
     this.apiKey = getApiKey();
     this.baseUrl = getBaseUrl();
   }
@@ -130,7 +165,17 @@ class StableFxService {
   }
 
   /**
-   * Request a quote from Circle StableFX
+   * Get authorization header
+   */
+  private getAuthHeader(): Record<string, string> {
+    return {
+      'Authorization': `Bearer ${this.apiKey}`,
+      'Content-Type': 'application/json',
+    };
+  }
+
+  /**
+   * Step 1: Request a quote from Circle StableFX
    */
   async getQuote(
     fromToken: TokenInfo,
@@ -139,7 +184,7 @@ class StableFxService {
     direction: 'from' | 'to' = 'from'
   ): Promise<StableFxQuote> {
     if (!this.isAvailable()) {
-      throw new Error('StableFX API key not configured');
+      throw new Error('StableFX API key not configured. Contact sales@circle.com for access.');
     }
 
     if (!this.isPairSupported(fromToken.symbol, toToken.symbol)) {
@@ -177,10 +222,7 @@ class StableFxService {
 
     const response = await fetch(`${this.baseUrl}/quotes`, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${this.apiKey}`,
-        'Content-Type': 'application/json',
-      },
+      headers: this.getAuthHeader(),
       body: JSON.stringify(requestBody),
     });
 
@@ -214,7 +256,7 @@ class StableFxService {
       rate: stableFxQuote.rate.toFixed(6),
       fee: `${stableFxQuote.fee.amount} ${stableFxQuote.fee.currency}`,
       estimatedGas: '0', // Gasless via Circle
-      priceImpact: '< 0.01%', // StableFX has minimal impact
+      priceImpact: '< 0.01%', // StableFX has minimal impact (RFQ model)
       minimumReceived: stableFxQuote.to.amount, // No slippage with RFQ
       timestamp: Date.now(),
       expiresAt,
@@ -224,23 +266,20 @@ class StableFxService {
   }
 
   /**
-   * Execute a trade using a previously obtained quote
+   * Step 2: Create a trade from a quote
    */
-  async executeTrade(quoteId: string): Promise<StableFxTrade> {
+  async createTrade(quoteId: string): Promise<StableFxTrade> {
     if (!this.isAvailable()) {
       throw new Error('StableFX API key not configured');
     }
 
     const idempotencyKey = crypto.randomUUID();
 
-    console.log('[StableFX] Executing trade for quote:', quoteId);
+    console.log('[StableFX] Creating trade for quote:', quoteId);
 
     const response = await fetch(`${this.baseUrl}/trades`, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${this.apiKey}`,
-        'Content-Type': 'application/json',
-      },
+      headers: this.getAuthHeader(),
       body: JSON.stringify({
         idempotencyKey,
         quoteId,
@@ -249,8 +288,8 @@ class StableFxService {
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
-      console.error('[StableFX] Trade execution failed:', error);
-      throw new Error(error.message || `StableFX trade failed: ${response.status}`);
+      console.error('[StableFX] Trade creation failed:', error);
+      throw new Error(error.message || `StableFX trade creation failed: ${response.status}`);
     }
 
     const trade = await response.json();
@@ -260,18 +299,126 @@ class StableFxService {
   }
 
   /**
+   * Step 3a: Get trade presign data for EIP-712 signing
+   */
+  async getTradePresignData(tradeId: string, recipientAddress: string): Promise<StableFxPresignData> {
+    console.log('[StableFX] Getting trade presign data:', { tradeId, recipientAddress });
+
+    const url = `${this.baseUrl}/signatures/presign/taker/${tradeId}?recipientAddress=${recipientAddress}`;
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: this.getAuthHeader(),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      console.error('[StableFX] Get presign data failed:', error);
+      throw new Error(error.message || `Failed to get presign data: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log('[StableFX] Presign data received');
+
+    return data;
+  }
+
+  /**
+   * Step 3b: Register trade signature
+   */
+  async registerTradeSignature(
+    tradeId: string,
+    walletAddress: string,
+    presignData: StableFxPresignData,
+    signature: string
+  ): Promise<void> {
+    console.log('[StableFX] Registering trade signature');
+
+    const response = await fetch(`${this.baseUrl}/signatures`, {
+      method: 'POST',
+      headers: this.getAuthHeader(),
+      body: JSON.stringify({
+        tradeId,
+        type: 'taker',
+        address: walletAddress,
+        details: presignData.message,
+        signature,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      console.error('[StableFX] Register signature failed:', error);
+      throw new Error(error.message || `Failed to register signature: ${response.status}`);
+    }
+
+    console.log('[StableFX] Signature registered successfully');
+  }
+
+  /**
+   * Step 4a: Get funding presign data (Permit2)
+   */
+  async getFundingPresignData(contractTradeIds: string[]): Promise<StableFxPresignData> {
+    console.log('[StableFX] Getting funding presign data:', { contractTradeIds });
+
+    const response = await fetch(`${this.baseUrl}/signatures/funding/presign`, {
+      method: 'POST',
+      headers: this.getAuthHeader(),
+      body: JSON.stringify({
+        contractTradeIds,
+        type: 'taker',
+        fundingMode: 'gross',
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      console.error('[StableFX] Get funding presign data failed:', error);
+      throw new Error(error.message || `Failed to get funding data: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log('[StableFX] Funding presign data received');
+
+    return data;
+  }
+
+  /**
+   * Step 4b: Fund the trade with Permit2 signature
+   */
+  async fundTrade(
+    permit2Message: Record<string, any>,
+    signature: string
+  ): Promise<void> {
+    console.log('[StableFX] Funding trade with Permit2');
+
+    const response = await fetch(`${this.baseUrl}/fund`, {
+      method: 'POST',
+      headers: this.getAuthHeader(),
+      body: JSON.stringify({
+        type: 'taker',
+        signature,
+        permit2: permit2Message,
+        fundingMode: 'gross',
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      console.error('[StableFX] Fund trade failed:', error);
+      throw new Error(error.message || `Failed to fund trade: ${response.status}`);
+    }
+
+    console.log('[StableFX] Trade funded successfully');
+  }
+
+  /**
    * Get trade status
    */
   async getTradeStatus(tradeId: string): Promise<StableFxTrade> {
-    if (!this.isAvailable()) {
-      throw new Error('StableFX API key not configured');
-    }
-
     const response = await fetch(`${this.baseUrl}/trades/${tradeId}`, {
       method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${this.apiKey}`,
-      },
+      headers: this.getAuthHeader(),
     });
 
     if (!response.ok) {
@@ -282,26 +429,88 @@ class StableFxService {
   }
 
   /**
-   * Full swap flow: get quote and execute
+   * Full swap execution flow
+   *
+   * 1. Create quote
+   * 2. Create trade
+   * 3. Sign and register trade signature
+   * 4. Sign and fund with Permit2
+   * 5. Wait for settlement
    */
-  async swap(
+  async executeSwap(
     fromToken: TokenInfo,
     toToken: TokenInfo,
-    amount: string
-  ): Promise<{ trade: StableFxTrade; quote: StableFxQuote }> {
+    amount: string,
+    signTypedData: (params: TypedDataParams) => Promise<`0x${string}`>,
+    walletAddress: string
+  ): Promise<{ tradeId: string; txHash?: string }> {
+    console.log('[StableFX] Starting swap execution:', {
+      from: fromToken.symbol,
+      to: toToken.symbol,
+      amount,
+      wallet: walletAddress,
+    });
+
     // Step 1: Get quote
     const quote = await this.getQuote(fromToken, toToken, amount);
 
-    // Step 2: Check quote hasn't expired
+    // Check quote hasn't expired
     const expiresAt = new Date(quote.expiresAt).getTime();
     if (Date.now() > expiresAt - STABLEFX_CONFIG.quoteExpiryBuffer) {
       throw new Error('Quote expired, please try again');
     }
 
-    // Step 3: Execute trade
-    const trade = await this.executeTrade(quote.id);
+    // Step 2: Create trade
+    const trade = await this.createTrade(quote.id);
 
-    return { trade, quote };
+    // Step 3: Sign and register trade signature
+    console.log('[StableFX] Signing trade agreement...');
+    const tradePresignData = await this.getTradePresignData(trade.id, walletAddress);
+
+    const tradeSignature = await signTypedData({
+      domain: tradePresignData.domain as TypedDataParams['domain'],
+      types: tradePresignData.types,
+      primaryType: tradePresignData.primaryType,
+      message: tradePresignData.message,
+    });
+
+    await this.registerTradeSignature(trade.id, walletAddress, tradePresignData, tradeSignature);
+
+    // Step 4: Sign and fund with Permit2
+    console.log('[StableFX] Signing Permit2 funding...');
+    const fundingPresignData = await this.getFundingPresignData([trade.contractTradeId]);
+
+    const fundingSignature = await signTypedData({
+      domain: fundingPresignData.domain as TypedDataParams['domain'],
+      types: fundingPresignData.types,
+      primaryType: fundingPresignData.primaryType,
+      message: fundingPresignData.message,
+    });
+
+    await this.fundTrade(fundingPresignData.message, fundingSignature);
+
+    // Step 5: Poll for settlement (optional - could return immediately)
+    console.log('[StableFX] Waiting for settlement...');
+    let finalTrade = await this.getTradeStatus(trade.id);
+    let attempts = 0;
+    const maxAttempts = 30; // 30 seconds max wait
+
+    while (finalTrade.status === 'pending_settlement' && attempts < maxAttempts) {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      finalTrade = await this.getTradeStatus(trade.id);
+      attempts++;
+    }
+
+    console.log('[StableFX] Swap completed:', {
+      tradeId: trade.id,
+      status: finalTrade.status,
+      txHash: finalTrade.settlementTransactionHash,
+    });
+
+    return {
+      tradeId: trade.id,
+      txHash: finalTrade.settlementTransactionHash,
+    };
   }
 
   /**

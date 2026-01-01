@@ -18,6 +18,7 @@ import {
   type CircleWalletState,
   type TransactionParams,
   type TokenTransferParams,
+  type TypedDataParams,
 } from '../services/circleWalletService';
 import { useSession } from './SessionContext';
 import { logger } from '../services/logger';
@@ -50,6 +51,7 @@ interface CircleWalletContextValue {
   sendBatchTransactions: (
     calls: Array<{ to: string; value?: bigint; data?: `0x${string}` }>
   ) => Promise<string>;
+  signTypedData: (params: TypedDataParams) => Promise<`0x${string}`>;
 
   // Utils
   getBalance: () => Promise<bigint>;
@@ -323,6 +325,17 @@ export const CircleWalletProvider: React.FC<CircleWalletProviderProps> = ({ chil
     []
   );
 
+  // Sign typed data (EIP-712)
+  const signTypedData = useCallback(async (params: TypedDataParams): Promise<`0x${string}`> => {
+    setError(null);
+    try {
+      return await circleWalletService.signTypedData(params);
+    } catch (err: any) {
+      setError(err.message);
+      throw err;
+    }
+  }, []);
+
   // Get balance
   const getBalance = useCallback(async (): Promise<bigint> => {
     return circleWalletService.getBalance();
@@ -366,6 +379,7 @@ export const CircleWalletProvider: React.FC<CircleWalletProviderProps> = ({ chil
     sendTransaction,
     sendTokenTransfer,
     sendBatchTransactions,
+    signTypedData,
 
     // Utils
     getBalance,

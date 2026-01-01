@@ -63,6 +63,22 @@ export interface TokenTransferParams {
   decimals: number;
 }
 
+// EIP-712 Typed Data for signing
+export interface TypedDataDomain {
+  name?: string;
+  version?: string;
+  chainId?: number;
+  verifyingContract?: `0x${string}`;
+  salt?: `0x${string}`;
+}
+
+export interface TypedDataParams {
+  domain: TypedDataDomain;
+  types: Record<string, Array<{ name: string; type: string }>>;
+  primaryType: string;
+  message: Record<string, any>;
+}
+
 // Constants
 const DEFAULT_TIMEOUT = 60000; // 60 seconds
 const MAX_RETRIES = 3;
@@ -999,6 +1015,48 @@ class CircleWalletServiceImpl {
    */
   getAddress(): string | null {
     return this.account?.address || null;
+  }
+
+  /**
+   * Sign EIP-712 typed data
+   * Required for StableFX integration (trade signatures and Permit2)
+   */
+  async signTypedData(params: TypedDataParams): Promise<`0x${string}`> {
+    if (!this.account) {
+      throw new Error('Wallet not connected');
+    }
+
+    // Require passkey authentication before signing
+    await this.ensurePasskeyAuthenticated();
+
+    logger.info('Signing typed data', {
+      component: 'CircleWalletService',
+      primaryType: params.primaryType,
+      domain: params.domain.name,
+    });
+
+    try {
+      // The Circle Smart Account should support signTypedData via viem
+      const signature = await this.account.signTypedData({
+        domain: params.domain,
+        types: params.types,
+        primaryType: params.primaryType,
+        message: params.message,
+      });
+
+      logger.info('Typed data signed successfully', {
+        component: 'CircleWalletService',
+        signatureLength: signature.length,
+      });
+
+      return signature;
+    } catch (err: any) {
+      logger.error('Failed to sign typed data', {
+        component: 'CircleWalletService',
+        errorMsg: err.message,
+      });
+      throw new Error(`Signing failed: ${err.message}`);
+    }
   }
 
   // Storage helpers for session persistence
