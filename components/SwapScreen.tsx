@@ -25,12 +25,24 @@ const SwapScreen: React.FC<SwapScreenProps> = ({ initialFromToken, initialToToke
         return {
             getAccountAddress: () => walletAddress,
             executeTransaction: async (to: string, value: bigint, data: string) => {
-                const hash = await sendTransaction({
+                console.log('[SWAP ADAPTER] executeTransaction called:', {
                     to,
-                    value,
-                    data: data as `0x${string}`,
+                    value: value.toString(),
+                    dataLength: data?.length,
+                    dataPrefix: data?.slice(0, 10),
                 });
-                return { hash };
+                try {
+                    const hash = await sendTransaction({
+                        to,
+                        value,
+                        data: (data.startsWith('0x') ? data : `0x${data}`) as `0x${string}`,
+                    });
+                    console.log('[SWAP ADAPTER] Transaction successful:', hash);
+                    return { hash };
+                } catch (err: any) {
+                    console.error('[SWAP ADAPTER] Transaction failed:', err);
+                    throw err;
+                }
             },
         };
     }, [walletAddress, sendTransaction]);
