@@ -24,24 +24,15 @@ export interface TokenInfo {
 }
 
 export interface SwapConfig {
-  // Uniswap V2/V3 Router addresses for different networks
-  routerAddresses: {
-    mainnet: {
-      ethereum: string;
-      base: string;
-      avalanche: string;
-    };
-    testnet: {
-      sepolia: string;
-      baseSepolia: string;
-      avalancheFuji: string;
-      arcTestnet: string;
-    };
+  // Circle StableFX contract addresses
+  stableFxContracts: {
+    fxEscrow: string;
+    permit2: string;
   };
-  // Default slippage tolerance
-  defaultSlippage: number;
-  // Minimum amounts
-  minimumSwapAmount: Record<string, string>;
+  // Supported currency pairs
+  supportedPairs: string[][];
+  // Minimum swap amount in USD
+  minimumSwapAmountUSD: number;
 }
 
 export const SUPPORTED_TOKENS: Record<string, TokenInfo> = {
@@ -112,25 +103,18 @@ export const SUPPORTED_TOKENS: Record<string, TokenInfo> = {
 };
 
 export const SWAP_CONFIG: SwapConfig = {
-  routerAddresses: {
-    mainnet: {
-      ethereum: '0xE592427A0AEce92De3Edee1F18E0157C05861564', // Uniswap V3 Router
-      base: '0x2626664c2603336E57B271c5C0b26F421741e481', // Uniswap V3 Router on Base
-      avalanche: '0xbb00FF08d01D300023C629E8fFfFcb65A5a578cE', // Trader Joe V2 Router
-    },
-    testnet: {
-      sepolia: '0x3bFA4769FB09eefC5a80d6E87c3B9C650f7Ae48E', // Uniswap V3 Router Sepolia
-      baseSepolia: '0x94cC0AaC535CCDB3C01d6787D6413C739ae12bc4', // Uniswap V3 Router Base Sepolia
-      avalancheFuji: '0x60aE616a2155Ee3d9A68541Ba4544862310933d4', // Trader Joe V2 Router Fuji
-      arcTestnet: '0xB9D1e7d5bCEAAEb8AA557dB4678E0211118A57f1', // UniswapV2Router02 on Arc testnet
-    },
+  // Circle StableFX contract addresses on Arc Testnet
+  stableFxContracts: {
+    fxEscrow: '0x1f91886C7028986aD885ffCee0e40b75C9cd5aC1',
+    permit2: '0x000000000022D473030F116dDEE9F6B43aC78BA3',
   },
-  defaultSlippage: 0.5, // 0.5%
-  minimumSwapAmount: {
-    USDC: '1000000', // 1 USDC (6 decimals)
-    EURC: '1000000', // 1 EURC (6 decimals)
-    USYC: '1000000', // 1 USYC (6 decimals)
-  },
+  // Supported pairs: USDC ↔ EURC only (via Circle StableFX)
+  supportedPairs: [
+    ['USDC', 'EURC'],
+    ['EURC', 'USDC'],
+  ],
+  // Minimum swap amount: $10 USD
+  minimumSwapAmountUSD: 10,
 };
 
 export const getTokenInfo = (symbol: string): TokenInfo | undefined => {
