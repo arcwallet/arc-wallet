@@ -24,4 +24,6 @@ services:
         value: https://app.arcwallet.network
       - key: RP_NAME
         value: Arc Wallet
+      - key: ALLOWED_EMAILS
+        value: sehereroglu786@gmail.com,edelibas@gmail.com
 
