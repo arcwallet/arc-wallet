@@ -6,11 +6,20 @@
  * and retries with payment proof.
  */
 
-import { circleWalletService } from './circleWalletService';
 import { logger } from './logger';
 
 // API Configuration - Use same backend URL as other services
 const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_PASSKEY_API_URL || 'https://arcwallet-backend.onrender.com';
+
+// Lazy import circleWalletService only when needed for payments
+let _circleWalletService: any = null;
+async function getCircleWalletService() {
+  if (!_circleWalletService) {
+    const module = await import('./circleWalletService');
+    _circleWalletService = module.circleWalletService;
+  }
+  return _circleWalletService;
+}
 
 // x402 Payment Requirements from server
 export interface X402PaymentRequirements {
@@ -83,8 +92,9 @@ async function executePayment(
   const USDC_ADDRESS = '0x0000000000000000000000000000000000000001'; // Native USDC on Arc
 
   try {
-    // Use Circle Wallet to send USDC payment
-    const txHash = await circleWalletService.sendTokenTransfer({
+    // Use Circle Wallet to send USDC payment (lazy loaded)
+    const circleWallet = await getCircleWalletService();
+    const txHash = await circleWallet.sendTokenTransfer({
       tokenAddress: USDC_ADDRESS,
       to: requirements.recipient,
       amount: requirements.price,
