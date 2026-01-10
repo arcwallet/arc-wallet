@@ -1,291 +1,263 @@
 /**
- * Arc Assistant - Enhanced Premium UI
+ * Arc Assistant - Institutional Crypto Design
  *
- * A futuristic Web3 AI assistant interface with:
- * - Animated gradient orb effects
- * - Glassmorphism components
- * - Framer Motion animations
- * - Circular budget indicator
- * - Quick action carousel
- * - Slash commands support
+ * Design Direction: "Bloomberg Terminal meets Apple Pay"
+ * Reference: Fireblocks, Anchorage Digital, Coinbase Prime, Ledger Enterprise
+ *
+ * NO: Glowing orbs, cyan accents, gradients, sparkles, floating particles
+ * YES: Clean lines, flat surfaces, professional blue, 1px borders
  */
 
-import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
-  Sparkles,
-  Send,
   ArrowUpRight,
   ArrowLeftRight,
-  BarChart3,
-  Shield,
-  Wallet,
-  X,
-  Settings,
-  RefreshCw,
-  Mic,
-  Paperclip,
-  ChevronRight,
-  ChevronLeft,
-  Zap,
+  GitBranch,
+  ShieldCheck,
   TrendingUp,
-  Globe,
   Clock,
-  CheckCircle2,
+  SlidersHorizontal,
+  RotateCcw,
+  ArrowUp,
+  X,
+  Check,
   AlertCircle,
   Copy,
   ExternalLink,
-  Command,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { useAgent } from '../contexts/AgentContext';
 
 // ============================================
-// Theme Colors
+// Design Tokens (CSS Variables approach)
 // ============================================
-const theme = {
-  bg: {
-    primary: '#0A1628',
-    card: '#111D2E',
-    elevated: '#1a2438',
-  },
-  accent: {
-    primary: '#00D4FF',
-    secondary: '#3B82F6',
-    gradient: 'linear-gradient(135deg, #00D4FF 0%, #3B82F6 100%)',
-  },
-  status: {
-    success: '#10B981',
-    warning: '#F59E0B',
-    error: '#EF4444',
-  },
-  text: {
-    primary: '#FFFFFF',
-    secondary: '#94A3B8',
-    muted: '#64748B',
-  },
-  border: 'rgba(255,255,255,0.1)',
+const tokens = {
+  // Backgrounds
+  bgPrimary: '#0B0F14',
+  bgSecondary: '#12171E',
+  surface: '#1A1F28',
+  surfaceHover: '#1E242D',
+
+  // Borders
+  border: '#2A3441',
+  borderHover: '#3B82F6',
+
+  // Text
+  textPrimary: '#F8FAFC',
+  textSecondary: '#64748B',
+  textTertiary: '#475569',
+
+  // Accents
+  accent: '#3B82F6',
+  accentSecondary: '#8B5CF6',
+  success: '#22C55E',
+  warning: '#EAB308',
+  danger: '#EF4444',
+
+  // Highlight
+  highlight: 'rgba(59, 130, 246, 0.08)',
+
+  // Transitions
+  transition: '150ms ease-out',
 };
 
 // ============================================
-// Animated Background Orb
+// Diamond Logo Icon
 // ============================================
-const AnimatedOrb: React.FC<{ size?: number }> = ({ size = 200 }) => (
-  <div className="absolute inset-0 flex items-center justify-center overflow-hidden pointer-events-none">
-    <motion.div
-      className="absolute rounded-full"
-      style={{
-        width: size,
-        height: size,
-        background: `radial-gradient(circle, ${theme.accent.primary}30 0%, transparent 70%)`,
-        filter: 'blur(40px)',
-      }}
-      animate={{
-        scale: [1, 1.2, 1],
-        opacity: [0.3, 0.5, 0.3],
-      }}
-      transition={{
-        duration: 4,
-        repeat: Infinity,
-        ease: 'easeInOut',
-      }}
+const DiamondIcon: React.FC<{ size?: number; className?: string }> = ({
+  size = 20,
+  className = '',
+}) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    className={className}
+  >
+    <path
+      d="M12 2L2 9L12 22L22 9L12 2Z"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
     />
-    <motion.div
-      className="absolute rounded-full"
-      style={{
-        width: size * 0.7,
-        height: size * 0.7,
-        background: `radial-gradient(circle, ${theme.accent.secondary}40 0%, transparent 70%)`,
-        filter: 'blur(30px)',
-      }}
-      animate={{
-        scale: [1.2, 1, 1.2],
-        opacity: [0.4, 0.6, 0.4],
-        rotate: [0, 180, 360],
-      }}
-      transition={{
-        duration: 6,
-        repeat: Infinity,
-        ease: 'easeInOut',
-      }}
+    <path
+      d="M2 9H22"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
     />
-  </div>
+    <path
+      d="M12 2L8 9L12 22L16 9L12 2Z"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
 );
 
 // ============================================
-// Floating Crypto Particles
+// Action Card Component
 // ============================================
-const FloatingParticles: React.FC = () => {
-  const particles = useMemo(() =>
-    Array.from({ length: 15 }, (_, i) => ({
-      id: i,
-      x: Math.random() * 100,
-      y: Math.random() * 100,
-      size: Math.random() * 4 + 2,
-      duration: Math.random() * 10 + 10,
-      delay: Math.random() * 5,
-    })), []
-  );
-
-  return (
-    <div className="absolute inset-0 overflow-hidden pointer-events-none">
-      {particles.map((particle) => (
-        <motion.div
-          key={particle.id}
-          className="absolute rounded-full bg-cyan-400/20"
-          style={{
-            left: `${particle.x}%`,
-            top: `${particle.y}%`,
-            width: particle.size,
-            height: particle.size,
-          }}
-          animate={{
-            y: [0, -30, 0],
-            opacity: [0.2, 0.5, 0.2],
-          }}
-          transition={{
-            duration: particle.duration,
-            repeat: Infinity,
-            delay: particle.delay,
-            ease: 'easeInOut',
-          }}
-        />
-      ))}
-    </div>
-  );
-};
-
-// ============================================
-// Circular Progress Indicator
-// ============================================
-interface CircularProgressProps {
-  value: number;
-  max: number;
-  size?: number;
-  strokeWidth?: number;
+interface ActionCardProps {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+  onClick: () => void;
 }
 
-const CircularProgress: React.FC<CircularProgressProps> = ({
-  value,
-  max,
-  size = 80,
-  strokeWidth = 6,
-}) => {
-  const percentage = Math.min((value / max) * 100, 100);
-  const radius = (size - strokeWidth) / 2;
-  const circumference = radius * 2 * Math.PI;
-  const offset = circumference - (percentage / 100) * circumference;
+const ActionCard: React.FC<ActionCardProps> = ({
+  icon,
+  title,
+  description,
+  onClick,
+}) => (
+  <button
+    onClick={onClick}
+    className="group text-left p-4 rounded-lg transition-all duration-150 ease-out"
+    style={{
+      backgroundColor: tokens.surface,
+      border: `1px solid ${tokens.border}`,
+    }}
+    onMouseEnter={(e) => {
+      e.currentTarget.style.backgroundColor = tokens.surfaceHover;
+      e.currentTarget.style.borderColor = tokens.accent;
+    }}
+    onMouseLeave={(e) => {
+      e.currentTarget.style.backgroundColor = tokens.surface;
+      e.currentTarget.style.borderColor = tokens.border;
+    }}
+    onMouseDown={(e) => {
+      e.currentTarget.style.transform = 'scale(0.98)';
+    }}
+    onMouseUp={(e) => {
+      e.currentTarget.style.transform = 'scale(1)';
+    }}
+  >
+    <div
+      className="mb-3"
+      style={{ color: tokens.textSecondary }}
+    >
+      {icon}
+    </div>
+    <h3
+      className="text-sm font-semibold mb-1"
+      style={{
+        color: tokens.textPrimary,
+        letterSpacing: '-0.02em',
+      }}
+    >
+      {title}
+    </h3>
+    <p
+      className="text-xs"
+      style={{ color: tokens.textSecondary }}
+    >
+      {description}
+    </p>
+  </button>
+);
 
-  const getColor = () => {
-    if (percentage >= 80) return theme.status.error;
-    if (percentage >= 50) return theme.status.warning;
-    return theme.status.success;
+// ============================================
+// Suggestion Chip Component
+// ============================================
+interface SuggestionChipProps {
+  text: string;
+  onClick: () => void;
+}
+
+const SuggestionChip: React.FC<SuggestionChipProps> = ({ text, onClick }) => (
+  <button
+    onClick={onClick}
+    className="px-3 py-1.5 text-xs rounded-md whitespace-nowrap transition-all duration-150 ease-out"
+    style={{
+      backgroundColor: 'transparent',
+      border: `1px solid ${tokens.border}`,
+      color: tokens.textSecondary,
+    }}
+    onMouseEnter={(e) => {
+      e.currentTarget.style.backgroundColor = tokens.surface;
+      e.currentTarget.style.color = tokens.textPrimary;
+    }}
+    onMouseLeave={(e) => {
+      e.currentTarget.style.backgroundColor = 'transparent';
+      e.currentTarget.style.color = tokens.textSecondary;
+    }}
+  >
+    {text}
+  </button>
+);
+
+// ============================================
+// Budget Bar Component
+// ============================================
+interface BudgetBarProps {
+  spent: number;
+  limit: number;
+  resetTime?: string;
+}
+
+const BudgetBar: React.FC<BudgetBarProps> = ({
+  spent,
+  limit,
+  resetTime = '12:00',
+}) => {
+  const percentage = Math.min((spent / limit) * 100, 100);
+
+  const getBarColor = () => {
+    if (percentage >= 80) return tokens.danger;
+    if (percentage >= 50) return tokens.warning;
+    return tokens.accent;
   };
 
   return (
-    <div className="relative" style={{ width: size, height: size }}>
-      <svg width={size} height={size} className="transform -rotate-90">
-        {/* Background circle */}
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          fill="none"
-          stroke="rgba(255,255,255,0.1)"
-          strokeWidth={strokeWidth}
-        />
-        {/* Progress circle */}
-        <motion.circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          fill="none"
-          stroke={getColor()}
-          strokeWidth={strokeWidth}
-          strokeLinecap="round"
-          strokeDasharray={circumference}
-          initial={{ strokeDashoffset: circumference }}
-          animate={{ strokeDashoffset: offset }}
-          transition={{ duration: 1, ease: 'easeOut' }}
-        />
-      </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-xs text-slate-400">Budget</span>
-        <span className="text-sm font-bold text-white">{percentage.toFixed(0)}%</span>
+    <div
+      className="px-4 py-3 rounded-lg"
+      style={{
+        backgroundColor: tokens.surface,
+        border: `1px solid ${tokens.border}`,
+      }}
+    >
+      <div className="flex items-center justify-between mb-2">
+        <span
+          className="text-xs"
+          style={{ color: tokens.textSecondary }}
+        >
+          Daily Limit
+        </span>
+        <span
+          className="text-xs"
+          style={{ color: tokens.textTertiary }}
+        >
+          Resets {resetTime}
+        </span>
+      </div>
+      <div className="flex items-center gap-3">
+        <div
+          className="flex-1 h-0.5 rounded-full overflow-hidden"
+          style={{ backgroundColor: tokens.border }}
+        >
+          <div
+            className="h-full rounded-full transition-all duration-300"
+            style={{
+              width: `${percentage}%`,
+              backgroundColor: getBarColor(),
+            }}
+          />
+        </div>
+        <span
+          className="text-xs font-mono"
+          style={{ color: tokens.textSecondary }}
+        >
+          ${spent.toFixed(2)} / ${limit.toFixed(2)}
+        </span>
       </div>
     </div>
   );
 };
-
-// ============================================
-// Glassmorphism Quick Action Button
-// ============================================
-interface QuickActionButtonProps {
-  icon: React.ReactNode;
-  label: string;
-  description?: string;
-  onClick: () => void;
-  delay?: number;
-  color?: string;
-}
-
-const QuickActionButton: React.FC<QuickActionButtonProps> = ({
-  icon,
-  label,
-  description,
-  onClick,
-  delay = 0,
-  color = theme.accent.primary,
-}) => (
-  <motion.button
-    initial={{ opacity: 0, y: 20 }}
-    animate={{ opacity: 1, y: 0 }}
-    transition={{ duration: 0.4, delay }}
-    whileHover={{ scale: 1.02, y: -2 }}
-    whileTap={{ scale: 0.98 }}
-    onClick={onClick}
-    className="group relative flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300"
-    style={{
-      background: 'rgba(255,255,255,0.03)',
-      backdropFilter: 'blur(10px)',
-      border: '1px solid rgba(255,255,255,0.08)',
-    }}
-  >
-    {/* Hover glow effect */}
-    <motion.div
-      className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-      style={{
-        background: `radial-gradient(circle at center, ${color}15 0%, transparent 70%)`,
-        boxShadow: `0 0 20px ${color}20`,
-      }}
-    />
-
-    <div
-      className="relative w-10 h-10 rounded-lg flex items-center justify-center transition-all duration-300"
-      style={{
-        background: `${color}15`,
-        color: color,
-      }}
-    >
-      {icon}
-    </div>
-
-    <div className="relative text-left">
-      <p className="text-sm font-medium text-white group-hover:text-cyan-300 transition-colors">
-        {label}
-      </p>
-      {description && (
-        <p className="text-xs text-slate-500 group-hover:text-slate-400 transition-colors">
-          {description}
-        </p>
-      )}
-    </div>
-
-    <ChevronRight
-      size={16}
-      className="relative ml-auto text-slate-600 group-hover:text-cyan-400 group-hover:translate-x-1 transition-all"
-    />
-  </motion.button>
-);
 
 // ============================================
 // Chat Message Component
@@ -299,9 +271,8 @@ interface Message {
   error?: string;
 }
 
-const ChatMessage: React.FC<{ message: Message; index: number }> = ({ message, index }) => {
+const ChatMessage: React.FC<{ message: Message }> = ({ message }) => {
   const isUser = message.role === 'user';
-  const [showTimestamp, setShowTimestamp] = useState(false);
   const [copied, setCopied] = useState(false);
 
   const copyToClipboard = (text: string) => {
@@ -310,22 +281,21 @@ const ChatMessage: React.FC<{ message: Message; index: number }> = ({ message, i
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // Parse markdown-like content
   const renderContent = (content: string) => {
     return content.split('\n').map((line, i) => {
       // Bold text
-      if (line.startsWith('**') && line.includes('**')) {
+      if (line.includes('**')) {
         const parts = line.split('**');
         return (
-          <p key={i} className="font-semibold text-[15px] mb-1">
-            {parts.filter((_, idx) => idx % 2 === 1).join('')}
+          <p key={i} className="text-sm font-semibold mb-1" style={{ color: tokens.textPrimary }}>
+            {parts.map((part, j) => (j % 2 === 1 ? part : <span key={j}>{part}</span>))}
           </p>
         );
       }
       // Italic text
       if (line.startsWith('_') && line.endsWith('_')) {
         return (
-          <p key={i} className="italic text-slate-400 text-xs mt-2">
+          <p key={i} className="text-xs mt-2" style={{ color: tokens.textTertiary }}>
             {line.slice(1, -1)}
           </p>
         );
@@ -333,9 +303,8 @@ const ChatMessage: React.FC<{ message: Message; index: number }> = ({ message, i
       // List items
       if (line.startsWith('• ') || line.startsWith('- ')) {
         return (
-          <p key={i} className="ml-2 my-0.5 flex items-start gap-2">
-            <span className="text-cyan-400 mt-1">•</span>
-            <span>{line.slice(2)}</span>
+          <p key={i} className="text-sm ml-2 my-0.5" style={{ color: tokens.textSecondary }}>
+            <span style={{ color: tokens.accent }}>•</span> {line.slice(2)}
           </p>
         );
       }
@@ -349,7 +318,8 @@ const ChatMessage: React.FC<{ message: Message; index: number }> = ({ message, i
               href={linkMatch[2]}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-cyan-400 hover:text-cyan-300 underline flex items-center gap-1 my-1"
+              className="text-sm flex items-center gap-1 my-1 hover:underline"
+              style={{ color: tokens.accent }}
             >
               {linkMatch[1]}
               <ExternalLink size={12} />
@@ -358,20 +328,27 @@ const ChatMessage: React.FC<{ message: Message; index: number }> = ({ message, i
         }
       }
       // Transaction hash
-      if (line.includes('Tx:') || line.includes('0x')) {
+      if (line.includes('0x')) {
         const hashMatch = line.match(/0x[a-fA-F0-9]+/);
         if (hashMatch) {
           return (
-            <p key={i} className="my-0.5 flex items-center gap-2">
-              <span>{line.replace(hashMatch[0], '')}</span>
-              <code className="bg-slate-800/50 px-2 py-0.5 rounded text-xs font-mono text-cyan-300">
+            <p key={i} className="text-sm my-0.5 flex items-center gap-2 flex-wrap">
+              <span style={{ color: tokens.textSecondary }}>{line.replace(hashMatch[0], '')}</span>
+              <code
+                className="px-2 py-0.5 rounded text-xs font-mono"
+                style={{
+                  backgroundColor: tokens.bgSecondary,
+                  color: tokens.textPrimary,
+                }}
+              >
                 {hashMatch[0].slice(0, 10)}...{hashMatch[0].slice(-8)}
               </code>
               <button
                 onClick={() => copyToClipboard(hashMatch[0])}
-                className="text-slate-500 hover:text-cyan-400 transition-colors"
+                className="p-1 rounded hover:bg-white/5 transition-colors"
+                style={{ color: tokens.textTertiary }}
               >
-                {copied ? <CheckCircle2 size={14} /> : <Copy size={14} />}
+                {copied ? <Check size={12} /> : <Copy size={12} />}
               </button>
             </p>
           );
@@ -380,88 +357,72 @@ const ChatMessage: React.FC<{ message: Message; index: number }> = ({ message, i
       // Empty line
       if (!line.trim()) return <br key={i} />;
       // Regular text
-      return <p key={i} className="my-0.5">{line}</p>;
+      return (
+        <p key={i} className="text-sm my-0.5" style={{ color: tokens.textSecondary }}>
+          {line}
+        </p>
+      );
     });
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3, delay: index * 0.05 }}
-      className={`flex gap-3 ${isUser ? 'flex-row-reverse' : ''}`}
-      onMouseEnter={() => setShowTimestamp(true)}
-      onMouseLeave={() => setShowTimestamp(false)}
-    >
-      {/* Avatar */}
+    <div className={`flex gap-3 ${isUser ? 'flex-row-reverse' : ''}`}>
+      {/* Agent indicator */}
       {!isUser && (
-        <motion.div
-          className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 relative"
+        <div
+          className="w-6 h-6 rounded flex items-center justify-center flex-shrink-0"
           style={{
-            background: 'linear-gradient(135deg, rgba(0,212,255,0.2) 0%, rgba(59,130,246,0.2) 100%)',
-            border: '1px solid rgba(0,212,255,0.3)',
+            backgroundColor: tokens.surface,
+            border: `1px solid ${tokens.border}`,
           }}
         >
-          <Sparkles size={18} className="text-cyan-400" />
-          <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-[#0A1628]" />
-        </motion.div>
+          <DiamondIcon size={12} className="text-slate-400" />
+        </div>
       )}
 
-      {/* Message Bubble */}
-      <div className="max-w-[80%] relative">
-        <motion.div
-          className={`rounded-2xl px-4 py-3 ${
-            isUser
-              ? 'bg-gradient-to-br from-blue-500 to-blue-600 text-white'
-              : message.error
-              ? 'bg-red-500/10 text-red-300 border border-red-500/20'
-              : ''
-          }`}
-          style={
-            !isUser && !message.error
-              ? {
-                  background: 'rgba(26, 36, 56, 0.8)',
-                  backdropFilter: 'blur(10px)',
-                  border: '1px solid rgba(0,212,255,0.2)',
-                  borderLeft: '3px solid #00D4FF',
-                }
-              : undefined
-          }
-        >
-          <div className="text-sm whitespace-pre-wrap break-words leading-relaxed">
-            {renderContent(message.content)}
+      {/* Message bubble */}
+      <div
+        className={`max-w-[80%] rounded-lg px-4 py-3 ${isUser ? 'ml-auto' : ''}`}
+        style={
+          isUser
+            ? {
+                backgroundColor: tokens.accent,
+                color: tokens.textPrimary,
+              }
+            : message.error
+            ? {
+                backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                border: `1px solid rgba(239, 68, 68, 0.3)`,
+              }
+            : {
+                backgroundColor: tokens.surface,
+                border: `1px solid ${tokens.border}`,
+              }
+        }
+      >
+        <div className="leading-relaxed">
+          {isUser ? (
+            <p className="text-sm">{message.content}</p>
+          ) : (
+            renderContent(message.content)
+          )}
+        </div>
+
+        {/* Payment info */}
+        {message.paymentInfo && (
+          <div
+            className="mt-2 pt-2 text-xs flex items-center gap-2"
+            style={{
+              borderTop: `1px solid ${tokens.border}`,
+              color: tokens.textTertiary,
+            }}
+          >
+            <Check size={12} style={{ color: tokens.success }} />
+            Paid ${message.paymentInfo.amount} USDC
           </div>
-
-          {/* Payment Info */}
-          {message.paymentInfo && (
-            <div className="mt-2 pt-2 border-t border-slate-600/30 text-xs text-slate-400 flex items-center gap-2">
-              <Wallet size={12} />
-              <span>Paid ${message.paymentInfo.amount} USDC</span>
-              <CheckCircle2 size={12} className="text-green-400" />
-            </div>
-          )}
-        </motion.div>
-
-        {/* Timestamp */}
-        <AnimatePresence>
-          {showTimestamp && (
-            <motion.span
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className={`absolute -bottom-5 text-[10px] text-slate-500 ${
-                isUser ? 'right-0' : 'left-0'
-              }`}
-            >
-              {new Date(message.timestamp).toLocaleTimeString([], {
-                hour: '2-digit',
-                minute: '2-digit',
-              })}
-            </motion.span>
-          )}
-        </AnimatePresence>
+        )}
       </div>
-    </motion.div>
+    </div>
   );
 };
 
@@ -469,383 +430,36 @@ const ChatMessage: React.FC<{ message: Message; index: number }> = ({ message, i
 // Typing Indicator
 // ============================================
 const TypingIndicator: React.FC = () => (
-  <motion.div
-    initial={{ opacity: 0, y: 20 }}
-    animate={{ opacity: 1, y: 0 }}
-    exit={{ opacity: 0, y: -10 }}
-    className="flex gap-3"
-  >
+  <div className="flex gap-3">
     <div
-      className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+      className="w-6 h-6 rounded flex items-center justify-center flex-shrink-0"
       style={{
-        background: 'linear-gradient(135deg, rgba(0,212,255,0.2) 0%, rgba(59,130,246,0.2) 100%)',
-        border: '1px solid rgba(0,212,255,0.3)',
+        backgroundColor: tokens.surface,
+        border: `1px solid ${tokens.border}`,
       }}
     >
-      <Sparkles size={18} className="text-cyan-400" />
+      <DiamondIcon size={12} className="text-slate-400" />
     </div>
     <div
-      className="rounded-2xl px-4 py-3 flex items-center gap-1"
+      className="rounded-lg px-4 py-3 flex items-center gap-1.5"
       style={{
-        background: 'rgba(26, 36, 56, 0.8)',
-        border: '1px solid rgba(0,212,255,0.2)',
+        backgroundColor: tokens.surface,
+        border: `1px solid ${tokens.border}`,
       }}
     >
       {[0, 1, 2].map((i) => (
-        <motion.span
+        <span
           key={i}
-          className="w-2 h-2 bg-cyan-400 rounded-full"
-          animate={{ y: [0, -6, 0] }}
-          transition={{
-            duration: 0.6,
-            repeat: Infinity,
-            delay: i * 0.15,
+          className="w-1.5 h-1.5 rounded-full animate-pulse"
+          style={{
+            backgroundColor: tokens.textTertiary,
+            animationDelay: `${i * 150}ms`,
           }}
         />
       ))}
     </div>
-  </motion.div>
+  </div>
 );
-
-// ============================================
-// Slash Command Dropdown
-// ============================================
-interface SlashCommandProps {
-  onSelect: (command: string) => void;
-  onClose: () => void;
-  filter: string;
-}
-
-const slashCommands = [
-  { command: '/send', description: 'Send tokens to an address', icon: ArrowUpRight },
-  { command: '/swap', description: 'Swap between tokens', icon: ArrowLeftRight },
-  { command: '/bridge', description: 'Bridge tokens to Base', icon: Globe },
-  { command: '/balance', description: 'Check wallet balance', icon: Wallet },
-  { command: '/price', description: 'Get token price', icon: BarChart3 },
-  { command: '/analyze', description: 'Analyze wallet risk', icon: Shield },
-  { command: '/news', description: 'Get market news', icon: TrendingUp },
-];
-
-const SlashCommandDropdown: React.FC<SlashCommandProps> = ({ onSelect, onClose, filter }) => {
-  const filteredCommands = slashCommands.filter((cmd) =>
-    cmd.command.toLowerCase().includes(filter.toLowerCase())
-  );
-
-  if (filteredCommands.length === 0) return null;
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: 10 }}
-      className="absolute bottom-full left-0 right-0 mb-2 rounded-xl overflow-hidden"
-      style={{
-        background: 'rgba(17, 29, 46, 0.95)',
-        backdropFilter: 'blur(20px)',
-        border: '1px solid rgba(0,212,255,0.2)',
-      }}
-    >
-      <div className="p-2 border-b border-slate-700/50">
-        <p className="text-xs text-slate-500 flex items-center gap-1">
-          <Command size={12} />
-          Commands
-        </p>
-      </div>
-      <div className="max-h-48 overflow-y-auto">
-        {filteredCommands.map((cmd) => (
-          <button
-            key={cmd.command}
-            onClick={() => {
-              onSelect(cmd.command);
-              onClose();
-            }}
-            className="w-full flex items-center gap-3 px-3 py-2 hover:bg-cyan-500/10 transition-colors text-left"
-          >
-            <cmd.icon size={16} className="text-cyan-400" />
-            <div>
-              <p className="text-sm text-white">{cmd.command}</p>
-              <p className="text-xs text-slate-500">{cmd.description}</p>
-            </div>
-          </button>
-        ))}
-      </div>
-    </motion.div>
-  );
-};
-
-// ============================================
-// Suggested Prompts Carousel
-// ============================================
-const suggestedPrompts = [
-  { text: 'Check my balance', icon: Wallet },
-  { text: 'Send 10 USDC', icon: ArrowUpRight },
-  { text: 'Swap to EURC', icon: ArrowLeftRight },
-  { text: 'Bridge to Base', icon: Globe },
-  { text: 'BTC price', icon: BarChart3 },
-  { text: 'Market news', icon: TrendingUp },
-];
-
-const SuggestedPromptsCarousel: React.FC<{ onSelect: (prompt: string) => void }> = ({ onSelect }) => {
-  const [scrollX, setScrollX] = useState(0);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  const scroll = (direction: 'left' | 'right') => {
-    if (containerRef.current) {
-      const newX = direction === 'left' ? scrollX - 150 : scrollX + 150;
-      containerRef.current.scrollTo({ left: newX, behavior: 'smooth' });
-      setScrollX(newX);
-    }
-  };
-
-  return (
-    <div className="relative mt-4">
-      <p className="text-xs text-slate-500 mb-2 flex items-center gap-1">
-        <Zap size={12} className="text-cyan-400" />
-        Quick prompts
-      </p>
-      <div className="relative">
-        <button
-          onClick={() => scroll('left')}
-          className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-8 h-8 bg-[#111D2E]/90 rounded-full flex items-center justify-center text-slate-400 hover:text-white transition-colors"
-        >
-          <ChevronLeft size={16} />
-        </button>
-
-        <div
-          ref={containerRef}
-          className="flex gap-2 overflow-x-auto scrollbar-hide px-8"
-          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-        >
-          {suggestedPrompts.map((prompt, i) => (
-            <motion.button
-              key={i}
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: i * 0.05 }}
-              onClick={() => onSelect(prompt.text)}
-              className="flex-shrink-0 flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-slate-300 hover:text-cyan-300 transition-all"
-              style={{
-                background: 'rgba(255,255,255,0.03)',
-                border: '1px solid rgba(255,255,255,0.08)',
-              }}
-              whileHover={{ scale: 1.05, borderColor: 'rgba(0,212,255,0.3)' }}
-            >
-              <prompt.icon size={14} className="text-cyan-400" />
-              {prompt.text}
-            </motion.button>
-          ))}
-        </div>
-
-        <button
-          onClick={() => scroll('right')}
-          className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-8 h-8 bg-[#111D2E]/90 rounded-full flex items-center justify-center text-slate-400 hover:text-white transition-colors"
-        >
-          <ChevronRight size={16} />
-        </button>
-      </div>
-    </div>
-  );
-};
-
-// ============================================
-// Enhanced Input Field
-// ============================================
-interface EnhancedInputProps {
-  value: string;
-  onChange: (value: string) => void;
-  onSubmit: () => void;
-  isProcessing: boolean;
-  onSlashCommand: (cmd: string) => void;
-}
-
-const EnhancedInput: React.FC<EnhancedInputProps> = ({
-  value,
-  onChange,
-  onSubmit,
-  isProcessing,
-  onSlashCommand,
-}) => {
-  const [showSlashMenu, setShowSlashMenu] = useState(false);
-  const [isFocused, setIsFocused] = useState(false);
-  const inputRef = useRef<HTMLTextAreaElement>(null);
-
-  useEffect(() => {
-    if (value.startsWith('/') && !value.includes(' ')) {
-      setShowSlashMenu(true);
-    } else {
-      setShowSlashMenu(false);
-    }
-  }, [value]);
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      onSubmit();
-    }
-  };
-
-  // Auto-resize textarea
-  useEffect(() => {
-    if (inputRef.current) {
-      inputRef.current.style.height = 'auto';
-      inputRef.current.style.height = `${Math.min(inputRef.current.scrollHeight, 120)}px`;
-    }
-  }, [value]);
-
-  return (
-    <div className="relative">
-      <AnimatePresence>
-        {showSlashMenu && (
-          <SlashCommandDropdown
-            filter={value}
-            onSelect={(cmd) => {
-              const commandMap: Record<string, string> = {
-                '/send': 'Send 10 USDC to 0x...',
-                '/swap': 'Swap 50 USDC to EURC',
-                '/bridge': 'Bridge 25 USDC to Base',
-                '/balance': 'Check my balance',
-                '/price': 'What is the price of BTC?',
-                '/analyze': 'Analyze 0x...',
-                '/news': 'Market news',
-              };
-              onChange(commandMap[cmd] || '');
-              onSlashCommand(cmd);
-            }}
-            onClose={() => setShowSlashMenu(false)}
-          />
-        )}
-      </AnimatePresence>
-
-      <motion.div
-        className="flex items-end gap-2 p-2 rounded-2xl transition-all duration-300"
-        style={{
-          background: 'rgba(26, 36, 56, 0.6)',
-          backdropFilter: 'blur(10px)',
-          border: `1px solid ${isFocused ? 'rgba(0,212,255,0.4)' : 'rgba(255,255,255,0.1)'}`,
-          boxShadow: isFocused ? '0 0 20px rgba(0,212,255,0.1)' : 'none',
-        }}
-      >
-        {/* Attachment button */}
-        <button
-          className="p-2 text-slate-500 hover:text-cyan-400 transition-colors rounded-lg hover:bg-white/5"
-          title="Attach file"
-        >
-          <Paperclip size={18} />
-        </button>
-
-        {/* Input area */}
-        <div className="flex-1 relative">
-          <textarea
-            ref={inputRef}
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            onKeyDown={handleKeyDown}
-            onFocus={() => setIsFocused(true)}
-            onBlur={() => setIsFocused(false)}
-            placeholder="Type a message or / for commands..."
-            disabled={isProcessing}
-            rows={1}
-            className="w-full bg-transparent text-white placeholder-slate-500 focus:outline-none resize-none text-sm py-2 px-1"
-            style={{ maxHeight: '120px' }}
-          />
-
-          {/* Character count */}
-          {value.length > 100 && (
-            <span className="absolute right-0 bottom-0 text-[10px] text-slate-500">
-              {value.length}/500
-            </span>
-          )}
-        </div>
-
-        {/* Voice input button */}
-        <button
-          className="p-2 text-slate-500 hover:text-cyan-400 transition-colors rounded-lg hover:bg-white/5"
-          title="Voice input"
-        >
-          <Mic size={18} />
-        </button>
-
-        {/* Send button */}
-        <motion.button
-          onClick={onSubmit}
-          disabled={!value.trim() || isProcessing}
-          className="p-3 rounded-xl text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-          style={{
-            background: value.trim() && !isProcessing
-              ? 'linear-gradient(135deg, #00D4FF 0%, #3B82F6 100%)'
-              : 'rgba(255,255,255,0.1)',
-          }}
-          whileHover={{ scale: value.trim() ? 1.05 : 1 }}
-          whileTap={{ scale: value.trim() ? 0.95 : 1 }}
-        >
-          {isProcessing ? (
-            <motion.div
-              animate={{ rotate: 360 }}
-              transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-            >
-              <RefreshCw size={18} />
-            </motion.div>
-          ) : (
-            <Send size={18} />
-          )}
-        </motion.button>
-      </motion.div>
-    </div>
-  );
-};
-
-// ============================================
-// Budget Widget
-// ============================================
-interface BudgetWidgetProps {
-  spent: number;
-  budget: number;
-  onExpand: () => void;
-}
-
-const BudgetWidget: React.FC<BudgetWidgetProps> = ({ spent, budget, onExpand }) => {
-  const [isHovered, setIsHovered] = useState(false);
-
-  return (
-    <motion.button
-      onClick={onExpand}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-      className="flex items-center gap-3 p-3 rounded-xl transition-all"
-      style={{
-        background: 'rgba(255,255,255,0.03)',
-        border: '1px solid rgba(255,255,255,0.08)',
-      }}
-      whileHover={{ scale: 1.02 }}
-    >
-      <CircularProgress value={spent} max={budget} size={50} strokeWidth={4} />
-
-      <div className="text-left">
-        <p className="text-xs text-slate-500">Daily Budget</p>
-        <p className="text-sm font-medium text-white">
-          ${spent.toFixed(2)} / ${budget.toFixed(2)}
-        </p>
-        <AnimatePresence>
-          {isHovered && (
-            <motion.p
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className="text-[10px] text-cyan-400"
-            >
-              Click to view details
-            </motion.p>
-          )}
-        </AnimatePresence>
-      </div>
-
-      <div className="ml-auto flex items-center gap-1 text-xs text-slate-500">
-        <Clock size={12} />
-        <span>Resets in 12h</span>
-      </div>
-    </motion.button>
-  );
-};
 
 // ============================================
 // Settings Panel
@@ -855,90 +469,113 @@ const SettingsPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const [dailyBudget, setDailyBudget] = useState(policy.dailyBudget.toString());
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{ backgroundColor: 'rgba(0, 0, 0, 0.8)' }}
       onClick={onClose}
     >
-      <motion.div
-        initial={{ scale: 0.9, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.9, opacity: 0 }}
-        onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-md mx-4 rounded-2xl p-6"
+      <div
+        className="w-full max-w-md mx-4 rounded-lg p-6"
         style={{
-          background: 'linear-gradient(180deg, #1a2438 0%, #111D2E 100%)',
-          border: '1px solid rgba(0,212,255,0.2)',
-          boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
+          backgroundColor: tokens.bgSecondary,
+          border: `1px solid ${tokens.border}`,
         }}
+        onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-            <Settings size={20} className="text-cyan-400" />
+          <h3
+            className="text-base font-semibold"
+            style={{
+              color: tokens.textPrimary,
+              letterSpacing: '-0.02em',
+            }}
+          >
             Settings
           </h3>
           <button
             onClick={onClose}
-            className="p-2 text-slate-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+            className="p-1.5 rounded hover:bg-white/5 transition-colors"
+            style={{ color: tokens.textSecondary }}
           >
-            <X size={18} />
+            <X size={16} />
           </button>
         </div>
 
         <div className="space-y-4">
           <div>
-            <label className="block text-sm text-slate-400 mb-2">Daily Budget (USDC)</label>
+            <label
+              className="block text-xs mb-2"
+              style={{ color: tokens.textSecondary }}
+            >
+              Daily Budget (USDC)
+            </label>
             <input
               type="number"
               value={dailyBudget}
               onChange={(e) => setDailyBudget(e.target.value)}
-              className="w-full px-4 py-3 bg-[#0A1628] border border-slate-700/50 rounded-xl text-white focus:outline-none focus:border-cyan-500/50 transition-colors"
+              className="w-full px-3 py-2 rounded-lg text-sm font-mono focus:outline-none transition-colors"
+              style={{
+                backgroundColor: tokens.bgPrimary,
+                border: `1px solid ${tokens.border}`,
+                color: tokens.textPrimary,
+              }}
+              onFocus={(e) => (e.target.style.borderColor = tokens.accent)}
+              onBlur={(e) => (e.target.style.borderColor = tokens.border)}
             />
           </div>
 
-          <div className="p-4 rounded-xl" style={{ background: 'rgba(0,212,255,0.05)' }}>
-            <h4 className="text-sm font-medium text-white mb-3 flex items-center gap-2">
-              <BarChart3 size={16} className="text-cyan-400" />
-              Usage Summary
+          <div
+            className="rounded-lg p-4"
+            style={{
+              backgroundColor: tokens.bgPrimary,
+              border: `1px solid ${tokens.border}`,
+            }}
+          >
+            <h4
+              className="text-xs font-semibold mb-3"
+              style={{ color: tokens.textSecondary }}
+            >
+              Usage
             </h4>
-            <div className="space-y-2 text-sm">
+            <div className="space-y-2">
               {[
                 { label: 'Today', value: spending.today },
                 { label: 'This Week', value: spending.thisWeek },
                 { label: 'This Month', value: spending.thisMonth },
               ].map((item) => (
-                <div key={item.label} className="flex justify-between">
-                  <span className="text-slate-400">{item.label}</span>
-                  <span className="text-white font-medium">${item.value.toFixed(2)}</span>
+                <div key={item.label} className="flex justify-between text-sm">
+                  <span style={{ color: tokens.textTertiary }}>{item.label}</span>
+                  <span className="font-mono" style={{ color: tokens.textPrimary }}>
+                    ${item.value.toFixed(2)}
+                  </span>
                 </div>
               ))}
             </div>
           </div>
         </div>
 
-        <motion.button
+        <button
           onClick={() => {
             updatePolicy({ dailyBudget: parseFloat(dailyBudget) || 10 });
             onClose();
           }}
-          className="w-full mt-6 py-3 rounded-xl text-white font-medium"
+          className="w-full mt-6 py-2.5 rounded-lg text-sm font-medium transition-all duration-150"
           style={{
-            background: 'linear-gradient(135deg, #00D4FF 0%, #3B82F6 100%)',
+            backgroundColor: tokens.accent,
+            color: tokens.textPrimary,
           }}
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
+          onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.9')}
+          onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
         >
-          Save Changes
-        </motion.button>
-      </motion.div>
-    </motion.div>
+          Save
+        </button>
+      </div>
+    </div>
   );
 };
 
 // ============================================
-// Payment Approval Modal
+// Payment Modal
 // ============================================
 const PaymentModal: React.FC = () => {
   const { pendingPayment, approvePayment, rejectPayment } = useAgent();
@@ -946,76 +583,100 @@ const PaymentModal: React.FC = () => {
   if (!pendingPayment) return null;
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{ backgroundColor: 'rgba(0, 0, 0, 0.8)' }}
     >
-      <motion.div
-        initial={{ scale: 0.9, y: 20 }}
-        animate={{ scale: 1, y: 0 }}
-        className="w-full max-w-sm mx-4 rounded-2xl p-6"
+      <div
+        className="w-full max-w-sm mx-4 rounded-lg p-6"
         style={{
-          background: 'linear-gradient(180deg, #1a2438 0%, #111D2E 100%)',
-          border: '1px solid rgba(0,212,255,0.2)',
+          backgroundColor: tokens.bgSecondary,
+          border: `1px solid ${tokens.border}`,
         }}
       >
         <div className="flex items-center gap-3 mb-5">
-          <div className="w-12 h-12 rounded-xl bg-cyan-500/10 flex items-center justify-center">
-            <Wallet size={24} className="text-cyan-400" />
+          <div
+            className="w-10 h-10 rounded-lg flex items-center justify-center"
+            style={{
+              backgroundColor: tokens.surface,
+              border: `1px solid ${tokens.border}`,
+            }}
+          >
+            <ShieldCheck size={20} style={{ color: tokens.accent }} />
           </div>
           <div>
-            <h3 className="text-lg font-semibold text-white">Confirm Payment</h3>
-            <p className="text-sm text-slate-400">Service fee required</p>
+            <h3
+              className="text-sm font-semibold"
+              style={{ color: tokens.textPrimary }}
+            >
+              Confirm Payment
+            </h3>
+            <p className="text-xs" style={{ color: tokens.textSecondary }}>
+              Service fee required
+            </p>
           </div>
         </div>
 
-        <div className="p-4 rounded-xl mb-5 space-y-3" style={{ background: 'rgba(0,0,0,0.3)' }}>
+        <div
+          className="rounded-lg p-4 mb-5 space-y-3"
+          style={{
+            backgroundColor: tokens.bgPrimary,
+            border: `1px solid ${tokens.border}`,
+          }}
+        >
           <div className="flex justify-between">
-            <span className="text-slate-400 text-sm">Amount</span>
-            <span className="text-lg font-bold text-white">
+            <span className="text-xs" style={{ color: tokens.textSecondary }}>
+              Amount
+            </span>
+            <span
+              className="text-sm font-semibold font-mono"
+              style={{ color: tokens.textPrimary }}
+            >
               ${pendingPayment.requirements.price} USDC
             </span>
           </div>
           <div className="flex justify-between">
-            <span className="text-slate-400 text-sm">Service</span>
-            <span className="text-white text-sm">
+            <span className="text-xs" style={{ color: tokens.textSecondary }}>
+              Service
+            </span>
+            <span className="text-xs" style={{ color: tokens.textPrimary }}>
               {pendingPayment.requirements.description}
             </span>
           </div>
         </div>
 
         <div className="flex gap-3">
-          <motion.button
+          <button
             onClick={rejectPayment}
-            className="flex-1 py-3 rounded-xl bg-slate-700/50 text-slate-300 font-medium"
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
+            className="flex-1 py-2.5 rounded-lg text-sm font-medium transition-colors"
+            style={{
+              backgroundColor: tokens.surface,
+              color: tokens.textSecondary,
+              border: `1px solid ${tokens.border}`,
+            }}
           >
             Cancel
-          </motion.button>
-          <motion.button
+          </button>
+          <button
             onClick={approvePayment}
-            className="flex-1 py-3 rounded-xl text-white font-medium"
+            className="flex-1 py-2.5 rounded-lg text-sm font-medium transition-colors"
             style={{
-              background: 'linear-gradient(135deg, #00D4FF 0%, #3B82F6 100%)',
+              backgroundColor: tokens.accent,
+              color: tokens.textPrimary,
             }}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
           >
             Confirm
-          </motion.button>
+          </button>
         </div>
-      </motion.div>
-    </motion.div>
+      </div>
+    </div>
   );
 };
 
 // ============================================
-// Main Enhanced Agent Page
+// Main Agent Page
 // ============================================
-const AgentPageEnhanced: React.FC = () => {
+const AgentPage: React.FC = () => {
   const {
     messages,
     isProcessing,
@@ -1028,198 +689,254 @@ const AgentPageEnhanced: React.FC = () => {
   const [inputValue, setInputValue] = useState('');
   const [showSettings, setShowSettings] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const handleSubmit = useCallback(async () => {
-    if (!inputValue.trim() || isProcessing) return;
-    const message = inputValue.trim();
-    setInputValue('');
-    await sendMessage(message);
-  }, [inputValue, isProcessing, sendMessage]);
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  const handleSubmit = useCallback(
+    async (e?: React.FormEvent) => {
+      e?.preventDefault();
+      if (!inputValue.trim() || isProcessing) return;
+      const message = inputValue.trim();
+      setInputValue('');
+      await sendMessage(message);
+    },
+    [inputValue, isProcessing, sendMessage]
+  );
 
   const handleQuickAction = (value: string) => {
     setInputValue(value);
+    inputRef.current?.focus();
   };
 
-  const quickActions = [
-    { icon: <ArrowUpRight size={18} />, label: 'Send', description: 'Transfer tokens', color: '#10B981' },
-    { icon: <ArrowLeftRight size={18} />, label: 'Swap', description: 'Exchange tokens', color: '#3B82F6' },
-    { icon: <Globe size={18} />, label: 'Bridge', description: 'Cross-chain transfer', color: '#8B5CF6' },
-    { icon: <BarChart3 size={18} />, label: 'Price', description: 'Token prices', color: '#F59E0B' },
-    { icon: <Shield size={18} />, label: 'Analyze', description: 'Risk analysis', color: '#EF4444' },
-    { icon: <TrendingUp size={18} />, label: 'News', description: 'Market updates', color: '#00D4FF' },
+  const actionCards = [
+    {
+      icon: <ArrowUpRight size={20} strokeWidth={1.5} />,
+      title: 'Send',
+      description: 'Transfer tokens',
+      command: 'Send 10 USDC to 0x...',
+    },
+    {
+      icon: <ArrowLeftRight size={20} strokeWidth={1.5} />,
+      title: 'Swap',
+      description: 'Exchange tokens',
+      command: 'Swap 50 USDC to EURC',
+    },
+    {
+      icon: <GitBranch size={20} strokeWidth={1.5} />,
+      title: 'Bridge',
+      description: 'Cross-chain',
+      command: 'Bridge 25 USDC to Base',
+    },
+    {
+      icon: <ShieldCheck size={20} strokeWidth={1.5} />,
+      title: 'Analyze',
+      description: 'Risk & security',
+      command: 'Analyze 0x742d35Cc...',
+    },
+    {
+      icon: <TrendingUp size={20} strokeWidth={1.5} />,
+      title: 'Prices',
+      description: 'Market data',
+      command: 'BTC price',
+    },
+    {
+      icon: <Clock size={20} strokeWidth={1.5} />,
+      title: 'History',
+      description: 'Past activity',
+      command: 'Show recent transactions',
+    },
+  ];
+
+  const suggestions = [
+    'Check balance',
+    'ETH price',
+    'Recent transactions',
+    'Gas fees',
+    'Portfolio value',
   ];
 
   return (
-    <div className="flex flex-col h-full max-h-[calc(100vh-120px)] relative">
+    <div
+      className="flex flex-col h-full"
+      style={{ backgroundColor: tokens.bgPrimary }}
+    >
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3">
-          <motion.div
-            className="relative w-12 h-12 rounded-xl flex items-center justify-center"
-            style={{
-              background: 'linear-gradient(135deg, rgba(0,212,255,0.2) 0%, rgba(59,130,246,0.2) 100%)',
-              border: '1px solid rgba(0,212,255,0.3)',
-            }}
-            animate={{ boxShadow: ['0 0 20px rgba(0,212,255,0.2)', '0 0 30px rgba(0,212,255,0.4)', '0 0 20px rgba(0,212,255,0.2)'] }}
-            transition={{ duration: 2, repeat: Infinity }}
-          >
-            <Sparkles size={24} className="text-cyan-400" />
-          </motion.div>
+      <div
+        className="flex items-center justify-between px-4 py-3"
+        style={{
+          borderBottom: `1px solid ${tokens.border}`,
+        }}
+      >
+        <div className="flex items-center gap-2">
+          <DiamondIcon size={18} style={{ color: tokens.textSecondary }} />
           <div>
-            <h1 className="text-xl font-semibold text-white">Arc Assistant</h1>
-            <p className="text-xs text-slate-500 flex items-center gap-1">
-              <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-              Online • Powered by AI
-            </p>
+            <h1
+              className="text-sm font-semibold"
+              style={{
+                color: tokens.textPrimary,
+                letterSpacing: '-0.02em',
+              }}
+            >
+              Assistant
+            </h1>
+            <div className="flex items-center gap-1.5">
+              <span
+                className="w-1.5 h-1.5 rounded-full"
+                style={{ backgroundColor: tokens.success }}
+              />
+              <span className="text-xs" style={{ color: tokens.textTertiary }}>
+                Ready
+              </span>
+            </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <motion.button
+        <div className="flex items-center gap-1">
+          <button
             onClick={clearMessages}
-            className="p-2.5 text-slate-500 hover:text-cyan-400 hover:bg-white/5 rounded-lg transition-colors"
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
+            className="p-2 rounded-lg transition-colors"
+            style={{ color: tokens.textSecondary }}
+            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = tokens.surface)}
+            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+            title="Reset"
           >
-            <RefreshCw size={16} />
-          </motion.button>
-          <motion.button
+            <RotateCcw size={16} />
+          </button>
+          <button
             onClick={() => setShowSettings(true)}
-            className="p-2.5 text-slate-500 hover:text-cyan-400 hover:bg-white/5 rounded-lg transition-colors"
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
+            className="p-2 rounded-lg transition-colors"
+            style={{ color: tokens.textSecondary }}
+            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = tokens.surface)}
+            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+            title="Settings"
           >
-            <Settings size={16} />
-          </motion.button>
+            <SlidersHorizontal size={16} />
+          </button>
         </div>
       </div>
 
-      {/* Budget Widget */}
-      <BudgetWidget
-        spent={spending.today}
-        budget={policy.dailyBudget}
-        onExpand={() => setShowSettings(true)}
-      />
+      {/* Budget Bar */}
+      <div className="px-4 py-3">
+        <BudgetBar spent={spending.today} limit={policy.dailyBudget} />
+      </div>
 
       {/* Messages Area */}
       <div
-        className="flex-1 overflow-y-auto rounded-2xl p-4 my-4 space-y-4"
-        style={{
-          background: 'rgba(10, 22, 40, 0.5)',
-          border: '1px solid rgba(255,255,255,0.05)',
-        }}
+        className="flex-1 overflow-y-auto px-4 py-4 space-y-4"
+        style={{ backgroundColor: tokens.bgPrimary }}
       >
         {messages.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center text-center px-4 relative">
-            {/* Background effects */}
-            <AnimatedOrb size={250} />
-            <FloatingParticles />
-
-            {/* Welcome content */}
-            <motion.div
-              className="relative z-10"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6 }}
-            >
-              <motion.div
-                className="w-20 h-20 rounded-2xl flex items-center justify-center mb-6 mx-auto"
+          <div className="h-full flex flex-col">
+            {/* Welcome */}
+            <div className="text-center py-8">
+              <h2
+                className="text-lg font-semibold mb-1"
                 style={{
-                  background: 'linear-gradient(135deg, rgba(0,212,255,0.2) 0%, rgba(59,130,246,0.2) 100%)',
-                  border: '1px solid rgba(0,212,255,0.3)',
+                  color: tokens.textPrimary,
+                  letterSpacing: '-0.02em',
                 }}
-                animate={{
-                  boxShadow: [
-                    '0 0 30px rgba(0,212,255,0.3)',
-                    '0 0 50px rgba(0,212,255,0.5)',
-                    '0 0 30px rgba(0,212,255,0.3)',
-                  ],
-                }}
-                transition={{ duration: 3, repeat: Infinity }}
               >
-                <Sparkles size={36} className="text-cyan-400" />
-              </motion.div>
+                What would you like to do?
+              </h2>
+              <p className="text-sm" style={{ color: tokens.textTertiary }}>
+                Select an action or type a command
+              </p>
+            </div>
 
-              <motion.h3
-                className="text-2xl font-semibold text-white mb-2"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.2 }}
+            {/* Action Cards Grid */}
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-6">
+              {actionCards.map((card) => (
+                <ActionCard
+                  key={card.title}
+                  icon={card.icon}
+                  title={card.title}
+                  description={card.description}
+                  onClick={() => handleQuickAction(card.command)}
+                />
+              ))}
+            </div>
+
+            {/* Suggestions */}
+            <div>
+              <p
+                className="text-xs mb-2"
+                style={{ color: tokens.textTertiary }}
               >
-                How can I help you?
-              </motion.h3>
-
-              <motion.p
-                className="text-slate-400 text-sm mb-8 max-w-sm"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.3 }}
-              >
-                Send tokens, swap currencies, analyze wallets, and get real-time market data
-              </motion.p>
-
-              {/* Quick Actions Grid */}
-              <div className="grid grid-cols-2 gap-3 max-w-md mx-auto">
-                {quickActions.map((action, i) => (
-                  <QuickActionButton
-                    key={action.label}
-                    icon={action.icon}
-                    label={action.label}
-                    description={action.description}
-                    color={action.color}
-                    delay={0.4 + i * 0.1}
-                    onClick={() => {
-                      const commands: Record<string, string> = {
-                        Send: 'Send 10 USDC to 0x...',
-                        Swap: 'Swap 50 USDC to EURC',
-                        Bridge: 'Bridge 25 USDC to Base',
-                        Price: 'What is the price of BTC?',
-                        Analyze: 'Analyze wallet 0x...',
-                        News: 'Crypto market news',
-                      };
-                      handleQuickAction(commands[action.label] || '');
-                    }}
+                Suggestions
+              </p>
+              <div className="flex gap-2 overflow-x-auto pb-2">
+                {suggestions.map((suggestion) => (
+                  <SuggestionChip
+                    key={suggestion}
+                    text={suggestion}
+                    onClick={() => handleQuickAction(suggestion)}
                   />
                 ))}
               </div>
-
-              {/* Suggested Prompts */}
-              <SuggestedPromptsCarousel onSelect={handleQuickAction} />
-            </motion.div>
+            </div>
           </div>
         ) : (
           <>
-            {messages.map((msg, i) => (
-              <ChatMessage key={msg.id} message={msg} index={i} />
+            {messages.map((msg) => (
+              <ChatMessage key={msg.id} message={msg} />
             ))}
-            <AnimatePresence>
-              {isProcessing && <TypingIndicator />}
-            </AnimatePresence>
+            {isProcessing && <TypingIndicator />}
           </>
         )}
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Enhanced Input */}
-      <EnhancedInput
-        value={inputValue}
-        onChange={setInputValue}
+      {/* Input */}
+      <form
         onSubmit={handleSubmit}
-        isProcessing={isProcessing}
-        onSlashCommand={(cmd) => console.log('Slash command:', cmd)}
-      />
+        className="px-4 py-3"
+        style={{ borderTop: `1px solid ${tokens.border}` }}
+      >
+        <div
+          className="flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-150"
+          style={{
+            backgroundColor: tokens.bgSecondary,
+            border: `1px solid ${tokens.border}`,
+          }}
+        >
+          <input
+            ref={inputRef}
+            type="text"
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            placeholder="Message..."
+            disabled={isProcessing}
+            className="flex-1 bg-transparent text-sm focus:outline-none disabled:opacity-50"
+            style={{
+              color: tokens.textPrimary,
+            }}
+          />
+          <button
+            type="submit"
+            disabled={!inputValue.trim() || isProcessing}
+            className="p-1.5 rounded-md transition-all duration-150 disabled:opacity-30"
+            style={{
+              backgroundColor: inputValue.trim() ? tokens.accent : 'transparent',
+              color: inputValue.trim() ? tokens.textPrimary : tokens.textTertiary,
+            }}
+          >
+            <ArrowUp size={16} />
+          </button>
+        </div>
+      </form>
 
       {/* Modals */}
-      <AnimatePresence>
-        {showSettings && <SettingsPanel onClose={() => setShowSettings(false)} />}
-      </AnimatePresence>
+      {showSettings && <SettingsPanel onClose={() => setShowSettings(false)} />}
       <PaymentModal />
     </div>
   );
 };
 
-export default AgentPageEnhanced;
+export default AgentPage;
