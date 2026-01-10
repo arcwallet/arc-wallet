@@ -12,7 +12,6 @@ import {
   RobotIcon,
   SettingsIcon
 } from './Icons';
-import { useAgent } from '../contexts/AgentContext';
 
 // Treasury Icon
 const TreasuryNavIcon = ({ size = 20, className = '' }: { size?: number; className?: string }) => (
@@ -69,8 +68,6 @@ interface SideNavBarProps {
 
 
 const SideNavBar: React.FC<SideNavBarProps> = ({ currentPage, onNavigate }) => {
-  const { isOpen: isAgentOpen, openAgent } = useAgent();
-
   const navItems = [
     { id: 'Dashboard', icon: 'dashboard', label: 'Dashboard' },
     { id: 'Send', icon: 'arrow_upward', label: 'Send' },
@@ -94,11 +91,11 @@ const SideNavBar: React.FC<SideNavBarProps> = ({ currentPage, onNavigate }) => {
         ))}
       </nav>
       <div className="mt-auto flex flex-col gap-2">
-        {/* Arc Agent Button */}
+        {/* Arc Agent Page Link */}
         <a
-          onClick={openAgent}
+          onClick={() => onNavigate('Agent')}
           className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-all ${
-            isAgentOpen
+            currentPage === 'Agent'
               ? 'bg-gradient-to-r from-[#4A9EFF]/20 to-[#6366F1]/20 text-[#4A9EFF] border-l-2 border-[#4A9EFF] font-semibold'
               : 'text-slate-400 hover:bg-white/5 hover:text-slate-200 font-medium border-l-2 border-transparent'
           }`}

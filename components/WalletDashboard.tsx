@@ -10,8 +10,8 @@ import Faucet from './Faucet';
 import SwapScreen from './SwapScreen';
 import Bridge from './Bridge';
 import History from './History';
-// Arc Agent Sidebar
-import AgentSidebar from './AgentSidebar';
+// Arc Agent Page
+import AgentPage from './AgentPage';
 import { useAgent } from '../contexts/AgentContext';
 export interface WalletBalance {
     token: string;
@@ -788,7 +788,7 @@ const WalletDashboard: React.FC = () => {
   const [agentIntentData, setAgentIntentData] = useState<AgentIntentData | null>(null);
 
   // Arc Agent
-  const { isOpen: isAgentOpen, openAgent, closeAgent, setNavigationCallback } = useAgent();
+  const { setNavigationCallback } = useAgent();
 
   const handleAgentIntent = (intent: any) => {
     setAgentIntentData(intent);
@@ -954,16 +954,8 @@ const WalletDashboard: React.FC = () => {
         return <MultiSigDashboard />;
       case 'Faucet':
         return <Faucet />;
-      // Agent temporarily disabled - will integrate new AI solution
-      // case 'Agent':
-      //   return (
-      //     <AgentScreen
-      //       onExecuteIntent={handleAgentIntent}
-      //       walletAddress={address}
-      //       balances={agentBalances}
-      //       totalBalance={totalBalance || undefined}
-      //     />
-      //   );
+      case 'Agent':
+        return <AgentPage />;
       case 'Settings':
         return <Settings />;
       default:
@@ -986,7 +978,7 @@ const WalletDashboard: React.FC = () => {
   };
 
   return (
-    <div className="flex h-screen w-full bg-[#0A0F1A] text-white relative">
+    <div className="flex h-screen w-full bg-[#0A0F1A] text-white">
       <SideNavBar currentPage={currentPage} onNavigate={handleNavigate} />
       <main className="flex flex-1 flex-col overflow-hidden">
         <DashboardHeader account={snapshot} isRefreshing={isAccountLoading} onRefresh={refresh} error={accountError} onNavigate={handleNavigate} />
@@ -1006,29 +998,6 @@ const WalletDashboard: React.FC = () => {
           )}
         </div>
       </main>
-
-      {/* Arc Agent Floating Button */}
-      {!isAgentOpen && (
-        <button
-          onClick={openAgent}
-          className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-r from-[#4A9EFF] to-[#6366F1] rounded-full shadow-lg shadow-[#4A9EFF]/25 flex items-center justify-center hover:scale-105 transition-transform z-50 group"
-          title="Open Arc Agent"
-        >
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white">
-            <path d="M12 8V4H8" />
-            <rect x="2" y="2" width="20" height="20" rx="5" />
-            <path d="M2 12h4" />
-            <path d="M18 12h4" />
-            <path d="M12 18v4" />
-            <circle cx="12" cy="12" r="2" />
-          </svg>
-          {/* Pulse animation */}
-          <span className="absolute inset-0 rounded-full bg-[#4A9EFF] animate-ping opacity-25" />
-        </button>
-      )}
-
-      {/* Arc Agent Sidebar */}
-      <AgentSidebar />
     </div>
   );
 };
