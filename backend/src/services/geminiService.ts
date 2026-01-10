@@ -88,7 +88,7 @@ class GeminiService {
         const apiKey = process.env.GEMINI_API_KEY;
         if (apiKey && apiKey.startsWith('AIza')) {
             this.client = new GoogleGenerativeAI(apiKey);
-            const modelName = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
+            const modelName = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
             this.model = this.client.getGenerativeModel({ model: modelName });
             // Don't log in production
             if (process.env.NODE_ENV === 'development') {
