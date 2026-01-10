@@ -12,11 +12,10 @@ import {
   SettingsIcon
 } from './Icons';
 
-// Command icon for Smart Assistant
-const CommandNavIcon = ({ size = 20, className = '' }: { size?: number; className?: string }) => (
+// Spark icon for Assistant
+const SparkNavIcon = ({ size = 20, className = '' }: { size?: number; className?: string }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-    <polyline points="4 17 10 11 4 5" />
-    <line x1="12" y1="19" x2="20" y2="19" />
+    <path d="M12 3v4m0 14v-4m9-5h-4M7 12H3m15.364-6.364l-2.828 2.828M8.464 15.536l-2.828 2.828m12.728 0l-2.828-2.828M8.464 8.464L5.636 5.636" />
   </svg>
 );
 
@@ -50,7 +49,7 @@ const getIconComponent = (iconName: string) => {
     case 'treasury': return <TreasuryNavIcon {...iconProps} />;
     case 'water_drop': return <FaucetIcon {...iconProps} />;
     case 'verified': return <VerifiedIcon {...iconProps} />;
-    case 'smart_toy': return <CommandNavIcon {...iconProps} />;
+    case 'smart_toy': return <SparkNavIcon {...iconProps} />;
     case 'settings': return <SettingsIcon {...iconProps} />;
     default: return <DashboardIcon {...iconProps} />;
   }
@@ -98,7 +97,7 @@ const SideNavBar: React.FC<SideNavBarProps> = ({ currentPage, onNavigate }) => {
         ))}
       </nav>
       <div className="mt-auto flex flex-col gap-2">
-        {/* Smart Assistant Page Link */}
+        {/* Assistant Page Link */}
         <a
           onClick={() => onNavigate('Agent')}
           className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-all ${
@@ -107,7 +106,7 @@ const SideNavBar: React.FC<SideNavBarProps> = ({ currentPage, onNavigate }) => {
               : 'text-slate-400 hover:bg-white/5 hover:text-slate-200 font-medium border-l-2 border-transparent'
           }`}
         >
-          <CommandNavIcon size={20} className="flex-shrink-0" />
+          <SparkNavIcon size={20} className="flex-shrink-0" />
           <p className="text-sm">Assistant</p>
         </a>
         <NavItem icon="settings" label="Settings" active={currentPage === 'Settings'} onClick={() => onNavigate('Settings')} />

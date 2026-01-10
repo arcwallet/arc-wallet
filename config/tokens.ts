@@ -24,15 +24,14 @@ export interface TokenInfo {
 }
 
 export interface SwapConfig {
-  // Circle StableFX contract addresses
-  stableFxContracts: {
-    fxEscrow: string;
-    permit2: string;
-  };
+  // Curve pool address on Arc Testnet
+  curvePool: string;
   // Supported currency pairs
   supportedPairs: string[][];
-  // Minimum swap amount in USD
-  minimumSwapAmountUSD: number;
+  // Minimum swap amount
+  minimumSwapAmount: number;
+  // Swap fee percentage
+  feePercent: number;
 }
 
 export const SUPPORTED_TOKENS: Record<string, TokenInfo> = {
@@ -103,18 +102,17 @@ export const SUPPORTED_TOKENS: Record<string, TokenInfo> = {
 };
 
 export const SWAP_CONFIG: SwapConfig = {
-  // Circle StableFX contract addresses on Arc Testnet
-  stableFxContracts: {
-    fxEscrow: '0x1f91886C7028986aD885ffCee0e40b75C9cd5aC1',
-    permit2: '0x000000000022D473030F116dDEE9F6B43aC78BA3',
-  },
-  // Supported pairs: USDC ↔ EURC only (via Circle StableFX)
+  // Curve USDC/EURC pool on Arc Testnet
+  curvePool: '0x2D84D79C852f6842AbE0304b70bBaA1506AdD457',
+  // Supported pairs: USDC ↔ EURC (via Curve StableSwap)
   supportedPairs: [
     ['USDC', 'EURC'],
     ['EURC', 'USDC'],
   ],
-  // Minimum swap amount: $10 USD
-  minimumSwapAmountUSD: 10,
+  // Minimum swap amount
+  minimumSwapAmount: 1,
+  // Swap fee percentage
+  feePercent: 0.04,
 };
 
 export const getTokenInfo = (symbol: string): TokenInfo | undefined => {

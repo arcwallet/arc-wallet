@@ -14,9 +14,8 @@ interface SwapScreenProps {
 }
 
 const SwapScreen: React.FC<SwapScreenProps> = ({ initialFromToken, initialToToken, initialAmount = '' }) => {
-    const tokens = getAllSupportedTokens();
-    // Circle Modular Wallet - Smart Wallet with EIP-712 signing for StableFX
-    const { address: walletAddress, isConnected, signTypedData } = useCircleWallet();
+    const tokens = getAllSupportedTokens().filter(t => t.swapable);
+    const { address: walletAddress, isConnected, executeTransaction } = useCircleWallet();
     const { addActivity } = useActivity();
 
     const [fromToken, setFromToken] = useState<TokenInfo>(() => {
@@ -44,14 +43,18 @@ const SwapScreen: React.FC<SwapScreenProps> = ({ initialFromToken, initialToToke
         const fetchQuote = async () => {
             if (!amount || parseFloat(amount) <= 0) {
                 setQuote(null);
+                setError(null);
                 return;
             }
             setLoading(true);
+            setError(null);
             try {
                 const q = await swapService.getQuote(fromToken, toToken, amount);
                 setQuote(q);
-            } catch (error) {
-                console.error('Error fetching quote:', error);
+            } catch (err: any) {
+                console.error('Error fetching quote:', err);
+                setError(err?.message || 'Failed to get quote');
+                setQuote(null);
             } finally {
                 setLoading(false);
             }
@@ -62,24 +65,31 @@ const SwapScreen: React.FC<SwapScreenProps> = ({ initialFromToken, initialToToke
     }, [amount, fromToken, toToken]);
 
     const handleSwap = async () => {
-        if (!quote || !isConnected || !walletAddress || !signTypedData) {
+        if (!quote || !isConnected || !walletAddress || !executeTransaction) {
             setError('Wallet not connected. Please connect your passkey wallet.');
             return;
         }
 
         setSwapping(true);
         setError(null);
+        setTxHash(null);
 
         try {
-            console.log('[SWAP UI] Starting swap via Circle StableFX:', {
+            console.log('[SWAP UI] Starting swap via Curve:', {
                 from: quote.fromToken.symbol,
                 to: quote.toToken.symbol,
                 amount: quote.fromAmount,
-                quoteId: quote.stableFxQuoteId,
             });
 
-            // Execute swap via Circle StableFX with EIP-712 signing
-            const hash = await swapService.executeSwap(quote, signTypedData, walletAddress);
+            // Execute swap via Curve pool
+            const hash = await swapService.executeSwap(
+                quote,
+                async (to: string, value: bigint, data: string) => {
+                    const result = await executeTransaction(to, value, data);
+                    return { hash: result };
+                },
+                walletAddress
+            );
 
             console.log('[SWAP UI] Swap successful! Hash:', hash);
             setTxHash(hash);
@@ -98,8 +108,8 @@ const SwapScreen: React.FC<SwapScreenProps> = ({ initialFromToken, initialToToke
                 status: TransactionStatus.Pending,
                 hash,
                 from: walletAddress,
-                to: walletAddress, // Swap is to self
-                networkFee: 0, // Gasless via Circle StableFX
+                to: walletAddress,
+                networkFee: 0.01,
                 approvals: {
                     required: 0,
                     list: [],
@@ -109,9 +119,9 @@ const SwapScreen: React.FC<SwapScreenProps> = ({ initialFromToken, initialToToke
             // Reset form
             setAmount('');
             setQuote(null);
-        } catch (error: any) {
-            console.error('[SWAP UI] Swap failed:', error);
-            const errorMessage = error?.message || 'Swap failed. Please try again.';
+        } catch (err: any) {
+            console.error('[SWAP UI] Swap failed:', err);
+            const errorMessage = err?.message || 'Swap failed. Please try again.';
             setError(errorMessage);
         } finally {
             setSwapping(false);
@@ -123,14 +133,15 @@ const SwapScreen: React.FC<SwapScreenProps> = ({ initialFromToken, initialToToke
         setToToken(fromToken);
         setAmount('');
         setQuote(null);
+        setError(null);
     };
 
     return (
         <div className="max-w-md mx-auto mt-8">
             <div className="mb-6">
-                <h2 className="text-2xl font-bold text-white">Stablecoin FX</h2>
+                <h2 className="text-2xl font-bold text-white">Swap</h2>
                 <p className="text-slate-400 text-sm mt-2">
-                    Swap stablecoins via <span className="text-blue-400 font-medium">Circle StableFX</span> — institutional-grade rates with instant settlement on Arc.
+                    Swap stablecoins via <span className="text-blue-400 font-medium">Curve</span> — optimized for stablecoin pairs with minimal slippage.
                 </p>
             </div>
 
@@ -186,7 +197,6 @@ const SwapScreen: React.FC<SwapScreenProps> = ({ initialFromToken, initialToToke
                 {/* Quote Details */}
                 {quote && (
                     <div className="mt-4 p-3 bg-slate-900/40 border border-slate-500/30 rounded-lg text-sm">
-                        {/* Warning if any */}
                         {quote.warning && (
                             <div className="mb-2 p-2 bg-yellow-500/10 border border-yellow-500/30 rounded text-yellow-400 text-xs">
                                 {quote.warning}
@@ -202,15 +212,15 @@ const SwapScreen: React.FC<SwapScreenProps> = ({ initialFromToken, initialToToke
                         </div>
                         <div className="flex justify-between text-slate-400 mb-1">
                             <span>Price Impact</span>
-                            <span className="text-blue-400">{quote.priceImpact}</span>
+                            <span className="text-green-400">{quote.priceImpact}</span>
                         </div>
                         <div className="flex justify-between text-slate-400 mb-1">
-                            <span>Execution</span>
-                            <span className="text-green-400">RFQ (No Slippage)</span>
+                            <span>Network Fee</span>
+                            <span>{quote.estimatedGas}</span>
                         </div>
                         <div className="flex justify-between text-slate-400">
-                            <span>You Receive</span>
-                            <span className="text-white font-medium">{quote.toAmount} {toToken.symbol}</span>
+                            <span>Min. Received</span>
+                            <span className="text-white font-medium">{quote.minimumReceived} {toToken.symbol}</span>
                         </div>
                     </div>
                 )}
@@ -224,14 +234,14 @@ const SwapScreen: React.FC<SwapScreenProps> = ({ initialFromToken, initialToToke
 
                 {/* Success Message */}
                 {txHash && (
-                    <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
-                        <p className="text-sm text-blue-400">
+                    <div className="mt-4 p-3 bg-green-500/10 border border-green-500/30 rounded-lg">
+                        <p className="text-sm text-green-400">
                             Swap successful!{' '}
                             <a
                                 href={`${TX_EXPLORER_URL}${txHash}`}
                                 target="_blank"
                                 rel="noreferrer"
-                                className="underline hover:text-blue-300"
+                                className="underline hover:text-green-300"
                             >
                                 View on Explorer
                             </a>
@@ -253,40 +263,41 @@ const SwapScreen: React.FC<SwapScreenProps> = ({ initialFromToken, initialToToke
                 </button>
             </div>
 
-            {/* Success Message */}
-            {txHash && (
-                <div className="mt-4 p-4 bg-blue-400/10 border border-blue-400/20 rounded-lg text-blue-400 text-center">
-                    <p className="font-bold">Swap Successful!</p>
-                    <p className="text-xs mt-1 opacity-80">Tx: {txHash.slice(0, 10)}...</p>
-                </div>
-            )}
-
             {/* Protocol Info */}
             <div className="mt-6 p-4 bg-slate-900/40 border border-slate-500/20 rounded-xl">
                 <div className="flex items-center gap-2 mb-3">
                     <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
                     <span className="text-xs text-slate-400">
-                        Arc Testnet • Circle StableFX
+                        Arc Testnet • Curve StableSwap
                     </span>
                 </div>
                 <div className="grid grid-cols-2 gap-3 text-xs">
                     <div className="bg-slate-800/50 rounded-lg p-2.5">
-                        <p className="text-slate-500 mb-1">Supported Pairs</p>
-                        <p className="text-slate-300 font-medium">USDC ↔ EURC</p>
+                        <p className="text-slate-500 mb-1">Pool</p>
+                        <p className="text-slate-300 font-medium">USDC / EURC</p>
                     </div>
                     <div className="bg-slate-800/50 rounded-lg p-2.5">
-                        <p className="text-slate-500 mb-1">Execution</p>
-                        <p className="text-slate-300 font-medium">Gasless RFQ</p>
+                        <p className="text-slate-500 mb-1">Fee</p>
+                        <p className="text-slate-300 font-medium">0.04%</p>
                     </div>
                 </div>
                 <div className="flex items-center justify-center gap-4 mt-3 pt-3 border-t border-slate-700/50">
                     <a
-                        href="https://developers.circle.com/stablecoins/stablefx-api"
+                        href="https://curve.fi"
                         target="_blank"
                         rel="noreferrer"
                         className="text-xs text-slate-500 hover:text-blue-400 transition-colors"
                     >
-                        StableFX Docs
+                        Curve.fi
+                    </a>
+                    <span className="text-slate-700">•</span>
+                    <a
+                        href="https://testnet.arcscan.app/address/0x2D84D79C852f6842AbE0304b70bBaA1506AdD457"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs text-slate-500 hover:text-blue-400 transition-colors"
+                    >
+                        Pool Contract
                     </a>
                     <span className="text-slate-700">•</span>
                     <a

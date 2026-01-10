@@ -1,13 +1,12 @@
 /**
- * Swap Service - StableFX Only
+ * Swap Service
  *
- * Uses Circle StableFX for institutional-grade USDC ↔ EURC swaps
- * with competitive rates and instant settlement on Arc.
+ * Uses Curve StableSwap pool for USDC ↔ EURC swaps on Arc Testnet
+ * with near-zero slippage optimized for stablecoin pairs.
  */
 
 import { TokenInfo } from '../config/tokens';
-import { stableFxService, SwapQuote as StableFxSwapQuote } from './stableFxService';
-import { TypedDataParams } from './circleWalletService';
+import { curveSwapService, CurveQuote } from './curveSwapService';
 
 export interface Quote {
   fromToken: TokenInfo;
@@ -22,38 +21,39 @@ export interface Quote {
   timestamp: number;
   expiresAt: number;
   warning?: string;
-  usingFallback?: boolean;
-  source: 'stablefx';
-  stableFxQuoteId: string;
+  source: 'curve';
+  poolAddress: string;
 }
 
 // Quote freshness configuration
 const QUOTE_CONFIG = {
-  STALE_TIME: 10_000, // 10 seconds - quote becomes stale
-  EXPIRY_BUFFER: 30_000, // 30 seconds before expiry, consider it expired
+  STALE_TIME: 30_000, // 30 seconds - quote becomes stale
+  EXPIRY_TIME: 60_000, // 60 seconds - quote expires
 };
 
 class SwapService {
+  private slippageTolerance: number = 0.5; // 0.5% default
+
   constructor() {
-    // No initialization needed - StableFX service handles everything
+    // Curve service handles initialization
   }
 
   /**
    * Check if swap service is available
    */
   isAvailable(): boolean {
-    return stableFxService.isAvailable();
+    return curveSwapService.isAvailable();
   }
 
   /**
    * Check if a token pair is supported
    */
   isPairSupported(fromSymbol: string, toSymbol: string): boolean {
-    return stableFxService.isPairSupported(fromSymbol, toSymbol);
+    return curveSwapService.isPairSupported(fromSymbol, toSymbol);
   }
 
   /**
-   * Get a quote for swapping tokens via Circle StableFX
+   * Get a quote for swapping tokens via Curve
    */
   async getQuote(
     fromToken: TokenInfo,
@@ -65,65 +65,55 @@ class SwapService {
       throw new Error('Invalid amount');
     }
 
-    // Check if StableFX is available
-    if (!stableFxService.isAvailable()) {
-      throw new Error('StableFX is not configured. Please set VITE_CIRCLE_STABLEFX_API_KEY in your environment.');
-    }
-
     // Check if pair is supported
-    if (!stableFxService.isPairSupported(fromToken.symbol, toToken.symbol)) {
-      throw new Error(`Pair ${fromToken.symbol}/${toToken.symbol} is not supported. StableFX only supports USDC ↔ EURC.`);
+    if (!curveSwapService.isPairSupported(fromToken.symbol, toToken.symbol)) {
+      throw new Error(`Pair ${fromToken.symbol}/${toToken.symbol} is not supported. Only USDC ↔ EURC is available.`);
     }
 
-    console.log('[SWAP] Getting StableFX quote:', {
+    console.log('[SWAP] Getting Curve quote:', {
       from: fromToken.symbol,
       to: toToken.symbol,
       amount,
     });
 
     try {
-      // Get quote from StableFX
-      const stableFxQuote = await stableFxService.getQuote(fromToken, toToken, amount);
+      // Get quote from Curve
+      const curveQuote = await curveSwapService.getQuote(fromToken, toToken, amount);
 
-      console.log('[SWAP] StableFX quote received:', {
-        id: stableFxQuote.id,
-        rate: stableFxQuote.rate,
-        toAmount: stableFxQuote.to.amount,
-        fee: stableFxQuote.fee.amount,
-        expiresAt: stableFxQuote.expiresAt,
+      console.log('[SWAP] Curve quote received:', {
+        rate: curveQuote.rate,
+        toAmount: curveQuote.toAmount,
+        fee: curveQuote.fee,
       });
 
       // Convert to our Quote format
       const quote: Quote = {
         fromToken,
         toToken,
-        fromAmount: stableFxQuote.from.amount,
-        toAmount: stableFxQuote.to.amount,
-        rate: stableFxQuote.rate.toFixed(6),
-        fee: `${stableFxQuote.fee.amount} ${stableFxQuote.fee.currency}`,
-        estimatedGas: '0', // Gasless via Circle
-        priceImpact: '< 0.01%', // RFQ model - no price impact
-        minimumReceived: stableFxQuote.to.amount, // No slippage with RFQ
-        timestamp: Date.now(),
-        expiresAt: new Date(stableFxQuote.expiresAt).getTime(),
-        source: 'stablefx',
-        stableFxQuoteId: stableFxQuote.id,
+        fromAmount: curveQuote.fromAmount,
+        toAmount: curveQuote.toAmount,
+        rate: curveQuote.rate,
+        fee: curveQuote.fee,
+        estimatedGas: '~0.01 USDC',
+        priceImpact: curveQuote.priceImpact,
+        minimumReceived: curveQuote.minimumReceived,
+        timestamp: curveQuote.timestamp,
+        expiresAt: curveQuote.timestamp + QUOTE_CONFIG.EXPIRY_TIME,
+        source: 'curve',
+        poolAddress: curveQuote.poolAddress,
       };
 
       return quote;
     } catch (error: any) {
-      console.error('[SWAP] StableFX quote failed:', error);
+      console.error('[SWAP] Curve quote failed:', error);
 
-      // Provide helpful error messages
       if (error?.message?.includes('Minimum')) {
         throw error;
       } else if (error?.message?.includes('not supported')) {
         throw error;
-      } else if (error?.message?.includes('API key')) {
-        throw new Error('StableFX API key not configured. Contact sales@circle.com for access.');
       }
 
-      throw new Error(error?.message || 'Failed to get swap quote from StableFX.');
+      throw new Error(error?.message || 'Failed to get swap quote.');
     }
   }
 
@@ -138,26 +128,20 @@ class SwapService {
    * Check if quote has expired
    */
   isQuoteExpired(quote: Quote): boolean {
-    return Date.now() > quote.expiresAt - QUOTE_CONFIG.EXPIRY_BUFFER;
+    return Date.now() > quote.expiresAt;
   }
 
   /**
-   * Execute a token swap via Circle StableFX
-   *
-   * Full flow:
-   * 1. Create Trade from Quote
-   * 2. Get Trade Presign Data → Sign → Register Signature
-   * 3. Get Funding Presign Data → Sign → Fund Trade
-   * 4. Wait for settlement
+   * Execute a token swap via Curve
    */
   async executeSwap(
     quote: Quote,
-    signTypedData: (params: TypedDataParams) => Promise<`0x${string}`>,
+    executeTransaction: (to: string, value: bigint, data: string) => Promise<{ hash?: string }>,
     walletAddress: string
   ): Promise<string> {
     // Validate quote
-    if (!quote.stableFxQuoteId) {
-      throw new Error('Invalid quote - no StableFX quote ID');
+    if (!quote.poolAddress) {
+      throw new Error('Invalid quote - no pool address');
     }
 
     // Check quote hasn't expired
@@ -165,8 +149,7 @@ class SwapService {
       throw new Error('Quote expired. Please get a fresh quote.');
     }
 
-    console.log('[SWAP] Executing StableFX swap:', {
-      quoteId: quote.stableFxQuoteId,
+    console.log('[SWAP] Executing Curve swap:', {
       from: quote.fromToken.symbol,
       to: quote.toToken.symbol,
       amount: quote.fromAmount,
@@ -174,29 +157,71 @@ class SwapService {
     });
 
     try {
-      // Execute the full StableFX swap flow
-      const result = await stableFxService.executeSwap(
+      // Get token address for approval
+      const fromTokenAddress = quote.fromToken.contractAddresses.testnet?.arcTestnet;
+      if (!fromTokenAddress) {
+        throw new Error(`Token ${quote.fromToken.symbol} not configured for Arc Testnet`);
+      }
+
+      // Step 1: Check and do approval if needed
+      const hasAllowance = await curveSwapService.checkAllowance(
+        fromTokenAddress,
+        walletAddress,
+        quote.fromAmount,
+        quote.fromToken.decimals
+      );
+
+      if (!hasAllowance) {
+        console.log('[SWAP] Approving token spend...');
+        const approvalTx = curveSwapService.buildApprovalTransaction(
+          fromTokenAddress,
+          quote.fromAmount,
+          quote.fromToken.decimals
+        );
+
+        const approvalResult = await executeTransaction(
+          approvalTx.to,
+          approvalTx.value,
+          approvalTx.data
+        );
+
+        if (!approvalResult.hash) {
+          throw new Error('Approval transaction failed');
+        }
+
+        console.log('[SWAP] Approval tx:', approvalResult.hash);
+
+        // Wait a bit for approval to be mined
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+
+      // Step 2: Execute swap
+      console.log('[SWAP] Executing swap transaction...');
+      const swapTx = curveSwapService.buildSwapTransaction(
         quote.fromToken,
         quote.toToken,
         quote.fromAmount,
-        signTypedData,
+        quote.minimumReceived,
         walletAddress
       );
 
-      console.log('[SWAP] StableFX swap completed:', {
-        tradeId: result.tradeId,
-        txHash: result.txHash,
-      });
+      const swapResult = await executeTransaction(
+        swapTx.to,
+        swapTx.value,
+        swapTx.data
+      );
 
-      return result.txHash || result.tradeId;
+      if (!swapResult.hash) {
+        throw new Error('Swap transaction failed');
+      }
+
+      console.log('[SWAP] Swap completed:', swapResult.hash);
+      return swapResult.hash;
     } catch (error: any) {
-      console.error('[SWAP] StableFX swap failed:', error);
+      console.error('[SWAP] Swap failed:', error);
 
-      // Enhanced error messages
       if (error?.message?.includes('expired')) {
         throw new Error('Quote expired. Please get a fresh quote and try again.');
-      } else if (error?.message?.includes('signature')) {
-        throw new Error('Signature verification failed. Please try again.');
       } else if (error?.message?.includes('insufficient')) {
         throw new Error('Insufficient balance for this swap.');
       } else if (error?.message?.includes('cancelled') || error?.message?.includes('rejected')) {
@@ -208,50 +233,61 @@ class SwapService {
   }
 
   /**
-   * Execute swap with PasskeyManager adapter (for backward compatibility with SwapScreen)
+   * Execute swap with PasskeyManager adapter (for SwapScreen compatibility)
    */
   async executeSwapWithPasskey(
     quote: Quote,
     passkeyManager: {
       getAccountAddress: () => string | null;
       executeTransaction: (to: string, value: bigint, data: string) => Promise<{ hash?: string }>;
-    },
-    signTypedData?: (params: TypedDataParams) => Promise<`0x${string}`>
+    }
   ): Promise<string> {
     const walletAddress = passkeyManager.getAccountAddress();
     if (!walletAddress) {
       throw new Error('Wallet not connected');
     }
 
-    if (!signTypedData) {
-      throw new Error('signTypedData function required for StableFX swaps');
-    }
-
-    return this.executeSwap(quote, signTypedData, walletAddress);
+    return this.executeSwap(
+      quote,
+      passkeyManager.executeTransaction.bind(passkeyManager),
+      walletAddress
+    );
   }
 
   /**
-   * Get StableFX configuration
+   * Get Curve pool configuration
    */
   getConfig() {
-    return stableFxService.getConfig();
+    return curveSwapService.getConfig();
   }
 
   /**
-   * Get slippage tolerance (always 0 for RFQ model)
+   * Get slippage tolerance
    */
   getSlippageTolerance(): number {
-    return 0; // RFQ model - no slippage
+    return this.slippageTolerance;
   }
 
   /**
-   * Set slippage tolerance (no-op for RFQ model)
+   * Set slippage tolerance
    */
-  setSlippageTolerance(_slippage: number): { success: boolean; warning?: string } {
-    return {
-      success: true,
-      warning: 'StableFX uses RFQ model - slippage tolerance is not applicable.',
-    };
+  setSlippageTolerance(slippage: number): { success: boolean; warning?: string } {
+    if (slippage < 0.1 || slippage > 5) {
+      return {
+        success: false,
+        warning: 'Slippage must be between 0.1% and 5%',
+      };
+    }
+
+    this.slippageTolerance = slippage;
+    return { success: true };
+  }
+
+  /**
+   * Get pool liquidity info
+   */
+  async getPoolLiquidity(): Promise<{ usdc: string; eurc: string }> {
+    return curveSwapService.getPoolBalances();
   }
 }
 
