@@ -194,6 +194,15 @@ export const AgentProvider: React.FC<AgentProviderProps> = ({ children }) => {
 
       setIsProcessing(true);
 
+      // Immediately add user message to UI
+      const userMsg: AgentMessage = {
+        id: `msg_${Date.now()}_user`,
+        role: 'user',
+        content: message,
+        timestamp: Date.now(),
+      };
+      setMessages(prev => [...prev, userMsg]);
+
       try {
         const response = await agentService.processMessage(message, {
           onPaymentRequired: async (requirements) => {
@@ -224,6 +233,7 @@ export const AgentProvider: React.FC<AgentProviderProps> = ({ children }) => {
           },
         });
 
+        // Sync with service messages (includes agent response)
         setMessages(agentService.getMessages());
         return response;
       } catch (error: any) {
