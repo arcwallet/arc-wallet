@@ -211,8 +211,14 @@ class AgentService {
     this.messages.push(userMsg);
 
     try {
-      // Parse intent
-      const intentResult = await parseIntent(userMessage);
+      // Parse intent - try API first, fallback to local
+      let intentResult;
+      try {
+        intentResult = await parseIntent(userMessage);
+      } catch (parseError) {
+        console.warn('API parse failed, using local parser:', parseError);
+        intentResult = this.localParseIntent(userMessage);
+      }
       const intent = this.mapToAgentIntent(intentResult);
 
       // Notify about parsed intent
@@ -277,6 +283,95 @@ class AgentService {
       confidence,
       requiresPayment,
       estimatedCost,
+    };
+  }
+
+  /**
+   * Local intent parser - fallback when API is unavailable
+   */
+  private localParseIntent(input: string): { intent: { type: string; params: any }; confidence: number; message: string } {
+    const lower = input.toLowerCase();
+    const addressMatch = input.match(/0x[a-fA-F0-9]{40}/);
+    const amountMatch = input.match(/(\d+\.?\d*)/);
+    const amount = amountMatch ? amountMatch[1] : '';
+
+    // SEND detection
+    const sendKeywords = ['send', 'gönder', 'gonder', 'yolla', 'transfer', 'enviar', 'at'];
+    if (sendKeywords.some(k => lower.includes(k)) || (addressMatch && amount)) {
+      const token = lower.includes('eurc') ? 'EURC' : lower.includes('arc') ? 'ARC' : 'USDC';
+      return {
+        intent: { type: 'SEND', params: { token, amount, recipient: addressMatch?.[0] || '' } },
+        confidence: addressMatch && amount ? 0.9 : 0.5,
+        message: addressMatch ? `Sending ${amount} ${token}...` : 'Please provide recipient address',
+      };
+    }
+
+    // BRIDGE detection
+    const bridgeKeywords = ['bridge', 'köprü', 'koprule', 'base'];
+    if (bridgeKeywords.some(k => lower.includes(k))) {
+      return {
+        intent: { type: 'BRIDGE', params: { amount, fromChain: 'arc', toChain: 'base sepolia' } },
+        confidence: amount ? 0.85 : 0.5,
+        message: `Bridging ${amount} USDC to Base Sepolia...`,
+      };
+    }
+
+    // SWAP detection
+    const swapKeywords = ['swap', 'takas', 'çevir', 'cevir', 'exchange', 'al'];
+    if (swapKeywords.some(k => lower.includes(k))) {
+      const toToken = lower.includes('eurc') ? 'EURC' : 'USDC';
+      return {
+        intent: { type: 'SWAP', params: { fromToken: 'USDC', toToken, amount } },
+        confidence: amount ? 0.85 : 0.5,
+        message: `Swapping ${amount} USDC to ${toToken}...`,
+      };
+    }
+
+    // BALANCE detection
+    const balanceKeywords = ['balance', 'bakiye', 'ne kadar'];
+    if (balanceKeywords.some(k => lower.includes(k))) {
+      return {
+        intent: { type: 'CHECK_BALANCE', params: {} },
+        confidence: 0.9,
+        message: 'Checking balance...',
+      };
+    }
+
+    // PRICE detection
+    const priceKeywords = ['price', 'fiyat', 'kaç'];
+    if (priceKeywords.some(k => lower.includes(k))) {
+      const token = lower.includes('btc') ? 'BTC' : lower.includes('eth') ? 'ETH' : 'USDC';
+      return {
+        intent: { type: 'GET_PRICE', params: { token } },
+        confidence: 0.9,
+        message: `Getting ${token} price...`,
+      };
+    }
+
+    // ANALYZE detection
+    if (addressMatch && (lower.includes('analiz') || lower.includes('analyze') || lower.includes('risk') || lower.includes('güvenli'))) {
+      return {
+        intent: { type: 'ANALYZE_WALLET', params: { address: addressMatch[0] } },
+        confidence: 0.9,
+        message: `Analyzing wallet ${addressMatch[0].slice(0, 10)}...`,
+      };
+    }
+
+    // NEWS detection
+    const newsKeywords = ['news', 'haber', 'piyasa', 'market'];
+    if (newsKeywords.some(k => lower.includes(k))) {
+      return {
+        intent: { type: 'GET_NEWS', params: {} },
+        confidence: 0.9,
+        message: 'Fetching market news...',
+      };
+    }
+
+    // Unknown
+    return {
+      intent: { type: 'UNKNOWN', params: {} },
+      confidence: 0.3,
+      message: 'I can help with: send, swap, bridge, balance, prices. What would you like to do?',
     };
   }
 
