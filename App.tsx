@@ -13,6 +13,9 @@ import { MultiSigProvider } from './contexts/MultiSigContext';
 import { PrivacyProvider } from './contexts/PrivacyContext';
 import { NetworkProvider } from './contexts/NetworkContext';
 
+// Arc Agent (x402 + AI)
+import { AgentProvider } from './contexts/AgentContext';
+
 // Circle Modular Wallet (ERC-4337 + ERC-6900)
 import { CircleWalletProvider, useCircleWallet } from './contexts/CircleWalletContext';
 import { ERC6900MultiSigProvider } from './contexts/ERC6900MultiSigContext';
@@ -91,11 +94,13 @@ const App: React.FC = () => {
                     <ActivityProvider>
                       <PrivacyProvider>
                         <MultiSigProvider>
-                          <div className="auth-wrapper">
-                            <React.Suspense fallback={null}>
-                              <RootView />
-                            </React.Suspense>
-                          </div>
+                          <AgentProvider>
+                            <div className="auth-wrapper">
+                              <React.Suspense fallback={null}>
+                                <RootView />
+                              </React.Suspense>
+                            </div>
+                          </AgentProvider>
                         </MultiSigProvider>
                       </PrivacyProvider>
                     </ActivityProvider>

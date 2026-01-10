@@ -1,0 +1,656 @@
+/**
+ * Arc Agent Service
+ *
+ * Orchestrates all Arc Agent capabilities:
+ * - Intent parsing and execution
+ * - x402 payments for premium services
+ * - Wallet operations (send, swap, bridge)
+ * - Policy enforcement
+ */
+
+import {
+  parseIntent,
+  analyzeWalletRisk,
+  getTokenPrice,
+  getNewsSummary,
+  type X402PaymentRequirements,
+  type X402PaymentResult,
+} from './x402Client';
+import { logger } from './logger';
+
+// ============================================
+// Types
+// ============================================
+
+export type IntentType =
+  | 'SEND'
+  | 'SWAP'
+  | 'BRIDGE'
+  | 'CHECK_BALANCE'
+  | 'ANALYZE_WALLET'
+  | 'GET_PRICE'
+  | 'GET_NEWS'
+  | 'UNKNOWN';
+
+export interface AgentIntent {
+  type: IntentType;
+  params: Record<string, any>;
+  confidence: number;
+  requiresPayment: boolean;
+  estimatedCost?: string;
+}
+
+export interface AgentMessage {
+  id: string;
+  role: 'user' | 'agent';
+  content: string;
+  timestamp: number;
+  intent?: AgentIntent;
+  paymentInfo?: X402PaymentResult;
+  error?: string;
+}
+
+export interface AgentPolicy {
+  maxPerTransaction: number;  // Max USDC per transaction
+  dailyBudget: number;        // Daily spending limit
+  requirePasskey: boolean;    // Always require passkey for payments
+  allowedIntents: IntentType[]; // Allowed intent types
+}
+
+export interface AgentSpending {
+  today: number;
+  thisWeek: number;
+  thisMonth: number;
+  lastTransaction?: X402PaymentResult;
+}
+
+// Default policy
+const DEFAULT_POLICY: AgentPolicy = {
+  maxPerTransaction: 0.10,  // $0.10 max per tx
+  dailyBudget: 10.00,       // $10.00 daily limit
+  requirePasskey: true,     // Always require passkey
+  allowedIntents: [
+    'SEND',
+    'SWAP',
+    'BRIDGE',
+    'CHECK_BALANCE',
+    'ANALYZE_WALLET',
+    'GET_PRICE',
+    'GET_NEWS',
+  ],
+};
+
+// x402 service costs
+const SERVICE_COSTS: Record<string, number> = {
+  ANALYZE_WALLET: 0.02,
+  GET_PRICE: 0.01,
+  GET_NEWS: 0.03,
+};
+
+// ============================================
+// Agent Service Class
+// ============================================
+
+class AgentService {
+  private policy: AgentPolicy = DEFAULT_POLICY;
+  private spending: AgentSpending = {
+    today: 0,
+    thisWeek: 0,
+    thisMonth: 0,
+  };
+  private messages: AgentMessage[] = [];
+
+  /**
+   * Initialize agent service
+   */
+  initialize(): void {
+    this.loadSpendingFromStorage();
+    this.loadPolicyFromStorage();
+    logger.info('Agent service initialized', { component: 'AgentService' });
+  }
+
+  /**
+   * Get current policy
+   */
+  getPolicy(): AgentPolicy {
+    return { ...this.policy };
+  }
+
+  /**
+   * Update policy
+   */
+  updatePolicy(updates: Partial<AgentPolicy>): void {
+    this.policy = { ...this.policy, ...updates };
+    this.savePolicyToStorage();
+    logger.info('Policy updated', {
+      component: 'AgentService',
+      policy: this.policy,
+    });
+  }
+
+  /**
+   * Get current spending
+   */
+  getSpending(): AgentSpending {
+    return { ...this.spending };
+  }
+
+  /**
+   * Get conversation history
+   */
+  getMessages(): AgentMessage[] {
+    return [...this.messages];
+  }
+
+  /**
+   * Clear conversation history
+   */
+  clearMessages(): void {
+    this.messages = [];
+  }
+
+  /**
+   * Process user message and execute intent
+   */
+  async processMessage(
+    userMessage: string,
+    callbacks: {
+      onPaymentRequired?: (
+        requirements: X402PaymentRequirements
+      ) => Promise<boolean>;
+      onPaymentSent?: (result: X402PaymentResult) => void;
+      onIntentParsed?: (intent: AgentIntent) => void;
+      onNavigate?: (page: string, data?: any) => void;
+    } = {}
+  ): Promise<AgentMessage> {
+    const messageId = `msg_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+
+    // Add user message to history
+    const userMsg: AgentMessage = {
+      id: `${messageId}_user`,
+      role: 'user',
+      content: userMessage,
+      timestamp: Date.now(),
+    };
+    this.messages.push(userMsg);
+
+    try {
+      // Parse intent
+      const intentResult = await parseIntent(userMessage);
+      const intent = this.mapToAgentIntent(intentResult);
+
+      // Notify about parsed intent
+      if (callbacks.onIntentParsed) {
+        callbacks.onIntentParsed(intent);
+      }
+
+      // Check if intent is allowed
+      if (!this.policy.allowedIntents.includes(intent.type)) {
+        throw new Error(`Intent type "${intent.type}" is not allowed by policy`);
+      }
+
+      // Execute intent
+      const response = await this.executeIntent(intent, callbacks);
+
+      // Create agent response message
+      const agentMsg: AgentMessage = {
+        id: `${messageId}_agent`,
+        role: 'agent',
+        content: response.message,
+        timestamp: Date.now(),
+        intent,
+        paymentInfo: response.paymentInfo,
+      };
+      this.messages.push(agentMsg);
+
+      return agentMsg;
+    } catch (error: any) {
+      logger.error('Agent processing error', {
+        component: 'AgentService',
+        errorMsg: error.message,
+      });
+
+      const errorMsg: AgentMessage = {
+        id: `${messageId}_agent`,
+        role: 'agent',
+        content: `I encountered an error: ${error.message}`,
+        timestamp: Date.now(),
+        error: error.message,
+      };
+      this.messages.push(errorMsg);
+
+      return errorMsg;
+    }
+  }
+
+  /**
+   * Map backend intent to AgentIntent
+   */
+  private mapToAgentIntent(intentResult: any): AgentIntent {
+    const type = intentResult.intent?.type || 'UNKNOWN';
+    const params = intentResult.intent?.params || {};
+    const confidence = intentResult.confidence || 0;
+
+    // Check if this intent requires payment
+    const requiresPayment = ['ANALYZE_WALLET', 'GET_PRICE', 'GET_NEWS'].includes(type);
+    const estimatedCost = SERVICE_COSTS[type]?.toString();
+
+    return {
+      type: type as IntentType,
+      params,
+      confidence,
+      requiresPayment,
+      estimatedCost,
+    };
+  }
+
+  /**
+   * Execute parsed intent
+   */
+  private async executeIntent(
+    intent: AgentIntent,
+    callbacks: {
+      onPaymentRequired?: (
+        requirements: X402PaymentRequirements
+      ) => Promise<boolean>;
+      onPaymentSent?: (result: X402PaymentResult) => void;
+      onNavigate?: (page: string, data?: any) => void;
+    }
+  ): Promise<{ message: string; paymentInfo?: X402PaymentResult }> {
+    logger.info('Executing intent', {
+      component: 'AgentService',
+      intentType: intent.type,
+    });
+
+    switch (intent.type) {
+      case 'SEND':
+        return this.handleSendIntent(intent, callbacks);
+
+      case 'SWAP':
+        return this.handleSwapIntent(intent, callbacks);
+
+      case 'BRIDGE':
+        return this.handleBridgeIntent(intent, callbacks);
+
+      case 'CHECK_BALANCE':
+        return this.handleBalanceIntent(intent);
+
+      case 'ANALYZE_WALLET':
+        return this.handleAnalyzeWalletIntent(intent, callbacks);
+
+      case 'GET_PRICE':
+        return this.handlePriceIntent(intent, callbacks);
+
+      case 'GET_NEWS':
+        return this.handleNewsIntent(callbacks);
+
+      default:
+        return {
+          message: "I'm not sure how to help with that. Try asking me to:\n" +
+            "- Send tokens (e.g., 'Send 10 USDC to 0x...')\n" +
+            "- Swap tokens (e.g., 'Swap 50 USDC to EURC')\n" +
+            "- Analyze a wallet (e.g., 'Analyze 0x...')\n" +
+            "- Get token prices (e.g., 'Price of ETH')\n" +
+            "- Get market news",
+        };
+    }
+  }
+
+  /**
+   * Handle SEND intent
+   */
+  private async handleSendIntent(
+    intent: AgentIntent,
+    callbacks: { onNavigate?: (page: string, data?: any) => void }
+  ): Promise<{ message: string }> {
+    const { token, amount, recipient } = intent.params;
+
+    if (!recipient) {
+      return {
+        message: `I'll help you send ${amount || ''} ${token || 'tokens'}. Please provide the recipient address.`,
+      };
+    }
+
+    // Navigate to Send page with pre-filled data
+    if (callbacks.onNavigate) {
+      callbacks.onNavigate('Send', {
+        type: 'SEND',
+        params: { token, amount, recipient },
+      });
+    }
+
+    return {
+      message: `I'm preparing to send ${amount} ${token} to ${recipient.slice(0, 6)}...${recipient.slice(-4)}. Please review and confirm on the Send page.`,
+    };
+  }
+
+  /**
+   * Handle SWAP intent
+   */
+  private async handleSwapIntent(
+    intent: AgentIntent,
+    callbacks: { onNavigate?: (page: string, data?: any) => void }
+  ): Promise<{ message: string }> {
+    const { fromToken, toToken, amount } = intent.params;
+
+    // Navigate to Swap page with pre-filled data
+    if (callbacks.onNavigate) {
+      callbacks.onNavigate('Swap', {
+        type: 'SWAP',
+        params: { fromToken, toToken, amount },
+      });
+    }
+
+    return {
+      message: `I'm preparing to swap ${amount} ${fromToken} to ${toToken}. Please review and confirm on the Swap page.`,
+    };
+  }
+
+  /**
+   * Handle BRIDGE intent
+   */
+  private async handleBridgeIntent(
+    intent: AgentIntent,
+    callbacks: { onNavigate?: (page: string, data?: any) => void }
+  ): Promise<{ message: string }> {
+    // Navigate to Bridge page
+    if (callbacks.onNavigate) {
+      callbacks.onNavigate('Bridge', intent.params);
+    }
+
+    return {
+      message: "I'm opening the Bridge page for you. You can transfer assets between Arc and other networks there.",
+    };
+  }
+
+  /**
+   * Handle CHECK_BALANCE intent
+   */
+  private async handleBalanceIntent(
+    intent: AgentIntent
+  ): Promise<{ message: string }> {
+    const { token } = intent.params;
+
+    if (token) {
+      return {
+        message: `To check your ${token} balance, please look at the Dashboard. Your balances are displayed there.`,
+      };
+    }
+
+    return {
+      message: "Your wallet balances are displayed on the Dashboard. Would you like me to analyze a specific wallet address instead?",
+    };
+  }
+
+  /**
+   * Handle ANALYZE_WALLET intent (x402 protected)
+   */
+  private async handleAnalyzeWalletIntent(
+    intent: AgentIntent,
+    callbacks: {
+      onPaymentRequired?: (
+        requirements: X402PaymentRequirements
+      ) => Promise<boolean>;
+      onPaymentSent?: (result: X402PaymentResult) => void;
+    }
+  ): Promise<{ message: string; paymentInfo?: X402PaymentResult }> {
+    const { address } = intent.params;
+
+    if (!address || !address.match(/^0x[a-fA-F0-9]{40}$/)) {
+      return {
+        message: "Please provide a valid wallet address to analyze (e.g., 'Analyze 0x742d35Cc6634C0532925a3b844Bc9e7595f3a5').",
+      };
+    }
+
+    // Check spending limit
+    const cost = SERVICE_COSTS.ANALYZE_WALLET;
+    if (this.spending.today + cost > this.policy.dailyBudget) {
+      return {
+        message: `Daily spending limit reached ($${this.spending.today.toFixed(2)}/$${this.policy.dailyBudget.toFixed(2)}). Try again tomorrow or increase your limit in settings.`,
+      };
+    }
+
+    let paymentInfo: X402PaymentResult | undefined;
+
+    try {
+      const result = await analyzeWalletRisk(address, {
+        onPaymentRequired: callbacks.onPaymentRequired,
+        onPaymentSent: (payment) => {
+          paymentInfo = payment;
+          this.recordSpending(parseFloat(payment.amount));
+          if (callbacks.onPaymentSent) {
+            callbacks.onPaymentSent(payment);
+          }
+        },
+      });
+
+      // Format risk analysis response
+      const riskEmoji = {
+        LOW: '✅',
+        MEDIUM: '⚠️',
+        HIGH: '🔴',
+        CRITICAL: '🚨',
+      }[result.riskLevel];
+
+      const flagsList = result.flags.length > 0
+        ? `\n\nFlags detected:\n${result.flags.map(f => `• ${f.replace(/_/g, ' ')}`).join('\n')}`
+        : '';
+
+      return {
+        message: `${riskEmoji} **Risk Analysis for ${address.slice(0, 6)}...${address.slice(-4)}**\n\n` +
+          `**Risk Level:** ${result.riskLevel}\n` +
+          `**Risk Score:** ${result.riskScore}/100\n` +
+          `${flagsList}\n\n` +
+          `**Recommendation:** ${result.recommendation}`,
+        paymentInfo,
+      };
+    } catch (error: any) {
+      if (error.message === 'Payment rejected by user') {
+        return {
+          message: 'Risk analysis cancelled. No payment was made.',
+        };
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Handle GET_PRICE intent (x402 protected)
+   */
+  private async handlePriceIntent(
+    intent: AgentIntent,
+    callbacks: {
+      onPaymentRequired?: (
+        requirements: X402PaymentRequirements
+      ) => Promise<boolean>;
+      onPaymentSent?: (result: X402PaymentResult) => void;
+    }
+  ): Promise<{ message: string; paymentInfo?: X402PaymentResult }> {
+    const token = intent.params.token || 'USDC';
+
+    // Check spending limit
+    const cost = SERVICE_COSTS.GET_PRICE;
+    if (this.spending.today + cost > this.policy.dailyBudget) {
+      return {
+        message: `Daily spending limit reached. Try again tomorrow.`,
+      };
+    }
+
+    let paymentInfo: X402PaymentResult | undefined;
+
+    try {
+      const result = await getTokenPrice(token, {
+        onPaymentRequired: callbacks.onPaymentRequired,
+        onPaymentSent: (payment) => {
+          paymentInfo = payment;
+          this.recordSpending(parseFloat(payment.amount));
+          if (callbacks.onPaymentSent) {
+            callbacks.onPaymentSent(payment);
+          }
+        },
+      });
+
+      const changeEmoji = result.change24h >= 0 ? '📈' : '📉';
+      const changeColor = result.change24h >= 0 ? '+' : '';
+
+      return {
+        message: `**${token} Price Data** ${changeEmoji}\n\n` +
+          `**Price:** $${result.price.toLocaleString()}\n` +
+          `**24h Change:** ${changeColor}${result.change24h.toFixed(2)}%\n` +
+          `**24h Volume:** $${result.volume24h.toLocaleString()}\n` +
+          `**Market Cap:** $${result.marketCap.toLocaleString()}\n\n` +
+          `_Last updated: ${new Date(result.lastUpdated).toLocaleTimeString()}_`,
+        paymentInfo,
+      };
+    } catch (error: any) {
+      if (error.message === 'Payment rejected by user') {
+        return {
+          message: 'Price lookup cancelled.',
+        };
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Handle GET_NEWS intent (x402 protected)
+   */
+  private async handleNewsIntent(
+    callbacks: {
+      onPaymentRequired?: (
+        requirements: X402PaymentRequirements
+      ) => Promise<boolean>;
+      onPaymentSent?: (result: X402PaymentResult) => void;
+    }
+  ): Promise<{ message: string; paymentInfo?: X402PaymentResult }> {
+    // Check spending limit
+    const cost = SERVICE_COSTS.GET_NEWS;
+    if (this.spending.today + cost > this.policy.dailyBudget) {
+      return {
+        message: `Daily spending limit reached. Try again tomorrow.`,
+      };
+    }
+
+    let paymentInfo: X402PaymentResult | undefined;
+
+    try {
+      const result = await getNewsSummary({
+        onPaymentRequired: callbacks.onPaymentRequired,
+        onPaymentSent: (payment) => {
+          paymentInfo = payment;
+          this.recordSpending(parseFloat(payment.amount));
+          if (callbacks.onPaymentSent) {
+            callbacks.onPaymentSent(payment);
+          }
+        },
+      });
+
+      const sentimentEmoji = {
+        bullish: '🟢',
+        neutral: '🟡',
+        bearish: '🔴',
+      }[result.marketSentiment] || '⚪';
+
+      const headlines = result.headlines
+        .map(h => `• ${h.title} _(${h.source})_`)
+        .join('\n');
+
+      return {
+        message: `**Market News Summary** ${sentimentEmoji}\n\n` +
+          `${result.summary}\n\n` +
+          `**Headlines:**\n${headlines}\n\n` +
+          `**Market Sentiment:** ${result.marketSentiment.toUpperCase()}`,
+        paymentInfo,
+      };
+    } catch (error: any) {
+      if (error.message === 'Payment rejected by user') {
+        return {
+          message: 'News summary cancelled.',
+        };
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Record spending
+   */
+  private recordSpending(amount: number): void {
+    this.spending.today += amount;
+    this.spending.thisWeek += amount;
+    this.spending.thisMonth += amount;
+    this.saveSpendingToStorage();
+
+    logger.info('Spending recorded', {
+      component: 'AgentService',
+      amount,
+      todayTotal: this.spending.today,
+    });
+  }
+
+  /**
+   * Reset daily spending (call at midnight)
+   */
+  resetDailySpending(): void {
+    this.spending.today = 0;
+    this.saveSpendingToStorage();
+  }
+
+  // Storage helpers
+  private saveSpendingToStorage(): void {
+    try {
+      localStorage.setItem('arc_agent_spending', JSON.stringify({
+        ...this.spending,
+        lastReset: Date.now(),
+      }));
+    } catch (e) {
+      // Ignore storage errors
+    }
+  }
+
+  private loadSpendingFromStorage(): void {
+    try {
+      const stored = localStorage.getItem('arc_agent_spending');
+      if (stored) {
+        const data = JSON.parse(stored);
+        // Check if day has changed
+        const lastReset = data.lastReset || 0;
+        const daysSinceReset = (Date.now() - lastReset) / (24 * 60 * 60 * 1000);
+
+        if (daysSinceReset >= 1) {
+          this.spending.today = 0;
+        } else {
+          this.spending.today = data.today || 0;
+        }
+
+        this.spending.thisWeek = data.thisWeek || 0;
+        this.spending.thisMonth = data.thisMonth || 0;
+      }
+    } catch (e) {
+      // Ignore storage errors
+    }
+  }
+
+  private savePolicyToStorage(): void {
+    try {
+      localStorage.setItem('arc_agent_policy', JSON.stringify(this.policy));
+    } catch (e) {
+      // Ignore storage errors
+    }
+  }
+
+  private loadPolicyFromStorage(): void {
+    try {
+      const stored = localStorage.getItem('arc_agent_policy');
+      if (stored) {
+        this.policy = { ...DEFAULT_POLICY, ...JSON.parse(stored) };
+      }
+    } catch (e) {
+      // Ignore storage errors
+    }
+  }
+}
+
+// Singleton instance
+export const agentService = new AgentService();
+export default agentService;

@@ -27,6 +27,34 @@ export const CheckBalanceIntentSchema = z.object({
     }),
 });
 
+export const BridgeIntentSchema = z.object({
+    type: z.literal('BRIDGE'),
+    params: z.object({
+        fromChain: z.string().optional(),
+        toChain: z.string().optional(),
+        amount: z.string().optional(),
+    }),
+});
+
+export const AnalyzeWalletIntentSchema = z.object({
+    type: z.literal('ANALYZE_WALLET'),
+    params: z.object({
+        address: z.string(),
+    }),
+});
+
+export const GetPriceIntentSchema = z.object({
+    type: z.literal('GET_PRICE'),
+    params: z.object({
+        token: z.string().optional(),
+    }),
+});
+
+export const GetNewsIntentSchema = z.object({
+    type: z.literal('GET_NEWS'),
+    params: z.object({}),
+});
+
 export const UnknownIntentSchema = z.object({
     type: z.literal('UNKNOWN'),
     params: z.object({}),
@@ -36,6 +64,10 @@ export const IntentSchema = z.discriminatedUnion('type', [
     SendIntentSchema,
     SwapIntentSchema,
     CheckBalanceIntentSchema,
+    BridgeIntentSchema,
+    AnalyzeWalletIntentSchema,
+    GetPriceIntentSchema,
+    GetNewsIntentSchema,
     UnknownIntentSchema,
 ]);
 

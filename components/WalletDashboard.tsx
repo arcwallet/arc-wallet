@@ -10,8 +10,9 @@ import Faucet from './Faucet';
 import SwapScreen from './SwapScreen';
 import Bridge from './Bridge';
 import History from './History';
-// AgentScreen temporarily disabled - will integrate new AI solution
-// import AgentScreen, { WalletBalance } from './AgentScreen';
+// Arc Agent Sidebar
+import AgentSidebar from './AgentSidebar';
+import { useAgent } from '../contexts/AgentContext';
 export interface WalletBalance {
     token: string;
     balance: string;
@@ -786,18 +787,33 @@ const WalletDashboard: React.FC = () => {
   const [isBalanceHidden, setIsBalanceHidden] = useState(false);
   const [agentIntentData, setAgentIntentData] = useState<AgentIntentData | null>(null);
 
+  // Arc Agent
+  const { isOpen: isAgentOpen, openAgent, closeAgent, setNavigationCallback } = useAgent();
+
   const handleAgentIntent = (intent: any) => {
     setAgentIntentData(intent);
     if (intent.type === 'SEND') {
       setCurrentPage('Send');
     } else if (intent.type === 'SWAP') {
       setCurrentPage('Swap');
+    } else if (intent.type === 'BRIDGE') {
+      setCurrentPage('Bridge');
     } else if (intent.type === 'CHECK_BALANCE') {
-      // For balance check, we might just want to stay on Agent screen or go to Dashboard
-      // For now, let's go to Dashboard to show balance
       setCurrentPage('Dashboard');
     }
   };
+
+  // Set up navigation callback for Agent
+  useEffect(() => {
+    setNavigationCallback((page: string, data?: any) => {
+      // Handle intent data if provided
+      if (data?.intent) {
+        handleAgentIntent(data.intent);
+      } else {
+        setCurrentPage(page);
+      }
+    });
+  }, [setNavigationCallback]);
 
   // Circle Modular Wallet - Smart Wallet (single wallet system)
   const { address } = useCircleWallet();
@@ -970,7 +986,7 @@ const WalletDashboard: React.FC = () => {
   };
 
   return (
-    <div className="flex h-screen w-full bg-[#0A0F1A] text-white">
+    <div className="flex h-screen w-full bg-[#0A0F1A] text-white relative">
       <SideNavBar currentPage={currentPage} onNavigate={handleNavigate} />
       <main className="flex flex-1 flex-col overflow-hidden">
         <DashboardHeader account={snapshot} isRefreshing={isAccountLoading} onRefresh={refresh} error={accountError} onNavigate={handleNavigate} />
@@ -990,6 +1006,29 @@ const WalletDashboard: React.FC = () => {
           )}
         </div>
       </main>
+
+      {/* Arc Agent Floating Button */}
+      {!isAgentOpen && (
+        <button
+          onClick={openAgent}
+          className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-r from-[#4A9EFF] to-[#6366F1] rounded-full shadow-lg shadow-[#4A9EFF]/25 flex items-center justify-center hover:scale-105 transition-transform z-50 group"
+          title="Open Arc Agent"
+        >
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white">
+            <path d="M12 8V4H8" />
+            <rect x="2" y="2" width="20" height="20" rx="5" />
+            <path d="M2 12h4" />
+            <path d="M18 12h4" />
+            <path d="M12 18v4" />
+            <circle cx="12" cy="12" r="2" />
+          </svg>
+          {/* Pulse animation */}
+          <span className="absolute inset-0 rounded-full bg-[#4A9EFF] animate-ping opacity-25" />
+        </button>
+      )}
+
+      {/* Arc Agent Sidebar */}
+      <AgentSidebar />
     </div>
   );
 };

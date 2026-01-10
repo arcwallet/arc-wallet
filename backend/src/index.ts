@@ -25,9 +25,8 @@ import { webhookService } from './services/webhookService.js';
 import { getBridgeCompleterService } from './services/bridgeCompleterService.js';
 import { initIndexerDB } from './db/indexer.js';
 import { MagicSessionStore } from './magicLink/SessionStore.js';
-// Agent temporarily disabled - will integrate new AI solution
-// import agentRouter from './controllers/agentController.js';
-// import { initializeAgentDatabase } from './database/agentDatabase.js';
+// Arc Agent x402 API routes
+import { createAgentRoutes } from './routes/agent.js';
 import { loadConfig, validateConfig } from './utils/config.js';
 import { cookieMiddleware } from './middleware/cookies.js';
 import { setCsrfCookie, validateCsrfToken } from './middleware/csrf.js';
@@ -134,8 +133,8 @@ app.use('/api/history', createHistoryRouter());
 app.use('/api/webhooks', createWebhookRouter());
 app.use('/api/gas-station', createGasStationRouter());
 app.use('/api/recovery', createRecoveryRoutes(db, config, magicSessionStore));
-// Agent temporarily disabled - will integrate new AI solution
-// app.use('/api/agent', agentRouter);
+// Arc Agent x402 API
+app.use('/api/agent', createAgentRoutes());
 
 // Initialize indexer database
 console.log('🔧 Initializing indexer database...');

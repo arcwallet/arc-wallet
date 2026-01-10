@@ -12,6 +12,7 @@ import {
   RobotIcon,
   SettingsIcon
 } from './Icons';
+import { useAgent } from '../contexts/AgentContext';
 
 // Treasury Icon
 const TreasuryNavIcon = ({ size = 20, className = '' }: { size?: number; className?: string }) => (
@@ -68,6 +69,8 @@ interface SideNavBarProps {
 
 
 const SideNavBar: React.FC<SideNavBarProps> = ({ currentPage, onNavigate }) => {
+  const { isOpen: isAgentOpen, openAgent } = useAgent();
+
   const navItems = [
     { id: 'Dashboard', icon: 'dashboard', label: 'Dashboard' },
     { id: 'Send', icon: 'arrow_upward', label: 'Send' },
@@ -77,8 +80,6 @@ const SideNavBar: React.FC<SideNavBarProps> = ({ currentPage, onNavigate }) => {
     { id: 'Treasury', icon: 'treasury', label: 'Treasury' },
     { id: 'History', icon: 'receipt_long', label: 'History' },
     { id: 'Multi-Sig', icon: 'group', label: 'Multi-Sig' },
-    // Agent tab temporarily disabled - will integrate new AI solution
-    // { id: 'Agent', icon: 'smart_toy', label: 'AI Agent' },
     { id: 'Faucet', icon: 'water_drop', label: 'Faucet' },
   ];
 
@@ -93,6 +94,19 @@ const SideNavBar: React.FC<SideNavBarProps> = ({ currentPage, onNavigate }) => {
         ))}
       </nav>
       <div className="mt-auto flex flex-col gap-2">
+        {/* Arc Agent Button */}
+        <a
+          onClick={openAgent}
+          className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-all ${
+            isAgentOpen
+              ? 'bg-gradient-to-r from-[#4A9EFF]/20 to-[#6366F1]/20 text-[#4A9EFF] border-l-2 border-[#4A9EFF] font-semibold'
+              : 'text-slate-400 hover:bg-white/5 hover:text-slate-200 font-medium border-l-2 border-transparent'
+          }`}
+        >
+          <RobotIcon size={20} className="flex-shrink-0" />
+          <p className="text-sm">Arc Agent</p>
+          <span className="ml-auto text-[10px] font-medium bg-gradient-to-r from-[#4A9EFF] to-[#6366F1] text-white px-1.5 py-0.5 rounded">AI</span>
+        </a>
         <NavItem icon="settings" label="Settings" active={currentPage === 'Settings'} onClick={() => onNavigate('Settings')} />
       </div>
     </aside>
