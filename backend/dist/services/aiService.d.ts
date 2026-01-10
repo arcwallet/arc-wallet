@@ -21,6 +21,30 @@ export declare const CheckBalanceIntentSchema: z.ZodObject<{
         token: z.ZodOptional<z.ZodString>;
     }, z.core.$strip>;
 }, z.core.$strip>;
+export declare const BridgeIntentSchema: z.ZodObject<{
+    type: z.ZodLiteral<"BRIDGE">;
+    params: z.ZodObject<{
+        fromChain: z.ZodOptional<z.ZodString>;
+        toChain: z.ZodOptional<z.ZodString>;
+        amount: z.ZodOptional<z.ZodString>;
+    }, z.core.$strip>;
+}, z.core.$strip>;
+export declare const AnalyzeWalletIntentSchema: z.ZodObject<{
+    type: z.ZodLiteral<"ANALYZE_WALLET">;
+    params: z.ZodObject<{
+        address: z.ZodString;
+    }, z.core.$strip>;
+}, z.core.$strip>;
+export declare const GetPriceIntentSchema: z.ZodObject<{
+    type: z.ZodLiteral<"GET_PRICE">;
+    params: z.ZodObject<{
+        token: z.ZodOptional<z.ZodString>;
+    }, z.core.$strip>;
+}, z.core.$strip>;
+export declare const GetNewsIntentSchema: z.ZodObject<{
+    type: z.ZodLiteral<"GET_NEWS">;
+    params: z.ZodObject<{}, z.core.$strip>;
+}, z.core.$strip>;
 export declare const UnknownIntentSchema: z.ZodObject<{
     type: z.ZodLiteral<"UNKNOWN">;
     params: z.ZodObject<{}, z.core.$strip>;
@@ -44,6 +68,26 @@ export declare const IntentSchema: z.ZodDiscriminatedUnion<[z.ZodObject<{
     params: z.ZodObject<{
         token: z.ZodOptional<z.ZodString>;
     }, z.core.$strip>;
+}, z.core.$strip>, z.ZodObject<{
+    type: z.ZodLiteral<"BRIDGE">;
+    params: z.ZodObject<{
+        fromChain: z.ZodOptional<z.ZodString>;
+        toChain: z.ZodOptional<z.ZodString>;
+        amount: z.ZodOptional<z.ZodString>;
+    }, z.core.$strip>;
+}, z.core.$strip>, z.ZodObject<{
+    type: z.ZodLiteral<"ANALYZE_WALLET">;
+    params: z.ZodObject<{
+        address: z.ZodString;
+    }, z.core.$strip>;
+}, z.core.$strip>, z.ZodObject<{
+    type: z.ZodLiteral<"GET_PRICE">;
+    params: z.ZodObject<{
+        token: z.ZodOptional<z.ZodString>;
+    }, z.core.$strip>;
+}, z.core.$strip>, z.ZodObject<{
+    type: z.ZodLiteral<"GET_NEWS">;
+    params: z.ZodObject<{}, z.core.$strip>;
 }, z.core.$strip>, z.ZodObject<{
     type: z.ZodLiteral<"UNKNOWN">;
     params: z.ZodObject<{}, z.core.$strip>;

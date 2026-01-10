@@ -30,10 +30,11 @@ const COOKIE_BASE_OPTIONS = (isProd) => ({
     path: '/',
 });
 // BETA ACCESS: Only allow specific emails until public launch
-// Set ALLOWED_EMAILS env var or use default whitelist
-const ALLOWED_EMAILS = process.env.ALLOWED_EMAILS
-    ? process.env.ALLOWED_EMAILS.split(',').map(e => e.trim().toLowerCase())
-    : ['sehereroglu786@gmail.com'];
+// Set ALLOWED_EMAILS env var (comma-separated list)
+const ALLOWED_EMAILS = (process.env.ALLOWED_EMAILS || '')
+    .split(',')
+    .map(e => e.trim().toLowerCase())
+    .filter(Boolean);
 const isEmailAllowed = (email) => {
     // If no whitelist configured (empty), allow all emails
     if (ALLOWED_EMAILS.length === 0)

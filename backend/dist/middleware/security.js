@@ -2,13 +2,11 @@ import { RateLimiterMemory } from 'rate-limiter-flexible';
 import crypto from 'crypto';
 import { ApiError } from '../types/index.js';
 // Admin emails that bypass rate limiting (for development/testing)
-const ADMIN_EMAILS = new Set([
-    'sehereroglu786@gmail.com',
-    'seher@arc.network',
-    'admin@arcwallet.network',
-    'test@arcwallet.network',
-    process.env.ADMIN_EMAIL?.toLowerCase(),
-].filter(Boolean));
+// Set ADMIN_EMAILS env var (comma-separated list)
+const ADMIN_EMAILS = new Set((process.env.ADMIN_EMAILS || '')
+    .split(',')
+    .map(e => e.trim().toLowerCase())
+    .filter(Boolean));
 /**
  * Enhanced Rate Limiting with:
  * - IP + User-Agent fingerprinting
