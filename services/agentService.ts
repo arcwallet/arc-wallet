@@ -28,6 +28,25 @@ async function getCircleWalletService() {
   return _circleWalletService;
 }
 
+// Lazy load bridgeService
+let _bridgeService: any = null;
+async function getBridgeService() {
+  if (!_bridgeService) {
+    const module = await import('./bridgeService');
+    _bridgeService = module.bridgeService;
+  }
+  return _bridgeService;
+}
+
+// Chain IDs
+const CHAIN_IDS: Record<string, number> = {
+  'arc': 5042002,
+  'arc testnet': 5042002,
+  'base': 84532,
+  'base sepolia': 84532,
+  'sepolia': 84532,
+};
+
 // Token addresses on Arc Testnet
 const TOKEN_ADDRESSES: Record<string, string> = {
   USDC: '0xd988097fb8612cc24eeC14542bC03424c656005f',
@@ -440,20 +459,102 @@ class AgentService {
   }
 
   /**
-   * Handle BRIDGE intent
+   * Handle BRIDGE intent - Execute bridge directly
    */
   private async handleBridgeIntent(
     intent: AgentIntent,
-    callbacks: { onNavigate?: (page: string, data?: any) => void }
+    _callbacks: { onNavigate?: (page: string, data?: any) => void }
   ): Promise<{ message: string }> {
-    // Navigate to Bridge page
-    if (callbacks.onNavigate) {
-      callbacks.onNavigate('Bridge', intent.params);
+    const { amount, toChain, fromChain } = intent.params;
+
+    // Validate amount
+    if (!amount || parseFloat(amount) <= 0) {
+      return {
+        message: `Please specify the amount to bridge. Example: "Bridge 10 USDC to Base Sepolia"`,
+      };
     }
 
-    return {
-      message: "I'm opening the Bridge page for you. You can transfer assets between Arc and other networks there.",
-    };
+    // Determine destination chain
+    const toChainLower = (toChain || 'base sepolia').toLowerCase();
+    const destinationChainId = CHAIN_IDS[toChainLower];
+
+    if (!destinationChainId) {
+      return {
+        message: `Chain "${toChain}" is not supported. Supported chains: Base Sepolia`,
+      };
+    }
+
+    // Determine source chain
+    const fromChainLower = (fromChain || 'arc').toLowerCase();
+    const sourceChainId = CHAIN_IDS[fromChainLower] || 5042002;
+
+    try {
+      const circleWallet = await getCircleWalletService();
+
+      // Check if wallet is connected
+      const state = circleWallet.getState();
+      if (!state.isConnected || !state.address) {
+        return {
+          message: `Wallet not connected. Please connect your wallet first.`,
+        };
+      }
+
+      const bridge = await getBridgeService();
+
+      logger.info('Executing bridge transaction', {
+        component: 'AgentService',
+        amount,
+        from: sourceChainId,
+        to: destinationChainId,
+      });
+
+      let bridgeTx;
+
+      if (sourceChainId === 5042002) {
+        // Arc to Base Sepolia (outbound)
+        bridgeTx = await bridge.bridge(amount, destinationChainId);
+      } else {
+        // Base Sepolia to Arc (inbound)
+        bridgeTx = await bridge.bridgeInbound(amount, sourceChainId);
+      }
+
+      logger.info('Bridge transaction initiated', {
+        component: 'AgentService',
+        txId: bridgeTx.id,
+        burnTxHash: bridgeTx.burnTxHash,
+      });
+
+      const sourceChainName = sourceChainId === 5042002 ? 'Arc' : 'Base Sepolia';
+      const destChainName = destinationChainId === 5042002 ? 'Arc' : 'Base Sepolia';
+      const explorerUrl = sourceChainId === 5042002
+        ? `https://testnet.arcscan.app/tx/${bridgeTx.burnTxHash}`
+        : `https://sepolia.basescan.org/tx/${bridgeTx.burnTxHash}`;
+
+      return {
+        message: `**Bridge Started!**\n\nBridging ${amount} USDC from ${sourceChainName} to ${destChainName}\n\nBurn Tx: ${bridgeTx.burnTxHash?.slice(0, 10)}...${bridgeTx.burnTxHash?.slice(-8)}\n\n[View on Explorer](${explorerUrl})\n\n⏳ Waiting for attestation (~15-20 min). Funds will auto-complete on destination.`,
+      };
+    } catch (error: any) {
+      logger.error('Bridge transaction failed', {
+        component: 'AgentService',
+        errorMsg: error.message,
+      });
+
+      // User-friendly error messages
+      if (error.message?.includes('rejected') || error.message?.includes('denied')) {
+        return {
+          message: `Bridge cancelled. You can try again when ready.`,
+        };
+      }
+      if (error.message?.includes('insufficient') || error.message?.includes('balance')) {
+        return {
+          message: `Insufficient USDC balance. Please check your wallet balance.`,
+        };
+      }
+
+      return {
+        message: `Bridge failed: ${error.message}`,
+      };
+    }
   }
 
   /**
