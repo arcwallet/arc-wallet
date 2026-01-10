@@ -10,6 +10,16 @@ const SendIntentSchema = z.object({
         recipient: z.string(),
     }),
 });
+const ScheduledSendIntentSchema = z.object({
+    type: z.literal('SCHEDULED_SEND'),
+    params: z.object({
+        token: z.string(),
+        amount: z.string(),
+        recipient: z.string(),
+        delayMinutes: z.number(),
+        scheduledTime: z.string().optional(),
+    }),
+});
 const SwapIntentSchema = z.object({
     type: z.literal('SWAP'),
     params: z.object({
@@ -54,6 +64,7 @@ const UnknownIntentSchema = z.object({
 });
 const IntentSchema = z.discriminatedUnion('type', [
     SendIntentSchema,
+    ScheduledSendIntentSchema,
     SwapIntentSchema,
     CheckBalanceIntentSchema,
     BridgeIntentSchema,
@@ -98,10 +109,17 @@ YOUR ONLY JOB: Extract structured data from user messages. Language doesn't matt
 
 ## INTENTS AND REQUIRED ENTITIES:
 
-SEND: Transfer tokens
+SEND: Transfer tokens (immediate)
 - amount: number (REQUIRED - extract from anywhere in text)
 - token: string (default "USDC" if not mentioned)
 - recipient: 0x address (REQUIRED - 42 char hex string)
+
+SCHEDULED_SEND: Transfer tokens at a future time
+- amount: number (REQUIRED)
+- token: string (default "USDC")
+- recipient: 0x address (REQUIRED)
+- delayMinutes: number (REQUIRED - convert time expressions: "10 dk" = 10, "1 saat" = 60, "yarın" = 1440)
+- Use this when user says: "X dakika/saat sonra", "later", "sonra", "after X minutes"
 
 SWAP: Exchange tokens
 - amount: number (REQUIRED)

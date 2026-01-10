@@ -7,6 +7,15 @@ declare const IntentSchema: z.ZodDiscriminatedUnion<[z.ZodObject<{
         recipient: z.ZodString;
     }, z.core.$strip>;
 }, z.core.$strip>, z.ZodObject<{
+    type: z.ZodLiteral<"SCHEDULED_SEND">;
+    params: z.ZodObject<{
+        token: z.ZodString;
+        amount: z.ZodString;
+        recipient: z.ZodString;
+        delayMinutes: z.ZodNumber;
+        scheduledTime: z.ZodOptional<z.ZodString>;
+    }, z.core.$strip>;
+}, z.core.$strip>, z.ZodObject<{
     type: z.ZodLiteral<"SWAP">;
     params: z.ZodObject<{
         fromToken: z.ZodString;

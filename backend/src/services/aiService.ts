@@ -12,6 +12,17 @@ export const SendIntentSchema = z.object({
     }),
 });
 
+export const ScheduledSendIntentSchema = z.object({
+    type: z.literal('SCHEDULED_SEND'),
+    params: z.object({
+        token: z.string(),
+        amount: z.string(),
+        recipient: z.string(),
+        delayMinutes: z.number(),
+        scheduledTime: z.string().optional(),
+    }),
+});
+
 export const SwapIntentSchema = z.object({
     type: z.literal('SWAP'),
     params: z.object({
@@ -63,6 +74,7 @@ export const UnknownIntentSchema = z.object({
 
 export const IntentSchema = z.discriminatedUnion('type', [
     SendIntentSchema,
+    ScheduledSendIntentSchema,
     SwapIntentSchema,
     CheckBalanceIntentSchema,
     BridgeIntentSchema,

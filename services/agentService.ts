@@ -236,6 +236,7 @@ const TOKEN_ADDRESSES: Record<string, string> = {
 
 export type IntentType =
   | 'SEND'
+  | 'SCHEDULED_SEND'
   | 'SWAP'
   | 'BRIDGE'
   | 'CHECK_BALANCE'
@@ -243,6 +244,23 @@ export type IntentType =
   | 'GET_PRICE'
   | 'GET_NEWS'
   | 'UNKNOWN';
+
+// Scheduled transactions storage
+interface ScheduledTransaction {
+  id: string;
+  type: 'SEND';
+  params: {
+    token: string;
+    amount: string;
+    recipient: string;
+  };
+  scheduledAt: number;
+  executeAt: number;
+  status: 'pending' | 'executed' | 'failed' | 'cancelled';
+}
+
+// In-memory storage for scheduled transactions (in production, use persistent storage)
+const scheduledTransactions: Map<string, ScheduledTransaction> = new Map();
 
 export interface AgentIntent {
   type: IntentType;
@@ -283,6 +301,7 @@ const DEFAULT_POLICY: AgentPolicy = {
   requirePasskey: true,     // Always require passkey
   allowedIntents: [
     'SEND',
+    'SCHEDULED_SEND',
     'SWAP',
     'BRIDGE',
     'CHECK_BALANCE',
@@ -793,6 +812,9 @@ class AgentService {
       case 'SEND':
         return this.handleSendIntent(intent, callbacks);
 
+      case 'SCHEDULED_SEND':
+        return this.handleScheduledSendIntent(intent);
+
       case 'SWAP':
         return this.handleSwapIntent(intent, callbacks);
 
@@ -965,6 +987,150 @@ _"bridge 10 usdc to base sepolia"_`;
 
       return {
         message: `Transaction failed: ${error.message}`,
+      };
+    }
+  }
+
+  /**
+   * Handle SCHEDULED_SEND intent - Schedule a transaction for later
+   */
+  private async handleScheduledSendIntent(
+    intent: AgentIntent
+  ): Promise<{ message: string }> {
+    const { token = 'USDC', amount, recipient, delayMinutes } = intent.params;
+
+    // Validate recipient address
+    if (!recipient || !recipient.match(/^0x[a-fA-F0-9]{40}$/)) {
+      return {
+        message: this.t(
+          'Lütfen geçerli bir alıcı adresi belirtin.',
+          'Please provide a valid recipient address.'
+        ),
+      };
+    }
+
+    // Validate amount
+    if (!amount || parseFloat(amount) <= 0) {
+      return {
+        message: this.t(
+          'Lütfen gönderilecek miktarı belirtin.',
+          'Please specify the amount to send.'
+        ),
+      };
+    }
+
+    // Validate delay
+    const delay = parseInt(delayMinutes) || 0;
+    if (delay <= 0) {
+      return {
+        message: this.t(
+          'Lütfen geçerli bir süre belirtin. Örnek: "10 dakika sonra"',
+          'Please specify a valid delay. Example: "in 10 minutes"'
+        ),
+      };
+    }
+
+    try {
+      const circleWallet = await getCircleWalletService();
+      const state = circleWallet.getState();
+
+      if (!state.isConnected || !state.address) {
+        return {
+          message: this.t(
+            'Cüzdan bağlı değil. Lütfen önce cüzdanınızı bağlayın.',
+            'Wallet not connected. Please connect your wallet first.'
+          ),
+        };
+      }
+
+      // Create scheduled transaction
+      const txId = `scheduled_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+      const now = Date.now();
+      const executeAt = now + (delay * 60 * 1000);
+
+      const scheduledTx: ScheduledTransaction = {
+        id: txId,
+        type: 'SEND',
+        params: {
+          token: token.toUpperCase(),
+          amount,
+          recipient,
+        },
+        scheduledAt: now,
+        executeAt,
+        status: 'pending',
+      };
+
+      scheduledTransactions.set(txId, scheduledTx);
+
+      // Schedule execution
+      setTimeout(async () => {
+        const tx = scheduledTransactions.get(txId);
+        if (!tx || tx.status !== 'pending') return;
+
+        try {
+          logger.info('Executing scheduled transaction', {
+            component: 'AgentService',
+            txId,
+            ...tx.params,
+          });
+
+          const tokenAddress = TOKEN_ADDRESSES[tx.params.token];
+          const wallet = await getCircleWalletService();
+
+          if (tx.params.token === 'ARC') {
+            const amountWei = BigInt(Math.floor(parseFloat(tx.params.amount) * 1e18));
+            await wallet.sendTransaction({
+              to: tx.params.recipient,
+              value: amountWei,
+            });
+          } else {
+            await wallet.sendTokenTransfer({
+              tokenAddress,
+              to: tx.params.recipient,
+              amount: tx.params.amount,
+              decimals: 6,
+            });
+          }
+
+          tx.status = 'executed';
+          logger.info('Scheduled transaction executed', { component: 'AgentService', txId });
+        } catch (error: any) {
+          tx.status = 'failed';
+          logger.error('Scheduled transaction failed', {
+            component: 'AgentService',
+            txId,
+            error: error.message,
+          });
+        }
+      }, delay * 60 * 1000);
+
+      const executeTime = new Date(executeAt).toLocaleTimeString();
+      const shortRecipient = `${recipient.slice(0, 6)}...${recipient.slice(-4)}`;
+
+      logger.info('Transaction scheduled', {
+        component: 'AgentService',
+        txId,
+        executeAt: new Date(executeAt).toISOString(),
+      });
+
+      return {
+        message: this.t(
+          `**İşlem Zamanlandı**\n\n${amount} ${token.toUpperCase()} ${shortRecipient} adresine ${delay} dakika sonra (${executeTime}) gönderilecek.\n\nİşlem ID: ${txId.slice(0, 12)}...`,
+          `**Transaction Scheduled**\n\n${amount} ${token.toUpperCase()} will be sent to ${shortRecipient} in ${delay} minutes (at ${executeTime}).\n\nTransaction ID: ${txId.slice(0, 12)}...`
+        ),
+      };
+    } catch (error: any) {
+      logger.error('Schedule transaction failed', {
+        component: 'AgentService',
+        error: error.message,
+      });
+
+      return {
+        message: this.t(
+          `İşlem zamanlanamadı: ${error.message}`,
+          `Failed to schedule transaction: ${error.message}`
+        ),
       };
     }
   }
