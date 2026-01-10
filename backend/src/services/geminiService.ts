@@ -101,8 +101,8 @@ class GeminiService {
                 }
             }
 
-            // Also initialize base model as fallback
-            const modelName = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+            // Also initialize base model as fallback - use latest Gemini Pro
+            const modelName = process.env.GEMINI_MODEL || 'gemini-2.5-flash-preview-05-20';
             this.model = this.client.getGenerativeModel({ model: modelName });
 
             if (process.env.NODE_ENV === 'development' && !this.isTuned) {

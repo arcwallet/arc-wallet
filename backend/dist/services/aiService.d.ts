@@ -98,8 +98,24 @@ export interface AgentResponse {
     intent: Intent;
     confidence: number;
 }
+type AIProvider = 'openai-finetuned' | 'openai' | 'gemini' | 'mock';
 declare class AIService {
+    private openai;
+    private provider;
+    private fineTunedModel;
+    constructor();
+    private initializeProviders;
+    getProvider(): AIProvider;
     parseIntent(message: string): Promise<AgentResponse>;
+    /**
+     * Parse with fine-tuned model - BEST ACCURACY
+     * The model was trained specifically for crypto wallet intents
+     */
+    private parseWithFineTunedModel;
+    /**
+     * Parse with standard OpenAI model
+     */
+    private parseWithOpenAI;
     isReady(): boolean;
 }
 export declare const aiService: AIService;

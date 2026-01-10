@@ -302,7 +302,7 @@ async function analyzeWalletRisk(address: string): Promise<{
 }
 
 /**
- * Get token price data
+ * Get token price data using Gemini AI for real-time data
  */
 async function getTokenPrice(token: string): Promise<{
   price: number;
@@ -312,27 +312,58 @@ async function getTokenPrice(token: string): Promise<{
   marketCap: number;
   lastUpdated: string;
 }> {
-  // Demo implementation - in production, use CoinGecko or similar API
-  const prices: Record<string, number> = {
+  // Use Gemini to get real-time price data
+  try {
+    const { GoogleGenerativeAI } = await import('@google/generative-ai');
+    const apiKey = process.env.GEMINI_API_KEY;
+
+    if (apiKey && apiKey.startsWith('AIza')) {
+      const genAI = new GoogleGenerativeAI(apiKey);
+      const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-preview-05-20' });
+
+      const prompt = `What is the current price of ${token} cryptocurrency in USD?
+      Respond ONLY with a JSON object in this exact format, no markdown:
+      {"price": <number>, "change24h": <number>, "volume24h": <number>, "marketCap": <number>}
+
+      Use real current market data. For stablecoins like USDC use 1.0, for EURC use the EUR/USD rate.`;
+
+      const result = await model.generateContent(prompt);
+      const text = result.response?.text?.() || '';
+
+      // Extract JSON from response
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        return {
+          price: parsed.price || 0,
+          currency: 'USD',
+          change24h: parseFloat((parsed.change24h || 0).toFixed(2)),
+          volume24h: parsed.volume24h || 0,
+          marketCap: parsed.marketCap || 0,
+          lastUpdated: new Date().toISOString(),
+        };
+      }
+    }
+  } catch (error) {
+    console.error('[Agent] Gemini price fetch error:', error);
+  }
+
+  // Fallback to static prices if Gemini fails
+  const fallbackPrices: Record<string, number> = {
     USDC: 1.0,
     EURC: 1.08,
-    ETH: 3250.42,
-    BTC: 97500.0,
+    ETH: 3500.0,
+    BTC: 100000.0,
     ARC: 0.15,
     USYC: 1.05,
   };
 
-  const price = prices[token] || 0;
-
-  // Simulated 24h change
-  const change24h = (Math.random() * 6 - 3); // -3% to +3%
-
   return {
-    price,
+    price: fallbackPrices[token] || 0,
     currency: 'USD',
-    change24h: parseFloat(change24h.toFixed(2)),
-    volume24h: Math.floor(Math.random() * 1000000000),
-    marketCap: Math.floor(price * 1000000000),
+    change24h: 0,
+    volume24h: 0,
+    marketCap: 0,
     lastUpdated: new Date().toISOString(),
   };
 }

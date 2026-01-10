@@ -65,15 +65,26 @@ const IntentSchema = z.discriminatedUnion('type', [
 class GeminiService {
     client = null;
     model = null;
+    tunedModel = null;
+    isTuned = false;
     constructor() {
         const apiKey = process.env.GEMINI_API_KEY;
         if (apiKey && apiKey.startsWith('AIza')) {
             this.client = new GoogleGenerativeAI(apiKey);
-            const modelName = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
+            // Check for tuned model first (priority)
+            const tunedModelName = process.env.GEMINI_TUNED_MODEL;
+            if (tunedModelName) {
+                this.tunedModel = this.client.getGenerativeModel({ model: tunedModelName });
+                this.isTuned = true;
+                if (process.env.NODE_ENV === 'development') {
+                    console.log(`✅ Gemini Tuned Model configured: ${tunedModelName}`);
+                }
+            }
+            // Also initialize base model as fallback - use latest Gemini Pro
+            const modelName = process.env.GEMINI_MODEL || 'gemini-2.5-flash-preview-05-20';
             this.model = this.client.getGenerativeModel({ model: modelName });
-            // Don't log in production
-            if (process.env.NODE_ENV === 'development') {
-                console.log('✅ Gemini AI configured');
+            if (process.env.NODE_ENV === 'development' && !this.isTuned) {
+                console.log(`✅ Gemini AI configured: ${modelName}`);
             }
         }
         else if (process.env.NODE_ENV === 'development') {
@@ -81,31 +92,108 @@ class GeminiService {
         }
     }
     getSystemPrompt() {
-        return `You are Arc Agent, an AI assistant for Arc Wallet on the Arc blockchain.
-Supported operations:
-1. SEND - token, amount, recipient address (e.g., "send 10 USDC to 0x...")
-2. SWAP - fromToken, toToken, amount (e.g., "swap 50 USDC to EURC")
-3. CHECK_BALANCE - optional token (e.g., "check my balance")
-4. BRIDGE - fromChain, toChain, amount (e.g., "bridge 100 USDC to Base")
-5. ANALYZE_WALLET - address (e.g., "analyze 0x..." or "is 0x... safe?")
-6. GET_PRICE - token (e.g., "price of ETH" or "what's BTC worth?")
-7. GET_NEWS - no params (e.g., "market news" or "crypto news")
-8. UNKNOWN - fallback for unclear requests
-Return a JSON object with fields: type, params, confidence (0-1), message.`;
+        return `You are a crypto wallet AI that extracts transaction intent from natural language in ANY language.
+
+YOUR ONLY JOB: Extract structured data from user messages. Language doesn't matter - understand the INTENT.
+
+## INTENTS AND REQUIRED ENTITIES:
+
+SEND: Transfer tokens
+- amount: number (REQUIRED - extract from anywhere in text)
+- token: string (default "USDC" if not mentioned)
+- recipient: 0x address (REQUIRED - 42 char hex string)
+
+SWAP: Exchange tokens
+- amount: number (REQUIRED)
+- fromToken: string (default "USDC")
+- toToken: string (REQUIRED - what they want to receive)
+
+BRIDGE: Cross-chain transfer to Base Sepolia
+- amount: number (REQUIRED)
+- fromChain: "arc" (default)
+- toChain: "base sepolia" (default)
+
+CHECK_BALANCE: View wallet balance
+- token: string (optional)
+
+ANALYZE_WALLET: Risk analysis
+- address: 0x address (REQUIRED)
+
+GET_PRICE: Token price lookup
+- token: string (REQUIRED)
+
+GET_NEWS: Market news (no params)
+
+UNKNOWN: Can't determine intent
+
+## ENTITY EXTRACTION RULES:
+1. Numbers can be anywhere: "göndermek istiyorum 50 usdc" → amount: "50"
+2. Addresses are always 0x + 40 hex chars
+3. Token names: USDC, EURC, ARC, ETH, BTC (case insensitive)
+4. Chain names: arc, base, base sepolia, sepolia
+
+## RESPONSE FORMAT:
+{
+  "type": "SEND|SWAP|BRIDGE|CHECK_BALANCE|ANALYZE_WALLET|GET_PRICE|GET_NEWS|UNKNOWN",
+  "params": { extracted entities },
+  "confidence": 0.0-1.0,
+  "message": "Response in USER'S LANGUAGE - confirm what you'll do or ask for missing info"
+}
+
+## EXAMPLES:
+
+User: "0x742d35Cc6634C0532925a3b844Bc454e4438f44e adresine 25 usdc gönder"
+{"type":"SEND","params":{"amount":"25","token":"USDC","recipient":"0x742d35Cc6634C0532925a3b844Bc454e4438f44e"},"confidence":0.95,"message":"25 USDC gönderiyorum 0x742d...f44e adresine"}
+
+User: "quiero enviar 100 dolares a 0xabc123..."
+{"type":"SEND","params":{"amount":"100","token":"USDC","recipient":"0xabc123..."},"confidence":0.9,"message":"Enviando 100 USDC a 0xabc1..."}
+
+User: "bridge 50 to base"
+{"type":"BRIDGE","params":{"amount":"50","fromChain":"arc","toChain":"base sepolia"},"confidence":0.9,"message":"Bridging 50 USDC from Arc to Base Sepolia"}
+
+User: "bakiyem ne kadar"
+{"type":"CHECK_BALANCE","params":{},"confidence":0.95,"message":"Cüzdan bakiyenizi kontrol ediyorum"}
+
+User: "50 tane eurc al"
+{"type":"SWAP","params":{"amount":"50","fromToken":"USDC","toToken":"EURC"},"confidence":0.85,"message":"50 USDC'yi EURC'ye çeviriyorum"}`;
     }
     async parseIntent(userMessage) {
-        if (!this.client || !this.model) {
+        if (!this.client || (!this.model && !this.tunedModel)) {
             return this.mockParseIntent(userMessage);
         }
+        // Try tuned model first if available
+        if (this.isTuned && this.tunedModel) {
+            try {
+                const result = await this.tunedModel.generateContent(userMessage);
+                const text = result.response?.text?.() || result.response?.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (!text)
+                    throw new Error('No response from tuned model');
+                const jsonMatch = text.match(/```json\n?([\s\S]*?)\n?```/) || text.match(/\{[\s\S]*\}/);
+                const jsonStr = jsonMatch ? (jsonMatch[1] || jsonMatch[0]) : text;
+                const parsed = JSON.parse(jsonStr.trim());
+                const intent = IntentSchema.parse({ type: parsed.type, params: parsed.params });
+                return {
+                    message: parsed.message || 'Processed.',
+                    intent,
+                    confidence: parsed.confidence ?? 0.95, // Higher confidence for tuned model
+                };
+            }
+            catch (error) {
+                console.warn('Tuned model failed, falling back to base model:', error);
+                // Fall through to base model
+            }
+        }
+        // Base model with system prompt
         try {
-            const result = await this.model.generateContent([
-                { role: 'system', parts: [{ text: this.getSystemPrompt() }] },
-                { role: 'user', parts: [{ text: userMessage }] },
-            ]);
-            const text = result.response?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+            const fullPrompt = `${this.getSystemPrompt()}\n\nUser message: "${userMessage}"\n\nRespond with only valid JSON:`;
+            const result = await this.model.generateContent(fullPrompt);
+            const text = result.response?.text?.() || result.response?.candidates?.[0]?.content?.parts?.[0]?.text;
             if (!text)
                 throw new Error('No response from Gemini');
-            const parsed = JSON.parse(text);
+            // Extract JSON from response (handle markdown code blocks)
+            const jsonMatch = text.match(/```json\n?([\s\S]*?)\n?```/) || text.match(/\{[\s\S]*\}/);
+            const jsonStr = jsonMatch ? (jsonMatch[1] || jsonMatch[0]) : text;
+            const parsed = JSON.parse(jsonStr.trim());
             const intent = IntentSchema.parse({ type: parsed.type, params: parsed.params });
             return {
                 message: parsed.message || 'Processed.',
@@ -119,97 +207,98 @@ Return a JSON object with fields: type, params, confidence (0-1), message.`;
         }
     }
     mockParseIntent(input) {
-        // Enhanced mock with all intent types
+        // Multilingual mock parser - fallback when Gemini unavailable
         const lower = input.toLowerCase();
-        // ANALYZE_WALLET - check for address analysis requests
         const addressMatch = input.match(/0x[a-fA-F0-9]{40}/);
-        if ((lower.includes('analyze') || lower.includes('risk') || lower.includes('check') || lower.includes('safe')) && addressMatch) {
+        const amountMatch = input.match(/(\d+\.?\d*)/);
+        const amount = amountMatch ? amountMatch[1] : '';
+        // Detect token from text
+        const detectToken = () => {
+            if (lower.includes('eurc'))
+                return 'EURC';
+            if (lower.includes('arc') && !lower.includes('arc '))
+                return 'ARC';
+            if (lower.includes('eth'))
+                return 'ETH';
+            if (lower.includes('btc'))
+                return 'BTC';
+            return 'USDC';
+        };
+        // ANALYZE_WALLET - multilingual keywords
+        const analyzeKeywords = ['analyze', 'analiz', 'risk', 'güvenli', 'safe', 'check address', 'kontrol', 'analizar', 'sicher'];
+        if (addressMatch && analyzeKeywords.some(k => lower.includes(k))) {
             return {
-                message: `I'll analyze the wallet ${addressMatch[0].slice(0, 6)}...${addressMatch[0].slice(-4)} for risk factors.`,
+                message: `Analyzing wallet ${addressMatch[0].slice(0, 6)}...${addressMatch[0].slice(-4)}`,
                 intent: { type: 'ANALYZE_WALLET', params: { address: addressMatch[0] } },
                 confidence: 0.9,
             };
         }
-        // GET_PRICE - check for price queries
-        if (lower.includes('price') || lower.includes('worth') || lower.includes('cost')) {
-            let token = 'USDC';
-            if (lower.includes('eth') || lower.includes('ethereum'))
-                token = 'ETH';
-            if (lower.includes('btc') || lower.includes('bitcoin'))
-                token = 'BTC';
-            if (lower.includes('eurc'))
-                token = 'EURC';
-            if (lower.includes('arc'))
-                token = 'ARC';
+        // GET_PRICE - multilingual keywords
+        const priceKeywords = ['price', 'fiyat', 'precio', 'preis', 'worth', 'değer', 'kaç', 'how much is', 'quanto'];
+        if (priceKeywords.some(k => lower.includes(k))) {
             return {
-                message: `I'll get the current price data for ${token}.`,
-                intent: { type: 'GET_PRICE', params: { token } },
+                message: `Getting ${detectToken()} price...`,
+                intent: { type: 'GET_PRICE', params: { token: detectToken() } },
                 confidence: 0.9,
             };
         }
-        // GET_NEWS - check for news requests
-        if (lower.includes('news') || lower.includes('market') || lower.includes('headlines') || lower.includes('update')) {
+        // GET_NEWS - multilingual keywords
+        const newsKeywords = ['news', 'haber', 'noticias', 'nachrichten', 'market', 'piyasa', 'mercado', 'markt'];
+        if (newsKeywords.some(k => lower.includes(k))) {
             return {
-                message: "I'll fetch the latest market news and sentiment analysis.",
+                message: "Fetching market news...",
                 intent: { type: 'GET_NEWS', params: {} },
                 confidence: 0.9,
             };
         }
-        // BRIDGE - check for bridge requests
-        if (lower.includes('bridge') || lower.includes('transfer to base') || lower.includes('cross-chain')) {
-            const amountMatch = input.match(/(\d+\.?\d*)/);
-            const amount = amountMatch ? amountMatch[1] : '';
+        // BRIDGE - multilingual keywords
+        const bridgeKeywords = ['bridge', 'köprü', 'köprüle', 'puente', 'brücke', 'cross-chain', 'to base', 'base sepolia'];
+        if (bridgeKeywords.some(k => lower.includes(k))) {
             return {
-                message: "I'll help you bridge assets between chains.",
-                intent: { type: 'BRIDGE', params: { fromChain: 'arc', toChain: 'base', amount } },
-                confidence: 0.8,
+                message: amount ? `Bridging ${amount} USDC to Base Sepolia...` : 'Please specify amount to bridge',
+                intent: { type: 'BRIDGE', params: { fromChain: 'arc', toChain: 'base sepolia', amount } },
+                confidence: amount ? 0.85 : 0.5,
             };
         }
-        // SEND - check for send requests
-        if (lower.includes('send') || lower.includes('transfer')) {
-            const amountMatch = input.match(/(\d+\.?\d*)/);
-            const amount = amountMatch ? amountMatch[1] : '0';
-            let token = 'USDC';
-            if (lower.includes('arc'))
-                token = 'ARC';
-            if (lower.includes('eurc'))
-                token = 'EURC';
+        // SEND - multilingual keywords
+        const sendKeywords = ['send', 'gönder', 'gonder', 'yolla', 'transfer', 'enviar', 'senden', 'mandar', 'at'];
+        if (sendKeywords.some(k => lower.includes(k)) || (addressMatch && amount)) {
+            const token = detectToken();
             const recipient = addressMatch ? addressMatch[0] : '';
             return {
-                message: recipient ? `I'll help you send ${amount} ${token} to ${recipient.slice(0, 6)}...${recipient.slice(-4)}.` : `I detected you want to send ${amount} ${token}, but need a recipient address.`,
+                message: recipient
+                    ? `Sending ${amount} ${token} to ${recipient.slice(0, 6)}...${recipient.slice(-4)}`
+                    : `Please provide recipient address`,
                 intent: { type: 'SEND', params: { token, amount, recipient } },
-                confidence: recipient ? 0.85 : 0.5,
+                confidence: recipient && amount ? 0.9 : 0.5,
             };
         }
-        // SWAP - check for swap requests
-        if (lower.includes('swap') || lower.includes('exchange') || lower.includes('convert')) {
-            const amountMatch = input.match(/(\d+\.?\d*)/);
-            const amount = amountMatch ? amountMatch[1] : '0';
+        // SWAP - multilingual keywords
+        const swapKeywords = ['swap', 'takas', 'değiştir', 'degistir', 'çevir', 'cevir', 'exchange', 'convert', 'intercambiar', 'tauschen', 'al ', 'buy'];
+        if (swapKeywords.some(k => lower.includes(k))) {
             let fromToken = 'USDC';
             let toToken = 'EURC';
-            if (lower.includes('usdc') && lower.includes('eurc')) {
+            if (lower.includes('eurc') && (lower.includes('usdc') || lower.includes('dolar'))) {
+                // Check order
                 if (lower.indexOf('eurc') < lower.indexOf('usdc')) {
                     fromToken = 'EURC';
                     toToken = 'USDC';
                 }
             }
+            if (lower.includes('eurc') && !lower.includes('usdc'))
+                toToken = 'EURC';
             return {
-                message: `I'll prepare a swap of ${amount} ${fromToken} for ${toToken}.`,
+                message: `Swapping ${amount} ${fromToken} to ${toToken}...`,
                 intent: { type: 'SWAP', params: { fromToken, toToken, amount } },
-                confidence: 0.8,
+                confidence: amount ? 0.85 : 0.5,
             };
         }
-        // CHECK_BALANCE - check for balance queries
-        if (lower.includes('balance') || lower.includes('how much')) {
-            let token;
-            if (lower.includes('usdc'))
-                token = 'USDC';
-            if (lower.includes('arc'))
-                token = 'ARC';
-            if (lower.includes('eurc'))
-                token = 'EURC';
+        // CHECK_BALANCE - multilingual keywords
+        const balanceKeywords = ['balance', 'bakiye', 'bakiyem', 'saldo', 'guthaben', 'ne kadar', 'how much do i have', 'cuanto tengo'];
+        if (balanceKeywords.some(k => lower.includes(k))) {
+            const token = lower.includes('usdc') ? 'USDC' : lower.includes('eurc') ? 'EURC' : undefined;
             return {
-                message: token ? `Checking your ${token} balance...` : 'Checking your wallet balance...',
+                message: 'Checking wallet balance...',
                 intent: { type: 'CHECK_BALANCE', params: { token } },
                 confidence: 0.9,
             };

@@ -51,6 +51,8 @@ export interface AgentResponse {
 declare class GeminiService {
     private client;
     private model;
+    private tunedModel;
+    private isTuned;
     constructor();
     private getSystemPrompt;
     parseIntent(userMessage: string): Promise<AgentResponse>;

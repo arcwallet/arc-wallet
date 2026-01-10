@@ -76,14 +76,14 @@ export declare const schemas: {
     }, z.core.$strip>;
     bridgeStart: z.ZodObject<{
         sourceChain: z.ZodEnum<{
-            ethereum: "ethereum";
             arc: "arc";
             sepolia: "sepolia";
+            ethereum: "ethereum";
         }>;
         destinationChain: z.ZodEnum<{
-            ethereum: "ethereum";
             arc: "arc";
             sepolia: "sepolia";
+            ethereum: "ethereum";
         }>;
         amount: z.ZodString;
         token: z.ZodString;
