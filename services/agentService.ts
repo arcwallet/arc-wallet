@@ -18,6 +18,23 @@ import {
 } from './x402Client';
 import { logger } from './logger';
 
+// Lazy load circleWalletService to avoid module crash
+let _circleWalletService: any = null;
+async function getCircleWalletService() {
+  if (!_circleWalletService) {
+    const module = await import('./circleWalletService');
+    _circleWalletService = module.circleWalletService;
+  }
+  return _circleWalletService;
+}
+
+// Token addresses on Arc Testnet
+const TOKEN_ADDRESSES: Record<string, string> = {
+  USDC: '0xd988097fb8612cc24eeC14542bC03424c656005f',
+  EURC: '0x08210F9170F89Ab7658F0B5E3fF39b0E03C594D4',
+  ARC: '0x0000000000000000000000000000000000000000', // Native token
+};
+
 // ============================================
 // Types
 // ============================================
@@ -297,31 +314,107 @@ class AgentService {
   }
 
   /**
-   * Handle SEND intent
+   * Handle SEND intent - Execute transaction directly
    */
   private async handleSendIntent(
     intent: AgentIntent,
-    callbacks: { onNavigate?: (page: string, data?: any) => void }
+    _callbacks: { onNavigate?: (page: string, data?: any) => void }
   ): Promise<{ message: string }> {
-    const { token, amount, recipient } = intent.params;
+    const { token = 'USDC', amount, recipient } = intent.params;
 
-    if (!recipient) {
+    // Validate recipient address
+    if (!recipient || !recipient.match(/^0x[a-fA-F0-9]{40}$/)) {
       return {
-        message: `I'll help you send ${amount || ''} ${token || 'tokens'}. Please provide the recipient address.`,
+        message: `Please provide a valid recipient address. Example: "Send 10 USDC to 0x742d35Cc6634C0532925a3b844Bc454e4438f44e"`,
       };
     }
 
-    // Navigate to Send page with pre-filled data
-    if (callbacks.onNavigate) {
-      callbacks.onNavigate('Send', {
-        type: 'SEND',
-        params: { token, amount, recipient },
-      });
+    // Validate amount
+    if (!amount || parseFloat(amount) <= 0) {
+      return {
+        message: `Please specify the amount to send. Example: "Send 10 ${token} to ${recipient.slice(0, 6)}...${recipient.slice(-4)}"`,
+      };
     }
 
-    return {
-      message: `I'm preparing to send ${amount} ${token} to ${recipient.slice(0, 6)}...${recipient.slice(-4)}. Please review and confirm on the Send page.`,
-    };
+    // Get token address
+    const tokenUpper = token.toUpperCase();
+    const tokenAddress = TOKEN_ADDRESSES[tokenUpper];
+    if (!tokenAddress && tokenUpper !== 'ARC') {
+      return {
+        message: `Token "${token}" is not supported. Supported tokens: USDC, EURC, ARC`,
+      };
+    }
+
+    try {
+      const circleWallet = await getCircleWalletService();
+
+      // Check if wallet is connected
+      const state = circleWallet.getState();
+      if (!state.isConnected || !state.address) {
+        return {
+          message: `Wallet not connected. Please connect your wallet first.`,
+        };
+      }
+
+      logger.info('Executing send transaction', {
+        component: 'AgentService',
+        token: tokenUpper,
+        amount,
+        recipient,
+      });
+
+      let txHash: string;
+
+      if (tokenUpper === 'ARC') {
+        // Send native ARC token
+        const amountWei = BigInt(Math.floor(parseFloat(amount) * 1e18));
+        txHash = await circleWallet.sendTransaction({
+          to: recipient,
+          value: amountWei,
+        });
+      } else {
+        // Send ERC20 token
+        txHash = await circleWallet.sendTokenTransfer({
+          tokenAddress,
+          to: recipient,
+          amount,
+          decimals: tokenUpper === 'USDC' || tokenUpper === 'EURC' ? 6 : 18,
+        });
+      }
+
+      logger.info('Send transaction successful', {
+        component: 'AgentService',
+        txHash,
+      });
+
+      const shortRecipient = `${recipient.slice(0, 6)}...${recipient.slice(-4)}`;
+      const explorerUrl = `https://testnet.arcscan.app/tx/${txHash}`;
+
+      return {
+        message: `**Transaction Sent!**\n\nSent ${amount} ${tokenUpper} to ${shortRecipient}\n\nTx: ${txHash.slice(0, 10)}...${txHash.slice(-8)}\n\n[View on Explorer](${explorerUrl})`,
+      };
+    } catch (error: any) {
+      logger.error('Send transaction failed', {
+        component: 'AgentService',
+        errorMsg: error.message,
+      });
+
+      // User-friendly error messages
+      if (error.message?.includes('rejected') || error.message?.includes('denied')) {
+        return {
+          message: `Transaction cancelled. You can try again when ready.`,
+        };
+      }
+      if (error.message?.includes('insufficient')) {
+        return {
+          message: `Insufficient ${tokenUpper} balance. Please check your wallet balance.`,
+        };
+      }
+
+      return {
+        message: `Transaction failed: ${error.message}`,
+      };
+    }
   }
 
   /**
