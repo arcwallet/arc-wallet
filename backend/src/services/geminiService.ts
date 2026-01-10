@@ -83,16 +83,30 @@ export interface AgentResponse {
 class GeminiService {
     private client: any = null;
     private model: any = null;
+    private tunedModel: any = null;
+    private isTuned: boolean = false;
 
     constructor() {
         const apiKey = process.env.GEMINI_API_KEY;
         if (apiKey && apiKey.startsWith('AIza')) {
             this.client = new GoogleGenerativeAI(apiKey);
+
+            // Check for tuned model first (priority)
+            const tunedModelName = process.env.GEMINI_TUNED_MODEL;
+            if (tunedModelName) {
+                this.tunedModel = this.client.getGenerativeModel({ model: tunedModelName });
+                this.isTuned = true;
+                if (process.env.NODE_ENV === 'development') {
+                    console.log(`✅ Gemini Tuned Model configured: ${tunedModelName}`);
+                }
+            }
+
+            // Also initialize base model as fallback
             const modelName = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
             this.model = this.client.getGenerativeModel({ model: modelName });
-            // Don't log in production
-            if (process.env.NODE_ENV === 'development') {
-                console.log('✅ Gemini AI configured');
+
+            if (process.env.NODE_ENV === 'development' && !this.isTuned) {
+                console.log(`✅ Gemini AI configured: ${modelName}`);
             }
         } else if (process.env.NODE_ENV === 'development') {
             console.warn('⚠️ GEMINI_API_KEY not configured. Using mock responses.');
@@ -167,11 +181,35 @@ User: "50 tane eurc al"
     }
 
     async parseIntent(userMessage: string): Promise<AgentResponse> {
-        if (!this.client || !this.model) {
+        if (!this.client || (!this.model && !this.tunedModel)) {
             return this.mockParseIntent(userMessage);
         }
+
+        // Try tuned model first if available
+        if (this.isTuned && this.tunedModel) {
+            try {
+                const result = await this.tunedModel.generateContent(userMessage);
+                const text = result.response?.text?.() || result.response?.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (!text) throw new Error('No response from tuned model');
+
+                const jsonMatch = text.match(/```json\n?([\s\S]*?)\n?```/) || text.match(/\{[\s\S]*\}/);
+                const jsonStr = jsonMatch ? (jsonMatch[1] || jsonMatch[0]) : text;
+                const parsed = JSON.parse(jsonStr.trim());
+
+                const intent = IntentSchema.parse({ type: parsed.type, params: parsed.params });
+                return {
+                    message: parsed.message || 'Processed.',
+                    intent,
+                    confidence: parsed.confidence ?? 0.95, // Higher confidence for tuned model
+                };
+            } catch (error) {
+                console.warn('Tuned model failed, falling back to base model:', error);
+                // Fall through to base model
+            }
+        }
+
+        // Base model with system prompt
         try {
-            // Use combined prompt for Gemini 2.0 compatibility
             const fullPrompt = `${this.getSystemPrompt()}\n\nUser message: "${userMessage}"\n\nRespond with only valid JSON:`;
             const result = await this.model.generateContent(fullPrompt);
             const text = result.response?.text?.() || result.response?.candidates?.[0]?.content?.parts?.[0]?.text;

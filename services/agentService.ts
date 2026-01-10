@@ -38,6 +38,26 @@ async function getBridgeService() {
   return _bridgeService;
 }
 
+// Lazy load swapService
+let _swapService: any = null;
+async function getSwapService() {
+  if (!_swapService) {
+    const module = await import('./swapService');
+    _swapService = module.swapService;
+  }
+  return _swapService;
+}
+
+// Lazy load token config
+let _tokenConfig: any = null;
+async function getTokenConfig() {
+  if (!_tokenConfig) {
+    const module = await import('../config/tokens');
+    _tokenConfig = module;
+  }
+  return _tokenConfig;
+}
+
 // Chain IDs
 const CHAIN_IDS: Record<string, number> = {
   'arc': 5042002,
@@ -135,6 +155,29 @@ class AgentService {
     thisMonth: 0,
   };
   private messages: AgentMessage[] = [];
+  private lastUserLanguage: 'tr' | 'en' = 'en';
+
+  /**
+   * Detect user's language from message
+   */
+  private detectLanguage(message: string): 'tr' | 'en' {
+    const turkishIndicators = [
+      'merhaba', 'selam', 'nasıl', 'gönder', 'yolla', 'bakiye', 'fiyat',
+      'çevir', 'köprü', 'kaç', 'ne kadar', 'analiz', 'haber', 'lütfen',
+      'tamam', 'evet', 'hayır', 'teşekkür', 'güvenli', 'riskli'
+    ];
+    const lower = message.toLowerCase();
+    const hasTurkish = turkishIndicators.some(word => lower.includes(word));
+    this.lastUserLanguage = hasTurkish ? 'tr' : 'en';
+    return this.lastUserLanguage;
+  }
+
+  /**
+   * Get localized message
+   */
+  private t(tr: string, en: string): string {
+    return this.lastUserLanguage === 'tr' ? tr : en;
+  }
 
   /**
    * Initialize agent service
@@ -186,6 +229,91 @@ class AgentService {
   }
 
   /**
+   * Get quick action suggestions for UI
+   */
+  getQuickActions(language: 'tr' | 'en' = 'en'): Array<{ label: string; command: string; icon: string }> {
+    if (language === 'tr') {
+      return [
+        { label: 'Bakiye', command: 'bakiyem ne kadar', icon: '💰' },
+        { label: 'Gönder', command: '10 USDC gönder', icon: '📤' },
+        { label: 'Swap', command: '50 USDC EURC\'ye çevir', icon: '🔄' },
+        { label: 'Bridge', command: '25 USDC base\'e köprüle', icon: '🌉' },
+        { label: 'BTC Fiyat', command: 'bitcoin fiyatı', icon: '📊' },
+        { label: 'Haberler', command: 'kripto haberleri', icon: '📰' },
+      ];
+    }
+
+    return [
+      { label: 'Balance', command: 'check my balance', icon: '💰' },
+      { label: 'Send', command: 'send 10 USDC to', icon: '📤' },
+      { label: 'Swap', command: 'swap 50 USDC to EURC', icon: '🔄' },
+      { label: 'Bridge', command: 'bridge 25 USDC to base', icon: '🌉' },
+      { label: 'BTC Price', command: 'bitcoin price', icon: '📊' },
+      { label: 'News', command: 'crypto news', icon: '📰' },
+    ];
+  }
+
+  /**
+   * Get suggested follow-up actions based on last intent
+   */
+  getSuggestedActions(): Array<{ label: string; command: string }> {
+    const lastAgentMessage = [...this.messages].reverse().find(m => m.role === 'agent');
+    if (!lastAgentMessage?.intent) {
+      return [];
+    }
+
+    const isTurkish = this.lastUserLanguage === 'tr';
+
+    switch (lastAgentMessage.intent.type) {
+      case 'SEND':
+        return isTurkish
+          ? [{ label: 'Bakiye kontrol', command: 'bakiyem ne kadar' }]
+          : [{ label: 'Check balance', command: 'check my balance' }];
+
+      case 'SWAP':
+        return isTurkish
+          ? [
+              { label: 'Bakiye kontrol', command: 'bakiyem ne kadar' },
+              { label: 'Başka swap', command: '50 EURC USDC\'ye çevir' },
+            ]
+          : [
+              { label: 'Check balance', command: 'check my balance' },
+              { label: 'Another swap', command: 'swap 50 EURC to USDC' },
+            ];
+
+      case 'BRIDGE':
+        return isTurkish
+          ? [{ label: 'Bakiye kontrol', command: 'bakiyem ne kadar' }]
+          : [{ label: 'Check balance', command: 'check my balance' }];
+
+      case 'CHECK_BALANCE':
+        return isTurkish
+          ? [
+              { label: 'Swap yap', command: '50 USDC EURC\'ye çevir' },
+              { label: 'Bridge yap', command: '25 USDC base\'e köprüle' },
+            ]
+          : [
+              { label: 'Make a swap', command: 'swap 50 USDC to EURC' },
+              { label: 'Bridge tokens', command: 'bridge 25 USDC to base' },
+            ];
+
+      case 'GET_PRICE':
+        return isTurkish
+          ? [
+              { label: 'ETH fiyatı', command: 'ETH fiyatı' },
+              { label: 'Haberler', command: 'kripto haberleri' },
+            ]
+          : [
+              { label: 'ETH price', command: 'ETH price' },
+              { label: 'Market news', command: 'crypto news' },
+            ];
+
+      default:
+        return [];
+    }
+  }
+
+  /**
    * Process user message and execute intent
    */
   async processMessage(
@@ -211,6 +339,9 @@ class AgentService {
     this.messages.push(userMsg);
 
     try {
+      // Detect user language
+      this.detectLanguage(userMessage);
+
       // Parse intent - try API first, fallback to local
       let intentResult;
       try {
@@ -417,14 +548,48 @@ class AgentService {
 
       default:
         return {
-          message: "I'm not sure how to help with that. Try asking me to:\n" +
-            "- Send tokens (e.g., 'Send 10 USDC to 0x...')\n" +
-            "- Swap tokens (e.g., 'Swap 50 USDC to EURC')\n" +
-            "- Analyze a wallet (e.g., 'Analyze 0x...')\n" +
-            "- Get token prices (e.g., 'Price of ETH')\n" +
-            "- Get market news",
+          message: this.getHelpMessage(),
         };
     }
+  }
+
+  /**
+   * Get localized help message with quick actions
+   */
+  private getHelpMessage(): string {
+    if (this.lastUserLanguage === 'tr') {
+      return `**Merhaba! Size nasıl yardımcı olabilirim?** 🤖
+
+**Hızlı Komutlar:**
+• "50 USDC gönder 0x..." - Token transfer
+• "100 USDC'yi EURC'ye çevir" - Swap
+• "50 USDC base'e köprüle" - Bridge
+• "bakiyem ne kadar" - Bakiye kontrolü
+• "ETH fiyatı ne" - Fiyat sorgulama
+• "0x... güvenli mi" - Cüzdan analizi
+• "kripto haberleri" - Piyasa haberleri
+
+**Örnek cümleler:**
+_"20 usdc yolla 0x742d..."_
+_"tüm USDC'mi EURC'ye çevir"_
+_"base sepolia'ya 10 usdc köprüle"_`;
+    }
+
+    return `**Hello! How can I help you?** 🤖
+
+**Quick Commands:**
+• "Send 50 USDC to 0x..." - Token transfer
+• "Swap 100 USDC to EURC" - Exchange tokens
+• "Bridge 50 USDC to Base" - Cross-chain transfer
+• "Check my balance" - View balances
+• "ETH price" - Price lookup
+• "Analyze 0x..." - Wallet risk analysis
+• "Crypto news" - Market news
+
+**Example phrases:**
+_"transfer 20 usdc to 0x742d..."_
+_"exchange all my USDC for EURC"_
+_"bridge 10 usdc to base sepolia"_`;
   }
 
   /**
@@ -532,25 +697,143 @@ class AgentService {
   }
 
   /**
-   * Handle SWAP intent
+   * Handle SWAP intent - Execute swap directly via Curve
    */
   private async handleSwapIntent(
     intent: AgentIntent,
-    callbacks: { onNavigate?: (page: string, data?: any) => void }
+    _callbacks: { onNavigate?: (page: string, data?: any) => void }
   ): Promise<{ message: string }> {
-    const { fromToken, toToken, amount } = intent.params;
+    const { fromToken = 'USDC', toToken = 'EURC', amount } = intent.params;
 
-    // Navigate to Swap page with pre-filled data
-    if (callbacks.onNavigate) {
-      callbacks.onNavigate('Swap', {
-        type: 'SWAP',
-        params: { fromToken, toToken, amount },
-      });
+    // Validate amount
+    if (!amount || parseFloat(amount) <= 0) {
+      return {
+        message: `Lütfen swap miktarını belirtin. Örnek: "50 USDC'yi EURC'ye çevir"`,
+      };
     }
 
-    return {
-      message: `I'm preparing to swap ${amount} ${fromToken} to ${toToken}. Please review and confirm on the Swap page.`,
-    };
+    // Normalize token names
+    const fromTokenUpper = fromToken.toUpperCase();
+    const toTokenUpper = toToken.toUpperCase();
+
+    // Validate supported pairs (only USDC ↔ EURC on Curve)
+    const validPairs = [
+      ['USDC', 'EURC'],
+      ['EURC', 'USDC'],
+    ];
+    const isValidPair = validPairs.some(
+      ([from, to]) => from === fromTokenUpper && to === toTokenUpper
+    );
+
+    if (!isValidPair) {
+      return {
+        message: `Şu an sadece USDC ↔ EURC swap destekleniyor. Örnek: "50 USDC'yi EURC'ye çevir"`,
+      };
+    }
+
+    try {
+      const circleWallet = await getCircleWalletService();
+      const swap = await getSwapService();
+      const tokenConfig = await getTokenConfig();
+
+      // Check wallet connection
+      const state = circleWallet.getState();
+      if (!state.isConnected || !state.address) {
+        return {
+          message: `Cüzdan bağlı değil. Lütfen önce cüzdanınızı bağlayın.`,
+        };
+      }
+
+      // Check if swap service is available
+      if (!swap.isAvailable()) {
+        return {
+          message: `Swap servisi şu an kullanılamıyor. Lütfen daha sonra tekrar deneyin.`,
+        };
+      }
+
+      // Get token info
+      const fromTokenInfo = tokenConfig.SUPPORTED_TOKENS.find(
+        (t: any) => t.symbol === fromTokenUpper
+      );
+      const toTokenInfo = tokenConfig.SUPPORTED_TOKENS.find(
+        (t: any) => t.symbol === toTokenUpper
+      );
+
+      if (!fromTokenInfo || !toTokenInfo) {
+        return {
+          message: `Token bulunamadı. Desteklenen tokenlar: USDC, EURC`,
+        };
+      }
+
+      logger.info('Getting swap quote', {
+        component: 'AgentService',
+        from: fromTokenUpper,
+        to: toTokenUpper,
+        amount,
+      });
+
+      // Get quote first
+      const quote = await swap.getQuote(fromTokenInfo, toTokenInfo, amount);
+
+      logger.info('Executing swap', {
+        component: 'AgentService',
+        quote: {
+          fromAmount: quote.fromAmount,
+          toAmount: quote.toAmount,
+          rate: quote.rate,
+        },
+      });
+
+      // Execute swap
+      const txHash = await swap.executeSwap(
+        quote,
+        async (to: string, value: bigint, data: string) => {
+          return circleWallet.sendTransaction({ to, value, data });
+        },
+        state.address
+      );
+
+      logger.info('Swap successful', {
+        component: 'AgentService',
+        txHash,
+      });
+
+      const explorerUrl = `https://testnet.arcscan.app/tx/${txHash}`;
+
+      return {
+        message: `**Swap Tamamlandı!**\n\n` +
+          `${quote.fromAmount} ${fromTokenUpper} → ${quote.toAmount} ${toTokenUpper}\n\n` +
+          `Rate: 1 ${fromTokenUpper} = ${quote.rate} ${toTokenUpper}\n` +
+          `Tx: ${txHash.slice(0, 10)}...${txHash.slice(-8)}\n\n` +
+          `[Explorer'da Görüntüle](${explorerUrl})`,
+      };
+    } catch (error: any) {
+      logger.error('Swap failed', {
+        component: 'AgentService',
+        errorMsg: error.message,
+      });
+
+      // User-friendly error messages
+      if (error.message?.includes('rejected') || error.message?.includes('cancelled')) {
+        return {
+          message: `Swap iptal edildi. Hazır olduğunuzda tekrar deneyebilirsiniz.`,
+        };
+      }
+      if (error.message?.includes('insufficient') || error.message?.includes('balance')) {
+        return {
+          message: `Yetersiz ${fromTokenUpper} bakiyesi. Lütfen bakiyenizi kontrol edin.`,
+        };
+      }
+      if (error.message?.includes('expired')) {
+        return {
+          message: `Fiyat teklifi süresi doldu. Lütfen tekrar deneyin.`,
+        };
+      }
+
+      return {
+        message: `Swap başarısız: ${error.message}`,
+      };
+    }
   }
 
   /**
@@ -653,22 +936,77 @@ class AgentService {
   }
 
   /**
-   * Handle CHECK_BALANCE intent
+   * Handle CHECK_BALANCE intent - Fetch and display real balances
    */
   private async handleBalanceIntent(
     intent: AgentIntent
   ): Promise<{ message: string }> {
     const { token } = intent.params;
 
-    if (token) {
+    try {
+      const circleWallet = await getCircleWalletService();
+
+      // Check wallet connection
+      const state = circleWallet.getState();
+      if (!state.isConnected || !state.address) {
+        return {
+          message: `Cüzdan bağlı değil. Lütfen önce cüzdanınızı bağlayın.`,
+        };
+      }
+
+      // Get balances from wallet state
+      const balances = state.balances || {};
+
+      // If specific token requested
+      if (token) {
+        const tokenUpper = token.toUpperCase();
+        const balance = balances[tokenUpper] || '0';
+        return {
+          message: `**${tokenUpper} Bakiyeniz:** ${balance} ${tokenUpper}`,
+        };
+      }
+
+      // Show all balances
+      const balanceLines: string[] = [];
+      const tokenOrder = ['USDC', 'EURC', 'ARC', 'ETH'];
+
+      for (const t of tokenOrder) {
+        if (balances[t] !== undefined) {
+          const bal = parseFloat(balances[t] || '0');
+          if (bal > 0 || t === 'USDC' || t === 'EURC') {
+            balanceLines.push(`• **${t}:** ${bal.toFixed(t === 'USDC' || t === 'EURC' ? 2 : 4)}`);
+          }
+        }
+      }
+
+      // Add any other tokens not in the standard order
+      for (const [t, bal] of Object.entries(balances)) {
+        if (!tokenOrder.includes(t) && parseFloat(bal as string) > 0) {
+          balanceLines.push(`• **${t}:** ${parseFloat(bal as string).toFixed(4)}`);
+        }
+      }
+
+      if (balanceLines.length === 0) {
+        return {
+          message: `**Cüzdan Bakiyesi**\n\nHenüz token bulunmuyor.\n\nAdres: ${state.address.slice(0, 6)}...${state.address.slice(-4)}`,
+        };
+      }
+
+      const shortAddress = `${state.address.slice(0, 6)}...${state.address.slice(-4)}`;
+
       return {
-        message: `To check your ${token} balance, please look at the Dashboard. Your balances are displayed there.`,
+        message: `**Cüzdan Bakiyesi** 💰\n\n${balanceLines.join('\n')}\n\n📍 ${shortAddress}`,
+      };
+    } catch (error: any) {
+      logger.error('Balance check failed', {
+        component: 'AgentService',
+        errorMsg: error.message,
+      });
+
+      return {
+        message: `Bakiye kontrolü başarısız: ${error.message}`,
       };
     }
-
-    return {
-      message: "Your wallet balances are displayed on the Dashboard. Would you like me to analyze a specific wallet address instead?",
-    };
   }
 
   /**
