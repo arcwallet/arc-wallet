@@ -131,27 +131,9 @@ const LoginPage: React.FC = () => {
     }
 
     try {
-      // First check if user has passkeys AND wallet (existing user)
-      const checkResult = await passkeyClient.checkUserPasskeys(email);
-
-      // CRITICAL: Only require passkey auth if user has BOTH passkey AND wallet
-      // New users may have stale passkey data but no wallet - they should go through OTP
-      const hasPasskeyAndWallet = checkResult.success &&
-        checkResult.data?.hasPasskey &&
-        checkResult.data?.walletAddress;
-
-      if (hasPasskeyAndWallet) {
-        // Existing user with wallet - try direct passkey authentication
-        showMessage('Passkey found! Please authenticate...', 'info');
-        setStep('passkey');
-
-        const authSuccess = await handlePasskeyAuth(email);
-        if (authSuccess) {
-          return; // Auth successful
-        }
-        // Passkey failed, fall back to OTP
-        showMessage('Sending verification code...', 'info');
-      }
+      // ALWAYS send OTP first - passkey will be verified AFTER OTP
+      // This ensures email ownership is verified before any wallet operations
+      showMessage('Sending verification code...', 'info');
 
       // Request OTP via SendGrid
       const response = await fetch(`${API_BASE}/api/circle/otp/request`, {
