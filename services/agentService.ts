@@ -451,22 +451,22 @@ class AgentService {
   getQuickActions(language: 'tr' | 'en' = 'en'): Array<{ label: string; command: string; icon: string }> {
     if (language === 'tr') {
       return [
-        { label: 'Bakiye', command: 'bakiyem ne kadar', icon: '💰' },
-        { label: 'Gönder', command: '10 USDC gönder', icon: '📤' },
-        { label: 'Swap', command: '50 USDC EURC\'ye çevir', icon: '🔄' },
-        { label: 'Bridge', command: '25 USDC base\'e köprüle', icon: '🌉' },
-        { label: 'BTC Fiyat', command: 'bitcoin fiyatı', icon: '📊' },
-        { label: 'Haberler', command: 'kripto haberleri', icon: '📰' },
+        { label: 'Bakiye', command: 'bakiyem ne kadar', icon: '' },
+        { label: 'Gönder', command: '10 USDC gönder', icon: '' },
+        { label: 'Swap', command: '50 USDC EURC\'ye çevir', icon: '' },
+        { label: 'Bridge', command: '25 USDC base\'e köprüle', icon: '' },
+        { label: 'BTC Fiyat', command: 'bitcoin fiyatı', icon: '' },
+        { label: 'Haberler', command: 'kripto haberleri', icon: '' },
       ];
     }
 
     return [
-      { label: 'Balance', command: 'check my balance', icon: '💰' },
-      { label: 'Send', command: 'send 10 USDC to', icon: '📤' },
-      { label: 'Swap', command: 'swap 50 USDC to EURC', icon: '🔄' },
-      { label: 'Bridge', command: 'bridge 25 USDC to base', icon: '🌉' },
-      { label: 'BTC Price', command: 'bitcoin price', icon: '📊' },
-      { label: 'News', command: 'crypto news', icon: '📰' },
+      { label: 'Balance', command: 'check my balance', icon: '' },
+      { label: 'Send', command: 'send 10 USDC to', icon: '' },
+      { label: 'Swap', command: 'swap 50 USDC to EURC', icon: '' },
+      { label: 'Bridge', command: 'bridge 25 USDC to base', icon: '' },
+      { label: 'BTC Price', command: 'bitcoin price', icon: '' },
+      { label: 'News', command: 'crypto news', icon: '' },
     ];
   }
 
@@ -823,7 +823,7 @@ class AgentService {
    */
   private getHelpMessage(): string {
     if (this.lastUserLanguage === 'tr') {
-      return `**Merhaba! Size nasıl yardımcı olabilirim?** 🤖
+      return `**Merhaba! Size nasıl yardımcı olabilirim?**
 
 **Hızlı Komutlar:**
 • "50 USDC gönder 0x..." - Token transfer
@@ -840,7 +840,7 @@ _"tüm USDC'mi EURC'ye çevir"_
 _"base sepolia'ya 10 usdc köprüle"_`;
     }
 
-    return `**Hello! How can I help you?** 🤖
+    return `**Hello! How can I help you?**
 
 **Quick Commands:**
 • "Send 50 USDC to 0x..." - Token transfer
@@ -1198,7 +1198,7 @@ _"bridge 10 usdc to base sepolia"_`;
         : `https://sepolia.basescan.org/tx/${bridgeTx.burnTxHash}`;
 
       return {
-        message: `**Bridge Started!**\n\nBridging ${amount} USDC from ${sourceChainName} to ${destChainName}\n\nBurn Tx: ${bridgeTx.burnTxHash?.slice(0, 10)}...${bridgeTx.burnTxHash?.slice(-8)}\n\n[View on Explorer](${explorerUrl})\n\n⏳ Waiting for attestation (~15-20 min). Funds will auto-complete on destination.`,
+        message: `**Bridge Started**\n\nBridging ${amount} USDC from ${sourceChainName} to ${destChainName}\n\nBurn Tx: ${bridgeTx.burnTxHash?.slice(0, 10)}...${bridgeTx.burnTxHash?.slice(-8)}\n\n[View on Explorer](${explorerUrl})\n\n_Waiting for attestation (~15-20 min). Funds will auto-complete on destination._`,
       };
     } catch (error: any) {
       logger.error('Bridge transaction failed', {
@@ -1284,7 +1284,7 @@ _"bridge 10 usdc to base sepolia"_`;
       const shortAddress = `${state.address.slice(0, 6)}...${state.address.slice(-4)}`;
 
       return {
-        message: `**Cüzdan Bakiyesi** 💰\n\n${balanceLines.join('\n')}\n\n📍 ${shortAddress}`,
+        message: `**Cüzdan Bakiyesi**\n\n${balanceLines.join('\n')}\n\nAdres: ${shortAddress}`,
       };
     } catch (error: any) {
       logger.error('Balance check failed', {
@@ -1341,11 +1341,11 @@ _"bridge 10 usdc to base sepolia"_`;
       });
 
       // Format risk analysis response
-      const riskEmoji = {
-        LOW: '✅',
-        MEDIUM: '⚠️',
-        HIGH: '🔴',
-        CRITICAL: '🚨',
+      const riskIndicator = {
+        LOW: '[LOW]',
+        MEDIUM: '[MEDIUM]',
+        HIGH: '[HIGH]',
+        CRITICAL: '[CRITICAL]',
       }[result.riskLevel];
 
       const flagsList = result.flags.length > 0
@@ -1353,7 +1353,7 @@ _"bridge 10 usdc to base sepolia"_`;
         : '';
 
       return {
-        message: `${riskEmoji} **Risk Analysis for ${address.slice(0, 6)}...${address.slice(-4)}**\n\n` +
+        message: `${riskIndicator} **Risk Analysis for ${address.slice(0, 6)}...${address.slice(-4)}**\n\n` +
           `**Risk Level:** ${result.riskLevel}\n` +
           `**Risk Score:** ${result.riskScore}/100\n` +
           `${flagsList}\n\n` +
@@ -1406,13 +1406,12 @@ _"bridge 10 usdc to base sepolia"_`;
         },
       });
 
-      const changeEmoji = result.change24h >= 0 ? '📈' : '📉';
-      const changeColor = result.change24h >= 0 ? '+' : '';
+      const changeSign = result.change24h >= 0 ? '+' : '';
 
       return {
-        message: `**${token} Price Data** ${changeEmoji}\n\n` +
+        message: `**${token} Price Data**\n\n` +
           `**Price:** $${result.price.toLocaleString()}\n` +
-          `**24h Change:** ${changeColor}${result.change24h.toFixed(2)}%\n` +
+          `**24h Change:** ${changeSign}${result.change24h.toFixed(2)}%\n` +
           `**24h Volume:** $${result.volume24h.toLocaleString()}\n` +
           `**Market Cap:** $${result.marketCap.toLocaleString()}\n\n` +
           `_Last updated: ${new Date(result.lastUpdated).toLocaleTimeString()}_`,
@@ -1461,18 +1460,12 @@ _"bridge 10 usdc to base sepolia"_`;
         },
       });
 
-      const sentimentEmoji = {
-        bullish: '🟢',
-        neutral: '🟡',
-        bearish: '🔴',
-      }[result.marketSentiment] || '⚪';
-
       const headlines = result.headlines
         .map(h => `• ${h.title} _(${h.source})_`)
         .join('\n');
 
       return {
-        message: `**Market News Summary** ${sentimentEmoji}\n\n` +
+        message: `**Market News Summary**\n\n` +
           `${result.summary}\n\n` +
           `**Headlines:**\n${headlines}\n\n` +
           `**Market Sentiment:** ${result.marketSentiment.toUpperCase()}`,
