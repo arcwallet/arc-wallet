@@ -302,7 +302,27 @@ async function analyzeWalletRisk(address: string): Promise<{
 }
 
 /**
- * Get token price data using Gemini AI for real-time data
+ * Token ID mapping for CoinGecko API
+ */
+const COINGECKO_IDS: Record<string, string> = {
+  BTC: 'bitcoin',
+  ETH: 'ethereum',
+  USDC: 'usd-coin',
+  EURC: 'euro-coin',
+  SOL: 'solana',
+  MATIC: 'matic-network',
+  AVAX: 'avalanche-2',
+  ARB: 'arbitrum',
+  OP: 'optimism',
+  LINK: 'chainlink',
+  UNI: 'uniswap',
+  AAVE: 'aave',
+  ARC: 'arc-token',
+  USYC: 'usyc',
+};
+
+/**
+ * Get token price data from CoinGecko API (real-time)
  */
 async function getTokenPrice(token: string): Promise<{
   price: number;
@@ -312,54 +332,56 @@ async function getTokenPrice(token: string): Promise<{
   marketCap: number;
   lastUpdated: string;
 }> {
-  // Use Gemini to get real-time price data
-  try {
-    const { GoogleGenerativeAI } = await import('@google/generative-ai');
-    const apiKey = process.env.GEMINI_API_KEY;
+  const tokenUpper = token.toUpperCase();
 
-    if (apiKey && apiKey.startsWith('AIza')) {
-      const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-preview-05-20' });
-
-      const prompt = `What is the current price of ${token} cryptocurrency in USD?
-      Respond ONLY with a JSON object in this exact format, no markdown:
-      {"price": <number>, "change24h": <number>, "volume24h": <number>, "marketCap": <number>}
-
-      Use real current market data. For stablecoins like USDC use 1.0, for EURC use the EUR/USD rate.`;
-
-      const result = await model.generateContent(prompt);
-      const text = result.response?.text?.() || '';
-
-      // Extract JSON from response
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0]);
-        return {
-          price: parsed.price || 0,
-          currency: 'USD',
-          change24h: parseFloat((parsed.change24h || 0).toFixed(2)),
-          volume24h: parsed.volume24h || 0,
-          marketCap: parsed.marketCap || 0,
-          lastUpdated: new Date().toISOString(),
-        };
-      }
-    }
-  } catch (error) {
-    console.error('[Agent] Gemini price fetch error:', error);
+  // Stablecoins - return fixed values
+  if (tokenUpper === 'USDC' || tokenUpper === 'USDT' || tokenUpper === 'DAI') {
+    return {
+      price: 1.0,
+      currency: 'USD',
+      change24h: 0,
+      volume24h: 0,
+      marketCap: 0,
+      lastUpdated: new Date().toISOString(),
+    };
   }
 
-  // Fallback to static prices if Gemini fails
-  const fallbackPrices: Record<string, number> = {
-    USDC: 1.0,
-    EURC: 1.08,
-    ETH: 3500.0,
-    BTC: 100000.0,
-    ARC: 0.15,
-    USYC: 1.05,
-  };
+  // Get CoinGecko ID
+  const coinId = COINGECKO_IDS[tokenUpper];
 
+  if (coinId) {
+    try {
+      const url = `https://api.coingecko.com/api/v3/simple/price?ids=${coinId}&vs_currencies=usd&include_24hr_change=true&include_24hr_vol=true&include_market_cap=true`;
+
+      const response = await fetch(url, {
+        headers: {
+          'Accept': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const coinData = data[coinId];
+
+        if (coinData) {
+          return {
+            price: coinData.usd || 0,
+            currency: 'USD',
+            change24h: parseFloat((coinData.usd_24h_change || 0).toFixed(2)),
+            volume24h: Math.round(coinData.usd_24h_vol || 0),
+            marketCap: Math.round(coinData.usd_market_cap || 0),
+            lastUpdated: new Date().toISOString(),
+          };
+        }
+      }
+    } catch (error) {
+      console.error('[Agent] CoinGecko API error:', error);
+    }
+  }
+
+  // Fallback for unknown tokens
   return {
-    price: fallbackPrices[token] || 0,
+    price: 0,
     currency: 'USD',
     change24h: 0,
     volume24h: 0,
