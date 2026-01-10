@@ -87,6 +87,10 @@ export const AgentProvider: React.FC<AgentProviderProps> = ({ children }) => {
   const [messages, setMessages] = useState<AgentMessage[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
 
+  // Initialization state
+  const [isInitialized, setIsInitialized] = useState(false);
+  const [initError, setInitError] = useState<string | null>(null);
+
   // Spending state
   const [spending, setSpending] = useState<AgentSpending>({
     today: 0,
@@ -105,14 +109,39 @@ export const AgentProvider: React.FC<AgentProviderProps> = ({ children }) => {
     ((page: string, data?: any) => void) | null
   >(null);
 
-  // Initialize agent service
+  // Initialize agent service with error handling
   useEffect(() => {
-    agentService.initialize();
-    setMessages(agentService.getMessages());
-    setSpending(agentService.getSpending());
-    setPolicy(agentService.getPolicy());
+    let isMounted = true;
 
-    logger.info('Agent context initialized', { component: 'AgentContext' });
+    const initializeAgent = async () => {
+      try {
+        agentService.initialize();
+        await agentService.waitForInitialization();
+
+        if (isMounted) {
+          setMessages(agentService.getMessages());
+          setSpending(agentService.getSpending());
+          setPolicy(agentService.getPolicy());
+          setIsInitialized(true);
+          setInitError(null);
+          logger.info('Agent context initialized', { component: 'AgentContext' });
+        }
+      } catch (error: any) {
+        if (isMounted) {
+          setInitError(error.message);
+          logger.error('Agent context initialization failed', {
+            component: 'AgentContext',
+            error: error.message,
+          });
+        }
+      }
+    };
+
+    initializeAgent();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   // ============================================
@@ -139,6 +168,30 @@ export const AgentProvider: React.FC<AgentProviderProps> = ({ children }) => {
 
   const sendMessage = useCallback(
     async (message: string): Promise<AgentMessage> => {
+      // Check if initialized
+      if (!isInitialized) {
+        const errorMsg: AgentMessage = {
+          id: `msg_${Date.now()}_error`,
+          role: 'agent',
+          content: 'Agent is still initializing. Please wait a moment and try again.',
+          timestamp: Date.now(),
+          error: 'not_initialized',
+        };
+        return errorMsg;
+      }
+
+      // Prevent double processing
+      if (isProcessing) {
+        const busyMsg: AgentMessage = {
+          id: `msg_${Date.now()}_busy`,
+          role: 'agent',
+          content: 'Please wait for the current operation to complete.',
+          timestamp: Date.now(),
+          error: 'busy',
+        };
+        return busyMsg;
+      }
+
       setIsProcessing(true);
 
       try {
@@ -173,11 +226,25 @@ export const AgentProvider: React.FC<AgentProviderProps> = ({ children }) => {
 
         setMessages(agentService.getMessages());
         return response;
+      } catch (error: any) {
+        logger.error('SendMessage failed', {
+          component: 'AgentContext',
+          error: error.message,
+        });
+
+        const errorMsg: AgentMessage = {
+          id: `msg_${Date.now()}_error`,
+          role: 'agent',
+          content: `An error occurred: ${error.message}`,
+          timestamp: Date.now(),
+          error: error.message,
+        };
+        return errorMsg;
       } finally {
         setIsProcessing(false);
       }
     },
-    [navigationCallback]
+    [navigationCallback, isInitialized, isProcessing]
   );
 
   const clearMessages = useCallback(() => {

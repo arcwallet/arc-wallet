@@ -6,6 +6,12 @@
  * - x402 payments for premium services
  * - Wallet operations (send, swap, bridge)
  * - Policy enforcement
+ *
+ * Improvements:
+ * - Thread-safe lazy loading with mutex pattern
+ * - Timeout protection for all async operations
+ * - Retry mechanism with exponential backoff
+ * - Comprehensive error handling
  */
 
 import {
@@ -18,44 +24,194 @@ import {
 } from './x402Client';
 import { logger } from './logger';
 
-// Lazy load circleWalletService to avoid module crash
-let _circleWalletService: any = null;
+// ============================================
+// Configuration
+// ============================================
+
+const CONFIG = {
+  // Timeouts (ms)
+  API_TIMEOUT: 15000,        // 15 seconds for API calls
+  WALLET_TIMEOUT: 30000,     // 30 seconds for wallet operations
+  SERVICE_TIMEOUT: 10000,    // 10 seconds for service initialization
+
+  // Retry settings
+  MAX_RETRIES: 3,
+  RETRY_DELAY_BASE: 1000,    // Base delay for exponential backoff
+
+  // Operation timeouts
+  SEND_TIMEOUT: 60000,       // 60 seconds for send
+  SWAP_TIMEOUT: 60000,       // 60 seconds for swap
+  BRIDGE_TIMEOUT: 90000,     // 90 seconds for bridge
+};
+
+// ============================================
+// Utility Functions
+// ============================================
+
+/**
+ * Promise with timeout
+ */
+function withTimeout<T>(promise: Promise<T>, ms: number, operation: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(`${operation} timed out after ${ms}ms`));
+    }, ms);
+
+    promise
+      .then((result) => {
+        clearTimeout(timer);
+        resolve(result);
+      })
+      .catch((error) => {
+        clearTimeout(timer);
+        reject(error);
+      });
+  });
+}
+
+/**
+ * Retry with exponential backoff
+ */
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  maxRetries: number = CONFIG.MAX_RETRIES,
+  operation: string = 'operation'
+): Promise<T> {
+  let lastError: Error = new Error('Unknown error');
+
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error: any) {
+      lastError = error;
+      logger.warn(`${operation} attempt ${attempt + 1} failed`, {
+        component: 'AgentService',
+        error: error.message,
+        attempt: attempt + 1,
+        maxRetries,
+      });
+
+      // Don't retry user rejections or timeout errors
+      if (
+        error.message?.includes('rejected') ||
+        error.message?.includes('cancelled') ||
+        error.message?.includes('timed out')
+      ) {
+        throw error;
+      }
+
+      // Wait before retrying (exponential backoff)
+      if (attempt < maxRetries - 1) {
+        const delay = CONFIG.RETRY_DELAY_BASE * Math.pow(2, attempt);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+
+  throw lastError;
+}
+
+// ============================================
+// Thread-safe Lazy Loading (Mutex Pattern)
+// ============================================
+
+class LazyLoader<T> {
+  private instance: T | null = null;
+  private loadingPromise: Promise<T> | null = null;
+  private loader: () => Promise<T>;
+
+  constructor(loader: () => Promise<T>) {
+    this.loader = loader;
+  }
+
+  async get(): Promise<T> {
+    // Return cached instance
+    if (this.instance) {
+      return this.instance;
+    }
+
+    // If already loading, wait for that promise
+    if (this.loadingPromise) {
+      return this.loadingPromise;
+    }
+
+    // Start loading
+    this.loadingPromise = this.loader()
+      .then((result) => {
+        this.instance = result;
+        this.loadingPromise = null;
+        return result;
+      })
+      .catch((error) => {
+        this.loadingPromise = null;
+        throw error;
+      });
+
+    return this.loadingPromise;
+  }
+
+  isLoaded(): boolean {
+    return this.instance !== null;
+  }
+
+  reset(): void {
+    this.instance = null;
+    this.loadingPromise = null;
+  }
+}
+
+// Lazy loaders with mutex pattern
+const circleWalletLoader = new LazyLoader(async () => {
+  const module = await import('./circleWalletService');
+  return module.circleWalletService;
+});
+
+const bridgeServiceLoader = new LazyLoader(async () => {
+  const module = await import('./bridgeService');
+  return module.bridgeService;
+});
+
+const swapServiceLoader = new LazyLoader(async () => {
+  const module = await import('./swapService');
+  return module.swapService;
+});
+
+const tokenConfigLoader = new LazyLoader(async () => {
+  const module = await import('../config/tokens');
+  return module;
+});
+
+// Helper functions with timeout protection
 async function getCircleWalletService() {
-  if (!_circleWalletService) {
-    const module = await import('./circleWalletService');
-    _circleWalletService = module.circleWalletService;
-  }
-  return _circleWalletService;
+  return withTimeout(
+    circleWalletLoader.get(),
+    CONFIG.SERVICE_TIMEOUT,
+    'CircleWallet initialization'
+  );
 }
 
-// Lazy load bridgeService
-let _bridgeService: any = null;
 async function getBridgeService() {
-  if (!_bridgeService) {
-    const module = await import('./bridgeService');
-    _bridgeService = module.bridgeService;
-  }
-  return _bridgeService;
+  return withTimeout(
+    bridgeServiceLoader.get(),
+    CONFIG.SERVICE_TIMEOUT,
+    'Bridge service initialization'
+  );
 }
 
-// Lazy load swapService
-let _swapService: any = null;
 async function getSwapService() {
-  if (!_swapService) {
-    const module = await import('./swapService');
-    _swapService = module.swapService;
-  }
-  return _swapService;
+  return withTimeout(
+    swapServiceLoader.get(),
+    CONFIG.SERVICE_TIMEOUT,
+    'Swap service initialization'
+  );
 }
 
-// Lazy load token config
-let _tokenConfig: any = null;
 async function getTokenConfig() {
-  if (!_tokenConfig) {
-    const module = await import('../config/tokens');
-    _tokenConfig = module;
-  }
-  return _tokenConfig;
+  return withTimeout(
+    tokenConfigLoader.get(),
+    CONFIG.SERVICE_TIMEOUT,
+    'Token config initialization'
+  );
 }
 
 // Chain IDs
@@ -156,6 +312,9 @@ class AgentService {
   };
   private messages: AgentMessage[] = [];
   private lastUserLanguage: 'tr' | 'en' = 'en';
+  private isInitialized: boolean = false;
+  private initializationPromise: Promise<void> | null = null;
+  private isProcessingMessage: boolean = false;
 
   /**
    * Detect user's language from message
@@ -180,12 +339,70 @@ class AgentService {
   }
 
   /**
-   * Initialize agent service
+   * Check if service is ready
+   */
+  isReady(): boolean {
+    return this.isInitialized;
+  }
+
+  /**
+   * Check if currently processing
+   */
+  isProcessing(): boolean {
+    return this.isProcessingMessage;
+  }
+
+  /**
+   * Initialize agent service (thread-safe)
    */
   initialize(): void {
-    this.loadSpendingFromStorage();
-    this.loadPolicyFromStorage();
-    logger.info('Agent service initialized', { component: 'AgentService' });
+    if (this.isInitialized) {
+      return;
+    }
+
+    if (this.initializationPromise) {
+      return;
+    }
+
+    this.initializationPromise = this.doInitialize();
+  }
+
+  private async doInitialize(): Promise<void> {
+    try {
+      this.loadSpendingFromStorage();
+      this.loadPolicyFromStorage();
+      this.isInitialized = true;
+      logger.info('Agent service initialized', { component: 'AgentService' });
+    } catch (error: any) {
+      logger.error('Agent service initialization failed', {
+        component: 'AgentService',
+        error: error.message,
+      });
+      // Still mark as initialized to prevent infinite retry
+      this.isInitialized = true;
+    } finally {
+      this.initializationPromise = null;
+    }
+  }
+
+  /**
+   * Wait for initialization to complete
+   */
+  async waitForInitialization(): Promise<void> {
+    if (this.isInitialized) {
+      return;
+    }
+
+    if (this.initializationPromise) {
+      await this.initializationPromise;
+      return;
+    }
+
+    // Initialize if not already started
+    this.initialize();
+    if (this.initializationPromise) {
+      await this.initializationPromise;
+    }
   }
 
   /**
@@ -329,6 +546,26 @@ class AgentService {
   ): Promise<AgentMessage> {
     const messageId = `msg_${Date.now()}_${Math.random().toString(36).slice(2)}`;
 
+    // Prevent concurrent message processing
+    if (this.isProcessingMessage) {
+      const busyMsg: AgentMessage = {
+        id: `${messageId}_agent`,
+        role: 'agent',
+        content: this.t(
+          'Lütfen önceki işlemin tamamlanmasını bekleyin.',
+          'Please wait for the previous operation to complete.'
+        ),
+        timestamp: Date.now(),
+        error: 'busy',
+      };
+      return busyMsg;
+    }
+
+    this.isProcessingMessage = true;
+
+    // Ensure service is initialized
+    await this.waitForInitialization();
+
     // Add user message to history
     const userMsg: AgentMessage = {
       id: `${messageId}_user`,
@@ -342,12 +579,19 @@ class AgentService {
       // Detect user language
       this.detectLanguage(userMessage);
 
-      // Parse intent - try API first, fallback to local
+      // Parse intent - try API first with timeout, fallback to local
       let intentResult;
       try {
-        intentResult = await parseIntent(userMessage);
-      } catch (parseError) {
-        console.warn('API parse failed, using local parser:', parseError);
+        intentResult = await withTimeout(
+          parseIntent(userMessage),
+          CONFIG.API_TIMEOUT,
+          'Intent parsing'
+        );
+      } catch (parseError: any) {
+        logger.warn('API parse failed, using local parser', {
+          component: 'AgentService',
+          error: parseError.message,
+        });
         intentResult = this.localParseIntent(userMessage);
       }
       const intent = this.mapToAgentIntent(intentResult);
@@ -383,16 +627,37 @@ class AgentService {
         errorMsg: error.message,
       });
 
+      // User-friendly error messages
+      let userFriendlyError = error.message;
+      if (error.message?.includes('timed out')) {
+        userFriendlyError = this.t(
+          'İşlem zaman aşımına uğradı. Lütfen tekrar deneyin.',
+          'Operation timed out. Please try again.'
+        );
+      } else if (error.message?.includes('network') || error.message?.includes('fetch')) {
+        userFriendlyError = this.t(
+          'Ağ bağlantısı hatası. İnternet bağlantınızı kontrol edin.',
+          'Network error. Please check your internet connection.'
+        );
+      } else if (error.message?.includes('rejected') || error.message?.includes('cancelled')) {
+        userFriendlyError = this.t(
+          'İşlem iptal edildi.',
+          'Operation cancelled.'
+        );
+      }
+
       const errorMsg: AgentMessage = {
         id: `${messageId}_agent`,
         role: 'agent',
-        content: `I encountered an error: ${error.message}`,
+        content: userFriendlyError,
         timestamp: Date.now(),
         error: error.message,
       };
       this.messages.push(errorMsg);
 
       return errorMsg;
+    } finally {
+      this.isProcessingMessage = false;
     }
   }
 
@@ -645,20 +910,28 @@ _"bridge 10 usdc to base sepolia"_`;
       let txHash: string;
 
       if (tokenUpper === 'ARC') {
-        // Send native ARC token
+        // Send native ARC token with timeout
         const amountWei = BigInt(Math.floor(parseFloat(amount) * 1e18));
-        txHash = await circleWallet.sendTransaction({
-          to: recipient,
-          value: amountWei,
-        });
+        txHash = await withTimeout(
+          circleWallet.sendTransaction({
+            to: recipient,
+            value: amountWei,
+          }),
+          CONFIG.SEND_TIMEOUT,
+          'Send transaction'
+        );
       } else {
-        // Send ERC20 token
-        txHash = await circleWallet.sendTokenTransfer({
-          tokenAddress,
-          to: recipient,
-          amount,
-          decimals: tokenUpper === 'USDC' || tokenUpper === 'EURC' ? 6 : 18,
-        });
+        // Send ERC20 token with timeout
+        txHash = await withTimeout(
+          circleWallet.sendTokenTransfer({
+            tokenAddress,
+            to: recipient,
+            amount,
+            decimals: tokenUpper === 'USDC' || tokenUpper === 'EURC' ? 6 : 18,
+          }),
+          CONFIG.SEND_TIMEOUT,
+          'Send token transfer'
+        );
       }
 
       logger.info('Send transaction successful', {
@@ -772,8 +1045,12 @@ _"bridge 10 usdc to base sepolia"_`;
         amount,
       });
 
-      // Get quote first
-      const quote = await swap.getQuote(fromTokenInfo, toTokenInfo, amount);
+      // Get quote first with timeout
+      const quote = await withTimeout(
+        swap.getQuote(fromTokenInfo, toTokenInfo, amount),
+        CONFIG.API_TIMEOUT,
+        'Swap quote'
+      );
 
       logger.info('Executing swap', {
         component: 'AgentService',
@@ -784,13 +1061,17 @@ _"bridge 10 usdc to base sepolia"_`;
         },
       });
 
-      // Execute swap
-      const txHash = await swap.executeSwap(
-        quote,
-        async (to: string, value: bigint, data: string) => {
-          return circleWallet.sendTransaction({ to, value, data });
-        },
-        state.address
+      // Execute swap with timeout
+      const txHash = await withTimeout(
+        swap.executeSwap(
+          quote,
+          async (to: string, value: bigint, data: string) => {
+            return circleWallet.sendTransaction({ to, value, data });
+          },
+          state.address
+        ),
+        CONFIG.SWAP_TIMEOUT,
+        'Swap execution'
       );
 
       logger.info('Swap successful', {
@@ -889,11 +1170,19 @@ _"bridge 10 usdc to base sepolia"_`;
       let bridgeTx;
 
       if (sourceChainId === 5042002) {
-        // Arc to Base Sepolia (outbound)
-        bridgeTx = await bridge.bridge(amount, destinationChainId);
+        // Arc to Base Sepolia (outbound) with timeout
+        bridgeTx = await withTimeout(
+          bridge.bridge(amount, destinationChainId),
+          CONFIG.BRIDGE_TIMEOUT,
+          'Bridge transaction'
+        );
       } else {
-        // Base Sepolia to Arc (inbound)
-        bridgeTx = await bridge.bridgeInbound(amount, sourceChainId);
+        // Base Sepolia to Arc (inbound) with timeout
+        bridgeTx = await withTimeout(
+          bridge.bridgeInbound(amount, sourceChainId),
+          CONFIG.BRIDGE_TIMEOUT,
+          'Bridge inbound transaction'
+        );
       }
 
       logger.info('Bridge transaction initiated', {

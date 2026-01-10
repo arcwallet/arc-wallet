@@ -65,9 +65,10 @@ const tokens = {
 // ============================================
 // Diamond Logo Icon
 // ============================================
-const DiamondIcon: React.FC<{ size?: number; className?: string }> = ({
+const DiamondIcon: React.FC<{ size?: number; className?: string; style?: React.CSSProperties }> = ({
   size = 20,
   className = '',
+  style = {},
 }) => (
   <svg
     width={size}
@@ -75,6 +76,7 @@ const DiamondIcon: React.FC<{ size?: number; className?: string }> = ({
     viewBox="0 0 24 24"
     fill="none"
     className={className}
+    style={style}
   >
     <path
       d="M12 2L2 9L12 22L22 9L12 2Z"
