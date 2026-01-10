@@ -1,17 +1,23 @@
 /**
- * Arc Agent Page
+ * Arc Assistant Page
  *
- * Full-page AI agent interface for Arc Wallet.
- * Provides chat interface, spending tracker, and settings.
+ * Smart command interface for Arc Wallet.
+ * Execute transactions, check balances, and get market info.
  */
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useAgent } from '../contexts/AgentContext';
-import { RobotIcon } from './Icons';
 
 // ============================================
 // Icons
 // ============================================
+
+const CommandIcon = ({ size = 20, className = '' }: { size?: number; className?: string }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <polyline points="4 17 10 11 4 5" />
+    <line x1="12" y1="19" x2="20" y2="19" />
+  </svg>
+);
 
 const SendIcon = ({ size = 20 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -61,14 +67,14 @@ const PaymentApprovalModal: React.FC = () => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="bg-slate-800 rounded-2xl p-6 max-w-sm mx-4 shadow-2xl border border-slate-600/50">
+      <div className="bg-slate-800 rounded-2xl p-6 max-w-sm mx-4 shadow-2xl border border-slate-700/50">
         <div className="flex items-center gap-3 mb-4">
-          <div className="w-12 h-12 rounded-full bg-blue-500/20 flex items-center justify-center">
+          <div className="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center">
             <DollarIcon size={24} />
           </div>
           <div>
-            <h3 className="text-lg font-semibold text-white">Payment Required</h3>
-            <p className="text-sm text-slate-400">x402 Service Fee</p>
+            <h3 className="text-lg font-semibold text-white">Confirm Payment</h3>
+            <p className="text-sm text-slate-400">Service Fee</p>
           </div>
         </div>
 
@@ -131,17 +137,17 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
   return (
     <div className={`flex gap-3 ${isUser ? 'flex-row-reverse' : ''}`}>
       {!isUser && (
-        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0">
-          <RobotIcon size={20} className="text-white" />
+        <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center flex-shrink-0">
+          <CommandIcon size={20} className="text-blue-400" />
         </div>
       )}
       <div
         className={`max-w-[70%] rounded-2xl px-5 py-4 ${
           isUser
-            ? 'bg-blue-500 text-white'
+            ? 'bg-blue-500/10 text-white border border-blue-500/20'
             : message.error
-            ? 'bg-red-500/20 text-red-200 border border-red-500/30'
-            : 'bg-slate-700/50 text-slate-100'
+            ? 'bg-red-500/10 text-red-200 border border-red-500/20'
+            : 'bg-slate-800/80 text-slate-100 border border-slate-700/50'
         }`}
       >
         <div className="text-sm whitespace-pre-wrap break-words leading-relaxed">
@@ -190,9 +196,9 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="bg-slate-800 rounded-2xl p-6 w-full max-w-md mx-4 shadow-2xl border border-slate-600/50">
+      <div className="bg-slate-800 rounded-2xl p-6 w-full max-w-md mx-4 shadow-2xl border border-slate-700/50">
         <div className="flex items-center justify-between mb-6">
-          <h3 className="text-xl font-semibold text-white">Agent Settings</h3>
+          <h3 className="text-xl font-semibold text-white">Settings</h3>
           <button onClick={onClose} className="text-slate-400 hover:text-white p-2 hover:bg-slate-700 rounded-lg transition-colors">
             <CloseIcon size={20} />
           </button>
@@ -305,12 +311,12 @@ const AgentPage: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
-            <RobotIcon size={28} className="text-white" />
+          <div className="w-14 h-14 rounded-2xl bg-blue-500/10 flex items-center justify-center">
+            <CommandIcon size={28} className="text-blue-400" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-white">Arc Agent</h1>
-            <p className="text-sm text-slate-400">AI-powered wallet assistant with x402 micropayments</p>
+            <h1 className="text-2xl font-bold text-white">Smart Assistant</h1>
+            <p className="text-sm text-slate-400">Execute commands and manage your wallet</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -334,7 +340,7 @@ const AgentPage: React.FC = () => {
       {/* Spending Tracker */}
       <div className="bg-slate-800/50 rounded-xl p-4 mb-4 border border-slate-700/50">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-sm text-slate-400">Today's Spending</span>
+          <span className="text-sm text-slate-400">Daily Limit</span>
           <span className={`text-sm font-medium ${isNearLimit ? 'text-amber-400' : 'text-slate-300'}`}>
             ${spending.today.toFixed(2)} / ${policy.dailyBudget.toFixed(2)} USDC
           </span>
@@ -342,7 +348,7 @@ const AgentPage: React.FC = () => {
         <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
           <div
             className={`h-full rounded-full transition-all ${
-              isNearLimit ? 'bg-amber-500' : 'bg-gradient-to-r from-blue-500 to-purple-500'
+              isNearLimit ? 'bg-amber-500' : 'bg-blue-500'
             }`}
             style={{ width: `${Math.min(percentUsed, 100)}%` }}
           />
@@ -353,24 +359,24 @@ const AgentPage: React.FC = () => {
       <div className="flex-1 overflow-y-auto bg-slate-800/30 rounded-xl border border-slate-700/50 p-4 space-y-4 mb-4">
         {messages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center px-4 py-12">
-            <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-blue-500/20 to-purple-600/20 flex items-center justify-center mb-6">
-              <RobotIcon size={40} className="text-blue-400" />
+            <div className="w-20 h-20 rounded-2xl bg-blue-500/10 flex items-center justify-center mb-6">
+              <CommandIcon size={40} className="text-blue-400" />
             </div>
-            <h3 className="text-xl font-semibold text-white mb-2">Hi, I'm Arc Agent</h3>
+            <h3 className="text-xl font-semibold text-white mb-2">How can I help?</h3>
             <p className="text-slate-400 mb-6 max-w-md">
-              I can help you send tokens, swap currencies, analyze wallets for risks, get real-time prices, and summarize market news.
+              Send tokens, swap currencies, check wallet risks, get prices, and view market updates.
             </p>
             <div className="grid grid-cols-2 gap-3 w-full max-w-md">
               {[
-                { label: 'Analyze wallet', value: 'Analyze 0x742d35Cc6634C0532925a3b844Bc454e4438f44e' },
-                { label: 'Get ETH price', value: 'What is the price of ETH?' },
+                { label: 'Check wallet', value: 'Analyze 0x742d35Cc6634C0532925a3b844Bc454e4438f44e' },
+                { label: 'ETH price', value: 'What is the price of ETH?' },
                 { label: 'Send tokens', value: 'Send 10 USDC to 0x...' },
                 { label: 'Market news', value: 'Show me the latest crypto news' },
               ].map((suggestion) => (
                 <button
                   key={suggestion.label}
                   onClick={() => setInputValue(suggestion.value)}
-                  className="px-4 py-3 bg-slate-700/50 hover:bg-slate-700 text-sm text-slate-300 rounded-xl transition-colors text-left border border-slate-600/30 hover:border-slate-500/50"
+                  className="px-4 py-3 bg-slate-800/80 hover:bg-slate-700 text-sm text-slate-300 rounded-xl transition-colors text-left border border-slate-700/50 hover:border-blue-500/30"
                 >
                   {suggestion.label}
                 </button>
@@ -383,14 +389,14 @@ const AgentPage: React.FC = () => {
 
         {isProcessing && (
           <div className="flex gap-3">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0">
-              <RobotIcon size={20} className="text-white" />
+            <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center flex-shrink-0">
+              <CommandIcon size={20} className="text-blue-400" />
             </div>
-            <div className="bg-slate-700/50 rounded-2xl px-5 py-4">
+            <div className="bg-slate-800/80 rounded-2xl px-5 py-4 border border-slate-700/50">
               <div className="flex gap-1.5">
-                <span className="w-2.5 h-2.5 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                <span className="w-2.5 h-2.5 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                <span className="w-2.5 h-2.5 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                <span className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                <span className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                <span className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
               </div>
             </div>
           </div>
@@ -406,14 +412,14 @@ const AgentPage: React.FC = () => {
           type="text"
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
-          placeholder="Ask Arc Agent anything..."
+          placeholder="Type a command..."
           disabled={isProcessing}
-          className="flex-1 px-5 py-4 bg-slate-800/50 border border-slate-700/50 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 disabled:opacity-50 text-base"
+          className="flex-1 px-5 py-4 bg-slate-800/50 border border-slate-700/50 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-blue-500/50 disabled:opacity-50 text-base"
         />
         <button
           type="submit"
           disabled={!inputValue.trim() || isProcessing}
-          className="px-6 py-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-xl hover:from-blue-400 hover:to-purple-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-500/20"
+          className="px-6 py-4 bg-blue-500 text-white rounded-xl hover:bg-blue-400 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <SendIcon size={22} />
         </button>
