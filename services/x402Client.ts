@@ -9,8 +9,8 @@
 import { circleWalletService } from './circleWalletService';
 import { logger } from './logger';
 
-// API Configuration
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+// API Configuration - Use same backend URL as other services
+const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_PASSKEY_API_URL || 'https://arcwallet-backend.onrender.com';
 
 // x402 Payment Requirements from server
 export interface X402PaymentRequirements {
