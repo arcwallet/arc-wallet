@@ -241,12 +241,24 @@ export async function parseIntent(message: string): Promise<{
   };
   confidence: number;
 }> {
-  const response = await fetch(`${API_BASE_URL}/api/agent/parse-intent`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message }),
-  });
-  return response.json();
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/agent/parse-intent`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message }),
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || `Request failed: ${response.status}`);
+    }
+
+    return response.json();
+  } catch (error: any) {
+    logger.error('parseIntent failed', { component: 'x402Client', errorMsg: error.message });
+    throw error;
+  }
 }
 
 /**
