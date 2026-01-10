@@ -118,13 +118,17 @@ Return a JSON object with fields: type, params, confidence (0-1), message.`;
             return this.mockParseIntent(userMessage);
         }
         try {
-            const result = await this.model.generateContent([
-                { role: 'system', parts: [{ text: this.getSystemPrompt() }] },
-                { role: 'user', parts: [{ text: userMessage }] },
-            ]);
-            const text = result.response?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+            // Use combined prompt for Gemini 2.0 compatibility
+            const fullPrompt = `${this.getSystemPrompt()}\n\nUser message: "${userMessage}"\n\nRespond with only valid JSON:`;
+            const result = await this.model.generateContent(fullPrompt);
+            const text = result.response?.text?.() || result.response?.candidates?.[0]?.content?.parts?.[0]?.text;
             if (!text) throw new Error('No response from Gemini');
-            const parsed = JSON.parse(text);
+
+            // Extract JSON from response (handle markdown code blocks)
+            const jsonMatch = text.match(/```json\n?([\s\S]*?)\n?```/) || text.match(/\{[\s\S]*\}/);
+            const jsonStr = jsonMatch ? (jsonMatch[1] || jsonMatch[0]) : text;
+            const parsed = JSON.parse(jsonStr.trim());
+
             const intent = IntentSchema.parse({ type: parsed.type, params: parsed.params });
             return {
                 message: parsed.message || 'Processed.',
