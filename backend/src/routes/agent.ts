@@ -1,13 +1,3 @@
-/**
- * Arc Agent API Routes
- *
- * x402-protected endpoints for Arc Agent capabilities:
- * - Wallet risk analysis
- * - Token price data
- * - News/market summary
- * - Intent parsing (AI)
- */
-
 import { Router, Request, Response } from 'express';
 import { x402Middleware } from '../middleware/x402.js';
 import { aiService } from '../services/aiService.js';
@@ -27,9 +17,6 @@ const PRICING = {
 export function createAgentRoutes(): Router {
   const router = Router();
 
-  /**
-   * Health check (no payment required)
-   */
   router.get('/health', (_req: Request, res: Response) => {
     res.json({
       status: 'ok',
@@ -39,9 +26,6 @@ export function createAgentRoutes(): Router {
     });
   });
 
-  /**
-   * Get pricing information (no payment required)
-   */
   router.get('/pricing', (_req: Request, res: Response) => {
     res.json({
       services: [
@@ -79,12 +63,9 @@ export function createAgentRoutes(): Router {
     });
   });
 
-  /**
-   * Parse user intent (no payment required - uses local AI)
-   */
   router.post('/parse-intent', async (req: Request, res: Response) => {
     try {
-      const { message } = req.body;
+      const { message, conversationHistory } = req.body;
 
       if (!message || typeof message !== 'string') {
         res.status(400).json({
@@ -94,7 +75,18 @@ export function createAgentRoutes(): Router {
         return;
       }
 
-      const result = await aiService.parseIntent(message);
+      // Validate conversation history format if provided
+      let history: Array<{ role: 'user' | 'assistant'; content: string }> | undefined;
+      if (conversationHistory && Array.isArray(conversationHistory)) {
+        history = conversationHistory
+          .filter((msg: any) => msg.role && msg.content)
+          .map((msg: any) => ({
+            role: msg.role === 'user' ? 'user' : 'assistant',
+            content: String(msg.content),
+          }));
+      }
+
+      const result = await aiService.parseIntent(message, history);
 
       res.json({
         success: true,
@@ -109,9 +101,6 @@ export function createAgentRoutes(): Router {
     }
   });
 
-  /**
-   * Wallet Risk Analysis (x402 protected)
-   */
   router.get(
     '/risk/:address',
     x402Middleware({
@@ -152,9 +141,6 @@ export function createAgentRoutes(): Router {
     }
   );
 
-  /**
-   * Token Price Data (x402 protected)
-   */
   router.get(
     '/price/:token',
     x402Middleware({
@@ -185,9 +171,6 @@ export function createAgentRoutes(): Router {
     }
   );
 
-  /**
-   * Market News Summary (x402 protected)
-   */
   router.get(
     '/news',
     x402Middleware({
@@ -218,13 +201,6 @@ export function createAgentRoutes(): Router {
   return router;
 }
 
-// ============================================
-// Service Functions
-// ============================================
-
-/**
- * Analyze wallet address for risk factors
- */
 async function analyzeWalletRisk(address: string): Promise<{
   riskScore: number;
   riskLevel: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
@@ -301,9 +277,6 @@ async function analyzeWalletRisk(address: string): Promise<{
   };
 }
 
-/**
- * Token ID mapping for CoinGecko API
- */
 const COINGECKO_IDS: Record<string, string> = {
   BTC: 'bitcoin',
   ETH: 'ethereum',
@@ -321,9 +294,6 @@ const COINGECKO_IDS: Record<string, string> = {
   USYC: 'usyc',
 };
 
-/**
- * Get token price data from CoinGecko API (real-time)
- */
 async function getTokenPrice(token: string): Promise<{
   price: number;
   currency: string;
@@ -390,9 +360,6 @@ async function getTokenPrice(token: string): Promise<{
   };
 }
 
-/**
- * Get market news summary
- */
 async function getNewsSummary(): Promise<{
   summary: string;
   headlines: Array<{ title: string; source: string; sentiment: string }>;

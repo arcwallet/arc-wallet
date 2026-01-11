@@ -153,7 +153,8 @@ export const CircleWalletProvider: React.FC<CircleWalletProviderProps> = ({ chil
   }, [isConnected, isReconnecting, refreshState, refreshBalance]);
 
   // Initialize and check for stored session on mount
-  // Automatically try to reconnect if there's a valid session
+  // CRITICAL: Only auto-reconnect if user has a valid SERVER session (verified via OTP)
+  // This prevents passkey prompt appearing before email/OTP verification
   useEffect(() => {
     refreshState();
 
@@ -165,11 +166,21 @@ export const CircleWalletProvider: React.FC<CircleWalletProviderProps> = ({ chil
       setAddress(storedSession.address);
       setUsername(storedSession.username);
 
-      // Automatically try to reconnect with passkey
-      // This will prompt for biometric/passkey verification
-      logger.info('Found stored session, attempting auto-reconnect', {
+      // IMPORTANT: Only auto-reconnect if user has valid server session
+      // currentEmail being set means user verified their email via OTP
+      if (!currentEmail) {
+        logger.info('Stored session found but no server session, waiting for OTP verification', {
+          component: 'CircleWalletContext',
+          address: storedSession.address,
+        });
+        return; // Don't auto-reconnect - wait for user to verify email first
+      }
+
+      // User has valid server session - safe to auto-reconnect
+      logger.info('Found stored session with valid server session, attempting auto-reconnect', {
         component: 'CircleWalletContext',
         address: storedSession.address,
+        email: currentEmail,
       });
 
       // Small delay to ensure UI is ready
@@ -185,7 +196,7 @@ export const CircleWalletProvider: React.FC<CircleWalletProviderProps> = ({ chil
 
       return () => clearTimeout(timer);
     }
-  }, []); // Only run once on mount - don't include refreshState in deps
+  }, [currentEmail]); // Re-run when currentEmail changes (after OTP verification)
 
   // Auto-refresh balance when connected
   useEffect(() => {

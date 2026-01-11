@@ -58,6 +58,12 @@ export const GetNewsIntentSchema = z.object({
     type: z.literal('GET_NEWS'),
     params: z.object({}),
 });
+export const GetTransactionsIntentSchema = z.object({
+    type: z.literal('GET_TRANSACTIONS'),
+    params: z.object({
+        address: z.string(),
+    }),
+});
 export const UnknownIntentSchema = z.object({
     type: z.literal('UNKNOWN'),
     params: z.object({}),
@@ -71,6 +77,7 @@ export const IntentSchema = z.discriminatedUnion('type', [
     AnalyzeWalletIntentSchema,
     GetPriceIntentSchema,
     GetNewsIntentSchema,
+    GetTransactionsIntentSchema,
     UnknownIntentSchema,
 ]);
 class AIService {
@@ -105,44 +112,60 @@ class AIService {
     getProvider() {
         return this.provider;
     }
-    async parseIntent(message) {
+    async parseIntent(message, conversationHistory) {
         try {
             // Use fine-tuned model if available
             if (this.provider === 'openai-finetuned' && this.openai && this.fineTunedModel) {
-                return await this.parseWithFineTunedModel(message);
+                return await this.parseWithFineTunedModel(message, conversationHistory);
             }
             // Use standard OpenAI
             if (this.provider === 'openai' && this.openai) {
-                return await this.parseWithOpenAI(message);
+                return await this.parseWithOpenAI(message, conversationHistory);
             }
             // Fallback to Gemini
-            return geminiService.parseIntent(message);
+            return geminiService.parseIntent(message, conversationHistory);
         }
         catch (error) {
             console.error('AI parsing error, falling back to Gemini:', error);
-            return geminiService.parseIntent(message);
+            return geminiService.parseIntent(message, conversationHistory);
         }
     }
     /**
      * Parse with fine-tuned model - BEST ACCURACY
      * The model was trained specifically for crypto wallet intents
      */
-    async parseWithFineTunedModel(message) {
+    async parseWithFineTunedModel(message, conversationHistory) {
         if (!this.openai || !this.fineTunedModel) {
             throw new Error('Fine-tuned model not configured');
         }
+        // Build messages array with conversation history
+        const messages = [
+            {
+                role: 'system',
+                content: `You are Arc Agent, a crypto wallet AI. Extract intent and respond in user's language.
+Intent types: SEND, SCHEDULED_SEND, SWAP, BRIDGE, CHECK_BALANCE, ANALYZE_WALLET, GET_PRICE, GET_NEWS, GET_TRANSACTIONS, UNKNOWN
+Use SCHEDULED_SEND when user wants to send later: "X dk/dakika sonra", "X saat sonra", "in X minutes", "later"
+SCHEDULED_SEND params: {token, amount, recipient, delayMinutes}
+Use GET_TRANSACTIONS when user pastes a wallet address or asks about transaction history: "0x...", "işlemler", "transactions", "history"
+GET_TRANSACTIONS params: {address}
+IMPORTANT: Use conversation history to understand context. If user refers to "aynı adrese" (same address), "ona" (to them), "oraya" (there), look at previous messages for the address/token/amount.`,
+            },
+        ];
+        // Add conversation history (last 10 messages for context)
+        if (conversationHistory && conversationHistory.length > 0) {
+            const recentHistory = conversationHistory.slice(-10);
+            for (const msg of recentHistory) {
+                messages.push({
+                    role: msg.role === 'user' ? 'user' : 'assistant',
+                    content: msg.content,
+                });
+            }
+        }
+        // Add current message
+        messages.push({ role: 'user', content: message });
         const response = await this.openai.chat.completions.create({
             model: this.fineTunedModel,
-            messages: [
-                {
-                    role: 'system',
-                    content: 'You are Arc Agent, a crypto wallet AI. Extract intent and respond in user\'s language.',
-                },
-                {
-                    role: 'user',
-                    content: message,
-                },
-            ],
+            messages,
             temperature: 0.2, // Low temperature for consistent outputs
             max_tokens: 500,
         });
@@ -160,26 +183,47 @@ class AIService {
     /**
      * Parse with standard OpenAI model
      */
-    async parseWithOpenAI(message) {
+    async parseWithOpenAI(message, conversationHistory) {
         if (!this.openai)
             throw new Error('OpenAI not configured');
-        const response = await this.openai.chat.completions.create({
-            model: 'gpt-4o-mini',
-            messages: [
-                {
-                    role: 'system',
-                    content: `You are a crypto wallet AI. Extract intent from user message in ANY language.
-Return JSON: {"type":"SEND|SWAP|BRIDGE|CHECK_BALANCE|ANALYZE_WALLET|GET_PRICE|GET_NEWS|UNKNOWN","params":{...},"confidence":0-1,"message":"response in user's language"}
-- SEND: {token, amount, recipient}
+        // Build messages array with conversation history
+        const messages = [
+            {
+                role: 'system',
+                content: `You are a crypto wallet AI. Extract intent from user message in ANY language.
+Return JSON: {"type":"SEND|SCHEDULED_SEND|SWAP|BRIDGE|CHECK_BALANCE|ANALYZE_WALLET|GET_PRICE|GET_NEWS|GET_TRANSACTIONS|UNKNOWN","params":{...},"confidence":0-1,"message":"response in user's language"}
+- SEND: {token, amount, recipient} - Immediate transfer
+- SCHEDULED_SEND: {token, amount, recipient, delayMinutes} - Transfer after delay. Use when user says "X dakika/saat sonra", "in X minutes", "later", "after X min"
+  * "10 dk sonra" = delayMinutes: 10
+  * "1 saat sonra" = delayMinutes: 60
+  * "yarın" or "tomorrow" = delayMinutes: 1440
 - SWAP: {fromToken, toToken, amount}
 - BRIDGE: {amount, fromChain, toChain}
-Default token is USDC. Extract numbers and 0x addresses from anywhere.`,
-                },
-                {
-                    role: 'user',
-                    content: message,
-                },
-            ],
+- GET_TRANSACTIONS: {address} - When user pastes a 0x address or asks for transaction history
+Default token is USDC. Extract numbers and 0x addresses from anywhere.
+
+IMPORTANT: Use conversation history to understand context references like:
+- "aynı adrese" (same address) / "same address" - use address from previous messages
+- "ona", "oraya" (to them/there) - refer to previous recipient
+- "aynı miktarı" (same amount) - use amount from previous messages
+- "tekrar", "bir daha" (again) - repeat previous action`,
+            },
+        ];
+        // Add conversation history (last 6 messages for context, fewer for JSON mode)
+        if (conversationHistory && conversationHistory.length > 0) {
+            const recentHistory = conversationHistory.slice(-6);
+            for (const msg of recentHistory) {
+                messages.push({
+                    role: msg.role === 'user' ? 'user' : 'assistant',
+                    content: msg.content,
+                });
+            }
+        }
+        // Add current message
+        messages.push({ role: 'user', content: message });
+        const response = await this.openai.chat.completions.create({
+            model: 'gpt-4o-mini',
+            messages,
             temperature: 0.3,
             max_tokens: 500,
             response_format: { type: 'json_object' },

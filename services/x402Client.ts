@@ -1,17 +1,7 @@
-/**
- * x402 Client Service
- *
- * Handles x402 Payment Required protocol for Arc Agent.
- * Automatically detects 402 responses, requests payment approval,
- * and retries with payment proof.
- */
-
 import { logger } from './logger';
 
-// API Configuration - Use same backend URL as other services
 const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_PASSKEY_API_URL || 'https://arcwallet-backend.onrender.com';
 
-// Lazy import circleWalletService only when needed for payments
 let _circleWalletService: any = null;
 async function getCircleWalletService() {
   if (!_circleWalletService) {
@@ -21,7 +11,6 @@ async function getCircleWalletService() {
   return _circleWalletService;
 }
 
-// x402 Payment Requirements from server
 export interface X402PaymentRequirements {
   price: string;
   token: string;
@@ -31,7 +20,6 @@ export interface X402PaymentRequirements {
   validUntil?: number;
 }
 
-// x402 Response when payment is required
 export interface X402PaymentRequiredResponse {
   error: string;
   code: 'PAYMENT_REQUIRED';
@@ -39,7 +27,6 @@ export interface X402PaymentRequiredResponse {
   message: string;
 }
 
-// Payment result after transaction
 export interface X402PaymentResult {
   txHash: string;
   amount: string;
@@ -47,23 +34,16 @@ export interface X402PaymentResult {
   timestamp: number;
 }
 
-// x402 fetch options
 export interface X402FetchOptions extends RequestInit {
   maxRetries?: number;
   onPaymentRequired?: (requirements: X402PaymentRequirements) => Promise<boolean>;
   onPaymentSent?: (result: X402PaymentResult) => void;
 }
 
-/**
- * Check if response is a 402 Payment Required
- */
 function isPaymentRequired(response: Response): boolean {
   return response.status === 402;
 }
 
-/**
- * Parse 402 response to get payment requirements
- */
 async function parsePaymentRequirements(
   response: Response
 ): Promise<X402PaymentRequirements> {
@@ -76,9 +56,6 @@ async function parsePaymentRequirements(
   return data.paymentRequirements;
 }
 
-/**
- * Execute USDC payment for x402
- */
 async function executePayment(
   requirements: X402PaymentRequirements
 ): Promise<X402PaymentResult> {
@@ -123,16 +100,6 @@ async function executePayment(
   }
 }
 
-/**
- * x402-aware fetch function
- *
- * Automatically handles 402 Payment Required responses:
- * 1. Detects 402 response
- * 2. Extracts payment requirements
- * 3. Calls onPaymentRequired callback for user approval
- * 4. Executes payment via Circle Wallet
- * 5. Retries request with payment proof
- */
 export async function x402Fetch(
   url: string,
   options: X402FetchOptions = {}
@@ -198,9 +165,6 @@ export async function x402Fetch(
   return response;
 }
 
-/**
- * x402 JSON fetch helper
- */
 export async function x402FetchJSON<T>(
   url: string,
   options: X402FetchOptions = {}
@@ -221,9 +185,6 @@ export async function x402FetchJSON<T>(
   return response.json();
 }
 
-/**
- * Get Agent API pricing info (no payment required)
- */
 export async function getAgentPricing(): Promise<{
   services: Array<{
     id: string;
@@ -239,10 +200,15 @@ export async function getAgentPricing(): Promise<{
   return response.json();
 }
 
-/**
- * Parse user intent (no payment required)
- */
-export async function parseIntent(message: string): Promise<{
+export interface ConversationMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export async function parseIntent(
+  message: string,
+  conversationHistory?: ConversationMessage[]
+): Promise<{
   success: boolean;
   message: string;
   intent: {
@@ -252,7 +218,7 @@ export async function parseIntent(message: string): Promise<{
   confidence: number;
 }> {
   const url = `${API_BASE_URL}/api/agent/parse-intent`;
-  console.log('[x402Client] parseIntent request to:', url);
+  logger.info('parseIntent request', { component: 'x402Client', url });
 
   try {
     const response = await fetch(url, {
@@ -261,12 +227,15 @@ export async function parseIntent(message: string): Promise<{
         'Content-Type': 'application/json',
         'Accept': 'application/json',
       },
-      body: JSON.stringify({ message }),
+      body: JSON.stringify({
+        message,
+        conversationHistory: conversationHistory?.slice(-10), // Send last 10 messages for context
+      }),
       credentials: 'include', // Include cookies for CORS
       mode: 'cors',
     });
 
-    console.log('[x402Client] parseIntent response status:', response.status);
+    logger.info('parseIntent response', { component: 'x402Client', status: response.status });
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
@@ -275,7 +244,7 @@ export async function parseIntent(message: string): Promise<{
 
     return response.json();
   } catch (error: any) {
-    console.error('[x402Client] parseIntent error:', error.message);
+    logger.error('parseIntent error', { component: 'x402Client', errorMsg: error.message });
     // Return fallback response instead of throwing
     return {
       success: true,
@@ -286,9 +255,6 @@ export async function parseIntent(message: string): Promise<{
   }
 }
 
-/**
- * Analyze wallet risk (x402 protected)
- */
 export async function analyzeWalletRisk(
   address: string,
   options: X402FetchOptions = {}
@@ -304,9 +270,6 @@ export async function analyzeWalletRisk(
   return x402FetchJSON(`/api/agent/risk/${address}`, options);
 }
 
-/**
- * Get token price (x402 protected)
- */
 export async function getTokenPrice(
   token: string,
   options: X402FetchOptions = {}
@@ -323,9 +286,6 @@ export async function getTokenPrice(
   return x402FetchJSON(`/api/agent/price/${token}`, options);
 }
 
-/**
- * Get market news summary (x402 protected)
- */
 export async function getNewsSummary(
   options: X402FetchOptions = {}
 ): Promise<{

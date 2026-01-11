@@ -55,6 +55,12 @@ export declare const GetNewsIntentSchema: z.ZodObject<{
     type: z.ZodLiteral<"GET_NEWS">;
     params: z.ZodObject<{}, z.core.$strip>;
 }, z.core.$strip>;
+export declare const GetTransactionsIntentSchema: z.ZodObject<{
+    type: z.ZodLiteral<"GET_TRANSACTIONS">;
+    params: z.ZodObject<{
+        address: z.ZodString;
+    }, z.core.$strip>;
+}, z.core.$strip>;
 export declare const UnknownIntentSchema: z.ZodObject<{
     type: z.ZodLiteral<"UNKNOWN">;
     params: z.ZodObject<{}, z.core.$strip>;
@@ -108,6 +114,11 @@ export declare const IntentSchema: z.ZodDiscriminatedUnion<[z.ZodObject<{
     type: z.ZodLiteral<"GET_NEWS">;
     params: z.ZodObject<{}, z.core.$strip>;
 }, z.core.$strip>, z.ZodObject<{
+    type: z.ZodLiteral<"GET_TRANSACTIONS">;
+    params: z.ZodObject<{
+        address: z.ZodString;
+    }, z.core.$strip>;
+}, z.core.$strip>, z.ZodObject<{
     type: z.ZodLiteral<"UNKNOWN">;
     params: z.ZodObject<{}, z.core.$strip>;
 }, z.core.$strip>], "type">;
@@ -117,6 +128,10 @@ export interface AgentResponse {
     intent: Intent;
     confidence: number;
 }
+export interface ConversationMessage {
+    role: 'user' | 'assistant';
+    content: string;
+}
 type AIProvider = 'openai-finetuned' | 'openai' | 'gemini' | 'mock';
 declare class AIService {
     private openai;
@@ -125,7 +140,7 @@ declare class AIService {
     constructor();
     private initializeProviders;
     getProvider(): AIProvider;
-    parseIntent(message: string): Promise<AgentResponse>;
+    parseIntent(message: string, conversationHistory?: ConversationMessage[]): Promise<AgentResponse>;
     /**
      * Parse with fine-tuned model - BEST ACCURACY
      * The model was trained specifically for crypto wallet intents

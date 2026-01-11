@@ -1,10 +1,3 @@
-/**
- * x402 Payment Required Middleware
- *
- * Implements the x402 protocol for Arc Agent micropayments.
- * When a request comes without valid payment, returns 402 with payment requirements.
- * When payment is verified, allows the request to proceed.
- */
 import { createPublicClient, http } from 'viem';
 // Arc Testnet configuration
 const ARC_TESTNET_RPC = 'https://rpc.testnet.arc.network';
@@ -12,15 +5,11 @@ const USDC_DECIMALS = 6;
 // Payment verification cache (txHash -> verified timestamp)
 const verifiedPayments = new Map();
 const PAYMENT_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
-/**
- * Creates x402 middleware for protecting API endpoints
- */
 export function x402Middleware(options) {
     return async (req, res, next) => {
         try {
             // Check for payment header
             const paymentTxHash = req.headers['x-payment-txhash'];
-            const paymentSignature = req.headers['x-payment-signature'];
             // If no payment provided, return 402 Payment Required
             if (!paymentTxHash) {
                 const paymentRequirements = {
@@ -94,9 +83,6 @@ export function x402Middleware(options) {
         }
     };
 }
-/**
- * Verify a payment transaction on-chain
- */
 async function verifyPayment(txHash, expectedRecipient, expectedAmount) {
     try {
         // For demo/testnet, we'll do a simplified verification
@@ -132,9 +118,6 @@ async function verifyPayment(txHash, expectedRecipient, expectedAmount) {
         return true;
     }
 }
-/**
- * Clean up expired cached payments periodically
- */
 setInterval(() => {
     const now = Date.now();
     for (const [txHash, data] of verifiedPayments.entries()) {

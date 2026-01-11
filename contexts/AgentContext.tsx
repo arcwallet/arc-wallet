@@ -1,13 +1,3 @@
-/**
- * Arc Agent Context
- *
- * React context for managing Arc Agent state:
- * - Conversation history
- * - Spending tracking
- * - Policy management
- * - Sidebar visibility
- */
-
 import React, {
   createContext,
   useCallback,
@@ -26,9 +16,6 @@ import {
 import { type X402PaymentRequirements, type X402PaymentResult } from '../services/x402Client';
 import { logger } from '../services/logger';
 
-// ============================================
-// Types
-// ============================================
 
 interface PendingPayment {
   requirements: X402PaymentRequirements;
@@ -65,15 +52,9 @@ interface AgentContextValue {
   setNavigationCallback: (cb: (page: string, data?: any) => void) => void;
 }
 
-// ============================================
-// Context
-// ============================================
 
 const AgentContext = createContext<AgentContextValue | undefined>(undefined);
 
-// ============================================
-// Provider
-// ============================================
 
 interface AgentProviderProps {
   children: ReactNode;
@@ -144,9 +125,6 @@ export const AgentProvider: React.FC<AgentProviderProps> = ({ children }) => {
     };
   }, []);
 
-  // ============================================
-  // Sidebar handlers
-  // ============================================
 
   const openAgent = useCallback(() => {
     setIsOpen(true);
@@ -162,9 +140,6 @@ export const AgentProvider: React.FC<AgentProviderProps> = ({ children }) => {
     setIsOpen((prev) => !prev);
   }, []);
 
-  // ============================================
-  // Message handlers
-  // ============================================
 
   const sendMessage = useCallback(
     async (message: string): Promise<AgentMessage> => {
@@ -194,14 +169,15 @@ export const AgentProvider: React.FC<AgentProviderProps> = ({ children }) => {
 
       setIsProcessing(true);
 
-      // Immediately add user message to UI
-      const userMsg: AgentMessage = {
-        id: `msg_${Date.now()}_user`,
+      // Add user message to local state immediately for instant feedback
+      // The actual message is also added in agentService, we'll sync after processing
+      const tempUserMsg: AgentMessage = {
+        id: `msg_${Date.now()}_user_temp`,
         role: 'user',
         content: message,
         timestamp: Date.now(),
       };
-      setMessages(prev => [...prev, userMsg]);
+      setMessages(prev => [...prev, tempUserMsg]);
 
       try {
         const response = await agentService.processMessage(message, {
@@ -262,26 +238,17 @@ export const AgentProvider: React.FC<AgentProviderProps> = ({ children }) => {
     setMessages([]);
   }, []);
 
-  // ============================================
-  // Spending handlers
-  // ============================================
 
   const refreshSpending = useCallback(() => {
     setSpending(agentService.getSpending());
   }, []);
 
-  // ============================================
-  // Policy handlers
-  // ============================================
 
   const updatePolicy = useCallback((updates: Partial<AgentPolicy>) => {
     agentService.updatePolicy(updates);
     setPolicy(agentService.getPolicy());
   }, []);
 
-  // ============================================
-  // Payment handlers
-  // ============================================
 
   const approvePayment = useCallback(() => {
     if (pendingPayment) {
@@ -297,9 +264,6 @@ export const AgentProvider: React.FC<AgentProviderProps> = ({ children }) => {
     }
   }, [pendingPayment]);
 
-  // ============================================
-  // Navigation callback
-  // ============================================
 
   const setNavigationCallback = useCallback(
     (cb: (page: string, data?: any) => void) => {
@@ -308,9 +272,6 @@ export const AgentProvider: React.FC<AgentProviderProps> = ({ children }) => {
     []
   );
 
-  // ============================================
-  // Context value
-  // ============================================
 
   const value: AgentContextValue = {
     isOpen,
@@ -338,9 +299,6 @@ export const AgentProvider: React.FC<AgentProviderProps> = ({ children }) => {
   );
 };
 
-// ============================================
-// Hook
-// ============================================
 
 export function useAgent(): AgentContextValue {
   const context = useContext(AgentContext);

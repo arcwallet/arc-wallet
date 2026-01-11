@@ -1,13 +1,3 @@
-/**
- * Arc Assistant - Institutional Crypto Design
- *
- * Design Direction: "Bloomberg Terminal meets Apple Pay"
- * Reference: Fireblocks, Anchorage Digital, Coinbase Prime, Ledger Enterprise
- *
- * NO: Glowing orbs, cyan accents, gradients, sparkles, floating particles
- * YES: Clean lines, flat surfaces, professional blue, 1px borders
- */
-
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   ArrowUpRight,
@@ -26,12 +16,14 @@ import {
   ExternalLink,
   ChevronLeft,
   ChevronRight,
+  Calendar,
+  XCircle,
 } from 'lucide-react';
 import { useAgent } from '../contexts/AgentContext';
+import { agentService } from '../services/agentService';
+import { scheduledTransactionService, type ScheduledTransaction } from '../services/scheduledTransactionService';
+import { useCircleWallet } from '../contexts/CircleWalletContext';
 
-// ============================================
-// Design Tokens (CSS Variables approach)
-// ============================================
 const tokens = {
   // Backgrounds
   bgPrimary: '#0B0F14',
@@ -62,9 +54,6 @@ const tokens = {
   transition: '150ms ease-out',
 };
 
-// ============================================
-// Diamond Logo Icon
-// ============================================
 const DiamondIcon: React.FC<{ size?: number; className?: string; style?: React.CSSProperties }> = ({
   size = 20,
   className = '',
@@ -101,9 +90,6 @@ const DiamondIcon: React.FC<{ size?: number; className?: string; style?: React.C
   </svg>
 );
 
-// ============================================
-// Action Card Component
-// ============================================
 interface ActionCardProps {
   icon: React.ReactNode;
   title: string;
@@ -163,9 +149,6 @@ const ActionCard: React.FC<ActionCardProps> = ({
   </button>
 );
 
-// ============================================
-// Suggestion Chip Component
-// ============================================
 interface SuggestionChipProps {
   text: string;
   onClick: () => void;
@@ -193,9 +176,6 @@ const SuggestionChip: React.FC<SuggestionChipProps> = ({ text, onClick }) => (
   </button>
 );
 
-// ============================================
-// Budget Bar Component
-// ============================================
 interface BudgetBarProps {
   spent: number;
   limit: number;
@@ -261,9 +241,110 @@ const BudgetBar: React.FC<BudgetBarProps> = ({
   );
 };
 
-// ============================================
-// Chat Message Component
-// ============================================
+interface ScheduledTransactionsPanelProps {
+  transactions: ScheduledTransaction[];
+  onCancel: (txId: string) => void;
+}
+
+const ScheduledTransactionsPanel: React.FC<ScheduledTransactionsPanelProps> = ({
+  transactions,
+  onCancel,
+}) => {
+  if (transactions.length === 0) return null;
+
+  const formatTimeRemaining = (executeAt: number): string => {
+    const now = Date.now();
+    const diff = executeAt - now;
+    if (diff <= 0) return 'Executing...';
+
+    const minutes = Math.floor(diff / 60000);
+    const seconds = Math.floor((diff % 60000) / 1000);
+
+    if (minutes > 0) {
+      return `${minutes}m ${seconds}s`;
+    }
+    return `${seconds}s`;
+  };
+
+  return (
+    <div
+      className="mx-4 mb-3 rounded-lg overflow-hidden"
+      style={{
+        backgroundColor: tokens.surface,
+        border: `1px solid ${tokens.border}`,
+      }}
+    >
+      <div
+        className="px-3 py-2 flex items-center gap-2"
+        style={{
+          borderBottom: `1px solid ${tokens.border}`,
+          backgroundColor: tokens.bgSecondary,
+        }}
+      >
+        <Calendar size={14} style={{ color: tokens.accent }} />
+        <span
+          className="text-xs font-medium"
+          style={{ color: tokens.textPrimary }}
+        >
+          Scheduled Transactions ({transactions.length})
+        </span>
+      </div>
+
+      <div className="divide-y" style={{ borderColor: tokens.border }}>
+        {transactions.map((tx) => (
+          <div
+            key={tx.id}
+            className="px-3 py-2 flex items-center justify-between"
+          >
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <span
+                  className="text-xs font-medium"
+                  style={{ color: tokens.textPrimary }}
+                >
+                  {tx.params.amount} {tx.params.token}
+                </span>
+                <span
+                  className="text-xs"
+                  style={{ color: tokens.textTertiary }}
+                >
+                  to {tx.params.recipient?.slice(0, 6)}...{tx.params.recipient?.slice(-4)}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 mt-1">
+                <Clock size={10} style={{ color: tokens.textSecondary }} />
+                <span
+                  className="text-xs font-mono"
+                  style={{ color: tokens.accent }}
+                >
+                  {formatTimeRemaining(tx.executeAt)}
+                </span>
+              </div>
+            </div>
+            <button
+              onClick={() => onCancel(tx.id)}
+              className="p-1.5 rounded transition-colors"
+              style={{
+                color: tokens.danger,
+                backgroundColor: 'transparent',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = `${tokens.danger}20`;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+              }}
+              title="Cancel transaction"
+            >
+              <XCircle size={16} />
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 interface Message {
   id: string;
   role: 'user' | 'agent';
@@ -428,9 +509,6 @@ const ChatMessage: React.FC<{ message: Message }> = ({ message }) => {
   );
 };
 
-// ============================================
-// Typing Indicator
-// ============================================
 const TypingIndicator: React.FC = () => (
   <div className="flex gap-3">
     <div
@@ -463,9 +541,6 @@ const TypingIndicator: React.FC = () => (
   </div>
 );
 
-// ============================================
-// Settings Panel
-// ============================================
 const SettingsPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const { policy, updatePolicy, spending } = useAgent();
   const [dailyBudget, setDailyBudget] = useState(policy.dailyBudget.toString());
@@ -576,9 +651,6 @@ const SettingsPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   );
 };
 
-// ============================================
-// Payment Modal
-// ============================================
 const PaymentModal: React.FC = () => {
   const { pendingPayment, approvePayment, rejectPayment } = useAgent();
 
@@ -675,9 +747,6 @@ const PaymentModal: React.FC = () => {
   );
 };
 
-// ============================================
-// Main Agent Page
-// ============================================
 const AgentPage: React.FC = () => {
   const {
     messages,
@@ -687,11 +756,38 @@ const AgentPage: React.FC = () => {
     spending,
     policy,
   } = useAgent();
+  const { walletAddress } = useCircleWallet();
 
   const [inputValue, setInputValue] = useState('');
   const [showSettings, setShowSettings] = useState(false);
+  const [scheduledTxs, setScheduledTxs] = useState<ScheduledTransaction[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Load and refresh scheduled transactions
+  useEffect(() => {
+    const loadScheduledTxs = () => {
+      const pending = scheduledTransactionService.getPendingTransactions(walletAddress || undefined);
+      setScheduledTxs(pending);
+    };
+
+    loadScheduledTxs();
+
+    // Refresh every second for countdown timer
+    const interval = setInterval(loadScheduledTxs, 1000);
+
+    return () => clearInterval(interval);
+  }, [walletAddress]);
+
+  // Handle cancel scheduled transaction
+  const handleCancelScheduledTx = useCallback((txId: string) => {
+    try {
+      scheduledTransactionService.cancel(txId);
+      setScheduledTxs(prev => prev.filter(tx => tx.id !== txId));
+    } catch (error) {
+      console.error('Failed to cancel scheduled transaction:', error);
+    }
+  }, []);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -828,6 +924,12 @@ const AgentPage: React.FC = () => {
       <div className="px-4 py-3">
         <BudgetBar spent={spending.today} limit={policy.dailyBudget} />
       </div>
+
+      {/* Scheduled Transactions */}
+      <ScheduledTransactionsPanel
+        transactions={scheduledTxs}
+        onCancel={handleCancelScheduledTx}
+      />
 
       {/* Messages Area */}
       <div

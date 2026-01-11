@@ -58,6 +58,12 @@ const GetNewsIntentSchema = z.object({
     type: z.literal('GET_NEWS'),
     params: z.object({}),
 });
+const GetTransactionsIntentSchema = z.object({
+    type: z.literal('GET_TRANSACTIONS'),
+    params: z.object({
+        address: z.string(),
+    }),
+});
 const UnknownIntentSchema = z.object({
     type: z.literal('UNKNOWN'),
     params: z.object({}),
@@ -71,6 +77,7 @@ const IntentSchema = z.discriminatedUnion('type', [
     AnalyzeWalletIntentSchema,
     GetPriceIntentSchema,
     GetNewsIntentSchema,
+    GetTransactionsIntentSchema,
     UnknownIntentSchema,
 ]);
 class GeminiService {
@@ -144,6 +151,13 @@ GET_NEWS: Market news (no params)
 
 UNKNOWN: Can't determine intent
 
+## CONTEXT UNDERSTANDING:
+When user refers to previous context, use conversation history:
+- "aynı adrese" / "same address" / "oraya" / "ona" = use recipient from previous message
+- "aynı miktarı" / "same amount" = use amount from previous message
+- "tekrar" / "bir daha" / "again" = repeat previous action
+- "onu" / "bunu" / "it" / "that" = refer to previous token/amount
+
 ## ENTITY EXTRACTION RULES:
 1. Numbers can be anywhere: "göndermek istiyorum 50 usdc" → amount: "50"
 2. Addresses are always 0x + 40 hex chars
@@ -175,14 +189,24 @@ User: "bakiyem ne kadar"
 User: "50 tane eurc al"
 {"type":"SWAP","params":{"amount":"50","fromToken":"USDC","toToken":"EURC"},"confidence":0.85,"message":"50 USDC'yi EURC'ye çeviriyorum"}`;
     }
-    async parseIntent(userMessage) {
+    async parseIntent(userMessage, conversationHistory) {
         if (!this.client || (!this.model && !this.tunedModel)) {
             return this.mockParseIntent(userMessage);
+        }
+        // Build conversation context string
+        let contextStr = '';
+        if (conversationHistory && conversationHistory.length > 0) {
+            const recentHistory = conversationHistory.slice(-6);
+            contextStr = '\n\n## CONVERSATION HISTORY (use for context references like "aynı adrese", "same address", "ona", "tekrar"):\n';
+            for (const msg of recentHistory) {
+                contextStr += `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}\n`;
+            }
         }
         // Try tuned model first if available
         if (this.isTuned && this.tunedModel) {
             try {
-                const result = await this.tunedModel.generateContent(userMessage);
+                const promptWithHistory = contextStr ? `${contextStr}\n\nCurrent message: ${userMessage}` : userMessage;
+                const result = await this.tunedModel.generateContent(promptWithHistory);
                 const text = result.response?.text?.() || result.response?.candidates?.[0]?.content?.parts?.[0]?.text;
                 if (!text)
                     throw new Error('No response from tuned model');
@@ -203,7 +227,7 @@ User: "50 tane eurc al"
         }
         // Base model with system prompt
         try {
-            const fullPrompt = `${this.getSystemPrompt()}\n\nUser message: "${userMessage}"\n\nRespond with only valid JSON:`;
+            const fullPrompt = `${this.getSystemPrompt()}${contextStr}\n\nUser message: "${userMessage}"\n\nRespond with only valid JSON:`;
             const result = await this.model.generateContent(fullPrompt);
             const text = result.response?.text?.() || result.response?.candidates?.[0]?.content?.parts?.[0]?.text;
             if (!text)
@@ -269,6 +293,16 @@ User: "50 tane eurc al"
                 confidence: 0.9,
             };
         }
+        // GET_TRANSACTIONS - when user pastes just an address or asks for tx history
+        const txKeywords = ['transaction', 'işlem', 'history', 'geçmiş', 'aktivite', 'activity'];
+        const isJustAddress = addressMatch && input.trim().length < 50 && !lower.includes('send') && !lower.includes('gönder') && !lower.includes('analiz') && !lower.includes('analyze');
+        if (isJustAddress || (addressMatch && txKeywords.some(k => lower.includes(k)))) {
+            return {
+                message: `${addressMatch[0].slice(0, 6)}...${addressMatch[0].slice(-4)} adresinin işlem geçmişi getiriliyor...`,
+                intent: { type: 'GET_TRANSACTIONS', params: { address: addressMatch[0] } },
+                confidence: 0.9,
+            };
+        }
         // BRIDGE - multilingual keywords
         const bridgeKeywords = ['bridge', 'köprü', 'köprüle', 'puente', 'brücke', 'cross-chain', 'to base', 'base sepolia'];
         if (bridgeKeywords.some(k => lower.includes(k))) {
@@ -278,7 +312,44 @@ User: "50 tane eurc al"
                 confidence: amount ? 0.85 : 0.5,
             };
         }
-        // SEND - multilingual keywords
+        // SCHEDULED_SEND - Check BEFORE regular SEND
+        // Turkish: "10 dk sonra", "5 dakika sonra", "1 saat sonra"
+        // English: "in 10 minutes", "after 5 min", "later"
+        const scheduledKeywords = ['sonra', 'later', 'schedule', 'after'];
+        const hasScheduledKeyword = scheduledKeywords.some(k => lower.includes(k)) ||
+            /in \d+ min/i.test(lower) || /after \d+ min/i.test(lower);
+        const sendKeywordsCheck = ['send', 'gönder', 'gonder', 'yolla', 'transfer'];
+        if (hasScheduledKeyword && sendKeywordsCheck.some(k => lower.includes(k))) {
+            const token = detectToken();
+            const recipient = addressMatch ? addressMatch[0] : '';
+            // Extract delay in minutes
+            let delayMinutes = 10; // default
+            const dkMatch = lower.match(/(\d+)\s*(dk|dakika)/);
+            const saatMatch = lower.match(/(\d+)\s*saat/);
+            const minMatch = lower.match(/(\d+)\s*min/);
+            const hourMatch = lower.match(/(\d+)\s*hour/);
+            if (dkMatch)
+                delayMinutes = parseInt(dkMatch[1]);
+            else if (saatMatch)
+                delayMinutes = parseInt(saatMatch[1]) * 60;
+            else if (minMatch)
+                delayMinutes = parseInt(minMatch[1]);
+            else if (hourMatch)
+                delayMinutes = parseInt(hourMatch[1]) * 60;
+            else if (lower.includes('yarın') || lower.includes('tomorrow'))
+                delayMinutes = 1440;
+            return {
+                message: recipient
+                    ? `Scheduling ${amount} ${token} to be sent in ${delayMinutes} minutes...`
+                    : `Please provide recipient address`,
+                intent: {
+                    type: 'SCHEDULED_SEND',
+                    params: { token, amount, recipient, delayMinutes }
+                },
+                confidence: recipient && amount ? 0.9 : 0.5,
+            };
+        }
+        // SEND - multilingual keywords (only if not scheduled)
         const sendKeywords = ['send', 'gönder', 'gonder', 'yolla', 'transfer', 'enviar', 'senden', 'mandar', 'at'];
         if (sendKeywords.some(k => lower.includes(k)) || (addressMatch && amount)) {
             const token = detectToken();

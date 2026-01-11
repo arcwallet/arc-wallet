@@ -7,7 +7,8 @@ import {
 } from '@simplewebauthn/server';
 import {
   RegistrationResponseJSON,
-  AuthenticationResponseJSON
+  AuthenticationResponseJSON,
+  AuthenticatorTransport
 } from '@simplewebauthn/types';
 import { randomUUID } from 'crypto';
 import { Database } from '../models/Database.js';
@@ -354,10 +355,14 @@ export class PasskeyController {
         const user = await this.db.getUserByUsername(normalizedUsername);
         if (user) {
           const userPasskeys = await this.db.getPasskeysByUserId(user.id);
+          // IMPORTANT: Include both 'internal' and 'hybrid' transports
+          // This ensures the browser auto-selects the correct passkey
+          // instead of showing a selection dialog
           allowCredentials = userPasskeys.map(passkey => ({
             id: passkey.credentialID,
-            transports: ['internal'] as any
+            transports: passkey.transports || ['internal', 'hybrid'] as AuthenticatorTransport[]
           }));
+          console.log('[PasskeyAuth] Found user passkeys, setting allowCredentials:', userPasskeys.length);
         } else {
           // User not found in DB - allow discoverable credential flow
           // SDK will handle recovery from chain if wallet is deployed

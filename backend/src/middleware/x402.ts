@@ -1,11 +1,3 @@
-/**
- * x402 Payment Required Middleware
- *
- * Implements the x402 protocol for Arc Agent micropayments.
- * When a request comes without valid payment, returns 402 with payment requirements.
- * When payment is verified, allows the request to proceed.
- */
-
 import { Request, Response, NextFunction } from 'express';
 import { createPublicClient, http, parseUnits, formatUnits } from 'viem';
 
@@ -35,15 +27,11 @@ export interface X402MiddlewareOptions {
   validitySeconds?: number; // How long the payment request is valid
 }
 
-/**
- * Creates x402 middleware for protecting API endpoints
- */
 export function x402Middleware(options: X402MiddlewareOptions) {
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
       // Check for payment header
       const paymentTxHash = req.headers['x-payment-txhash'] as string;
-      const paymentSignature = req.headers['x-payment-signature'] as string;
 
       // If no payment provided, return 402 Payment Required
       if (!paymentTxHash) {
@@ -128,9 +116,6 @@ export function x402Middleware(options: X402MiddlewareOptions) {
   };
 }
 
-/**
- * Verify a payment transaction on-chain
- */
 async function verifyPayment(
   txHash: string,
   expectedRecipient: string,
@@ -176,9 +161,6 @@ async function verifyPayment(
   }
 }
 
-/**
- * Clean up expired cached payments periodically
- */
 setInterval(() => {
   const now = Date.now();
   for (const [txHash, data] of verifiedPayments.entries()) {

@@ -1,12 +1,3 @@
-/**
- * Arc Agent API Routes
- *
- * x402-protected endpoints for Arc Agent capabilities:
- * - Wallet risk analysis
- * - Token price data
- * - News/market summary
- * - Intent parsing (AI)
- */
 import { Router } from 'express';
 import { x402Middleware } from '../middleware/x402.js';
 import { aiService } from '../services/aiService.js';
@@ -22,9 +13,6 @@ const PRICING = {
 };
 export function createAgentRoutes() {
     const router = Router();
-    /**
-     * Health check (no payment required)
-     */
     router.get('/health', (_req, res) => {
         res.json({
             status: 'ok',
@@ -33,9 +21,6 @@ export function createAgentRoutes() {
             timestamp: new Date().toISOString(),
         });
     });
-    /**
-     * Get pricing information (no payment required)
-     */
     router.get('/pricing', (_req, res) => {
         res.json({
             services: [
@@ -72,12 +57,9 @@ export function createAgentRoutes() {
             network: 'arc-testnet',
         });
     });
-    /**
-     * Parse user intent (no payment required - uses local AI)
-     */
     router.post('/parse-intent', async (req, res) => {
         try {
-            const { message } = req.body;
+            const { message, conversationHistory } = req.body;
             if (!message || typeof message !== 'string') {
                 res.status(400).json({
                     error: 'Invalid request',
@@ -85,7 +67,17 @@ export function createAgentRoutes() {
                 });
                 return;
             }
-            const result = await aiService.parseIntent(message);
+            // Validate conversation history format if provided
+            let history;
+            if (conversationHistory && Array.isArray(conversationHistory)) {
+                history = conversationHistory
+                    .filter((msg) => msg.role && msg.content)
+                    .map((msg) => ({
+                    role: msg.role === 'user' ? 'user' : 'assistant',
+                    content: String(msg.content),
+                }));
+            }
+            const result = await aiService.parseIntent(message, history);
             res.json({
                 success: true,
                 ...result,
@@ -99,9 +91,6 @@ export function createAgentRoutes() {
             });
         }
     });
-    /**
-     * Wallet Risk Analysis (x402 protected)
-     */
     router.get('/risk/:address', x402Middleware({
         price: PRICING.riskAnalysis,
         recipient: AGENT_PAYMENT_RECIPIENT,
@@ -135,9 +124,6 @@ export function createAgentRoutes() {
             });
         }
     });
-    /**
-     * Token Price Data (x402 protected)
-     */
     router.get('/price/:token', x402Middleware({
         price: PRICING.priceData,
         recipient: AGENT_PAYMENT_RECIPIENT,
@@ -162,9 +148,6 @@ export function createAgentRoutes() {
             });
         }
     });
-    /**
-     * Market News Summary (x402 protected)
-     */
     router.get('/news', x402Middleware({
         price: PRICING.newsSummary,
         recipient: AGENT_PAYMENT_RECIPIENT,
@@ -189,12 +172,6 @@ export function createAgentRoutes() {
     });
     return router;
 }
-// ============================================
-// Service Functions
-// ============================================
-/**
- * Analyze wallet address for risk factors
- */
 async function analyzeWalletRisk(address) {
     // Demo implementation - in production, integrate with AnChain.AI or similar
     const addressLower = address.toLowerCase();
@@ -260,9 +237,6 @@ async function analyzeWalletRisk(address) {
         },
     };
 }
-/**
- * Token ID mapping for CoinGecko API
- */
 const COINGECKO_IDS = {
     BTC: 'bitcoin',
     ETH: 'ethereum',
@@ -279,9 +253,6 @@ const COINGECKO_IDS = {
     ARC: 'arc-token',
     USYC: 'usyc',
 };
-/**
- * Get token price data from CoinGecko API (real-time)
- */
 async function getTokenPrice(token) {
     const tokenUpper = token.toUpperCase();
     // Stablecoins - return fixed values
@@ -334,9 +305,6 @@ async function getTokenPrice(token) {
         lastUpdated: new Date().toISOString(),
     };
 }
-/**
- * Get market news summary
- */
 async function getNewsSummary() {
     // Demo implementation - in production, use news API + AI summarization
     const headlines = [

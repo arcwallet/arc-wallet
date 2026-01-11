@@ -48,6 +48,11 @@ declare const IntentSchema: z.ZodDiscriminatedUnion<[z.ZodObject<{
     type: z.ZodLiteral<"GET_NEWS">;
     params: z.ZodObject<{}, z.core.$strip>;
 }, z.core.$strip>, z.ZodObject<{
+    type: z.ZodLiteral<"GET_TRANSACTIONS">;
+    params: z.ZodObject<{
+        address: z.ZodString;
+    }, z.core.$strip>;
+}, z.core.$strip>, z.ZodObject<{
     type: z.ZodLiteral<"UNKNOWN">;
     params: z.ZodObject<{}, z.core.$strip>;
 }, z.core.$strip>], "type">;
@@ -64,7 +69,10 @@ declare class GeminiService {
     private isTuned;
     constructor();
     private getSystemPrompt;
-    parseIntent(userMessage: string): Promise<AgentResponse>;
+    parseIntent(userMessage: string, conversationHistory?: Array<{
+        role: 'user' | 'assistant';
+        content: string;
+    }>): Promise<AgentResponse>;
     private mockParseIntent;
 }
 export declare const geminiService: GeminiService;
