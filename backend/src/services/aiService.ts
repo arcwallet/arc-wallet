@@ -179,13 +179,13 @@ class AIService {
         const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
             {
                 role: 'system',
-                content: `You are Arc Agent, a crypto wallet AI. Extract intent and respond in user's language.
+                content: `You are Arc Agent, a crypto wallet AI. Extract intent from user messages.
 Intent types: SEND, SCHEDULED_SEND, SWAP, BRIDGE, CHECK_BALANCE, ANALYZE_WALLET, GET_PRICE, GET_NEWS, GET_TRANSACTIONS, UNKNOWN
-Use SCHEDULED_SEND when user wants to send later: "X dk/dakika sonra", "X saat sonra", "in X minutes", "later"
+Use SCHEDULED_SEND when user wants to send later: "in X minutes", "after X hours", "later", "schedule"
 SCHEDULED_SEND params: {token, amount, recipient, delayMinutes}
-Use GET_TRANSACTIONS when user pastes a wallet address or asks about transaction history: "0x...", "işlemler", "transactions", "history"
+Use GET_TRANSACTIONS when user pastes a wallet address or asks about transaction history: "0x...", "transactions", "history"
 GET_TRANSACTIONS params: {address}
-IMPORTANT: Use conversation history to understand context. If user refers to "aynı adrese" (same address), "ona" (to them), "oraya" (there), look at previous messages for the address/token/amount.`,
+IMPORTANT: Use conversation history to understand context. If user refers to "same address", "to them", "there", look at previous messages for the address/token/amount.`,
             },
         ];
 
@@ -233,23 +233,23 @@ IMPORTANT: Use conversation history to understand context. If user refers to "ay
         const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
             {
                 role: 'system',
-                content: `You are a crypto wallet AI. Extract intent from user message in ANY language.
-Return JSON: {"type":"SEND|SCHEDULED_SEND|SWAP|BRIDGE|CHECK_BALANCE|ANALYZE_WALLET|GET_PRICE|GET_NEWS|GET_TRANSACTIONS|UNKNOWN","params":{...},"confidence":0-1,"message":"response in user's language"}
+                content: `You are a crypto wallet AI. Extract intent from user messages.
+Return JSON: {"type":"SEND|SCHEDULED_SEND|SWAP|BRIDGE|CHECK_BALANCE|ANALYZE_WALLET|GET_PRICE|GET_NEWS|GET_TRANSACTIONS|UNKNOWN","params":{...},"confidence":0-1,"message":"response message"}
 - SEND: {token, amount, recipient} - Immediate transfer
-- SCHEDULED_SEND: {token, amount, recipient, delayMinutes} - Transfer after delay. Use when user says "X dakika/saat sonra", "in X minutes", "later", "after X min"
-  * "10 dk sonra" = delayMinutes: 10
-  * "1 saat sonra" = delayMinutes: 60
-  * "yarın" or "tomorrow" = delayMinutes: 1440
+- SCHEDULED_SEND: {token, amount, recipient, delayMinutes} - Transfer after delay. Use when user says "in X minutes", "later", "after X min", "schedule"
+  * "in 10 minutes" = delayMinutes: 10
+  * "in 1 hour" = delayMinutes: 60
+  * "tomorrow" = delayMinutes: 1440
 - SWAP: {fromToken, toToken, amount}
 - BRIDGE: {amount, fromChain, toChain}
 - GET_TRANSACTIONS: {address} - When user pastes a 0x address or asks for transaction history
 Default token is USDC. Extract numbers and 0x addresses from anywhere.
 
 IMPORTANT: Use conversation history to understand context references like:
-- "aynı adrese" (same address) / "same address" - use address from previous messages
-- "ona", "oraya" (to them/there) - refer to previous recipient
-- "aynı miktarı" (same amount) - use amount from previous messages
-- "tekrar", "bir daha" (again) - repeat previous action`,
+- "same address" - use address from previous messages
+- "to them", "there" - refer to previous recipient
+- "same amount" - use amount from previous messages
+- "again" - repeat previous action`,
             },
         ];
 

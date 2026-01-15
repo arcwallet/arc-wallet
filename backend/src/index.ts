@@ -27,6 +27,8 @@ import { initIndexerDB } from './db/indexer.js';
 import { MagicSessionStore } from './magicLink/SessionStore.js';
 // Arc Agent x402 API routes
 import { createAgentRoutes } from './routes/agent.js';
+import agentControllerRouter from './controllers/agentController.js';
+import { initializeAgentDatabase } from './database/agentDatabase.js';
 import { loadConfig, validateConfig } from './utils/config.js';
 import { cookieMiddleware } from './middleware/cookies.js';
 import { setCsrfCookie, validateCsrfToken } from './middleware/csrf.js';
@@ -133,16 +135,18 @@ app.use('/api/history', createHistoryRouter());
 app.use('/api/webhooks', createWebhookRouter());
 app.use('/api/gas-station', createGasStationRouter());
 app.use('/api/recovery', createRecoveryRoutes(db, config, magicSessionStore));
-// Arc Agent x402 API
+// Arc Agent API - Controller routes (history, parse, stats)
+app.use('/api/agent', agentControllerRouter);
+// Arc Agent x402 API routes (pricing, risk analysis, price, news)
 app.use('/api/agent', createAgentRoutes());
 
 // Initialize indexer database
 console.log('🔧 Initializing indexer database...');
 initIndexerDB();
 
-// Agent database temporarily disabled - will integrate new AI solution
-// console.log('🔧 Initializing agent database...');
-// initializeAgentDatabase();
+// Initialize agent database for conversation history
+console.log('🔧 Initializing agent database...');
+initializeAgentDatabase();
 
 // Initialize and start indexer service (optional - can be disabled via env)
 const INDEXER_ENABLED = process.env.INDEXER_ENABLED !== 'false';

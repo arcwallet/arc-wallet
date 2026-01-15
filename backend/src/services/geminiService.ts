@@ -134,9 +134,9 @@ class GeminiService {
     }
 
     private getSystemPrompt(): string {
-        return `You are a crypto wallet AI that extracts transaction intent from natural language in ANY language.
+        return `You are a crypto wallet AI that extracts transaction intent from natural language.
 
-YOUR ONLY JOB: Extract structured data from user messages. Language doesn't matter - understand the INTENT.
+YOUR ONLY JOB: Extract structured data from user messages and understand the INTENT.
 
 ## INTENTS AND REQUIRED ENTITIES:
 
@@ -149,8 +149,8 @@ SCHEDULED_SEND: Transfer tokens at a future time
 - amount: number (REQUIRED)
 - token: string (default "USDC")
 - recipient: 0x address (REQUIRED)
-- delayMinutes: number (REQUIRED - convert time expressions: "10 dk" = 10, "1 saat" = 60, "yarın" = 1440)
-- Use this when user says: "X dakika/saat sonra", "later", "sonra", "after X minutes"
+- delayMinutes: number (REQUIRED - convert time expressions: "10 min" = 10, "1 hour" = 60, "tomorrow" = 1440)
+- Use this when user says: "in X minutes", "later", "after X minutes", "schedule"
 
 SWAP: Exchange tokens
 - amount: number (REQUIRED)
@@ -177,13 +177,13 @@ UNKNOWN: Can't determine intent
 
 ## CONTEXT UNDERSTANDING:
 When user refers to previous context, use conversation history:
-- "aynı adrese" / "same address" / "oraya" / "ona" = use recipient from previous message
-- "aynı miktarı" / "same amount" = use amount from previous message
-- "tekrar" / "bir daha" / "again" = repeat previous action
-- "onu" / "bunu" / "it" / "that" = refer to previous token/amount
+- "same address" / "there" / "them" = use recipient from previous message
+- "same amount" = use amount from previous message
+- "again" = repeat previous action
+- "it" / "that" = refer to previous token/amount
 
 ## ENTITY EXTRACTION RULES:
-1. Numbers can be anywhere: "göndermek istiyorum 50 usdc" → amount: "50"
+1. Numbers can be anywhere: "I want to send 50 usdc" → amount: "50"
 2. Addresses are always 0x + 40 hex chars
 3. Token names: USDC, EURC, ARC, ETH, BTC (case insensitive)
 4. Chain names: arc, base, base sepolia, sepolia
@@ -193,25 +193,22 @@ When user refers to previous context, use conversation history:
   "type": "SEND|SWAP|BRIDGE|CHECK_BALANCE|ANALYZE_WALLET|GET_PRICE|GET_NEWS|UNKNOWN",
   "params": { extracted entities },
   "confidence": 0.0-1.0,
-  "message": "Response in USER'S LANGUAGE - confirm what you'll do or ask for missing info"
+  "message": "Response confirming what you'll do or asking for missing info"
 }
 
 ## EXAMPLES:
 
-User: "0x742d35Cc6634C0532925a3b844Bc454e4438f44e adresine 25 usdc gönder"
-{"type":"SEND","params":{"amount":"25","token":"USDC","recipient":"0x742d35Cc6634C0532925a3b844Bc454e4438f44e"},"confidence":0.95,"message":"25 USDC gönderiyorum 0x742d...f44e adresine"}
-
-User: "quiero enviar 100 dolares a 0xabc123..."
-{"type":"SEND","params":{"amount":"100","token":"USDC","recipient":"0xabc123..."},"confidence":0.9,"message":"Enviando 100 USDC a 0xabc1..."}
+User: "send 25 usdc to 0x742d35Cc6634C0532925a3b844Bc454e4438f44e"
+{"type":"SEND","params":{"amount":"25","token":"USDC","recipient":"0x742d35Cc6634C0532925a3b844Bc454e4438f44e"},"confidence":0.95,"message":"Sending 25 USDC to 0x742d...f44e"}
 
 User: "bridge 50 to base"
 {"type":"BRIDGE","params":{"amount":"50","fromChain":"arc","toChain":"base sepolia"},"confidence":0.9,"message":"Bridging 50 USDC from Arc to Base Sepolia"}
 
-User: "bakiyem ne kadar"
-{"type":"CHECK_BALANCE","params":{},"confidence":0.95,"message":"Cüzdan bakiyenizi kontrol ediyorum"}
+User: "what's my balance"
+{"type":"CHECK_BALANCE","params":{},"confidence":0.95,"message":"Checking your wallet balance"}
 
-User: "50 tane eurc al"
-{"type":"SWAP","params":{"amount":"50","fromToken":"USDC","toToken":"EURC"},"confidence":0.85,"message":"50 USDC'yi EURC'ye çeviriyorum"}`;
+User: "buy 50 eurc"
+{"type":"SWAP","params":{"amount":"50","fromToken":"USDC","toToken":"EURC"},"confidence":0.85,"message":"Swapping 50 USDC to EURC"}`;
     }
 
     async parseIntent(userMessage: string, conversationHistory?: Array<{ role: 'user' | 'assistant'; content: string }>): Promise<AgentResponse> {
@@ -223,7 +220,7 @@ User: "50 tane eurc al"
         let contextStr = '';
         if (conversationHistory && conversationHistory.length > 0) {
             const recentHistory = conversationHistory.slice(-6);
-            contextStr = '\n\n## CONVERSATION HISTORY (use for context references like "aynı adrese", "same address", "ona", "tekrar"):\n';
+            contextStr = '\n\n## CONVERSATION HISTORY (use for context references like "same address", "again", "there"):\n';
             for (const msg of recentHistory) {
                 contextStr += `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}\n`;
             }
@@ -278,7 +275,7 @@ User: "50 tane eurc al"
     }
 
     private mockParseIntent(input: string): AgentResponse {
-        // Multilingual mock parser - fallback when Gemini unavailable
+        // English-only mock parser - fallback when Gemini unavailable
         const lower = input.toLowerCase();
         const addressMatch = input.match(/0x[a-fA-F0-9]{40}/);
         const amountMatch = input.match(/(\d+\.?\d*)/);
@@ -293,8 +290,8 @@ User: "50 tane eurc al"
             return 'USDC';
         };
 
-        // ANALYZE_WALLET - multilingual keywords
-        const analyzeKeywords = ['analyze', 'analiz', 'risk', 'güvenli', 'safe', 'check address', 'kontrol', 'analizar', 'sicher'];
+        // ANALYZE_WALLET
+        const analyzeKeywords = ['analyze', 'risk', 'safe', 'check address'];
         if (addressMatch && analyzeKeywords.some(k => lower.includes(k))) {
             return {
                 message: `Analyzing wallet ${addressMatch[0].slice(0, 6)}...${addressMatch[0].slice(-4)}`,
@@ -303,8 +300,8 @@ User: "50 tane eurc al"
             };
         }
 
-        // GET_PRICE - multilingual keywords
-        const priceKeywords = ['price', 'fiyat', 'precio', 'preis', 'worth', 'değer', 'kaç', 'how much is', 'quanto'];
+        // GET_PRICE
+        const priceKeywords = ['price', 'worth', 'how much is', 'value'];
         if (priceKeywords.some(k => lower.includes(k))) {
             return {
                 message: `Getting ${detectToken()} price...`,
@@ -313,8 +310,8 @@ User: "50 tane eurc al"
             };
         }
 
-        // GET_NEWS - multilingual keywords
-        const newsKeywords = ['news', 'haber', 'noticias', 'nachrichten', 'market', 'piyasa', 'mercado', 'markt'];
+        // GET_NEWS
+        const newsKeywords = ['news', 'market'];
         if (newsKeywords.some(k => lower.includes(k))) {
             return {
                 message: "Fetching market news...",
@@ -324,18 +321,18 @@ User: "50 tane eurc al"
         }
 
         // GET_TRANSACTIONS - when user pastes just an address or asks for tx history
-        const txKeywords = ['transaction', 'işlem', 'history', 'geçmiş', 'aktivite', 'activity'];
-        const isJustAddress = addressMatch && input.trim().length < 50 && !lower.includes('send') && !lower.includes('gönder') && !lower.includes('analiz') && !lower.includes('analyze');
+        const txKeywords = ['transaction', 'history', 'activity'];
+        const isJustAddress = addressMatch && input.trim().length < 50 && !lower.includes('send') && !lower.includes('analyze');
         if (isJustAddress || (addressMatch && txKeywords.some(k => lower.includes(k)))) {
             return {
-                message: `${addressMatch![0].slice(0, 6)}...${addressMatch![0].slice(-4)} adresinin işlem geçmişi getiriliyor...`,
+                message: `Fetching transaction history for ${addressMatch![0].slice(0, 6)}...${addressMatch![0].slice(-4)}...`,
                 intent: { type: 'GET_TRANSACTIONS', params: { address: addressMatch![0] } },
                 confidence: 0.9,
             };
         }
 
-        // BRIDGE - multilingual keywords
-        const bridgeKeywords = ['bridge', 'köprü', 'köprüle', 'puente', 'brücke', 'cross-chain', 'to base', 'base sepolia'];
+        // BRIDGE
+        const bridgeKeywords = ['bridge', 'cross-chain', 'to base', 'base sepolia'];
         if (bridgeKeywords.some(k => lower.includes(k))) {
             return {
                 message: amount ? `Bridging ${amount} USDC to Base Sepolia...` : 'Please specify amount to bridge',
@@ -345,12 +342,10 @@ User: "50 tane eurc al"
         }
 
         // SCHEDULED_SEND - Check BEFORE regular SEND
-        // Turkish: "10 dk sonra", "5 dakika sonra", "1 saat sonra"
-        // English: "in 10 minutes", "after 5 min", "later"
-        const scheduledKeywords = ['sonra', 'later', 'schedule', 'after'];
+        const scheduledKeywords = ['later', 'schedule', 'after'];
         const hasScheduledKeyword = scheduledKeywords.some(k => lower.includes(k)) ||
             /in \d+ min/i.test(lower) || /after \d+ min/i.test(lower);
-        const sendKeywordsCheck = ['send', 'gönder', 'gonder', 'yolla', 'transfer'];
+        const sendKeywordsCheck = ['send', 'transfer'];
 
         if (hasScheduledKeyword && sendKeywordsCheck.some(k => lower.includes(k))) {
             const token = detectToken();
@@ -358,16 +353,12 @@ User: "50 tane eurc al"
 
             // Extract delay in minutes
             let delayMinutes = 10; // default
-            const dkMatch = lower.match(/(\d+)\s*(dk|dakika)/);
-            const saatMatch = lower.match(/(\d+)\s*saat/);
             const minMatch = lower.match(/(\d+)\s*min/);
             const hourMatch = lower.match(/(\d+)\s*hour/);
 
-            if (dkMatch) delayMinutes = parseInt(dkMatch[1]);
-            else if (saatMatch) delayMinutes = parseInt(saatMatch[1]) * 60;
-            else if (minMatch) delayMinutes = parseInt(minMatch[1]);
+            if (minMatch) delayMinutes = parseInt(minMatch[1]);
             else if (hourMatch) delayMinutes = parseInt(hourMatch[1]) * 60;
-            else if (lower.includes('yarın') || lower.includes('tomorrow')) delayMinutes = 1440;
+            else if (lower.includes('tomorrow')) delayMinutes = 1440;
 
             return {
                 message: recipient
@@ -381,8 +372,8 @@ User: "50 tane eurc al"
             };
         }
 
-        // SEND - multilingual keywords (only if not scheduled)
-        const sendKeywords = ['send', 'gönder', 'gonder', 'yolla', 'transfer', 'enviar', 'senden', 'mandar', 'at'];
+        // SEND (only if not scheduled)
+        const sendKeywords = ['send', 'transfer'];
         if (sendKeywords.some(k => lower.includes(k)) || (addressMatch && amount)) {
             const token = detectToken();
             const recipient = addressMatch ? addressMatch[0] : '';
@@ -395,12 +386,12 @@ User: "50 tane eurc al"
             };
         }
 
-        // SWAP - multilingual keywords
-        const swapKeywords = ['swap', 'takas', 'değiştir', 'degistir', 'çevir', 'cevir', 'exchange', 'convert', 'intercambiar', 'tauschen', 'al ', 'buy'];
+        // SWAP
+        const swapKeywords = ['swap', 'exchange', 'convert', 'buy'];
         if (swapKeywords.some(k => lower.includes(k))) {
             let fromToken = 'USDC';
             let toToken = 'EURC';
-            if (lower.includes('eurc') && (lower.includes('usdc') || lower.includes('dolar'))) {
+            if (lower.includes('eurc') && lower.includes('usdc')) {
                 // Check order
                 if (lower.indexOf('eurc') < lower.indexOf('usdc')) {
                     fromToken = 'EURC'; toToken = 'USDC';
@@ -414,8 +405,8 @@ User: "50 tane eurc al"
             };
         }
 
-        // CHECK_BALANCE - multilingual keywords
-        const balanceKeywords = ['balance', 'bakiye', 'bakiyem', 'saldo', 'guthaben', 'ne kadar', 'how much do i have', 'cuanto tengo'];
+        // CHECK_BALANCE
+        const balanceKeywords = ['balance', 'how much do i have'];
         if (balanceKeywords.some(k => lower.includes(k))) {
             const token = lower.includes('usdc') ? 'USDC' : lower.includes('eurc') ? 'EURC' : undefined;
             return {

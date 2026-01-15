@@ -9,18 +9,15 @@ import {
 import { logger } from './logger';
 
 const CONFIG = {
-  // Timeouts (ms)
-  API_TIMEOUT: 15000,        // 15 seconds for API calls
-  SERVICE_TIMEOUT: 10000,    // 10 seconds for service initialization
-
-  // Operation timeouts
-  SEND_TIMEOUT: 60000,       // 60 seconds for send
-  SWAP_TIMEOUT: 60000,       // 60 seconds for swap
-  BRIDGE_TIMEOUT: 90000,     // 90 seconds for bridge
+  API_TIMEOUT: 15000,
+  SERVICE_TIMEOUT: 10000,
+  SEND_TIMEOUT: 60000,
+  SWAP_TIMEOUT: 60000,
+  BRIDGE_TIMEOUT: 90000,
 };
 
 const MESSAGES_STORAGE_KEY = 'arc_agent_messages';
-const MAX_STORED_MESSAGES = 50; // Keep last 50 messages
+const MAX_STORED_MESSAGES = 50;
 
 function withTimeout<T>(promise: Promise<T>, ms: number, operation: string): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -50,17 +47,9 @@ class LazyLoader<T> {
   }
 
   async get(): Promise<T> {
-    // Return cached instance
-    if (this.instance) {
-      return this.instance;
-    }
+    if (this.instance) return this.instance;
+    if (this.loadingPromise) return this.loadingPromise;
 
-    // If already loading, wait for that promise
-    if (this.loadingPromise) {
-      return this.loadingPromise;
-    }
-
-    // Start loading
     this.loadingPromise = this.loader()
       .then((result) => {
         this.instance = result;
@@ -85,7 +74,6 @@ class LazyLoader<T> {
   }
 }
 
-// Lazy loaders with mutex pattern
 const circleWalletLoader = new LazyLoader(async () => {
   const module = await import('./circleWalletService');
   return module.circleWalletService;
@@ -106,40 +94,22 @@ const tokenConfigLoader = new LazyLoader(async () => {
   return module;
 });
 
-// Helper functions with timeout protection
 async function getCircleWalletService() {
-  return withTimeout(
-    circleWalletLoader.get(),
-    CONFIG.SERVICE_TIMEOUT,
-    'CircleWallet initialization'
-  );
+  return withTimeout(circleWalletLoader.get(), CONFIG.SERVICE_TIMEOUT, 'CircleWallet initialization');
 }
 
 async function getBridgeService() {
-  return withTimeout(
-    bridgeServiceLoader.get(),
-    CONFIG.SERVICE_TIMEOUT,
-    'Bridge service initialization'
-  );
+  return withTimeout(bridgeServiceLoader.get(), CONFIG.SERVICE_TIMEOUT, 'Bridge service initialization');
 }
 
 async function getSwapService() {
-  return withTimeout(
-    swapServiceLoader.get(),
-    CONFIG.SERVICE_TIMEOUT,
-    'Swap service initialization'
-  );
+  return withTimeout(swapServiceLoader.get(), CONFIG.SERVICE_TIMEOUT, 'Swap service initialization');
 }
 
 async function getTokenConfig() {
-  return withTimeout(
-    tokenConfigLoader.get(),
-    CONFIG.SERVICE_TIMEOUT,
-    'Token config initialization'
-  );
+  return withTimeout(tokenConfigLoader.get(), CONFIG.SERVICE_TIMEOUT, 'Token config initialization');
 }
 
-// Chain IDs
 const CHAIN_IDS: Record<string, number> = {
   'arc': 5042002,
   'arc testnet': 5042002,
@@ -148,11 +118,10 @@ const CHAIN_IDS: Record<string, number> = {
   'sepolia': 84532,
 };
 
-// Token addresses on Arc Testnet
 const TOKEN_ADDRESSES: Record<string, string> = {
   USDC: '0xd988097fb8612cc24eeC14542bC03424c656005f',
   EURC: '0x08210F9170F89Ab7658F0B5E3fF39b0E03C594D4',
-  ARC: '0x0000000000000000000000000000000000000000', // Native token
+  ARC: '0x0000000000000000000000000000000000000000',
 };
 
 export type IntentType =
@@ -167,7 +136,6 @@ export type IntentType =
   | 'GET_TRANSACTIONS'
   | 'UNKNOWN';
 
-// Import scheduled transaction service
 import {
   scheduledTransactionService,
   type ScheduledTransaction,
@@ -192,10 +160,10 @@ export interface AgentMessage {
 }
 
 export interface AgentPolicy {
-  maxPerTransaction: number;  // Max USDC per transaction
-  dailyBudget: number;        // Daily spending limit
-  requirePasskey: boolean;    // Always require passkey for payments
-  allowedIntents: IntentType[]; // Allowed intent types
+  maxPerTransaction: number;
+  dailyBudget: number;
+  requirePasskey: boolean;
+  allowedIntents: IntentType[];
 }
 
 export interface AgentSpending {
@@ -205,11 +173,10 @@ export interface AgentSpending {
   lastTransaction?: X402PaymentResult;
 }
 
-// Default policy
 const DEFAULT_POLICY: AgentPolicy = {
-  maxPerTransaction: 0.10,  // $0.10 max per tx
-  dailyBudget: 10.00,       // $10.00 daily limit
-  requirePasskey: true,     // Always require passkey
+  maxPerTransaction: 0.10,
+  dailyBudget: 10.00,
+  requirePasskey: true,
   allowedIntents: [
     'SEND',
     'SCHEDULED_SEND',
@@ -223,7 +190,6 @@ const DEFAULT_POLICY: AgentPolicy = {
   ],
 };
 
-// x402 service costs
 const SERVICE_COSTS: Record<string, number> = {
   ANALYZE_WALLET: 0.02,
   GET_PRICE: 0.01,
@@ -232,65 +198,22 @@ const SERVICE_COSTS: Record<string, number> = {
 
 class AgentService {
   private policy: AgentPolicy = DEFAULT_POLICY;
-  private spending: AgentSpending = {
-    today: 0,
-    thisWeek: 0,
-    thisMonth: 0,
-  };
+  private spending: AgentSpending = { today: 0, thisWeek: 0, thisMonth: 0 };
   private messages: AgentMessage[] = [];
-  private lastUserLanguage: 'tr' | 'en' = 'en';
   private isInitialized: boolean = false;
   private initializationPromise: Promise<void> | null = null;
   private isProcessingMessage: boolean = false;
 
-  /**
-   * Detect user's language from message
-   */
-  private detectLanguage(message: string): 'tr' | 'en' {
-    const turkishIndicators = [
-      'merhaba', 'selam', 'nasıl', 'gönder', 'yolla', 'bakiye', 'fiyat',
-      'çevir', 'köprü', 'kaç', 'ne kadar', 'analiz', 'haber', 'lütfen',
-      'tamam', 'evet', 'hayır', 'teşekkür', 'güvenli', 'riskli'
-    ];
-    const lower = message.toLowerCase();
-    const hasTurkish = turkishIndicators.some(word => lower.includes(word));
-    this.lastUserLanguage = hasTurkish ? 'tr' : 'en';
-    return this.lastUserLanguage;
-  }
-
-  /**
-   * Get localized message
-   */
-  private t(tr: string, en: string): string {
-    return this.lastUserLanguage === 'tr' ? tr : en;
-  }
-
-  /**
-   * Check if service is ready
-   */
   isReady(): boolean {
     return this.isInitialized;
   }
 
-  /**
-   * Check if currently processing
-   */
   isProcessing(): boolean {
     return this.isProcessingMessage;
   }
 
-  /**
-   * Initialize agent service (thread-safe)
-   */
   initialize(): void {
-    if (this.isInitialized) {
-      return;
-    }
-
-    if (this.initializationPromise) {
-      return;
-    }
-
+    if (this.isInitialized || this.initializationPromise) return;
     this.initializationPromise = this.doInitialize();
   }
 
@@ -300,7 +223,6 @@ class AgentService {
       this.loadPolicyFromStorage();
       this.loadMessagesFromStorage();
 
-      // Initialize scheduled transaction service with execute callback
       scheduledTransactionService.initialize(async (tx) => {
         return this.executeScheduledTransaction(tx);
       });
@@ -308,20 +230,13 @@ class AgentService {
       this.isInitialized = true;
       logger.info('Agent service initialized', { component: 'AgentService' });
     } catch (error: any) {
-      logger.error('Agent service initialization failed', {
-        component: 'AgentService',
-        error: error.message,
-      });
-      // Still mark as initialized to prevent infinite retry
+      logger.error('Agent service initialization failed', { component: 'AgentService', error: error.message });
       this.isInitialized = true;
     } finally {
       this.initializationPromise = null;
     }
   }
 
-  /**
-   * Execute a scheduled transaction (called by ScheduledTransactionService)
-   */
   private async executeScheduledTransaction(tx: ScheduledTransaction): Promise<string> {
     const circleWallet = await getCircleWalletService();
     const state = circleWallet.getState();
@@ -335,10 +250,7 @@ class AgentService {
 
       if (tx.params.token === 'ARC') {
         const amountWei = BigInt(Math.floor(parseFloat(tx.params.amount) * 1e18));
-        return await circleWallet.sendTransaction({
-          to: tx.params.recipient,
-          value: amountWei,
-        });
+        return await circleWallet.sendTransaction({ to: tx.params.recipient, value: amountWei });
       } else {
         return await circleWallet.sendTokenTransfer({
           tokenAddress,
@@ -352,55 +264,31 @@ class AgentService {
     throw new Error(`Unsupported scheduled transaction type: ${tx.type}`);
   }
 
-  /**
-   * Wait for initialization to complete
-   */
   async waitForInitialization(): Promise<void> {
-    if (this.isInitialized) {
-      return;
-    }
-
+    if (this.isInitialized) return;
     if (this.initializationPromise) {
       await this.initializationPromise;
       return;
     }
-
-    // Initialize if not already started
     this.initialize();
     if (this.initializationPromise) {
       await this.initializationPromise;
     }
   }
 
-  /**
-   * Get current policy
-   */
   getPolicy(): AgentPolicy {
     return { ...this.policy };
   }
 
-  /**
-   * Update policy
-   */
   updatePolicy(updates: Partial<AgentPolicy>): void {
     this.policy = { ...this.policy, ...updates };
     this.savePolicyToStorage();
-    logger.info('Policy updated', {
-      component: 'AgentService',
-      policy: this.policy,
-    });
   }
 
-  /**
-   * Get current spending
-   */
   getSpending(): AgentSpending {
     return { ...this.spending };
   }
 
-  /**
-   * Get conversation history
-   */
   getMessages(): AgentMessage[] {
     return [...this.messages];
   }
@@ -415,30 +303,19 @@ class AgentService {
       const stored = localStorage.getItem(MESSAGES_STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored) as AgentMessage[];
-        // Only load recent messages
         this.messages = parsed.slice(-MAX_STORED_MESSAGES);
-        logger.info('Loaded conversation history', {
-          component: 'AgentService',
-          count: this.messages.length,
-        });
       }
     } catch (error) {
-      logger.error('Failed to load messages from storage', {
-        component: 'AgentService',
-      });
       this.messages = [];
     }
   }
 
   private saveMessagesToStorage(): void {
     try {
-      // Keep only recent messages
       const toStore = this.messages.slice(-MAX_STORED_MESSAGES);
       localStorage.setItem(MESSAGES_STORAGE_KEY, JSON.stringify(toStore));
     } catch (error) {
-      logger.error('Failed to save messages to storage', {
-        component: 'AgentService',
-      });
+      // Ignore
     }
   }
 
@@ -447,21 +324,7 @@ class AgentService {
     this.saveMessagesToStorage();
   }
 
-  /**
-   * Get quick action suggestions for UI
-   */
-  getQuickActions(language: 'tr' | 'en' = 'en'): Array<{ label: string; command: string; icon: string }> {
-    if (language === 'tr') {
-      return [
-        { label: 'Bakiye', command: 'bakiyem ne kadar', icon: '' },
-        { label: 'Gönder', command: '10 USDC gönder', icon: '' },
-        { label: 'Swap', command: '50 USDC EURC\'ye çevir', icon: '' },
-        { label: 'Bridge', command: '25 USDC base\'e köprüle', icon: '' },
-        { label: 'BTC Fiyat', command: 'bitcoin fiyatı', icon: '' },
-        { label: 'Haberler', command: 'kripto haberleri', icon: '' },
-      ];
-    }
-
+  getQuickActions(): Array<{ label: string; command: string; icon: string }> {
     return [
       { label: 'Balance', command: 'check my balance', icon: '' },
       { label: 'Send', command: 'send 10 USDC to', icon: '' },
@@ -472,75 +335,39 @@ class AgentService {
     ];
   }
 
-  /**
-   * Get suggested follow-up actions based on last intent
-   */
   getSuggestedActions(): Array<{ label: string; command: string }> {
     const lastAgentMessage = [...this.messages].reverse().find(m => m.role === 'agent');
-    if (!lastAgentMessage?.intent) {
-      return [];
-    }
-
-    const isTurkish = this.lastUserLanguage === 'tr';
+    if (!lastAgentMessage?.intent) return [];
 
     switch (lastAgentMessage.intent.type) {
       case 'SEND':
-        return isTurkish
-          ? [{ label: 'Bakiye kontrol', command: 'bakiyem ne kadar' }]
-          : [{ label: 'Check balance', command: 'check my balance' }];
-
+        return [{ label: 'Check balance', command: 'check my balance' }];
       case 'SWAP':
-        return isTurkish
-          ? [
-              { label: 'Bakiye kontrol', command: 'bakiyem ne kadar' },
-              { label: 'Başka swap', command: '50 EURC USDC\'ye çevir' },
-            ]
-          : [
-              { label: 'Check balance', command: 'check my balance' },
-              { label: 'Another swap', command: 'swap 50 EURC to USDC' },
-            ];
-
+        return [
+          { label: 'Check balance', command: 'check my balance' },
+          { label: 'Another swap', command: 'swap 50 EURC to USDC' },
+        ];
       case 'BRIDGE':
-        return isTurkish
-          ? [{ label: 'Bakiye kontrol', command: 'bakiyem ne kadar' }]
-          : [{ label: 'Check balance', command: 'check my balance' }];
-
+        return [{ label: 'Check balance', command: 'check my balance' }];
       case 'CHECK_BALANCE':
-        return isTurkish
-          ? [
-              { label: 'Swap yap', command: '50 USDC EURC\'ye çevir' },
-              { label: 'Bridge yap', command: '25 USDC base\'e köprüle' },
-            ]
-          : [
-              { label: 'Make a swap', command: 'swap 50 USDC to EURC' },
-              { label: 'Bridge tokens', command: 'bridge 25 USDC to base' },
-            ];
-
+        return [
+          { label: 'Make a swap', command: 'swap 50 USDC to EURC' },
+          { label: 'Bridge tokens', command: 'bridge 25 USDC to base' },
+        ];
       case 'GET_PRICE':
-        return isTurkish
-          ? [
-              { label: 'ETH fiyatı', command: 'ETH fiyatı' },
-              { label: 'Haberler', command: 'kripto haberleri' },
-            ]
-          : [
-              { label: 'ETH price', command: 'ETH price' },
-              { label: 'Market news', command: 'crypto news' },
-            ];
-
+        return [
+          { label: 'ETH price', command: 'ETH price' },
+          { label: 'Market news', command: 'crypto news' },
+        ];
       default:
         return [];
     }
   }
 
-  /**
-   * Process user message and execute intent
-   */
   async processMessage(
     userMessage: string,
     callbacks: {
-      onPaymentRequired?: (
-        requirements: X402PaymentRequirements
-      ) => Promise<boolean>;
+      onPaymentRequired?: (requirements: X402PaymentRequirements) => Promise<boolean>;
       onPaymentSent?: (result: X402PaymentResult) => void;
       onIntentParsed?: (intent: AgentIntent) => void;
       onNavigate?: (page: string, data?: any) => void;
@@ -548,27 +375,19 @@ class AgentService {
   ): Promise<AgentMessage> {
     const messageId = `msg_${Date.now()}_${Math.random().toString(36).slice(2)}`;
 
-    // Prevent concurrent message processing
     if (this.isProcessingMessage) {
-      const busyMsg: AgentMessage = {
+      return {
         id: `${messageId}_agent`,
         role: 'agent',
-        content: this.t(
-          'Lütfen önceki işlemin tamamlanmasını bekleyin.',
-          'Please wait for the previous operation to complete.'
-        ),
+        content: 'Please wait for the previous operation to complete.',
         timestamp: Date.now(),
         error: 'busy',
       };
-      return busyMsg;
     }
 
     this.isProcessingMessage = true;
-
-    // Ensure service is initialized
     await this.waitForInitialization();
 
-    // Add user message to history (will be synced to UI via getMessages())
     const userMsg: AgentMessage = {
       id: `${messageId}_user`,
       role: 'user',
@@ -577,22 +396,12 @@ class AgentService {
     };
     this.addMessage(userMsg);
 
-    // Notify UI immediately that user message was added
-    // This is handled by returning the message and letting caller sync
-
     try {
-      // Detect user language
-      this.detectLanguage(userMessage);
+      const conversationHistory = this.messages.slice(-10).map(msg => ({
+        role: msg.role === 'user' ? 'user' as const : 'assistant' as const,
+        content: msg.content,
+      }));
 
-      // Build conversation history for context
-      const conversationHistory = this.messages
-        .slice(-10) // Last 10 messages
-        .map(msg => ({
-          role: msg.role === 'user' ? 'user' as const : 'assistant' as const,
-          content: msg.content,
-        }));
-
-      // Parse intent - try API first with timeout, fallback to local
       let intentResult;
       try {
         intentResult = await withTimeout(
@@ -600,29 +409,28 @@ class AgentService {
           CONFIG.API_TIMEOUT,
           'Intent parsing'
         );
+
+        if (intentResult.intent?.type === 'SEND' && this.hasScheduledKeywords(userMessage)) {
+          logger.info('API returned SEND but message has scheduled keywords, using local parser', { component: 'AgentService' });
+          intentResult = this.localParseIntent(userMessage);
+        }
       } catch (parseError: any) {
-        logger.warn('API parse failed, using local parser', {
-          component: 'AgentService',
-          error: parseError.message,
-        });
+        logger.warn('API parse failed, using local parser', { component: 'AgentService', error: parseError.message });
         intentResult = this.localParseIntent(userMessage);
       }
+
       const intent = this.mapToAgentIntent(intentResult);
 
-      // Notify about parsed intent
       if (callbacks.onIntentParsed) {
         callbacks.onIntentParsed(intent);
       }
 
-      // Check if intent is allowed
       if (!this.policy.allowedIntents.includes(intent.type)) {
         throw new Error(`Intent type "${intent.type}" is not allowed by policy`);
       }
 
-      // Execute intent
       const response = await this.executeIntent(intent, callbacks);
 
-      // Create agent response message
       const agentMsg: AgentMessage = {
         id: `${messageId}_agent`,
         role: 'agent',
@@ -635,28 +443,15 @@ class AgentService {
 
       return agentMsg;
     } catch (error: any) {
-      logger.error('Agent processing error', {
-        component: 'AgentService',
-        errorMsg: error.message,
-      });
+      logger.error('Agent processing error', { component: 'AgentService', errorMsg: error.message });
 
-      // User-friendly error messages
       let userFriendlyError = error.message;
       if (error.message?.includes('timed out')) {
-        userFriendlyError = this.t(
-          'İşlem zaman aşımına uğradı. Lütfen tekrar deneyin.',
-          'Operation timed out. Please try again.'
-        );
+        userFriendlyError = 'Operation timed out. Please try again.';
       } else if (error.message?.includes('network') || error.message?.includes('fetch')) {
-        userFriendlyError = this.t(
-          'Ağ bağlantısı hatası. İnternet bağlantınızı kontrol edin.',
-          'Network error. Please check your internet connection.'
-        );
+        userFriendlyError = 'Network error. Please check your internet connection.';
       } else if (error.message?.includes('rejected') || error.message?.includes('cancelled')) {
-        userFriendlyError = this.t(
-          'İşlem iptal edildi.',
-          'Operation cancelled.'
-        );
+        userFriendlyError = 'Operation cancelled.';
       }
 
       const errorMsg: AgentMessage = {
@@ -674,84 +469,63 @@ class AgentService {
     }
   }
 
-  /**
-   * Map backend intent to AgentIntent
-   */
   private mapToAgentIntent(intentResult: any): AgentIntent {
     const type = intentResult.intent?.type || 'UNKNOWN';
     const params = intentResult.intent?.params || {};
     const confidence = intentResult.confidence || 0;
-
-    // Check if this intent requires payment
     const requiresPayment = ['ANALYZE_WALLET', 'GET_PRICE', 'GET_NEWS'].includes(type);
     const estimatedCost = SERVICE_COSTS[type]?.toString();
 
-    return {
-      type: type as IntentType,
-      params,
-      confidence,
-      requiresPayment,
-      estimatedCost,
-    };
+    return { type: type as IntentType, params, confidence, requiresPayment, estimatedCost };
   }
 
-  /**
-   * Local intent parser - fallback when API is unavailable
-   */
+  private hasScheduledKeywords(message: string): boolean {
+    const lower = message.toLowerCase();
+
+    const scheduledPatterns = [
+      'later', 'schedule', 'delayed', 'tomorrow',
+      /in \d+ min/i, /in \d+ hour/i, /after \d+ min/i, /after \d+ hour/i
+    ];
+
+    for (const pattern of scheduledPatterns) {
+      if (typeof pattern === 'string') {
+        if (lower.includes(pattern)) return true;
+      } else {
+        if (pattern.test(lower)) return true;
+      }
+    }
+
+    return false;
+  }
+
   private localParseIntent(input: string): { intent: { type: string; params: any }; confidence: number; message: string } {
     const lower = input.toLowerCase();
     const addressMatch = input.match(/0x[a-fA-F0-9]{40}/);
     const amountMatch = input.match(/(\d+\.?\d*)/);
     const amount = amountMatch ? amountMatch[1] : '';
 
-    // SCHEDULED_SEND detection - Check this BEFORE regular SEND
-    // Turkish: "10 dk sonra", "5 dakika sonra", "1 saat sonra", "yarın"
-    // English: "in 10 minutes", "after 5 min", "later"
-    const scheduledKeywords = [
-      'sonra', 'dakika sonra', 'dk sonra', 'saat sonra', 'later',
-      'in \\d+ min', 'after \\d+ min', 'schedule'
-    ];
-    const hasScheduledKeyword = scheduledKeywords.some(k => {
-      if (k.includes('\\d')) {
-        return new RegExp(k, 'i').test(lower);
-      }
-      return lower.includes(k);
-    });
+    // SCHEDULED_SEND detection
+    const hasScheduledKeyword = this.hasScheduledKeywords(input);
 
-    if (hasScheduledKeyword && (lower.includes('gönder') || lower.includes('send') || lower.includes('yolla') || lower.includes('transfer'))) {
+    if (hasScheduledKeyword && (lower.includes('send') || lower.includes('transfer'))) {
       const token = lower.includes('eurc') ? 'EURC' : lower.includes('arc') ? 'ARC' : 'USDC';
 
-      // Extract delay in minutes
-      let delayMinutes = 10; // default
-
-      // Turkish patterns: "10 dk", "10 dakika", "1 saat"
-      const dkMatch = lower.match(/(\d+)\s*(dk|dakika)/);
-      const saatMatch = lower.match(/(\d+)\s*saat/);
-      // English patterns: "10 min", "10 minutes", "1 hour"
+      let delayMinutes = 10;
       const minMatch = lower.match(/(\d+)\s*min/);
       const hourMatch = lower.match(/(\d+)\s*hour/);
 
-      if (dkMatch) {
-        delayMinutes = parseInt(dkMatch[1]);
-      } else if (saatMatch) {
-        delayMinutes = parseInt(saatMatch[1]) * 60;
-      } else if (minMatch) {
+      if (minMatch) {
         delayMinutes = parseInt(minMatch[1]);
       } else if (hourMatch) {
         delayMinutes = parseInt(hourMatch[1]) * 60;
-      } else if (lower.includes('yarın') || lower.includes('tomorrow')) {
-        delayMinutes = 1440; // 24 hours
+      } else if (lower.includes('tomorrow')) {
+        delayMinutes = 1440;
       }
 
       return {
         intent: {
           type: 'SCHEDULED_SEND',
-          params: {
-            token,
-            amount,
-            recipient: addressMatch?.[0] || '',
-            delayMinutes,
-          }
+          params: { token, amount, recipient: addressMatch?.[0] || '', delayMinutes }
         },
         confidence: addressMatch && amount ? 0.9 : 0.5,
         message: addressMatch
@@ -760,9 +534,8 @@ class AgentService {
       };
     }
 
-    // SEND detection (only if not scheduled)
-    const sendKeywords = ['send', 'gönder', 'gonder', 'yolla', 'transfer', 'enviar', 'at'];
-    if (sendKeywords.some(k => lower.includes(k)) || (addressMatch && amount)) {
+    // SEND detection
+    if (lower.includes('send') || lower.includes('transfer') || (addressMatch && amount)) {
       const token = lower.includes('eurc') ? 'EURC' : lower.includes('arc') ? 'ARC' : 'USDC';
       return {
         intent: { type: 'SEND', params: { token, amount, recipient: addressMatch?.[0] || '' } },
@@ -772,8 +545,7 @@ class AgentService {
     }
 
     // BRIDGE detection
-    const bridgeKeywords = ['bridge', 'köprü', 'koprule', 'base'];
-    if (bridgeKeywords.some(k => lower.includes(k))) {
+    if (lower.includes('bridge') || lower.includes('base')) {
       return {
         intent: { type: 'BRIDGE', params: { amount, fromChain: 'arc', toChain: 'base sepolia' } },
         confidence: amount ? 0.85 : 0.5,
@@ -782,8 +554,7 @@ class AgentService {
     }
 
     // SWAP detection
-    const swapKeywords = ['swap', 'takas', 'çevir', 'cevir', 'exchange', 'al'];
-    if (swapKeywords.some(k => lower.includes(k))) {
+    if (lower.includes('swap') || lower.includes('exchange')) {
       const toToken = lower.includes('eurc') ? 'EURC' : 'USDC';
       return {
         intent: { type: 'SWAP', params: { fromToken: 'USDC', toToken, amount } },
@@ -793,8 +564,7 @@ class AgentService {
     }
 
     // BALANCE detection
-    const balanceKeywords = ['balance', 'bakiye', 'ne kadar'];
-    if (balanceKeywords.some(k => lower.includes(k))) {
+    if (lower.includes('balance')) {
       return {
         intent: { type: 'CHECK_BALANCE', params: {} },
         confidence: 0.9,
@@ -803,8 +573,7 @@ class AgentService {
     }
 
     // PRICE detection
-    const priceKeywords = ['price', 'fiyat', 'kaç'];
-    if (priceKeywords.some(k => lower.includes(k))) {
+    if (lower.includes('price')) {
       const token = lower.includes('btc') ? 'BTC' : lower.includes('eth') ? 'ETH' : 'USDC';
       return {
         intent: { type: 'GET_PRICE', params: { token } },
@@ -814,7 +583,7 @@ class AgentService {
     }
 
     // ANALYZE detection
-    if (addressMatch && (lower.includes('analiz') || lower.includes('analyze') || lower.includes('risk') || lower.includes('güvenli'))) {
+    if (addressMatch && (lower.includes('analyze') || lower.includes('risk'))) {
       return {
         intent: { type: 'ANALYZE_WALLET', params: { address: addressMatch[0] } },
         confidence: 0.9,
@@ -823,8 +592,7 @@ class AgentService {
     }
 
     // NEWS detection
-    const newsKeywords = ['news', 'haber', 'piyasa', 'market'];
-    if (newsKeywords.some(k => lower.includes(k))) {
+    if (lower.includes('news') || lower.includes('market')) {
       return {
         intent: { type: 'GET_NEWS', params: {} },
         confidence: 0.9,
@@ -832,21 +600,27 @@ class AgentService {
       };
     }
 
-    // GET_TRANSACTIONS - when user pastes just an address or asks for transaction history
-    const txKeywords = ['transaction', 'işlem', 'history', 'geçmiş', 'aktivite', 'activity'];
-    const isJustAddress = addressMatch && input.trim().length < 50 && !lower.includes('send') && !lower.includes('gönder');
-    if (isJustAddress || (addressMatch && txKeywords.some(k => lower.includes(k)))) {
+    // GET_TRANSACTIONS detection
+    const txKeywords = ['transaction', 'history', 'activity', 'recent'];
+    const wantsTxHistory = txKeywords.some(k => lower.includes(k)) && !lower.includes('swap') && !lower.includes('bridge');
+    const isJustAddress = addressMatch && input.trim().length < 50 && !lower.includes('send');
+
+    if (isJustAddress || (addressMatch && wantsTxHistory)) {
       return {
         intent: { type: 'GET_TRANSACTIONS', params: { address: addressMatch![0] } },
         confidence: 0.9,
-        message: this.t(
-          `${addressMatch![0].slice(0, 6)}...${addressMatch![0].slice(-4)} adresinin işlemleri getiriliyor...`,
-          `Fetching transactions for ${addressMatch![0].slice(0, 6)}...${addressMatch![0].slice(-4)}...`
-        ),
+        message: `Fetching transactions for ${addressMatch![0].slice(0, 6)}...${addressMatch![0].slice(-4)}...`,
       };
     }
 
-    // Unknown
+    if (wantsTxHistory && !addressMatch) {
+      return {
+        intent: { type: 'GET_TRANSACTIONS', params: { address: null } },
+        confidence: 0.85,
+        message: 'Fetching your transaction history...',
+      };
+    }
+
     return {
       intent: { type: 'UNKNOWN', params: {} },
       confidence: 0.3,
@@ -854,81 +628,41 @@ class AgentService {
     };
   }
 
-  /**
-   * Execute parsed intent
-   */
   private async executeIntent(
     intent: AgentIntent,
     callbacks: {
-      onPaymentRequired?: (
-        requirements: X402PaymentRequirements
-      ) => Promise<boolean>;
+      onPaymentRequired?: (requirements: X402PaymentRequirements) => Promise<boolean>;
       onPaymentSent?: (result: X402PaymentResult) => void;
       onNavigate?: (page: string, data?: any) => void;
     }
   ): Promise<{ message: string; paymentInfo?: X402PaymentResult }> {
-    logger.info('Executing intent', {
-      component: 'AgentService',
-      intentType: intent.type,
-    });
+    logger.info('Executing intent', { component: 'AgentService', intentType: intent.type });
 
     switch (intent.type) {
       case 'SEND':
-        return this.handleSendIntent(intent, callbacks);
-
+        return this.handleSendIntent(intent);
       case 'SCHEDULED_SEND':
         return this.handleScheduledSendIntent(intent);
-
       case 'SWAP':
-        return this.handleSwapIntent(intent, callbacks);
-
+        return this.handleSwapIntent(intent);
       case 'BRIDGE':
-        return this.handleBridgeIntent(intent, callbacks);
-
+        return this.handleBridgeIntent(intent);
       case 'CHECK_BALANCE':
         return this.handleBalanceIntent(intent);
-
       case 'ANALYZE_WALLET':
         return this.handleAnalyzeWalletIntent(intent, callbacks);
-
       case 'GET_PRICE':
         return this.handlePriceIntent(intent, callbacks);
-
       case 'GET_NEWS':
         return this.handleNewsIntent(callbacks);
-
       case 'GET_TRANSACTIONS':
         return this.handleTransactionsIntent(intent);
-
       default:
-        return {
-          message: this.getHelpMessage(),
-        };
+        return { message: this.getHelpMessage() };
     }
   }
 
-  /**
-   * Get localized help message with quick actions
-   */
   private getHelpMessage(): string {
-    if (this.lastUserLanguage === 'tr') {
-      return `**Merhaba! Size nasıl yardımcı olabilirim?**
-
-**Hızlı Komutlar:**
-• "50 USDC gönder 0x..." - Token transfer
-• "100 USDC'yi EURC'ye çevir" - Swap
-• "50 USDC base'e köprüle" - Bridge
-• "bakiyem ne kadar" - Bakiye kontrolü
-• "ETH fiyatı ne" - Fiyat sorgulama
-• "0x... güvenli mi" - Cüzdan analizi
-• "kripto haberleri" - Piyasa haberleri
-
-**Örnek cümleler:**
-_"20 usdc yolla 0x742d..."_
-_"tüm USDC'mi EURC'ye çevir"_
-_"base sepolia'ya 10 usdc köprüle"_`;
-    }
-
     return `**Hello! How can I help you?**
 
 **Quick Commands:**
@@ -946,71 +680,41 @@ _"exchange all my USDC for EURC"_
 _"bridge 10 usdc to base sepolia"_`;
   }
 
-  /**
-   * Handle SEND intent - Execute transaction directly
-   */
-  private async handleSendIntent(
-    intent: AgentIntent,
-    _callbacks: { onNavigate?: (page: string, data?: any) => void }
-  ): Promise<{ message: string }> {
+  private async handleSendIntent(intent: AgentIntent): Promise<{ message: string }> {
     const { token = 'USDC', amount, recipient } = intent.params;
 
-    // Validate recipient address
     if (!recipient || !recipient.match(/^0x[a-fA-F0-9]{40}$/)) {
-      return {
-        message: `Please provide a valid recipient address. Example: "Send 10 USDC to 0x742d35Cc6634C0532925a3b844Bc454e4438f44e"`,
-      };
+      return { message: 'Please provide a valid recipient address. Example: "Send 10 USDC to 0x742d35Cc6634C0532925a3b844Bc454e4438f44e"' };
     }
 
-    // Validate amount
     if (!amount || parseFloat(amount) <= 0) {
-      return {
-        message: `Please specify the amount to send. Example: "Send 10 ${token} to ${recipient.slice(0, 6)}...${recipient.slice(-4)}"`,
-      };
+      return { message: `Please specify the amount to send. Example: "Send 10 ${token} to ${recipient.slice(0, 6)}...${recipient.slice(-4)}"` };
     }
 
-    // Get token address
     const tokenUpper = token.toUpperCase();
     const tokenAddress = TOKEN_ADDRESSES[tokenUpper];
     if (!tokenAddress && tokenUpper !== 'ARC') {
-      return {
-        message: `Token "${token}" is not supported. Supported tokens: USDC, EURC, ARC`,
-      };
+      return { message: `Token "${token}" is not supported. Supported tokens: USDC, EURC, ARC` };
     }
 
     try {
       const circleWallet = await getCircleWalletService();
-
-      // Check if wallet is connected
       const state = circleWallet.getState();
-      if (!state.isConnected || !state.address) {
-        return {
-          message: `Wallet not connected. Please connect your wallet first.`,
-        };
-      }
 
-      logger.info('Executing send transaction', {
-        component: 'AgentService',
-        token: tokenUpper,
-        amount,
-        recipient,
-      });
+      if (!state.isConnected || !state.address) {
+        return { message: 'Wallet not connected. Please connect your wallet first.' };
+      }
 
       let txHash: string;
 
       if (tokenUpper === 'ARC') {
-        // Send native ARC token with timeout
         const amountWei = BigInt(Math.floor(parseFloat(amount) * 1e18));
         txHash = await withTimeout(
-          circleWallet.sendTransaction({
-            to: recipient,
-            value: amountWei,
-          }),
+          circleWallet.sendTransaction({ to: recipient, value: amountWei }),
           CONFIG.SEND_TIMEOUT,
           'Send transaction'
         );
       } else {
-        // Send ERC20 token with timeout
         txHash = await withTimeout(
           circleWallet.sendTokenTransfer({
             tokenAddress,
@@ -1023,11 +727,6 @@ _"bridge 10 usdc to base sepolia"_`;
         );
       }
 
-      logger.info('Send transaction successful', {
-        component: 'AgentService',
-        txHash,
-      });
-
       const shortRecipient = `${recipient.slice(0, 6)}...${recipient.slice(-4)}`;
       const explorerUrl = `https://testnet.arcscan.app/tx/${txHash}`;
 
@@ -1035,67 +734,30 @@ _"bridge 10 usdc to base sepolia"_`;
         message: `**Transaction Sent!**\n\nSent ${amount} ${tokenUpper} to ${shortRecipient}\n\nTx: ${txHash.slice(0, 10)}...${txHash.slice(-8)}\n\n[View on Explorer](${explorerUrl})`,
       };
     } catch (error: any) {
-      logger.error('Send transaction failed', {
-        component: 'AgentService',
-        errorMsg: error.message,
-      });
-
-      // User-friendly error messages
       if (error.message?.includes('rejected') || error.message?.includes('denied')) {
-        return {
-          message: `Transaction cancelled. You can try again when ready.`,
-        };
+        return { message: 'Transaction cancelled. You can try again when ready.' };
       }
       if (error.message?.includes('insufficient')) {
-        return {
-          message: `Insufficient ${tokenUpper} balance. Please check your wallet balance.`,
-        };
+        return { message: `Insufficient ${tokenUpper} balance. Please check your wallet balance.` };
       }
-
-      return {
-        message: `Transaction failed: ${error.message}`,
-      };
+      return { message: `Transaction failed: ${error.message}` };
     }
   }
 
-  /**
-   * Handle SCHEDULED_SEND intent - Schedule a transaction for later
-   * Uses persistent ScheduledTransactionService
-   */
-  private async handleScheduledSendIntent(
-    intent: AgentIntent
-  ): Promise<{ message: string }> {
+  private async handleScheduledSendIntent(intent: AgentIntent): Promise<{ message: string }> {
     const { token = 'USDC', amount, recipient, delayMinutes } = intent.params;
 
-    // Validate recipient address
     if (!recipient || !recipient.match(/^0x[a-fA-F0-9]{40}$/)) {
-      return {
-        message: this.t(
-          'Lütfen geçerli bir alıcı adresi belirtin.',
-          'Please provide a valid recipient address.'
-        ),
-      };
+      return { message: 'Please provide a valid recipient address.' };
     }
 
-    // Validate amount
     if (!amount || parseFloat(amount) <= 0) {
-      return {
-        message: this.t(
-          'Lütfen gönderilecek miktarı belirtin.',
-          'Please specify the amount to send.'
-        ),
-      };
+      return { message: 'Please specify the amount to send.' };
     }
 
-    // Validate delay
     const delay = parseInt(delayMinutes) || 0;
     if (delay <= 0) {
-      return {
-        message: this.t(
-          'Lütfen geçerli bir süre belirtin. Örnek: "10 dakika sonra"',
-          'Please specify a valid delay. Example: "in 10 minutes"'
-        ),
-      };
+      return { message: 'Please specify a valid delay. Example: "in 10 minutes"' };
     }
 
     try {
@@ -1103,148 +765,63 @@ _"bridge 10 usdc to base sepolia"_`;
       const state = circleWallet.getState();
 
       if (!state.isConnected || !state.address) {
-        return {
-          message: this.t(
-            'Cüzdan bağlı değil. Lütfen önce cüzdanınızı bağlayın.',
-            'Wallet not connected. Please connect your wallet first.'
-          ),
-        };
+        return { message: 'Wallet not connected. Please connect your wallet first.' };
       }
 
-      // Create scheduled transaction using the service
       const scheduledTx = scheduledTransactionService.create({
         type: 'SEND',
-        params: {
-          token: token.toUpperCase(),
-          amount,
-          recipient,
-        },
+        params: { token: token.toUpperCase(), amount, recipient },
         delayMinutes: delay,
         walletAddress: state.address,
       });
 
       const executeTime = new Date(scheduledTx.executeAt).toLocaleTimeString();
       const shortRecipient = `${recipient.slice(0, 6)}...${recipient.slice(-4)}`;
-
-      // Get pending count for user info
       const pendingCount = scheduledTransactionService.getPendingTransactions(state.address).length;
 
       return {
-        message: this.t(
-          `**İşlem Zamanlandı**\n\n` +
-          `${amount} ${token.toUpperCase()} ${shortRecipient} adresine ` +
-          `${delay} dakika sonra (${executeTime}) gönderilecek.\n\n` +
-          `ID: \`${scheduledTx.id.slice(0, 16)}\`\n` +
-          `Bekleyen işlemler: ${pendingCount}\n\n` +
-          `_İptal etmek için: "işlemi iptal et ${scheduledTx.id.slice(0, 8)}"_`,
-
-          `**Transaction Scheduled**\n\n` +
-          `${amount} ${token.toUpperCase()} will be sent to ${shortRecipient} ` +
-          `in ${delay} minutes (at ${executeTime}).\n\n` +
-          `ID: \`${scheduledTx.id.slice(0, 16)}\`\n` +
-          `Pending transactions: ${pendingCount}\n\n` +
-          `_To cancel: "cancel transaction ${scheduledTx.id.slice(0, 8)}"_`
-        ),
+        message: `**Transaction Scheduled**\n\n${amount} ${token.toUpperCase()} will be sent to ${shortRecipient} in ${delay} minutes (at ${executeTime}).\n\nID: \`${scheduledTx.id.slice(0, 16)}\`\nPending transactions: ${pendingCount}\n\n_To cancel: "cancel transaction ${scheduledTx.id.slice(0, 8)}"_`,
       };
     } catch (error: any) {
-      logger.error('Schedule transaction failed', {
-        component: 'AgentService',
-        error: error.message,
-      });
-
-      return {
-        message: this.t(
-          `İşlem zamanlanamadı: ${error.message}`,
-          `Failed to schedule transaction: ${error.message}`
-        ),
-      };
+      return { message: `Failed to schedule transaction: ${error.message}` };
     }
   }
 
-  /**
-   * Cancel a scheduled transaction
-   */
   cancelScheduledTransaction(txIdPrefix: string): { success: boolean; message: string } {
-    // Find transaction by ID prefix
     const allTx = scheduledTransactionService.getTransactions();
     const tx = allTx.find(t => t.id.startsWith(txIdPrefix) || t.id.includes(txIdPrefix));
 
     if (!tx) {
-      return {
-        success: false,
-        message: this.t(
-          `İşlem bulunamadı: ${txIdPrefix}`,
-          `Transaction not found: ${txIdPrefix}`
-        ),
-      };
+      return { success: false, message: `Transaction not found: ${txIdPrefix}` };
     }
 
     try {
       scheduledTransactionService.cancel(tx.id);
-      return {
-        success: true,
-        message: this.t(
-          `**İşlem İptal Edildi**\n\n${tx.params.amount} ${tx.params.token} transferi iptal edildi.`,
-          `**Transaction Cancelled**\n\n${tx.params.amount} ${tx.params.token} transfer has been cancelled.`
-        ),
-      };
+      return { success: true, message: `**Transaction Cancelled**\n\n${tx.params.amount} ${tx.params.token} transfer has been cancelled.` };
     } catch (error: any) {
-      return {
-        success: false,
-        message: this.t(
-          `İptal edilemedi: ${error.message}`,
-          `Cannot cancel: ${error.message}`
-        ),
-      };
+      return { success: false, message: `Cannot cancel: ${error.message}` };
     }
   }
 
-  /**
-   * Get pending scheduled transactions for display
-   */
   getPendingScheduledTransactions(walletAddress: string): ScheduledTransaction[] {
     return scheduledTransactionService.getPendingTransactions(walletAddress);
   }
 
-  /**
-   * Handle SWAP intent - Execute swap directly via Curve
-   */
-  private async handleSwapIntent(
-    intent: AgentIntent,
-    _callbacks: { onNavigate?: (page: string, data?: any) => void }
-  ): Promise<{ message: string }> {
+  private async handleSwapIntent(intent: AgentIntent): Promise<{ message: string }> {
     const { fromToken = 'USDC', toToken = 'EURC', amount } = intent.params;
 
-    // Validate amount
     if (!amount || parseFloat(amount) <= 0) {
-      return {
-        message: this.t(
-          'Lütfen swap miktarını belirtin. Örnek: "50 USDC\'yi EURC\'ye çevir"',
-          'Please specify the swap amount. Example: "swap 50 USDC to EURC"'
-        ),
-      };
+      return { message: 'Please specify the swap amount. Example: "swap 50 USDC to EURC"' };
     }
 
-    // Normalize token names
     const fromTokenUpper = fromToken.toUpperCase();
     const toTokenUpper = toToken.toUpperCase();
 
-    // Validate supported pairs (only USDC ↔ EURC on Curve)
-    const validPairs = [
-      ['USDC', 'EURC'],
-      ['EURC', 'USDC'],
-    ];
-    const isValidPair = validPairs.some(
-      ([from, to]) => from === fromTokenUpper && to === toTokenUpper
-    );
+    const validPairs = [['USDC', 'EURC'], ['EURC', 'USDC']];
+    const isValidPair = validPairs.some(([from, to]) => from === fromTokenUpper && to === toTokenUpper);
 
     if (!isValidPair) {
-      return {
-        message: this.t(
-          'Şu an sadece USDC ↔ EURC swap destekleniyor. Örnek: "50 USDC\'yi EURC\'ye çevir"',
-          'Only USDC ↔ EURC swap is supported. Example: "swap 50 USDC to EURC"'
-        ),
-      };
+      return { message: 'Only USDC ↔ EURC swap is supported. Example: "swap 50 USDC to EURC"' };
     }
 
     try {
@@ -1252,68 +829,24 @@ _"bridge 10 usdc to base sepolia"_`;
       const swap = await getSwapService();
       const tokenConfig = await getTokenConfig();
 
-      // Check wallet connection
       const state = circleWallet.getState();
       if (!state.isConnected || !state.address) {
-        return {
-          message: this.t(
-            'Cüzdan bağlı değil. Lütfen önce cüzdanınızı bağlayın.',
-            'Wallet not connected. Please connect your wallet first.'
-          ),
-        };
+        return { message: 'Wallet not connected. Please connect your wallet first.' };
       }
 
-      // Check if swap service is available
       if (!swap.isAvailable()) {
-        return {
-          message: this.t(
-            'Swap servisi şu an kullanılamıyor. Lütfen daha sonra tekrar deneyin.',
-            'Swap service is currently unavailable. Please try again later.'
-          ),
-        };
+        return { message: 'Swap service is currently unavailable. Please try again later.' };
       }
 
-      // Get token info
-      const fromTokenInfo = tokenConfig.SUPPORTED_TOKENS.find(
-        (t: any) => t.symbol === fromTokenUpper
-      );
-      const toTokenInfo = tokenConfig.SUPPORTED_TOKENS.find(
-        (t: any) => t.symbol === toTokenUpper
-      );
+      const fromTokenInfo = tokenConfig.SUPPORTED_TOKENS.find((t: any) => t.symbol === fromTokenUpper);
+      const toTokenInfo = tokenConfig.SUPPORTED_TOKENS.find((t: any) => t.symbol === toTokenUpper);
 
       if (!fromTokenInfo || !toTokenInfo) {
-        return {
-          message: this.t(
-            'Token bulunamadı. Desteklenen tokenlar: USDC, EURC',
-            'Token not found. Supported tokens: USDC, EURC'
-          ),
-        };
+        return { message: 'Token not found. Supported tokens: USDC, EURC' };
       }
 
-      logger.info('Getting swap quote', {
-        component: 'AgentService',
-        from: fromTokenUpper,
-        to: toTokenUpper,
-        amount,
-      });
+      const quote = await withTimeout(swap.getQuote(fromTokenInfo, toTokenInfo, amount), CONFIG.API_TIMEOUT, 'Swap quote');
 
-      // Get quote first with timeout
-      const quote = await withTimeout(
-        swap.getQuote(fromTokenInfo, toTokenInfo, amount),
-        CONFIG.API_TIMEOUT,
-        'Swap quote'
-      );
-
-      logger.info('Executing swap', {
-        component: 'AgentService',
-        quote: {
-          fromAmount: quote.fromAmount,
-          toAmount: quote.toAmount,
-          rate: quote.rate,
-        },
-      });
-
-      // Execute swap with timeout
       const txHash = await withTimeout(
         swap.executeSwap(
           quote,
@@ -1326,141 +859,58 @@ _"bridge 10 usdc to base sepolia"_`;
         'Swap execution'
       );
 
-      logger.info('Swap successful', {
-        component: 'AgentService',
-        txHash,
-      });
-
       const explorerUrl = `https://testnet.arcscan.app/tx/${txHash}`;
 
       return {
-        message: this.t(
-          `**Swap Tamamlandı!**\n\n` +
-            `${quote.fromAmount} ${fromTokenUpper} → ${quote.toAmount} ${toTokenUpper}\n\n` +
-            `Oran: 1 ${fromTokenUpper} = ${quote.rate} ${toTokenUpper}\n` +
-            `Tx: ${txHash.slice(0, 10)}...${txHash.slice(-8)}\n\n` +
-            `[Explorer'da Görüntüle](${explorerUrl})`,
-          `**Swap Complete!**\n\n` +
-            `${quote.fromAmount} ${fromTokenUpper} → ${quote.toAmount} ${toTokenUpper}\n\n` +
-            `Rate: 1 ${fromTokenUpper} = ${quote.rate} ${toTokenUpper}\n` +
-            `Tx: ${txHash.slice(0, 10)}...${txHash.slice(-8)}\n\n` +
-            `[View on Explorer](${explorerUrl})`
-        ),
+        message: `**Swap Complete!**\n\n${quote.fromAmount} ${fromTokenUpper} → ${quote.toAmount} ${toTokenUpper}\n\nRate: 1 ${fromTokenUpper} = ${quote.rate} ${toTokenUpper}\nTx: ${txHash.slice(0, 10)}...${txHash.slice(-8)}\n\n[View on Explorer](${explorerUrl})`,
       };
     } catch (error: any) {
-      logger.error('Swap failed', {
-        component: 'AgentService',
-        errorMsg: error.message,
-      });
-
-      // User-friendly error messages
       if (error.message?.includes('rejected') || error.message?.includes('cancelled')) {
-        return {
-          message: this.t(
-            'Swap iptal edildi. Hazır olduğunuzda tekrar deneyebilirsiniz.',
-            'Swap cancelled. You can try again when ready.'
-          ),
-        };
+        return { message: 'Swap cancelled. You can try again when ready.' };
       }
       if (error.message?.includes('insufficient') || error.message?.includes('balance')) {
-        return {
-          message: this.t(
-            `Yetersiz ${fromTokenUpper} bakiyesi. Lütfen bakiyenizi kontrol edin.`,
-            `Insufficient ${fromTokenUpper} balance. Please check your balance.`
-          ),
-        };
+        return { message: `Insufficient ${fromTokenUpper} balance. Please check your balance.` };
       }
       if (error.message?.includes('expired')) {
-        return {
-          message: this.t(
-            'Fiyat teklifi süresi doldu. Lütfen tekrar deneyin.',
-            'Quote expired. Please try again.'
-          ),
-        };
+        return { message: 'Quote expired. Please try again.' };
       }
-
-      return {
-        message: this.t(
-          `Swap başarısız: ${error.message}`,
-          `Swap failed: ${error.message}`
-        ),
-      };
+      return { message: `Swap failed: ${error.message}` };
     }
   }
 
-  /**
-   * Handle BRIDGE intent - Execute bridge directly
-   */
-  private async handleBridgeIntent(
-    intent: AgentIntent,
-    _callbacks: { onNavigate?: (page: string, data?: any) => void }
-  ): Promise<{ message: string }> {
+  private async handleBridgeIntent(intent: AgentIntent): Promise<{ message: string }> {
     const { amount, toChain, fromChain } = intent.params;
 
-    // Validate amount
     if (!amount || parseFloat(amount) <= 0) {
-      return {
-        message: `Please specify the amount to bridge. Example: "Bridge 10 USDC to Base Sepolia"`,
-      };
+      return { message: 'Please specify the amount to bridge. Example: "Bridge 10 USDC to Base Sepolia"' };
     }
 
-    // Determine destination chain
     const toChainLower = (toChain || 'base sepolia').toLowerCase();
     const destinationChainId = CHAIN_IDS[toChainLower];
 
     if (!destinationChainId) {
-      return {
-        message: `Chain "${toChain}" is not supported. Supported chains: Base Sepolia`,
-      };
+      return { message: `Chain "${toChain}" is not supported. Supported chains: Base Sepolia` };
     }
 
-    // Determine source chain
     const fromChainLower = (fromChain || 'arc').toLowerCase();
     const sourceChainId = CHAIN_IDS[fromChainLower] || 5042002;
 
     try {
       const circleWallet = await getCircleWalletService();
-
-      // Check if wallet is connected
       const state = circleWallet.getState();
+
       if (!state.isConnected || !state.address) {
-        return {
-          message: `Wallet not connected. Please connect your wallet first.`,
-        };
+        return { message: 'Wallet not connected. Please connect your wallet first.' };
       }
 
       const bridge = await getBridgeService();
 
-      logger.info('Executing bridge transaction', {
-        component: 'AgentService',
-        amount,
-        from: sourceChainId,
-        to: destinationChainId,
-      });
-
       let bridgeTx;
-
       if (sourceChainId === 5042002) {
-        // Arc to Base Sepolia (outbound) with timeout
-        bridgeTx = await withTimeout(
-          bridge.bridge(amount, destinationChainId),
-          CONFIG.BRIDGE_TIMEOUT,
-          'Bridge transaction'
-        );
+        bridgeTx = await withTimeout(bridge.bridge(amount, destinationChainId), CONFIG.BRIDGE_TIMEOUT, 'Bridge transaction');
       } else {
-        // Base Sepolia to Arc (inbound) with timeout
-        bridgeTx = await withTimeout(
-          bridge.bridgeInbound(amount, sourceChainId),
-          CONFIG.BRIDGE_TIMEOUT,
-          'Bridge inbound transaction'
-        );
+        bridgeTx = await withTimeout(bridge.bridgeInbound(amount, sourceChainId), CONFIG.BRIDGE_TIMEOUT, 'Bridge inbound transaction');
       }
-
-      logger.info('Bridge transaction initiated', {
-        component: 'AgentService',
-        txId: bridgeTx.id,
-        burnTxHash: bridgeTx.burnTxHash,
-      });
 
       const sourceChainName = sourceChainId === 5042002 ? 'Arc' : 'Base Sepolia';
       const destChainName = destinationChainId === 5042002 ? 'Arc' : 'Base Sepolia';
@@ -1472,67 +922,35 @@ _"bridge 10 usdc to base sepolia"_`;
         message: `**Bridge Started**\n\nBridging ${amount} USDC from ${sourceChainName} to ${destChainName}\n\nBurn Tx: ${bridgeTx.burnTxHash?.slice(0, 10)}...${bridgeTx.burnTxHash?.slice(-8)}\n\n[View on Explorer](${explorerUrl})\n\n_Waiting for attestation (~15-20 min). Funds will auto-complete on destination._`,
       };
     } catch (error: any) {
-      logger.error('Bridge transaction failed', {
-        component: 'AgentService',
-        errorMsg: error.message,
-      });
-
-      // User-friendly error messages
       if (error.message?.includes('rejected') || error.message?.includes('denied')) {
-        return {
-          message: `Bridge cancelled. You can try again when ready.`,
-        };
+        return { message: 'Bridge cancelled. You can try again when ready.' };
       }
       if (error.message?.includes('insufficient') || error.message?.includes('balance')) {
-        return {
-          message: `Insufficient USDC balance. Please check your wallet balance.`,
-        };
+        return { message: 'Insufficient USDC balance. Please check your wallet balance.' };
       }
-
-      return {
-        message: `Bridge failed: ${error.message}`,
-      };
+      return { message: `Bridge failed: ${error.message}` };
     }
   }
 
-  /**
-   * Handle CHECK_BALANCE intent - Fetch and display real balances
-   */
-  private async handleBalanceIntent(
-    intent: AgentIntent
-  ): Promise<{ message: string }> {
+  private async handleBalanceIntent(intent: AgentIntent): Promise<{ message: string }> {
     const { token } = intent.params;
 
     try {
       const circleWallet = await getCircleWalletService();
-
-      // Check wallet connection
       const state = circleWallet.getState();
+
       if (!state.isConnected || !state.address) {
-        return {
-          message: this.t(
-            'Cüzdan bağlı değil. Lütfen önce cüzdanınızı bağlayın.',
-            'Wallet not connected. Please connect your wallet first.'
-          ),
-        };
+        return { message: 'Wallet not connected. Please connect your wallet first.' };
       }
 
-      // Get balances from wallet state
       const balances = state.balances || {};
 
-      // If specific token requested
       if (token) {
         const tokenUpper = token.toUpperCase();
         const balance = balances[tokenUpper] || '0';
-        return {
-          message: this.t(
-            `**${tokenUpper} Bakiyeniz:** ${balance} ${tokenUpper}`,
-            `**Your ${tokenUpper} Balance:** ${balance} ${tokenUpper}`
-          ),
-        };
+        return { message: `**Your ${tokenUpper} Balance:** ${balance} ${tokenUpper}` };
       }
 
-      // Show all balances
       const balanceLines: string[] = [];
       const tokenOrder = ['USDC', 'EURC', 'ARC', 'ETH'];
 
@@ -1545,7 +963,6 @@ _"bridge 10 usdc to base sepolia"_`;
         }
       }
 
-      // Add any other tokens not in the standard order
       for (const [t, bal] of Object.entries(balances)) {
         if (!tokenOrder.includes(t) && parseFloat(bal as string) > 0) {
           balanceLines.push(`• **${t}:** ${parseFloat(bal as string).toFixed(4)}`);
@@ -1555,61 +972,31 @@ _"bridge 10 usdc to base sepolia"_`;
       const shortAddress = `${state.address.slice(0, 6)}...${state.address.slice(-4)}`;
 
       if (balanceLines.length === 0) {
-        return {
-          message: this.t(
-            `**Cüzdan Bakiyesi**\n\nHenüz token bulunmuyor.\n\nAdres: ${shortAddress}`,
-            `**Wallet Balance**\n\nNo tokens found yet.\n\nAddress: ${shortAddress}`
-          ),
-        };
+        return { message: `**Wallet Balance**\n\nNo tokens found yet.\n\nAddress: ${shortAddress}` };
       }
 
-      return {
-        message: this.t(
-          `**Cüzdan Bakiyesi**\n\n${balanceLines.join('\n')}\n\nAdres: ${shortAddress}`,
-          `**Wallet Balance**\n\n${balanceLines.join('\n')}\n\nAddress: ${shortAddress}`
-        ),
-      };
+      return { message: `**Wallet Balance**\n\n${balanceLines.join('\n')}\n\nAddress: ${shortAddress}` };
     } catch (error: any) {
-      logger.error('Balance check failed', {
-        component: 'AgentService',
-        errorMsg: error.message,
-      });
-
-      return {
-        message: this.t(
-          `Bakiye kontrolü başarısız: ${error.message}`,
-          `Balance check failed: ${error.message}`
-        ),
-      };
+      return { message: `Balance check failed: ${error.message}` };
     }
   }
 
-  /**
-   * Handle ANALYZE_WALLET intent (x402 protected)
-   */
   private async handleAnalyzeWalletIntent(
     intent: AgentIntent,
     callbacks: {
-      onPaymentRequired?: (
-        requirements: X402PaymentRequirements
-      ) => Promise<boolean>;
+      onPaymentRequired?: (requirements: X402PaymentRequirements) => Promise<boolean>;
       onPaymentSent?: (result: X402PaymentResult) => void;
     }
   ): Promise<{ message: string; paymentInfo?: X402PaymentResult }> {
     const { address } = intent.params;
 
     if (!address || !address.match(/^0x[a-fA-F0-9]{40}$/)) {
-      return {
-        message: "Please provide a valid wallet address to analyze (e.g., 'Analyze 0x742d35Cc6634C0532925a3b844Bc9e7595f3a5').",
-      };
+      return { message: "Please provide a valid wallet address to analyze (e.g., 'Analyze 0x742d35Cc...')." };
     }
 
-    // Check spending limit
     const cost = SERVICE_COSTS.ANALYZE_WALLET;
     if (this.spending.today + cost > this.policy.dailyBudget) {
-      return {
-        message: `Daily spending limit reached ($${this.spending.today.toFixed(2)}/$${this.policy.dailyBudget.toFixed(2)}). Try again tomorrow or increase your limit in settings.`,
-      };
+      return { message: `Daily spending limit reached ($${this.spending.today.toFixed(2)}/$${this.policy.dailyBudget.toFixed(2)}). Try again tomorrow or increase your limit in settings.` };
     }
 
     let paymentInfo: X402PaymentResult | undefined;
@@ -1620,62 +1007,39 @@ _"bridge 10 usdc to base sepolia"_`;
         onPaymentSent: (payment) => {
           paymentInfo = payment;
           this.recordSpending(parseFloat(payment.amount));
-          if (callbacks.onPaymentSent) {
-            callbacks.onPaymentSent(payment);
-          }
+          if (callbacks.onPaymentSent) callbacks.onPaymentSent(payment);
         },
       });
 
-      // Format risk analysis response
-      const riskIndicator = {
-        LOW: '[LOW]',
-        MEDIUM: '[MEDIUM]',
-        HIGH: '[HIGH]',
-        CRITICAL: '[CRITICAL]',
-      }[result.riskLevel];
-
+      const riskIndicator = { LOW: '[LOW]', MEDIUM: '[MEDIUM]', HIGH: '[HIGH]', CRITICAL: '[CRITICAL]' }[result.riskLevel];
       const flagsList = result.flags.length > 0
         ? `\n\nFlags detected:\n${result.flags.map(f => `• ${f.replace(/_/g, ' ')}`).join('\n')}`
         : '';
 
       return {
-        message: `${riskIndicator} **Risk Analysis for ${address.slice(0, 6)}...${address.slice(-4)}**\n\n` +
-          `**Risk Level:** ${result.riskLevel}\n` +
-          `**Risk Score:** ${result.riskScore}/100\n` +
-          `${flagsList}\n\n` +
-          `**Recommendation:** ${result.recommendation}`,
+        message: `${riskIndicator} **Risk Analysis for ${address.slice(0, 6)}...${address.slice(-4)}**\n\n**Risk Level:** ${result.riskLevel}\n**Risk Score:** ${result.riskScore}/100\n${flagsList}\n\n**Recommendation:** ${result.recommendation}`,
         paymentInfo,
       };
     } catch (error: any) {
       if (error.message === 'Payment rejected by user') {
-        return {
-          message: 'Risk analysis cancelled. No payment was made.',
-        };
+        return { message: 'Risk analysis cancelled. No payment was made.' };
       }
       throw error;
     }
   }
 
-  /**
-   * Handle GET_PRICE intent (x402 protected)
-   */
   private async handlePriceIntent(
     intent: AgentIntent,
     callbacks: {
-      onPaymentRequired?: (
-        requirements: X402PaymentRequirements
-      ) => Promise<boolean>;
+      onPaymentRequired?: (requirements: X402PaymentRequirements) => Promise<boolean>;
       onPaymentSent?: (result: X402PaymentResult) => void;
     }
   ): Promise<{ message: string; paymentInfo?: X402PaymentResult }> {
     const token = intent.params.token || 'USDC';
 
-    // Check spending limit
     const cost = SERVICE_COSTS.GET_PRICE;
     if (this.spending.today + cost > this.policy.dailyBudget) {
-      return {
-        message: `Daily spending limit reached. Try again tomorrow.`,
-      };
+      return { message: 'Daily spending limit reached. Try again tomorrow.' };
     }
 
     let paymentInfo: X402PaymentResult | undefined;
@@ -1686,50 +1050,33 @@ _"bridge 10 usdc to base sepolia"_`;
         onPaymentSent: (payment) => {
           paymentInfo = payment;
           this.recordSpending(parseFloat(payment.amount));
-          if (callbacks.onPaymentSent) {
-            callbacks.onPaymentSent(payment);
-          }
+          if (callbacks.onPaymentSent) callbacks.onPaymentSent(payment);
         },
       });
 
       const changeSign = result.change24h >= 0 ? '+' : '';
 
       return {
-        message: `**${token} Price Data**\n\n` +
-          `**Price:** $${result.price.toLocaleString()}\n` +
-          `**24h Change:** ${changeSign}${result.change24h.toFixed(2)}%\n` +
-          `**24h Volume:** $${result.volume24h.toLocaleString()}\n` +
-          `**Market Cap:** $${result.marketCap.toLocaleString()}\n\n` +
-          `_Last updated: ${new Date(result.lastUpdated).toLocaleTimeString()}_`,
+        message: `**${token} Price Data**\n\n**Price:** $${result.price.toLocaleString()}\n**24h Change:** ${changeSign}${result.change24h.toFixed(2)}%\n**24h Volume:** $${result.volume24h.toLocaleString()}\n**Market Cap:** $${result.marketCap.toLocaleString()}\n\n_Last updated: ${new Date(result.lastUpdated).toLocaleTimeString()}_`,
         paymentInfo,
       };
     } catch (error: any) {
       if (error.message === 'Payment rejected by user') {
-        return {
-          message: 'Price lookup cancelled.',
-        };
+        return { message: 'Price lookup cancelled.' };
       }
       throw error;
     }
   }
 
-  /**
-   * Handle GET_NEWS intent (x402 protected)
-   */
   private async handleNewsIntent(
     callbacks: {
-      onPaymentRequired?: (
-        requirements: X402PaymentRequirements
-      ) => Promise<boolean>;
+      onPaymentRequired?: (requirements: X402PaymentRequirements) => Promise<boolean>;
       onPaymentSent?: (result: X402PaymentResult) => void;
     }
   ): Promise<{ message: string; paymentInfo?: X402PaymentResult }> {
-    // Check spending limit
     const cost = SERVICE_COSTS.GET_NEWS;
     if (this.spending.today + cost > this.policy.dailyBudget) {
-      return {
-        message: `Daily spending limit reached. Try again tomorrow.`,
-      };
+      return { message: 'Daily spending limit reached. Try again tomorrow.' };
     }
 
     let paymentInfo: X402PaymentResult | undefined;
@@ -1740,57 +1087,52 @@ _"bridge 10 usdc to base sepolia"_`;
         onPaymentSent: (payment) => {
           paymentInfo = payment;
           this.recordSpending(parseFloat(payment.amount));
-          if (callbacks.onPaymentSent) {
-            callbacks.onPaymentSent(payment);
-          }
+          if (callbacks.onPaymentSent) callbacks.onPaymentSent(payment);
         },
       });
 
-      const headlines = result.headlines
-        .map(h => `• ${h.title} _(${h.source})_`)
-        .join('\n');
+      const headlines = result.headlines.map(h => `• ${h.title} _(${h.source})_`).join('\n');
 
       return {
-        message: `**Market News Summary**\n\n` +
-          `${result.summary}\n\n` +
-          `**Headlines:**\n${headlines}\n\n` +
-          `**Market Sentiment:** ${result.marketSentiment.toUpperCase()}`,
+        message: `**Market News Summary**\n\n${result.summary}\n\n**Headlines:**\n${headlines}\n\n**Market Sentiment:** ${result.marketSentiment.toUpperCase()}`,
         paymentInfo,
       };
     } catch (error: any) {
       if (error.message === 'Payment rejected by user') {
-        return {
-          message: 'News summary cancelled.',
-        };
+        return { message: 'News summary cancelled.' };
       }
       throw error;
     }
   }
 
-  private async handleTransactionsIntent(
-    intent: AgentIntent
-  ): Promise<{ message: string }> {
-    const { address } = intent.params;
+  private async handleTransactionsIntent(intent: AgentIntent): Promise<{ message: string }> {
+    let { address } = intent.params;
 
-    if (!address || !address.match(/^0x[a-fA-F0-9]{40}$/)) {
-      return {
-        message: this.t(
-          'Geçersiz adres formatı. Lütfen geçerli bir Ethereum adresi girin.',
-          'Invalid address format. Please provide a valid Ethereum address.'
-        ),
-      };
+    if (!address) {
+      try {
+        const circleWallet = await getCircleWalletService();
+        const state = circleWallet.getState();
+        if (state.isConnected && state.address) {
+          address = state.address;
+        } else {
+          return { message: 'Wallet not connected. Please connect your wallet first or provide an address.' };
+        }
+      } catch (error) {
+        return { message: 'Could not get wallet state. Please provide an address.' };
+      }
+    }
+
+    if (!address.match(/^0x[a-fA-F0-9]{40}$/)) {
+      return { message: 'Invalid address format. Please provide a valid Ethereum address.' };
     }
 
     const shortAddr = `${address.slice(0, 6)}...${address.slice(-4)}`;
 
     try {
-      // Use Blockscout API for Arc testnet
       const explorerUrl = 'https://explorer.arc.circle.com/api/v2';
       const response = await fetch(
         `${explorerUrl}/addresses/${address}/transactions?filter=to%20%7C%20from`,
-        {
-          headers: { 'Accept': 'application/json' },
-        }
+        { headers: { 'Accept': 'application/json' } }
       );
 
       if (!response.ok) {
@@ -1801,21 +1143,13 @@ _"bridge 10 usdc to base sepolia"_`;
       const transactions = data.items || [];
 
       if (transactions.length === 0) {
-        return {
-          message: this.t(
-            `**${shortAddr} İşlem Geçmişi**\n\nBu adreste henüz işlem bulunmuyor.`,
-            `**${shortAddr} Transaction History**\n\nNo transactions found for this address.`
-          ),
-        };
+        return { message: `**${shortAddr} Transaction History**\n\nNo transactions found for this address.` };
       }
 
-      // Format last 10 transactions
       const txList = transactions.slice(0, 10).map((tx: any) => {
         const isIncoming = tx.to?.hash?.toLowerCase() === address.toLowerCase();
         const direction = isIncoming ? '📥' : '📤';
-        const otherAddr = isIncoming
-          ? tx.from?.hash?.slice(0, 8) + '...'
-          : tx.to?.hash?.slice(0, 8) + '...';
+        const otherAddr = isIncoming ? tx.from?.hash?.slice(0, 8) + '...' : tx.to?.hash?.slice(0, 8) + '...';
         const value = tx.value ? (parseInt(tx.value) / 1e18).toFixed(4) : '0';
         const time = new Date(tx.timestamp).toLocaleDateString();
         const status = tx.status === 'ok' ? '✓' : '✗';
@@ -1826,30 +1160,10 @@ _"bridge 10 usdc to base sepolia"_`;
       const totalTx = data.next_page_params ? '10+' : transactions.length;
 
       return {
-        message: this.t(
-          `**${shortAddr} İşlem Geçmişi**\n\n` +
-          `Toplam: ${totalTx} işlem\n\n` +
-          `**Son İşlemler:**\n${txList}\n\n` +
-          `_📥 Gelen | 📤 Giden_`,
-          `**${shortAddr} Transaction History**\n\n` +
-          `Total: ${totalTx} transactions\n\n` +
-          `**Recent Transactions:**\n${txList}\n\n` +
-          `_📥 Incoming | 📤 Outgoing_`
-        ),
+        message: `**${shortAddr} Transaction History**\n\nTotal: ${totalTx} transactions\n\n**Recent Transactions:**\n${txList}\n\n_📥 Incoming | 📤 Outgoing_`,
       };
     } catch (error: any) {
-      logger.error('Transaction fetch failed', {
-        component: 'AgentService',
-        address,
-        error: error.message,
-      });
-
-      return {
-        message: this.t(
-          `İşlem geçmişi alınamadı. Explorer: https://explorer.arc.circle.com/address/${address}`,
-          `Could not fetch transaction history. Explorer: https://explorer.arc.circle.com/address/${address}`
-        ),
-      };
+      return { message: `Could not fetch transaction history. Explorer: https://explorer.arc.circle.com/address/${address}` };
     }
   }
 
@@ -1858,32 +1172,17 @@ _"bridge 10 usdc to base sepolia"_`;
     this.spending.thisWeek += amount;
     this.spending.thisMonth += amount;
     this.saveSpendingToStorage();
-
-    logger.info('Spending recorded', {
-      component: 'AgentService',
-      amount,
-      todayTotal: this.spending.today,
-    });
   }
 
-  /**
-   * Reset daily spending (call at midnight)
-   */
   resetDailySpending(): void {
     this.spending.today = 0;
     this.saveSpendingToStorage();
   }
 
-  // Storage helpers
   private saveSpendingToStorage(): void {
     try {
-      localStorage.setItem('arc_agent_spending', JSON.stringify({
-        ...this.spending,
-        lastReset: Date.now(),
-      }));
-    } catch (e) {
-      // Ignore storage errors
-    }
+      localStorage.setItem('arc_agent_spending', JSON.stringify({ ...this.spending, lastReset: Date.now() }));
+    } catch (e) {}
   }
 
   private loadSpendingFromStorage(): void {
@@ -1891,7 +1190,6 @@ _"bridge 10 usdc to base sepolia"_`;
       const stored = localStorage.getItem('arc_agent_spending');
       if (stored) {
         const data = JSON.parse(stored);
-        // Check if day has changed
         const lastReset = data.lastReset || 0;
         const daysSinceReset = (Date.now() - lastReset) / (24 * 60 * 60 * 1000);
 
@@ -1904,17 +1202,13 @@ _"bridge 10 usdc to base sepolia"_`;
         this.spending.thisWeek = data.thisWeek || 0;
         this.spending.thisMonth = data.thisMonth || 0;
       }
-    } catch (e) {
-      // Ignore storage errors
-    }
+    } catch (e) {}
   }
 
   private savePolicyToStorage(): void {
     try {
       localStorage.setItem('arc_agent_policy', JSON.stringify(this.policy));
-    } catch (e) {
-      // Ignore storage errors
-    }
+    } catch (e) {}
   }
 
   private loadPolicyFromStorage(): void {
@@ -1923,12 +1217,9 @@ _"bridge 10 usdc to base sepolia"_`;
       if (stored) {
         this.policy = { ...DEFAULT_POLICY, ...JSON.parse(stored) };
       }
-    } catch (e) {
-      // Ignore storage errors
-    }
+    } catch (e) {}
   }
 }
 
-// Singleton instance
 export const agentService = new AgentService();
 export default agentService;
