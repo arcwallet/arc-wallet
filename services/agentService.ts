@@ -1129,9 +1129,10 @@ _"bridge 10 usdc to base sepolia"_`;
     const shortAddr = `${address.slice(0, 6)}...${address.slice(-4)}`;
 
     try {
-      const explorerUrl = 'https://explorer.arc.circle.com/api/v2';
+      // Use testnet.arcscan.app API for Arc Testnet transactions
+      const explorerUrl = 'https://testnet.arcscan.app/api/v2';
       const response = await fetch(
-        `${explorerUrl}/addresses/${address}/transactions?filter=to%20%7C%20from`,
+        `${explorerUrl}/addresses/${address}/transactions`,
         { headers: { 'Accept': 'application/json' } }
       );
 
@@ -1163,7 +1164,7 @@ _"bridge 10 usdc to base sepolia"_`;
         message: `**${shortAddr} Transaction History**\n\nTotal: ${totalTx} transactions\n\n**Recent Transactions:**\n${txList}\n\n_📥 Incoming | 📤 Outgoing_`,
       };
     } catch (error: any) {
-      return { message: `Could not fetch transaction history. Explorer: https://explorer.arc.circle.com/address/${address}` };
+      return { message: `Could not fetch transaction history. Explorer: https://testnet.arcscan.app/address/${address}` };
     }
   }
 
